@@ -303,6 +303,16 @@ Flags:
 | `-llm-base-url` | no | OpenAI-compatible base URL; overrides `ARIADNE_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`). |
 | `-version` | no | Print the ariadne version and exit. |
 
+### Latest full test run with the LLM source
+
+[docs/llm-test-report.md](docs/llm-test-report.md) records one complete run: all unit
+tests, one live LLM call, and full analyses of **spring-petclinic 2.4.5** and **WebGoat
+8.2.2**, each once without and once with `-llm` (model `z-ai/glm-5.3`, ~$0.24 in total).
+It includes the before/after status counts, how the LLM answered by evidence type (fix
+diff vs. advisory text only), and links to the full reports
+([petclinic](docs/llm-run/petclinic.md), [WebGoat](docs/llm-run/webgoat.md)) and their
+`results.json` files.
+
 ### Using the LLM source
 
 The API key is read **only** from the environment (never a flag, so it
