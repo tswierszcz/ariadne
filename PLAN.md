@@ -450,6 +450,49 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
 **Done when:** unit tests on a hand-built fixture graph cover path reconstruction, the depth
 cap, and the `REACHABLE` vs `FRAMEWORK` split.
 
+**Status: done, except `--max-dep-depth`/node cap (deferred — see below).** Implemented as a
+single multi-source BFS pair (not per-CVE: both passes run once in `reach.New`, independent of
+how many CVEs `Analyze` is then asked about):
+- Pass 1 (REACHABLE): BFS from every app method, treating every framework-package node as a
+  dead end — visited (so a direct one-hop app→framework call still counts, which is exactly
+  the plan's "entry call lands directly in the vulnerable package" exception) but never
+  expanded past. Pass 2 (FRAMEWORK): the same roots, no restriction at all. A CVE's matched
+  methods found in pass 1 → `REACHABLE`; found only in pass 2 → `FRAMEWORK`; not found in
+  either (but vulnmap has methods for it) → `NOT_REACHABLE`; no vulnmap entry at all →
+  `UNKNOWN`.
+- Inherited-method matching implemented and verified by hand against `javap`: a call through
+  a subclass that does not override the vulnerable method keeps the subclass as the
+  bytecode's `Methodref` owner (confirmed, not assumed), so `matchVulnerableMethod` also
+  checks every non-overriding transitive subtype of the vulnerable class.
+- A minimal, non-profile `FrameworkMatcher` (`"group:artifact"` glob patterns) stands in for
+  the full `framework_packages.yaml`-driven profile system section 4 describes; seeded with
+  exactly that section's initial list. Profile wiring (incl. the conditional
+  jackson-databind/`@RequestBody` rule) is still CLI/Phase 6+ territory.
+- `--max-dep-depth`/a node cap is not implemented; on real petclinic/WebGoat graphs (up to
+  340k nodes, 2.6M edges) both BFS passes together finish in under 100ms, so there's no
+  evidence yet that a cap is needed. Revisit if a larger target app changes that.
+- New `testdata/reachfixture/` (3 separate jars: an app and two dependencies, one tagged as
+  a framework package) built via `scripts/build-reachfixture.sh`, specifically to give each
+  status a real, distinct call-graph shape to test against instead of a status asserted only
+  by construction.
+- Verified end-to-end on both real apps (current `cves.json`/manual-table-only `vulnmap.json`,
+  no diff/LLM sources re-run): analyzing all CVEs takes well under 100ms for either app.
+  - **WebGoat (control case): `CVE-2021-39144` and every other XStream CVE → `REACHABLE`**,
+    with the exact 2-hop path
+    `VulnerableComponentsLesson#completed → XStream#fromXML`. 51 REACHABLE, 32 FRAMEWORK,
+    21 NOT_REACHABLE, 56 UNKNOWN (of 160).
+  - **petclinic: 13 REACHABLE, 18 FRAMEWORK, 25 NOT_REACHABLE, 92 UNKNOWN (of 148)** — "many
+    CVEs, few reachable", exactly as section 2 predicts. `CVE-2022-22965` (Spring4Shell) is
+    correctly found REACHABLE via `PetController`'s data-binding path.
+  - **Observed limitation worth flagging for the profile phase:** several petclinic
+    REACHABLE paths route through deep Spring Beans/SpEL internals (`CachedIntrospectionResults`,
+    `SpelExpression`, ...) because section 4's initial framework list only names
+    `spring-web`/`spring-webmvc`/`spring-boot:*`, not `spring-beans`/`spring-core`/
+    `spring-expression`/`spring-aop`. Those are exactly the plan's own stated defaults, so
+    this isn't a bug — just a sign the seed list may be too narrow once a real profile
+    system assigns it, since some of these paths are arguably framework/reflection-mediated
+    rather than genuine app-code reachability.
+
 ### Phase 6 — CLI + report (`cmd/ariadne`, `internal/report`, ~1 h)
 ```bash
 go build -o bin/ariadne ./cmd/ariadne
