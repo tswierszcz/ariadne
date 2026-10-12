@@ -1,4 +1,6 @@
+
 # ariadne
+<p align="center"><img src="docs/ariadne-icon.png" width="160" alt="Ariadne logo"></p>
 
 CVE reachability analysis for JVM applications. ariadne takes a built Java
 application and its resolved Maven dependencies, builds a static call graph
@@ -378,11 +380,4 @@ report:
   third source (asking an LLM to read an advisory and its diff) from the
   original plan is not implemented.
 
-## Status
 
-Phases 0–6 of the plan in [PLAN.md](PLAN.md) are complete and verified,
-end-to-end, against two real applications: an old (pre-2021)
-`spring-petclinic` build, and `WebGoat` v8.2.2 as a control case (its
-bundled old XStream is confirmed `REACHABLE`). Phase 7 (broader input
-support, a real profile system, Gradle) and Phase 8 (an optional
-exploitability check) are not started.
