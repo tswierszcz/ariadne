@@ -306,13 +306,14 @@ Flags:
 
 ### Latest full test run with the LLM source
 
-[docs/llm-test-report.md](docs/llm-test-report.md) records one complete run: all unit
+[docs/llm-test-report.md](docs/llm-test-report.md) records one complete live run: all unit
 tests, one live LLM call, and full analyses of **spring-petclinic 2.4.5** and **WebGoat
-8.2.2**, each once without and once with `-llm` (model `z-ai/glm-5.3`, ~$0.24 in total).
-It includes the before/after status counts, how the LLM answered by evidence type (fix
-diff vs. advisory text only), and links to the full reports
-([petclinic](docs/llm-run/petclinic.md), [WebGoat](docs/llm-run/webgoat.md)) and their
-`results.json` files.
+8.2.2**, each once without and once with `-llm` (model `z-ai/glm-5.3`, every LLM answer a
+fresh call, ~$0.20 in total), including the `NOT_APPLICABLE` status for WebJar-only CVEs.
+It covers the before/after status counts, how the LLM answered by evidence type (fix diff
+vs. advisory text only), how repeatable the answers were against an earlier run, and links
+to the full reports ([petclinic](docs/llm-run/petclinic.md), [WebGoat](docs/llm-run/webgoat.md))
+and their `results.json` files.
 
 ### Using the LLM source
 

@@ -20,10 +20,7 @@
     "cve": "CVE-2016-1000027",
     "status": "NOT_REACHABLE",
     "methods": [
-      "org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter#handleRequest",
-      "org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter#readRemoteInvocation",
-      "org.springframework.remoting.httpinvoker.SimpleHttpInvokerServiceExporter#handle",
-      "org.springframework.remoting.rmi.RemoteInvocationSerializingExporter#doReadRemoteInvocation"
+      "org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter#handleRequest"
     ],
     "source": "llm",
     "model": "z-ai/glm-5.3",
@@ -1677,7 +1674,9 @@
     "cve": "CVE-2024-12798",
     "status": "FRAMEWORK",
     "methods": [
+      "ch.qos.logback.classic.boolex.JaninoEventEvaluator#evaluate",
       "ch.qos.logback.classic.boolex.JaninoEventEvaluator#getDecoratedExpression",
+      "ch.qos.logback.classic.boolex.JaninoEventEvaluator#start",
       "ch.qos.logback.core.boolex.JaninoEventEvaluatorBase#evaluate",
       "ch.qos.logback.core.boolex.JaninoEventEvaluatorBase#setExpression",
       "ch.qos.logback.core.boolex.JaninoEventEvaluatorBase#start"
@@ -1804,15 +1803,7 @@
   },
   {
     "cve": "CVE-2024-22243",
-    "status": "UNKNOWN",
-    "methods": [
-      "org.springframework.web.util.UriComponentsBuilder#fromHttpUrl",
-      "org.springframework.web.util.UriComponentsBuilder#fromUriString"
-    ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "advisory",
-    "note": "LLM (z-ai/glm-5.3) suggested org.springframework.web.util.UriComponentsBuilder#fromHttpUrl, org.springframework.web.util.UriComponentsBuilder#fromUriString from the advisory text only (no fix diff); not reachable, but unverified"
+    "status": "UNKNOWN"
   },
   {
     "cve": "CVE-2024-22257",
@@ -1880,45 +1871,19 @@
   },
   {
     "cve": "CVE-2024-22262",
-    "status": "UNKNOWN"
-  },
-  {
-    "cve": "CVE-2024-3653",
-    "status": "FRAMEWORK",
+    "status": "UNKNOWN",
     "methods": [
-      "io.undertow.server.handlers.LearningPushHandler#\u003cinit\u003e"
+      "org.springframework.web.util.UriComponentsBuilder#fromHttpUrl",
+      "org.springframework.web.util.UriComponentsBuilder#fromUriString"
     ],
     "source": "llm",
     "model": "z-ai/glm-5.3",
     "evidence": "advisory",
-    "path": [
-      "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManagerBean()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#lazyBean(Ljava/lang/Class;)Ljava/lang/Object;",
-      "org.springframework.security.config.annotation.configuration.AutowireBeanFactoryObjectPostProcessor#postProcess(Ljava/lang/Object;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#invokeInitMethods(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)V",
-      "org.springframework.web.filter.GenericFilterBean#afterPropertiesSet()V",
-      "org.springframework.web.filter.DelegatingFilterProxy#initFilterBean()V",
-      "org.springframework.web.filter.DelegatingFilterProxy#findWebApplicationContext()Lorg/springframework/web/context/WebApplicationContext;",
-      "org.springframework.context.support.AbstractApplicationContext#refresh()V",
-      "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh()V",
-      "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#createWebServer()V",
-      "org.springframework.boot.web.embedded.undertow.UndertowServletWebServerFactory#getWebServer([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lorg/springframework/boot/web/server/WebServer;",
-      "org.springframework.boot.web.embedded.undertow.UndertowServletWebServerFactory#createManager([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lio/undertow/servlet/api/DeploymentManager;",
-      "io.undertow.servlet.core.DeploymentManagerImpl#deploy()V",
-      "io.undertow.servlet.core.DeploymentManagerImpl$1#call(Lio/undertow/server/HttpServerExchange;Ljava/lang/Object;)Ljava/lang/Void;",
-      "io.undertow.servlet.core.DeploymentManagerImpl#access$500(Lio/undertow/server/HttpHandler;Ljava/util/List;)Lio/undertow/server/HttpHandler;",
-      "io.undertow.servlet.core.DeploymentManagerImpl#wrapHandlers(Lio/undertow/server/HttpHandler;Ljava/util/List;)Lio/undertow/server/HttpHandler;",
-      "io.undertow.server.handlers.LearningPushHandler$Builder$1#wrap(Lio/undertow/server/HttpHandler;)Lio/undertow/server/HttpHandler;",
-      "io.undertow.server.handlers.LearningPushHandler#\u003cinit\u003e(IILio/undertow/server/HttpHandler;)V"
-    ],
-    "entry": {
-      "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    "note": "LLM (z-ai/glm-5.3) suggested org.springframework.web.util.UriComponentsBuilder#fromHttpUrl, org.springframework.web.util.UriComponentsBuilder#fromUriString from the advisory text only (no fix diff); not reachable, but unverified"
+  },
+  {
+    "cve": "CVE-2024-3653",
+    "status": "UNKNOWN"
   },
   {
     "cve": "CVE-2024-38808",
@@ -2886,14 +2851,7 @@
   },
   {
     "cve": "CVE-2026-10532",
-    "status": "UNKNOWN",
-    "methods": [
-      "ch.qos.logback.core.net.HardenedObjectInputStream#resolveClass"
-    ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "advisory",
-    "note": "LLM (z-ai/glm-5.3) suggested ch.qos.logback.core.net.HardenedObjectInputStream#resolveClass from the advisory text only (no fix diff); not reachable, but unverified"
+    "status": "UNKNOWN"
   },
   {
     "cve": "CVE-2026-1225",
@@ -3230,35 +3188,7 @@
   },
   {
     "cve": "CVE-2026-47838",
-    "status": "REACHABLE",
-    "methods": [
-      "org.springframework.security.web.authentication.preauth.x509.SubjectDnX509PrincipalExtractor#extractPrincipal"
-    ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "advisory",
-    "path": [
-      "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManagerBean()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#lazyBean(Ljava/lang/Class;)Ljava/lang/Object;",
-      "org.springframework.security.config.annotation.configuration.AutowireBeanFactoryObjectPostProcessor#postProcess(Ljava/lang/Object;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#invokeInitMethods(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)V",
-      "org.springframework.security.web.FilterChainProxy#afterPropertiesSet()V",
-      "org.springframework.security.config.http.DefaultFilterChainValidator#validate(Lorg/springframework/security/web/FilterChainProxy;)V",
-      "org.springframework.security.config.http.DefaultFilterChainValidator#checkLoginPageIsntProtected(Lorg/springframework/security/web/FilterChainProxy;Ljava/util/List;)V",
-      "org.springframework.security.web.access.intercept.DefaultFilterInvocationSecurityMetadataSource#getAttributes(Ljava/lang/Object;)Ljava/util/Collection;",
-      "org.springframework.security.web.authentication.preauth.AbstractPreAuthenticatedProcessingFilter$PreAuthenticatedProcessingRequestMatcher#matches(Ljavax/servlet/http/HttpServletRequest;)Z",
-      "org.springframework.security.web.authentication.preauth.AbstractPreAuthenticatedProcessingFilter#principalChanged(Ljavax/servlet/http/HttpServletRequest;Lorg/springframework/security/core/Authentication;)Z",
-      "org.springframework.security.web.authentication.preauth.x509.X509AuthenticationFilter#getPreAuthenticatedPrincipal(Ljavax/servlet/http/HttpServletRequest;)Ljava/lang/Object;",
-      "org.springframework.security.web.authentication.preauth.x509.SubjectDnX509PrincipalExtractor#extractPrincipal(Ljava/security/cert/X509Certificate;)Ljava/lang/Object;"
-    ],
-    "entry": {
-      "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    "status": "UNKNOWN"
   },
   {
     "cve": "CVE-2026-47884",
@@ -3444,7 +3374,8 @@
     "cve": "CVE-2026-83557",
     "status": "NOT_REACHABLE",
     "methods": [
-      "com.fasterxml.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator#validateSubType"
+      "com.fasterxml.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator#validateSubType",
+      "com.fasterxml.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator$UnsafeBaseTypes#\u003cinit\u003e"
     ],
     "source": "llm",
     "model": "z-ai/glm-5.3",
