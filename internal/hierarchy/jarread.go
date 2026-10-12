@@ -41,12 +41,30 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool) ([]*ClassInfo, e
 			return nil, fmt.Errorf("parsing %s in %s: %w", f.Name, jarPath, err)
 		}
 
+		// ExtractCalls needs cf's constant pool and bootstrap methods,
+		// which classfile.ClassFile deliberately doesn't expose, so this
+		// is the only point where it can run; the result (not cf itself)
+		// is what ClassInfo keeps.
+		methods := make([]Method, len(cf.Methods))
+		for i, m := range cf.Methods {
+			methods[i].Method = m
+			if m.Code == nil {
+				continue
+			}
+			calls, unresolved, err := cf.ExtractCalls(m.Code)
+			if err != nil {
+				return nil, fmt.Errorf("extracting calls from %s %s#%s%s: %w", jarPath, cf.ThisClass, m.Name, m.Descriptor, err)
+			}
+			methods[i].Calls = calls
+			methods[i].UnresolvedDynamic = unresolved
+		}
+
 		out = append(out, &ClassInfo{
 			FQCN:        cf.ThisClass,
 			SuperClass:  cf.SuperClass,
 			Interfaces:  cf.Interfaces,
 			AccessFlags: cf.AccessFlags,
-			Methods:     cf.Methods,
+			Methods:     methods,
 			Annotations: cf.Annotations,
 			SourceJar:   jarPath,
 			GAV:         gav,

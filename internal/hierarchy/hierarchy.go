@@ -9,13 +9,28 @@ import (
 	"ariadne/internal/input"
 )
 
+// Method is one method's static metadata plus the call-site edges found
+// in its bytecode, extracted once while the class's constant pool and
+// bootstrap methods were still in scope (classfile.ClassFile does not
+// keep them, by design, so this is the only time ExtractCalls can run).
+type Method struct {
+	classfile.Method
+	// Calls is nil for an abstract/native method (no Code), and otherwise
+	// every call-site edge ExtractCalls found.
+	Calls []classfile.Call
+	// UnresolvedDynamic counts this method's invokedynamic sites whose
+	// bootstrap wasn't LambdaMetafactory/altMetafactory (e.g. a
+	// StringConcatFactory string concatenation), and so produced no edge.
+	UnresolvedDynamic int
+}
+
 // ClassInfo is everything the rest of ariadne needs about one class.
 type ClassInfo struct {
 	FQCN        string
 	SuperClass  string // "" only for java.lang.Object itself
 	Interfaces  []string
 	AccessFlags uint16
-	Methods     []classfile.Method
+	Methods     []Method
 	Annotations []string
 	// SourceJar is the jar this class was read from ("" for an app class
 	// read from a classes directory/app-classes.jar rather than a
@@ -35,13 +50,28 @@ func (c *ClassInfo) IsInterface() bool { return c.AccessFlags&classfile.AccInter
 // MethodByName returns the first method named name declared directly on
 // this class, regardless of descriptor (ariadne matches overload-
 // insensitively throughout, per the plan).
-func (c *ClassInfo) MethodByName(name string) (classfile.Method, bool) {
+func (c *ClassInfo) MethodByName(name string) (Method, bool) {
 	for _, m := range c.Methods {
 		if m.Name == name {
 			return m, true
 		}
 	}
-	return classfile.Method{}, false
+	return Method{}, false
+}
+
+// MethodsByName returns every method named name declared directly on this
+// class — there can be more than one, since Java allows overloads and
+// ariadne matches by name only. Used where a caller needs every overload
+// rather than just "does this class declare a method named X" (CHA
+// expansion, which does not try to pick one overload over another).
+func (c *ClassInfo) MethodsByName(name string) []Method {
+	var out []Method
+	for _, m := range c.Methods {
+		if m.Name == name {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // Hierarchy is the whole class universe ariadne read: every app class and

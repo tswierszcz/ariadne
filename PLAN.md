@@ -317,6 +317,27 @@ pass:
 On petclinic, the graph contains an edge `OwnerController → OwnerRepository#findById`
 (or similar).
 
+**Status: done.** All three packages implemented and verified against both the fixture
+and the real petclinic/WebGoat jars (see the Phase 3a/3b/3c commits for the detailed
+per-package findings). Headline numbers on real petclinic (87 dep jars):
+- `classfile`: 29154 classes, 822218 call edges, 0 parse errors, 0 unresolved dynamic
+  sites (WebGoat: 40811 classes, 1023924 edges, 13 unresolved — all StringConcatFactory).
+- `hierarchy`: built in ~4s; confirmed `OwnerRepository` has 0 bytecode subtypes (the
+  Spring Data proxy blind spot) and `java.lang.Object` has 26367 of 29123 classes as
+  subtypes.
+- `callgraph`: 273180 nodes; **1229600 edges with the CHA skip list vs. 11452847
+  without it (9.3x more), and 1.9s to build vs. 2m43s (85x slower)** — measured
+  confirmation that the skip list from section 3.6 is load-bearing, not cosmetic.
+- The exact acceptance-test edge from this section,
+  `OwnerController#initUpdateOwnerForm → OwnerRepository#findById`, is present (as a
+  direct `interface` edge, since OwnerRepository has no CHA-reachable implementation —
+  Spring generates its proxy at runtime).
+- The CHA/synthetic-edges-from-profile item is deferred: no profile system exists yet
+  (that's Phase 4/5/6 territory per section 4), so `callgraph.Build` currently takes a
+  plain `SkipFunc` with `DefaultSkip` (java./javax./jdk./sun.) as the only rule; profile
+  package wiring (including Spring Data's synthetic edges) happens when internal/reach
+  and the CLI are built.
+
 ### Phase 4 — CVE → vulnerable methods (`internal/vulnmap`, ~2 h; the hardest part)
 Sources, in priority order:
 1. **Manual table** `vuln_methods.yaml` — always wins. Seed entries
