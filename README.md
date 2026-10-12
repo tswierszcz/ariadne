@@ -1,1 +1,388 @@
 # ariadne
+
+CVE reachability analysis for JVM applications. ariadne takes a built Java
+application and its resolved Maven dependencies, builds a static call graph
+straight from bytecode, cross-references the dependencies against known
+vulnerabilities (OSV), and reports which of those vulnerabilities are
+actually **reachable** from the application's own code — as opposed to
+merely present on the classpath.
+
+No JDK is required to run it: ariadne parses `.class` files itself. A JDK
+is only needed to build the Java *target* applications and test fixtures
+this repository ships with.
+
+See [PLAN.md](PLAN.md) for the full design rationale, phase-by-phase
+history, and every finding made while building this (including two real
+bugs found by running the tool end-to-end, with before/after numbers).
+This file describes how the finished pipeline actually works.
+
+## The pipeline
+
+Running `ariadne` executes eight steps in order. Each one is a separate
+Go package under `internal/`, independently testable, and the CLI
+(`cmd/ariadne`) just wires them together.
+
+```
+-app, -deps, -deps-list
+        │
+        ▼
+ 1. internal/input      Normalize -app into a single jar; resolve every
+                         dependency jar to a Maven coordinate (GAV).
+        │
+        ▼
+ 2. internal/classfile  Parse every .class file in the app + dependency
+                         jars (no JDK); decode each method's bytecode into
+                         call-site edges.
+        │
+        ▼
+ 3. internal/hierarchy  Index every class read: superclass, interfaces,
+                         methods, annotations, source jar/GAV, app-vs-dep.
+        │
+        ▼
+ 4. internal/callgraph  Intern every method into an integer id; build the
+                         directed call graph; expand virtual/interface
+                         calls via class-hierarchy analysis (CHA).
+        │
+        ▼
+ 5. internal/cves       Resolved GAVs → OSV querybatch → per-id details →
+                         deduplicated CVE list (cves.json-shaped).
+        │
+        ▼
+ 6. internal/vulnmap    CVE → the methods that are actually vulnerable
+                         (manual table, then GitHub fix-commit diffs).
+        │
+        ▼
+ 7. internal/reach      BFS from every app method over the call graph;
+                         assign each CVE a status; reconstruct the
+                         shortest path for REACHABLE/FRAMEWORK ones.
+        │
+        ▼
+ 8. internal/report     Render report.md (Markdown) and results.json
+                         (deterministic) from the finished analysis.
+```
+
+### 1. Input normalization (`internal/input`)
+
+`-app` accepts three forms, auto-detected:
+
+- a **directory** of `.class` files (e.g. `target/classes`) — packed into
+  a temporary jar;
+- a **plain jar** — used as-is;
+- a **Spring Boot fat jar** — detected by a `BOOT-INF/` entry.
+  `BOOT-INF/classes/` is repacked into a temporary jar (with the
+  `BOOT-INF/classes/` prefix stripped) and every `BOOT-INF/lib/*.jar` is
+  extracted to a temporary directory, which is then used as the
+  dependency source automatically (`-deps` is not needed in this case).
+
+Every dependency jar (from `-deps`, or extracted from a fat jar) is then
+resolved to a Maven coordinate, in priority order:
+
+1. `META-INF/maven/<group>/<artifact>/pom.properties` **inside the jar
+   itself** — works regardless of which build tool produced it. If a jar
+   contains more than one such file (a shaded/uber jar bundling other
+   libraries' poms), the one whose own `artifact-version` matches the
+   jar's file name is preferred, and the rest are recorded as a warning.
+2. `-deps-list` (the output of `mvn dependency:list`), matched by file
+   name (`artifactId-version[-classifier].jar`). The parser tolerates
+   ANSI color codes and the ` -- module x [auto]` suffix newer versions
+   of the plugin append.
+3. If neither source identifies a jar, it is reported as **unidentified**
+   in the final report and excluded from the OSV query — it is never
+   silently dropped.
+
+### 2–3. Bytecode parsing and the class hierarchy (`internal/classfile`, `internal/hierarchy`)
+
+`internal/classfile` is a from-scratch, pure-Go JVM class-file parser: the
+constant pool (every tag through Java 21, including `MethodHandle`,
+`Dynamic`/`InvokeDynamic`), class/field/method structure,
+`RuntimeVisibleAnnotations`, and a full bytecode walker over the `Code`
+attribute's instructions. For each method it extracts every call-site
+edge:
+
+| Bytecode instruction | Edge kind | Resolution |
+|---|---|---|
+| `invokevirtual` | `virtual` | Methodref's owner/name/descriptor, as compiled (not necessarily the declaring class — see below) |
+| `invokespecial` | `special` | same (constructors, super calls, private-method calls) |
+| `invokestatic` | `static` | same |
+| `invokeinterface` | `interface` | same |
+| `invokedynamic` | `dynamic` | resolved through `BootstrapMethods`: if the bootstrap is `LambdaMetafactory`/`altMetafactory`, the real target method is read from its 2nd bootstrap argument (the implementation `MethodHandle`) — this is how lambdas and method references become graph edges instead of disappearing. Any other bootstrap (e.g. `StringConcatFactory` for `+` string concatenation on newer bytecode) is counted as **unresolved** rather than guessed at. |
+
+`internal/hierarchy` reads every class from the app and every dependency
+jar (in parallel), and indexes: superclass, interfaces, declared methods
+(with their extracted call edges and annotations), which jar it came
+from, its resolved GAV, and whether it's app code or a dependency. It
+also answers two questions the next two steps need:
+
+- **`Subtypes(fqcn)`** — every transitive subtype of a class/interface
+  (memoized), for CHA expansion.
+- **`ResolveMethod(fqcn, name)`** — which class in the superclass/
+  superinterface chain actually declares a given method name (JVM lookup
+  order: the class itself, then its superclass chain, then interfaces
+  reachable from that chain, breadth-first).
+
+A duplicate class found in two different jars (a classpath conflict) is
+kept from whichever jar was read first and reported as a warning, not an
+error.
+
+### 4. The call graph and CHA expansion (`internal/callgraph`)
+
+Every method is interned into a dense `uint32` id. Building the graph is
+two passes:
+
+1. **Intern every declared method** first, so a method with no outgoing
+   calls at all (a getter, an empty override) still gets a node —
+   `internal/reach` needs it there to use as a root.
+2. **Add edges.** Every call-site edge found by `classfile` becomes a
+   direct graph edge. For a `virtual` or `interface` call to `T#m`, an
+   extra edge is added to `S#m` for **every transitive subtype `S` of `T`
+   that itself declares `m`** — this is class-hierarchy analysis (CHA):
+   the call graph can't know which subtype a given object actually is at
+   run time, so it conservatively assumes it could be any of them.
+
+**CHA is deliberately not applied to JDK types.** A call declared on
+`java.*`/`javax.*`/`jdk.*`/`sun.*` (`Object#toString`, `Runnable#run`,
+`Map#get`, ...) is never expanded to its subtypes. Without this guard,
+CHA fans out into a huge fraction of the entire classpath through
+nothing more than the framework's own bootstrap calling a few common
+`Object`/collection methods — measured on real petclinic: **1.2M edges
+with the guard vs. 11.4M without it (9.3×), built in 1.9s vs. 2m43s
+(85× slower)**. The practical effect without the guard is that nearly
+every CVE in every dependency would show up as "reachable", which is not
+useful.
+
+A call to a subtype's inherited (not overridden) method still resolves
+correctly: `classfile.ExtractCalls` reports a Methodref's owner exactly
+as the bytecode names it, which for a call through a subclass reference
+is the subclass — even when that subclass never declares the method
+itself. `internal/reach`'s method matching (see below) accounts for this.
+
+### 5. CVE resolution (`internal/cves`)
+
+Every unique `(groupId:artifactId, version)` pair is queried against
+`POST https://api.osv.dev/v1/querybatch` (chunked at 1000 per request,
+OSV's documented limit; pagination via `/v1/query` + `page_token` is
+implemented for a package with more results than one page, though no
+real Maven package has been observed to need it). Each returned
+vulnerability id is then fetched individually via `GET /v1/vulns/{id}`,
+in parallel (8 workers).
+
+Records that alias each other (a GHSA id and the CVE id it corresponds
+to, say — OSV cross-links these in each record's own `aliases` field)
+are merged into one entry via union-find, preferring a `CVE-*` id as the
+primary key when the group has one. Each entry keeps: id, aliases,
+summary, a severity label, which of the app's dependencies it affects,
+and its references (particularly `FIX` links to a commit).
+
+Every HTTP request goes through `internal/httpcache`, a disk cache keyed
+by a hash of the request. `-offline` makes a cache miss a hard, clear
+error instead of silently reaching the network.
+
+### 6. CVE → vulnerable methods (`internal/vulnmap`)
+
+For each CVE, in priority order:
+
+1. **The manual table** (`internal/vulnmap/vuln_methods.yaml`, embedded
+   in the binary; override with `-vuln-methods`). Matched by the CVE's
+   own id or any of its aliases. This always wins when present.
+2. **A GitHub fix-commit diff.** For every reference matching
+   `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
+   `<url>.diff`, keeps only `.java` files under a `src/main/` path
+   (excluding test code), and for each one fetches the full file *as it
+   existed at that commit* from `raw.githubusercontent.com`. A
+   brace-aware scanner (`internal/javadiff`) — which first blanks out
+   every comment, string, text block and char literal so a stray `{` or
+   `;` inside one never desyncs brace matching — finds which
+   method/constructor encloses each line the diff actually changed.
+   `if`/`for`/`while`/lambda/anonymous-class bodies are transparent (a
+   changed line inside one is attributed to the *enclosing* method); a
+   method whose name matches its enclosing class is renamed to `<init>`,
+   matching bytecode's own convention.
+3. No source 3 (an LLM reading the advisory + diff) is implemented.
+
+A CVE vulnmap finds no methods for at all becomes `UNKNOWN` in the next
+step, not an error.
+
+### 7. Reachability (`internal/reach`)
+
+Two multi-source breadth-first searches are run **once**, from every
+application method simultaneously (not once per CVE — this is what keeps
+analyzing 100+ CVEs under 100ms even on a 2.6M-edge graph):
+
+- **Pass 1 (REACHABLE):** a node whose class's GAV matches a
+  framework-package pattern is still visited (so a one-hop call straight
+  from app code into a framework method still counts), but its own
+  outgoing edges are never expanded — execution can't be traced *through*
+  it. Frameworks dispatch via reflection/proxies the static graph can't
+  see, so continuing past one would be guessing.
+- **Pass 2 (FRAMEWORK):** the same roots, no such restriction.
+
+A CVE's status is decided by where its vulnerable method(s) were first
+found:
+
+| Status | Meaning |
+|---|---|
+| `REACHABLE` | Found in pass 1: a path exists that never has to pass *through* framework-internal code to get there. The shortest such path is recorded, along with the first app → dependency edge on it (the "entry call"). |
+| `FRAMEWORK` | Found only in pass 2: the only path runs through framework code the static graph can't follow past. Needs manual review. |
+| `NOT_REACHABLE` | vulnmap has methods for this CVE, but neither pass ever visits any of them. |
+| `UNKNOWN` | vulnmap has no entry for this CVE at all. |
+
+Matching a vulnmap method name (`"Class#method"`, no descriptor — matching
+is overload-insensitive everywhere in ariadne) against the graph also
+checks every non-overriding transitive subtype of the named class, to
+catch the inherited-method-called-through-a-subclass-reference case
+described above.
+
+The default framework package list (`internal/reach.DefaultFrameworkPackages`)
+is exactly OSV's/this project's initial seed:
+`org.apache.tomcat.embed:*`, `org.springframework:spring-web`,
+`org.springframework:spring-webmvc`, `org.springframework.boot:*`,
+`com.fasterxml.jackson.core:jackson-databind`, `org.hibernate:*`,
+`ch.qos.logback:*`, `org.apache.logging.log4j:*`. There is no profile
+system yet (see Limitations) — this list is not configurable from the
+CLI.
+
+### 8. The report (`internal/report`)
+
+`report.md` is rendered from an embedded template and includes: a header
+(app, timestamp, ariadne version, graph size before/after CHA, unresolved
+`invokedynamic` count, dependency identification rate), a status/severity
+summary, the full CVE table, every `REACHABLE` CVE's full call path with
+its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
+review, the list of unidentified dependency jars, and a fixed Limitations
+section (see below).
+
+`results.json` is the same analysis as structured data — sorted by CVE
+id, with each result's own method list sorted — so that two runs against
+the same cached inputs produce **byte-for-byte identical output**
+(verified: see [PLAN.md](PLAN.md)'s Phase 6 notes for a real
+non-determinism bug this guarantee caught and how it was fixed).
+
+## Usage
+
+```bash
+go build -o bin/ariadne ./cmd/ariadne
+
+# From a build directory plus its resolved dependencies:
+bin/ariadne -app target/classes -deps target/dependency -deps-list deps.txt \
+  -out report.md -json results.json
+
+# Straight from a Spring Boot fat jar (no -deps needed):
+bin/ariadne -app target/myapp-1.0.0.jar -out report.md -json results.json
+
+# Re-run against a warm cache only, never touching the network:
+bin/ariadne -app ... -deps ... -out report.md -json results.json -offline
+```
+
+Flags:
+
+| Flag | Required | Meaning |
+|---|---|---|
+| `-app` | yes | A directory, a plain jar, or a Spring Boot fat jar. |
+| `-deps` | no* | Directory of dependency jars. *Not needed for a fat jar, which supplies its own via `BOOT-INF/lib/`.* |
+| `-deps-list` | no | `mvn dependency:list` output, used as a fallback for jars with no `pom.properties`. |
+| `-vuln-methods` | no | Override the embedded `vuln_methods.yaml`. |
+| `-out` | yes | `report.md` output path. |
+| `-json` | yes | `results.json` output path. |
+| `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
+| `-offline` | no | Serve only from the cache; a miss is a clear, immediate error. |
+| `-version` | no | Print the ariadne version and exit. |
+
+## Building and testing
+
+```bash
+make build   # -> bin/ariadne
+make test    # go test ./... — no JDK, no network required
+make vet
+```
+
+`go test ./...` never requires a JDK or network access: every package's
+test fixtures are pre-compiled `.jar` files committed under `testdata/`,
+and every test that would otherwise need the network (OSV, GitHub) runs
+against a `net/http/httptest` server instead.
+
+Regenerating the fixtures (only needed if you change
+`testdata/*/src/**/*.java`) does need a JDK:
+
+```bash
+make fixtures JAVAC8=/path/to/jdk11-or-later/bin/javac JAVAC21=/path/to/jdk21-or-later/bin/javac
+./scripts/build-reachfixture.sh /path/to/javac
+```
+
+Preparing the two target applications this project was developed and
+verified against (also JDK-dependent; not needed to run or test ariadne
+itself) uses the scripts in `scripts/`:
+
+```bash
+./scripts/prepare-petclinic.sh /path/to/jdk11/JAVA_HOME
+./scripts/prepare-webgoat.sh   /path/to/jdk17-or-later/JAVA_HOME
+```
+
+## Project layout
+
+```
+cmd/ariadne/            CLI entry point; wires every package below together
+internal/
+  input/                -app/-deps normalization, GAV resolution
+  cves/                 OSV querying, alias deduplication
+  httpcache/             disk cache + --offline support (shared by cves and vulnmap)
+  classfile/             .class parser + bytecode walker
+  hierarchy/              class universe: super/interfaces/subtypes/methods
+  callgraph/              interning, edges, CHA expansion
+  vulnmap/                CVE -> vulnerable methods (manual table + fix-commit diffs)
+    vuln_methods.yaml      the embedded manual table
+  javadiff/               unified-diff parsing + the brace-aware Java method scanner
+  reach/                  BFS, status assignment, path reconstruction
+  report/                 Markdown/JSON rendering
+    templates/
+scripts/                 prepare-{petclinic,webgoat}.sh, build-*fixture*.sh
+testdata/
+  fixture/                hand-written Java project, compiled for Java 8 and 21
+  reachfixture/           a 3-jar fixture (app + framework dep + plain dep) covering
+                          all four reachability statuses
+work/                     cloned/built target apps (gitignored; scripts/prepare-*.sh output)
+.cache/                   OSV/GitHub HTTP cache (gitignored)
+```
+
+## Known limitations
+
+These are structural, not bugs, and are also printed in every generated
+report:
+
+- **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK
+  `Proxy`), and any `invokedynamic` site other than a lambda/method
+  reference** are invisible to a static call graph. A Spring Data
+  repository interface, for instance, has *no bytecode implementation at
+  all* — Spring generates it at run time — so a call to one can only be
+  seen reaching the interface method itself.
+- **Serialization gadgets and config-driven behavior** (XML wiring,
+  `web.xml`, `ServiceLoader`) are not modeled.
+- **Shaded/relocated dependencies**: a jar whose classes were relocated
+  under a different package than its own Maven coordinates declare is
+  not detected as such.
+- **CHA over-approximates**: a virtual/interface call is treated as
+  reaching every subtype that declares the same-named method, whether or
+  not that specific override is ever invoked for that call site at run
+  time. This can only produce false positives.
+- **Reflection under-approximates**: anything invoked purely via
+  `java.lang.reflect`, a `MethodHandle` lookup outside a recognized
+  `LambdaMetafactory` call, or dependency injection wiring beans by
+  name/type at runtime is invisible, and can produce false negatives (a
+  real path exists that ariadne cannot see).
+- **No profile system yet.** The framework-package list that decides
+  `REACHABLE` vs. `FRAMEWORK` is fixed (see step 7 above) and not
+  configurable from the CLI; there is also no `-roots annotated` mode
+  (roots are always every application method) and no WAR/EAR/Gradle
+  input support. See [PLAN.md](PLAN.md)'s Phase 7 for what this would
+  involve.
+- **No LLM-assisted vulnerable-method mapping.** `internal/vulnmap`'s
+  third source (asking an LLM to read an advisory and its diff) from the
+  original plan is not implemented.
+
+## Status
+
+Phases 0–6 of the plan in [PLAN.md](PLAN.md) are complete and verified,
+end-to-end, against two real applications: an old (pre-2021)
+`spring-petclinic` build, and `WebGoat` v8.2.2 as a control case (its
+bundled old XStream is confirmed `REACHABLE`). Phase 7 (broader input
+support, a real profile system, Gradle) and Phase 8 (an optional
+exploitability check) are not started.
