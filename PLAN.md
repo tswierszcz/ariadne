@@ -4,7 +4,7 @@
 > (as `PLAN.md`, `CLAUDE.md` or `AGENTS.md`, depending on the harness) and
 > tell the agent: "Read PLAN.md and implement it phase by phase."
 
-## 1. Task (from the manager)
+## 1. Task
 
 1. Take an open-source Java application that has open-source dependencies.
 2. Build the application's call graph and find the calls it makes into its dependencies.
