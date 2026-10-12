@@ -1,0 +1,67 @@
+# Manual CVE -> vulnerable-method mapping. This always wins over the
+# fix-commit-diff source (see resolve.go): every entry here has been
+# checked by hand against its advisory and/or fix commit.
+#
+# Format: CVE-2021-44228: ["Class#method", ...] — overload-insensitive
+# (no descriptor), matching ariadne's convention everywhere else.
+# Constructors use "<init>", the name the JVM itself uses.
+
+CVE-2022-1471: # SnakeYAML, unsafe Constructor deserialization (RCE)
+  - org.yaml.snakeyaml.Yaml#load
+  - org.yaml.snakeyaml.Yaml#loadAs
+  - org.yaml.snakeyaml.Yaml#loadAll
+  - org.yaml.snakeyaml.constructor.Constructor#<init>
+
+CVE-2021-44228: # Log4Shell
+  - org.apache.logging.log4j.core.lookup.JndiLookup#lookup
+
+CVE-2022-42889: # Text4Shell
+  - org.apache.commons.text.StringSubstitutor#replace
+
+# XStream (WebGoat's control case). An unconfigured XStream's
+# fromXML/fromXML-family entry points are the shared attack surface for
+# essentially every one of these — each CVE is a different gadget chain
+# reachable through the same deserialization call, which is also exactly
+# why they share one set of vulnerable methods here rather than each
+# getting a distinct, gadget-specific method list. The exact CVE ids
+# below are every XStream 1.4.5 vulnerability OSV reported when ariadne
+# ran against the real WebGoat dependency set (see PLAN.md Phase 2).
+CVE-2013-7285:
+  &xstream-entry-points
+  - com.thoughtworks.xstream.XStream#fromXML
+  - com.thoughtworks.xstream.XStream#unmarshal
+CVE-2016-3674: *xstream-entry-points
+CVE-2017-7957: *xstream-entry-points
+CVE-2020-26217: *xstream-entry-points
+CVE-2020-26258: *xstream-entry-points
+CVE-2020-26259: *xstream-entry-points
+CVE-2021-21341: *xstream-entry-points
+CVE-2021-21342: *xstream-entry-points
+CVE-2021-21343: *xstream-entry-points
+CVE-2021-21344: *xstream-entry-points
+CVE-2021-21345: *xstream-entry-points
+CVE-2021-21346: *xstream-entry-points
+CVE-2021-21347: *xstream-entry-points
+CVE-2021-21348: *xstream-entry-points
+CVE-2021-21349: *xstream-entry-points
+CVE-2021-21350: *xstream-entry-points
+CVE-2021-21351: *xstream-entry-points
+CVE-2021-29505: *xstream-entry-points
+CVE-2021-39139: *xstream-entry-points
+CVE-2021-39140: *xstream-entry-points
+CVE-2021-39141: *xstream-entry-points
+CVE-2021-39144: *xstream-entry-points # the plan's own seed example
+CVE-2021-39145: *xstream-entry-points
+CVE-2021-39146: *xstream-entry-points
+CVE-2021-39147: *xstream-entry-points
+CVE-2021-39148: *xstream-entry-points
+CVE-2021-39149: *xstream-entry-points
+CVE-2021-39150: *xstream-entry-points
+CVE-2021-39151: *xstream-entry-points
+CVE-2021-39152: *xstream-entry-points
+CVE-2021-39153: *xstream-entry-points
+CVE-2021-39154: *xstream-entry-points
+CVE-2021-43859: *xstream-entry-points
+CVE-2022-40151: *xstream-entry-points
+CVE-2022-41966: *xstream-entry-points
+CVE-2024-47072: *xstream-entry-points

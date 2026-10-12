@@ -402,6 +402,32 @@ CVEs without methods → status `UNKNOWN`.
 **Done when:** a unit test on a stored sample `.diff` in `testdata/diffs/` returns the expected
 methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
 
+**Status: sources 1 and 2 done (LLM/source 3 deliberately skipped for now, per instruction).**
+- `vuln_methods.yaml` seeded with the plan's own examples (SnakeYAML, Log4Shell, Text4Shell)
+  plus every XStream 1.4.5 CVE id OSV actually returned for WebGoat (37 entries via a
+  YAML anchor/alias, since they share one attack surface: an unconfigured XStream's
+  `fromXML`/`unmarshal`). `LoadManual("")` loads this embedded default;
+  `LoadManual(path)` loads an override.
+- Diff source implemented as `internal/javadiff` (unified-diff parsing + a brace-aware,
+  comment/string-stripping Java method scanner that correctly treats `if`/`for`/lambda/
+  anonymous-class bodies as transparent and renames a same-named method to `<init>`) plus
+  `internal/vulnmap`'s orchestration: every GitHub `.../commit/<sha>` reference → fetch
+  `<url>.diff` → keep `.java` files under `src/main/` → fetch each at
+  `raw.githubusercontent.com/.../<sha>/<path>` → map changed lines to methods. All fetches
+  go through `internal/httpcache`.
+  **Deviation from the plan's own description:** rather than a regex/`javalang` pass over
+  the diff's `@@` hunk context, the implementation always fetches the full post-fix file
+  and runs the same brace-aware scanner on it, using the diff only for *which lines*
+  changed — this was simpler to get right than trying to parse Java out of hunk context
+  lines alone, and the plan already allows fetching the full file "for a reliable result".
+- Verified against the real `cves.json` for both apps (unit tests use a fake HTTP server
+  instead, so no test depends on the network): petclinic resolved 56/148 CVEs (1 manual,
+  55 diff); WebGoat resolved 104/160 (37 manual, 67 diff). WebGoat's `CVE-2021-39144` (the
+  plan's own seed) resolves to `com.thoughtworks.xstream.XStream#fromXML`/`#unmarshal` via
+  the manual table, confirmed in `vulnmap.json`.
+- Not yet wired into a CLI/`vulnmap.json` output path (no `cmd/ariadne` flags exist yet);
+  that happens with Phase 6.
+
 ### Phase 5 — Reachability engine (`internal/reach`, ~1 h)
 - Roots: all app methods (default) or profile entry points (`--roots profile`).
 - Multi-source BFS over the CHA-expanded graph with parent pointers (`[]int32`, -1 = none)
