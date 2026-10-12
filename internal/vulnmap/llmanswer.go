@@ -3,6 +3,7 @@ package vulnmap
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -10,6 +11,11 @@ import (
 )
 
 const maxLLMMethods = 10
+
+// errTruncated means the model ran out of tokens. Unlike a malformed reply
+// it is not worth a corrective retry: the same prompt would hit the same
+// limit again and just double the cost.
+var errTruncated = errors.New(`the reply was cut off by the token limit (finish_reason "length")`)
 
 var (
 	llmClassRe  = regexp.MustCompile(`^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)+$`)
@@ -34,7 +40,7 @@ type llmAnswer struct {
 // verbatim on the corrective retry, so it names the exact violation.
 func parseLLMAnswer(content, finishReason string) (llmAnswer, error) {
 	if finishReason == "length" {
-		return llmAnswer{}, fmt.Errorf("the reply was cut off by the token limit (finish_reason \"length\")")
+		return llmAnswer{}, errTruncated
 	}
 
 	start := strings.IndexByte(content, '{')

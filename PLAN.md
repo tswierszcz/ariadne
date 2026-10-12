@@ -402,7 +402,7 @@ CVEs without methods → status `UNKNOWN`.
 **Done when:** a unit test on a stored sample `.diff` in `testdata/diffs/` returns the expected
 methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
 
-**Status: sources 1 and 2 done; source 3 (LLM) implemented — see the Source 3 notes below.**
+**Status: done — sources 1, 2 and 3 (LLM, opt-in) implemented; see the Source 3 notes below.**
 - `vuln_methods.yaml` seeded with the plan's own examples (SnakeYAML, Log4Shell, Text4Shell)
   plus every XStream 1.4.5 CVE id OSV actually returned for WebGoat (37 entries via a
   YAML anchor/alias, since they share one attack surface: an unconfigured XStream's
@@ -446,6 +446,14 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
   - `-llm`/`-llm-model`/`-llm-base-url` in `cmd/ariadne`; the key is read only from
     `ARIADNE_LLM_API_KEY`. Unit tests use a fake HTTP server (no key, no network); the one
     real-endpoint test is skipped unless `ARIADNE_LLM_E2E=1` (`make e2e-llm`).
+  - **Live check (one real CVE, `z-ai/glm-5.3`, CVE-2025-61795 / Tomcat in petclinic, diff
+    evidence).** The first attempt returned an empty reply: GLM 5.3 is a reasoning model and
+    spent its whole 8192-token budget on hidden reasoning. Fixes: request
+    `reasoning: {"effort": "low"}`, `max_tokens` 16384, and no corrective retry on
+    `finish_reason: "length"` (it would just repeat and double the cost; the CVE is skipped
+    with a warning and nothing is cached). After the fix: valid reply, 189 completion tokens
+    (25 reasoning), ~$0.0013, and `Request#parseParts` / `#getParts` / `#getPart` all passed
+    bytecode grounding. A full petclinic run with `-llm` (~92 CVEs) has not been done.
 
 ### Phase 5 — Reachability engine (`internal/reach`, ~1 h)
 - Roots: all app methods (default) or profile entry points (`--roots profile`).

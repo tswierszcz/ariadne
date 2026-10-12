@@ -82,7 +82,12 @@ One JSON object:
      package);
    - `method` matches `^([A-Za-z_$][\w$]*|<init>|<clinit>)$`;
    - `role` is `vulnerable` or `entry_point`;
-   - a reply with `finish_reason: "length"` is also invalid.
+   - a reply with `finish_reason: "length"` is a failed request, not an
+     invalid reply: it gets **no** corrective retry (the same prompt would hit
+     the same limit and just double the cost), is not cached, and the CVE is
+     skipped (`UNKNOWN`) with a warning. (Found on the first live run: GLM 5.3
+     is a reasoning model and spent its whole 8192-token budget on hidden
+     reasoning, returning an empty reply.)
 3. On any violation: **one corrective retry**. Append the bad reply as an
    `assistant` turn and the corrective message (section 3) as a `user` turn.
    If the second reply is also invalid, the CVE gets no entry (`UNKNOWN`) and
@@ -241,8 +246,9 @@ Your previous reply could not be used: {{.Error}}. Reply again with only the JSO
 `X-Title: ariadne`:
 
 ```json
-{"model":"<model>","temperature":0,"max_tokens":8192,
+{"model":"<model>","temperature":0,"max_tokens":16384,
  "response_format":{"type":"json_object"},
+ "reasoning":{"effort":"low"},
  "messages":[{"role":"system","content":"<system>"},{"role":"user","content":"<user>"}]}
 ```
 

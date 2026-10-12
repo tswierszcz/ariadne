@@ -154,6 +154,20 @@ func (r *Resolver) llmCommitDiffs(ctx context.Context, cve cves.CVE) (urls []str
 	return urls, commits, nil
 }
 
+// reasoningTokens extracts completion_tokens_details.reasoning_tokens from
+// a usage object for the truncation warning, or "unknown".
+func reasoningTokens(usage json.RawMessage) string {
+	var u struct {
+		Details struct {
+			Reasoning *int `json:"reasoning_tokens"`
+		} `json:"completion_tokens_details"`
+	}
+	if json.Unmarshal(usage, &u) != nil || u.Details.Reasoning == nil {
+		return "unknown"
+	}
+	return strconv.Itoa(*u.Details.Reasoning)
+}
+
 // exchange returns the cached record for (model, prompt) or performs the
 // call, validates the reply, and on a validation failure makes the single
 // corrective retry. Transport failures are returned as errors and never
@@ -193,6 +207,11 @@ func (s *LLMSource) exchange(ctx context.Context, cveID, system, user string) (l
 		rec.Usage = reply.Usage
 
 		ans, perr := parseLLMAnswer(reply.Content, reply.FinishReason)
+		if errors.Is(perr, errTruncated) {
+			// Not cached and not retried: report it as a failed request
+			// so the CVE is skipped with a clear warning.
+			return llmRecord{}, fmt.Errorf("%w (reasoning tokens: %s)", perr, reasoningTokens(reply.Usage))
+		}
 		if perr == nil {
 			rec.Valid, rec.Answer, rec.Error = true, &ans, ""
 			break

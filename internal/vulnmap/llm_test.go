@@ -457,6 +457,31 @@ func TestLLM_invalidReplyGetsOneCorrectiveRetry(t *testing.T) {
 	}
 }
 
+func TestLLM_truncatedReplyIsNotRetriedOrCached(t *testing.T) {
+	llm := newFakeLLM(t, func(_ int, req chatRequest) (int, string, http.Header) {
+		if req.MaxTokens != 16384 || req.Reasoning == nil || req.Reasoning.Effort != "low" {
+			t.Errorf("request must cap reasoning and allow 16384 tokens: %+v", req)
+		}
+		return 200, completion("", "length"), nil
+	})
+	r, src := llmFixture(t, fakeDiff, llm)
+
+	for i := 0; i < 2; i++ {
+		if _, ok, err := r.Resolve(context.Background(), testCVE()); err != nil || ok {
+			t.Fatalf("run %d: ok=%v err=%v, want no entry and no error", i, ok, err)
+		}
+	}
+	if llm.callCount() != 2 {
+		t.Errorf("calls = %d, want 2 (one per run: no corrective retry, no caching)", llm.callCount())
+	}
+	if st := src.Stats(); st.Skipped != 2 || st.Invalid != 0 {
+		t.Errorf("stats = %+v, want 2 skipped", st)
+	}
+	if w := src.Warnings(); len(w) != 2 || !strings.Contains(w[0], "token limit") {
+		t.Errorf("warnings = %v", w)
+	}
+}
+
 func TestLLM_twiceInvalidIsUnknownAndCachedAsInvalid(t *testing.T) {
 	llm := newFakeLLM(t, func(int, chatRequest) (int, string, http.Header) {
 		return 200, completion("sorry, I cannot do that", "stop"), nil

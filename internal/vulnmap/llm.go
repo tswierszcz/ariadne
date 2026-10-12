@@ -23,7 +23,7 @@ const (
 
 	llmMaxAttempts    = 3
 	llmMaxRetryAfter  = 30 * time.Second
-	llmMaxTokens      = 8192
+	llmMaxTokens      = 16384
 	llmMaxErrorBodyKB = 2
 )
 
@@ -85,7 +85,14 @@ type chatRequest struct {
 	Temperature    int               `json:"temperature"`
 	MaxTokens      int               `json:"max_tokens"`
 	ResponseFormat map[string]string `json:"response_format,omitempty"`
-	Messages       []chatMessage     `json:"messages"`
+	// Reasoning caps a reasoning model's hidden thinking: GLM 5.3 spent its
+	// whole token budget on it once and returned an empty reply.
+	Reasoning *chatReasoning `json:"reasoning,omitempty"`
+	Messages  []chatMessage  `json:"messages"`
+}
+
+type chatReasoning struct {
+	Effort string `json:"effort"`
 }
 
 type chatResponse struct {
@@ -182,7 +189,7 @@ func (c *llmClient) chat(ctx context.Context, msgs []chatMessage) (chatReply, er
 // chatOnce performs a single HTTP exchange. status is 0 for a transport
 // error or an unusable 200 body (treated as transient by the caller).
 func (c *llmClient) chatOnce(ctx context.Context, msgs []chatMessage, jsonMode bool) (reply chatReply, status int, retryAfter time.Duration, err error) {
-	body := chatRequest{Model: c.cfg.Model, MaxTokens: llmMaxTokens, Messages: msgs}
+	body := chatRequest{Model: c.cfg.Model, MaxTokens: llmMaxTokens, Messages: msgs, Reasoning: &chatReasoning{Effort: "low"}}
 	if jsonMode {
 		body.ResponseFormat = map[string]string{"type": "json_object"}
 	}
