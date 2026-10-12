@@ -5,6 +5,8 @@ narzędziem. Uzupełnienie do [PLAN.md](PLAN.md) (historia faz) i
 [README.md](README.md) (jak działa pipeline) — tutaj trafia *dlaczego*,
 nie *co*.
 
+Wersja angielska tego pliku: [FAQ.md](FAQ.md).
+
 ## Dlaczego lepiej analizować bytecode (`.class`), a nie kod źródłowy Javy?
 
 Kilka powodów, od najważniejszego:
