@@ -140,3 +140,41 @@ func TestResolveDepJars_unidentified(t *testing.T) {
 		t.Fatalf("got %+v, want one unidentified DepJar", got)
 	}
 }
+
+// TestResolveDepJars_webAssetsOnly checks the WebJar detection: only a jar
+// with web assets and no bytecode qualifies. An empty Maven aggregator
+// (spring-boot-starter-web) must not, since CVEs filed against it
+// (Spring4Shell) concern JVM code in other jars.
+func TestResolveDepJars_webAssetsOnly(t *testing.T) {
+	dir := t.TempDir()
+	pom := func(g, a, v string) (string, string) {
+		return "META-INF/maven/" + g + "/" + a + "/pom.properties", "groupId=" + g + "\nartifactId=" + a + "\nversion=" + v + "\n"
+	}
+	jar := func(name string, extra map[string]string, g, a, v string) {
+		entries := map[string]string{}
+		k, val := pom(g, a, v)
+		entries[k] = val
+		for n, c := range extra {
+			entries[n] = c
+		}
+		writeJar(t, filepath.Join(dir, name), entries)
+	}
+	jar("bootstrap-3.3.6.jar", map[string]string{"META-INF/resources/webjars/bootstrap/3.3.6/js/bootstrap.js": "x"}, "org.webjars", "bootstrap", "3.3.6")
+	jar("spring-boot-starter-web-2.4.5.jar", nil, "org.springframework.boot", "spring-boot-starter-web", "2.4.5")
+	jar("lib-1.0.jar", map[string]string{"a/B.class": "x"}, "org.example", "lib", "1.0")
+	jar("mixed-1.0.jar", map[string]string{"a/C.class": "x", "META-INF/resources/webjars/mixed/1.0/m.js": "x"}, "org.example", "mixed", "1.0")
+
+	jars, err := ResolveDepJars(dir, nil)
+	if err != nil {
+		t.Fatalf("ResolveDepJars: %v", err)
+	}
+	want := map[string]bool{"bootstrap": true, "spring-boot-starter-web": false, "lib": false, "mixed": false}
+	for _, dj := range jars {
+		if got := dj.WebAssetsOnly; got != want[dj.GAV.Artifact] {
+			t.Errorf("%s: WebAssetsOnly = %v, want %v", dj.GAV.Artifact, got, want[dj.GAV.Artifact])
+		}
+	}
+	if len(jars) != len(want) {
+		t.Errorf("got %d jars, want %d", len(jars), len(want))
+	}
+}

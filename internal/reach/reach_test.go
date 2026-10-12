@@ -2,6 +2,7 @@ package reach
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"ariadne/internal/callgraph"
@@ -218,5 +219,38 @@ func TestAnalyze_llmAdvisoryOnlyNotReachableIsDowngradedToUnknown(t *testing.T) 
 	r = analyzeEntry(t, e, vulnmap.Entry{Methods: []string{"reachfixture.VulnerableLib#vulnerable"}, Source: vulnmap.SourceLLM, Model: "m/x", Evidence: vulnmap.EvidenceAdvisory})
 	if r.Status != StatusReachable || r.Note != "" {
 		t.Errorf("advisory-only LLM REACHABLE: Status = %q Note = %q, want REACHABLE unchanged", r.Status, r.Note)
+	}
+}
+
+func TestAnalyze_webJarOnlyCVEIsNotApplicable(t *testing.T) {
+	e, _, _ := buildEngine(t)
+	e.SetWebAssetPackages(map[string]bool{"org.webjars:bootstrap": true})
+	webjar := []cves.Affected{{Package: "org.webjars:bootstrap", Version: "3.3.6"}}
+
+	list := []cves.CVE{
+		{ID: "CVE-W-1", Affected: webjar}, // no mapping at all
+		{ID: "CVE-W-2", Affected: webjar}, // a (necessarily wrong) mapping does not matter
+		{ID: "CVE-W-3", Affected: append(webjar, cves.Affected{Package: "org.vulnerable:lib", Version: "1.0"})},
+		{ID: "CVE-W-4"}, // no affected packages: never NOT_APPLICABLE
+	}
+	vm := map[string]vulnmap.Entry{
+		"CVE-W-2": {Methods: []string{"reachfixture.VulnerableLib#vulnerable"}, Source: vulnmap.SourceDiff},
+		"CVE-W-3": {Methods: []string{"reachfixture.VulnerableLib#vulnerable"}, Source: vulnmap.SourceManual},
+	}
+	got := map[string]Result{}
+	for _, r := range e.Analyze(list, vm) {
+		got[r.CVE] = r
+	}
+
+	for _, id := range []string{"CVE-W-1", "CVE-W-2"} {
+		if r := got[id]; r.Status != StatusNotApplicable || !strings.Contains(r.Note, "org.webjars:bootstrap 3.3.6") {
+			t.Errorf("%s = %+v, want NOT_APPLICABLE with a note naming the WebJar", id, r)
+		}
+	}
+	if r := got["CVE-W-3"]; r.Status != StatusReachable {
+		t.Errorf("CVE-W-3 (also affects a JVM library) = %q, want REACHABLE", r.Status)
+	}
+	if r := got["CVE-W-4"]; r.Status != StatusUnknown {
+		t.Errorf("CVE-W-4 = %q, want UNKNOWN", r.Status)
 	}
 }

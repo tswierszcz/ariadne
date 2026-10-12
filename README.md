@@ -238,6 +238,7 @@ found:
 | `FRAMEWORK` | Found only in pass 2: the only path runs through framework code the static graph can't follow past. Needs manual review. |
 | `NOT_REACHABLE` | vulnmap has methods for this CVE, but neither pass ever visits any of them. |
 | `UNKNOWN` | vulnmap has no entry for this CVE at all. |
+| `NOT_APPLICABLE` | Every affected dependency is a WebJar (no `.class` file, assets under `META-INF/resources/webjars/`): client-side JavaScript/CSS a call graph cannot analyze. Checked before everything else. **Not** a verdict that the app is safe: the code runs in the browser. An empty jar alone does not qualify, since Maven aggregators such as `spring-boot-starter-web` are class-free too and CVEs filed against them (Spring4Shell) concern JVM code in other jars. |
 
 Matching a vulnmap method name (`"Class#method"`, no descriptor — matching
 is overload-insensitive everywhere in ariadne) against the graph also

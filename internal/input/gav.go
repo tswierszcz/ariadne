@@ -44,4 +44,11 @@ type DepJar struct {
 	GAV      *GAV   // nil if unidentified
 	Source   Source
 	Warnings []string // e.g. "multiple pom.properties found"
+	// WebAssetsOnly is true for a WebJar: no .class file at all, and
+	// content under META-INF/resources/webjars/ (JavaScript/CSS served to
+	// the browser). An empty jar alone does not qualify: Maven aggregators
+	// such as spring-boot-starter-web are also class-free, yet CVEs filed
+	// against them (Spring4Shell, CVE-2022-22965) concern JVM code that
+	// lives in other jars.
+	WebAssetsOnly bool
 }

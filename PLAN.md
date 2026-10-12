@@ -152,6 +152,7 @@ synthetic_edges:              # proxies with no implementation in bytecode
 | `FRAMEWORK` | The vulnerable code is in a framework package of the active profile and is driven by the framework, or the only paths found go through the framework. Needs manual review. |
 | `NOT_REACHABLE` | Vulnerable methods are known, no path found. |
 | `UNKNOWN` | No mapping from the CVE to methods, so only package-level information. |
+| `NOT_APPLICABLE` | Added after Phase 6. Every affected dependency is a WebJar (no `.class`, assets under `META-INF/resources/webjars/`), i.e. client-side JS/CSS outside a JVM call graph. Not "safe": check whether the app's pages use the component. Empty aggregator jars (`spring-boot-starter-*`, `org.jruby:jruby`) deliberately do not qualify: Spring4Shell (CVE-2022-22965) is filed against `spring-boot-starter-web`. Effect: petclinic's 6 `org.webjars:bootstrap` CVEs move from UNKNOWN to NOT_APPLICABLE; WebGoat unchanged. |
 
 ## 6. Phases
 

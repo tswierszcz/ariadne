@@ -12,6 +12,11 @@ results as data, including each LLM result's `model`, `evidence` and `note`):
 | spring-petclinic 2.4.5 | [llm-run/petclinic.md](llm-run/petclinic.md) | [llm-run/petclinic.json](llm-run/petclinic.json) |
 | WebGoat 8.2.2 (control case) | [llm-run/webgoat.md](llm-run/webgoat.md) | [llm-run/webgoat.json](llm-run/webgoat.json) |
 
+> **Later change:** the `NOT_APPLICABLE` status was added after this run. Re-running the
+> same inputs moves petclinic's 6 `org.webjars:bootstrap` CVEs from UNKNOWN to
+> NOT_APPLICABLE (UNKNOWN 54 → 48 with `-llm`); nothing else changes. The numbers and
+> reports below are left as they were recorded.
+
 ## What was tested
 
 1. **`go test ./... -count=1`**: every package passes, with no JDK and no network (the LLM

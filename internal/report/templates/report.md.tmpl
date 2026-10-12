@@ -22,6 +22,14 @@
 | FRAMEWORK | {{index .StatusCounts "FRAMEWORK"}} |
 | NOT_REACHABLE | {{index .StatusCounts "NOT_REACHABLE"}} |
 | UNKNOWN | {{index .StatusCounts "UNKNOWN"}} |
+| NOT_APPLICABLE | {{index .StatusCounts "NOT_APPLICABLE"}} |
+{{- if index .StatusCounts "NOT_APPLICABLE"}}
+
+NOT_APPLICABLE means every affected dependency is a WebJar: client-side JavaScript/CSS
+with no JVM bytecode, which a call graph cannot analyze. It is **not** a verdict that the
+app is safe: the vulnerability runs in the browser, so check whether the app's pages use
+the affected component.
+{{- end}}
 
 | Severity | Count |
 |---|---|

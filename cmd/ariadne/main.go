@@ -227,14 +227,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	log("analyzing reachability")
 	engine := reach.New(g, h, nil)
+	webAssets := map[string]bool{}
+	for _, dj := range depJars {
+		if dj.WebAssetsOnly && dj.GAV != nil {
+			webAssets[dj.GAV.Group+":"+dj.GAV.Artifact] = true
+		}
+	}
+	engine.SetWebAssetPackages(webAssets)
 	results := engine.Analyze(cveList, vm)
 
 	counts := map[reach.Status]int{}
 	for _, r := range results {
 		counts[r.Status]++
 	}
-	log("REACHABLE=%d FRAMEWORK=%d NOT_REACHABLE=%d UNKNOWN=%d",
-		counts[reach.StatusReachable], counts[reach.StatusFramework], counts[reach.StatusNotReachable], counts[reach.StatusUnknown])
+	log("REACHABLE=%d FRAMEWORK=%d NOT_REACHABLE=%d UNKNOWN=%d NOT_APPLICABLE=%d",
+		counts[reach.StatusReachable], counts[reach.StatusFramework], counts[reach.StatusNotReachable], counts[reach.StatusUnknown],
+		counts[reach.StatusNotApplicable])
 
 	header := report.Header{
 		App:             cfg.app,

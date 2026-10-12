@@ -14,7 +14,7 @@ import (
 	"ariadne/internal/vulnmap"
 )
 
-// Status is one of the four outcomes section 4 defines.
+// Status is one of the outcomes section 5 of PLAN.md defines.
 type Status string
 
 const (
@@ -22,6 +22,10 @@ const (
 	StatusFramework    Status = "FRAMEWORK"
 	StatusNotReachable Status = "NOT_REACHABLE"
 	StatusUnknown      Status = "UNKNOWN"
+	// StatusNotApplicable: every affected dependency is a WebJar (client-
+	// side JavaScript/CSS, no JVM bytecode), so a call graph cannot answer
+	// the question at all. It is not a verdict that the app is safe.
+	StatusNotApplicable Status = "NOT_APPLICABLE"
 )
 
 // EntryEdge is the first app -> dependency edge on a REACHABLE/FRAMEWORK
@@ -67,6 +71,30 @@ type Engine struct {
 	// since both are independent of which CVE is being checked.
 	appOnly bfsResult
 	full    bfsResult
+
+	// webAssetPkgs holds "group:artifact" of dependencies that are WebJars
+	// (see input.DepJar.WebAssetsOnly); set with SetWebAssetPackages.
+	webAssetPkgs map[string]bool
+}
+
+// SetWebAssetPackages marks dependencies ("group:artifact") that contain
+// only client-side web assets. A CVE whose every affected package is one
+// of them gets StatusNotApplicable.
+func (e *Engine) SetWebAssetPackages(pkgs map[string]bool) {
+	e.webAssetPkgs = pkgs
+}
+
+// onlyWebAssets reports whether cve affects WebJars and nothing else.
+func (e *Engine) onlyWebAssets(cve cves.CVE) bool {
+	if len(cve.Affected) == 0 {
+		return false
+	}
+	for _, a := range cve.Affected {
+		if !e.webAssetPkgs[a.Package] {
+			return false
+		}
+	}
+	return true
 }
 
 // New builds an Engine and immediately runs both BFS passes, so
@@ -142,6 +170,20 @@ func (e *Engine) Analyze(list []cves.CVE, vm map[string]vulnmap.Entry) []Result 
 
 func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	entry, ok := vm[cve.ID]
+	if e.onlyWebAssets(cve) {
+		// Checked first: whatever a mapping says, a WebJar has no bytecode
+		// for the vulnerable code to live in.
+		pkgs := make([]string, len(cve.Affected))
+		for i, a := range cve.Affected {
+			pkgs[i] = a.Package + " " + a.Version
+		}
+		return Result{
+			CVE: cve.ID, Status: StatusNotApplicable,
+			Methods: entry.Methods, Source: entry.Source, Model: entry.Model, Evidence: entry.Evidence,
+			Note: fmt.Sprintf("%s contains only client-side web assets (WebJar: JavaScript/CSS), no JVM bytecode; "+
+				"check whether the app's pages use the affected component", strings.Join(pkgs, ", ")),
+		}
+	}
 	if !ok {
 		return Result{CVE: cve.ID, Status: StatusUnknown}
 	}

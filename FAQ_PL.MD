@@ -401,7 +401,12 @@ dodatkowo** sprawdź każdy transytywny podtyp, który nie nadpisuje tej
 metody — bo wywołanie przez referencję podklasy zapisuje w bytecode
 nazwę podklasy, nawet gdy metoda jest tylko dziedziczona.
 
-**Status dla CVE:** brak wpisu z kroku 6 → `UNKNOWN`. Inaczej: dopasowane
+**Status dla CVE:** najpierw, jeśli każda podatna zależność to WebJar
+(ani jednego pliku `.class`, zasoby w `META-INF/resources/webjars/`) →
+`NOT_APPLICABLE`: JavaScript/CSS po stronie przeglądarki, którego graf
+wywołań nie przeanalizuje, co nie znaczy „bezpieczne”. (Sam pusty jar się
+nie liczy: agregatory Mavena, jak `spring-boot-starter-web`, też są puste,
+a Spring4Shell jest przypisany właśnie do niego.) Potem: brak wpisu z kroku 6 → `UNKNOWN`. Inaczej: dopasowane
 węzły odwiedzone w przeszukaniu 1 → `REACHABLE` (najkrótsza taka
 ścieżka). Odwiedzone tylko w przeszukaniu 2 → `FRAMEWORK`. Nigdzie →
 `NOT_REACHABLE`.

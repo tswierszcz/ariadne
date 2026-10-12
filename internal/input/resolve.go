@@ -37,7 +37,7 @@ func ResolveDepJars(dir string, depsListGAVs []GAV) ([]DepJar, error) {
 }
 
 func resolveOne(path, name string, byFileStem map[string]GAV) (DepJar, error) {
-	gavs, err := gavsFromJar(path)
+	gavs, webAssetsOnly, err := inspectJar(path)
 	if err != nil {
 		return DepJar{}, err
 	}
@@ -57,7 +57,7 @@ func resolveOne(path, name string, byFileStem map[string]GAV) (DepJar, error) {
 				break
 			}
 		}
-		dj := DepJar{Path: path, GAV: &gavs[best], Source: SourcePOMProperties}
+		dj := DepJar{Path: path, GAV: &gavs[best], Source: SourcePOMProperties, WebAssetsOnly: webAssetsOnly}
 		if len(gavs) > 1 {
 			others := make([]GAV, 0, len(gavs)-1)
 			for i, g := range gavs {
@@ -74,10 +74,10 @@ func resolveOne(path, name string, byFileStem map[string]GAV) (DepJar, error) {
 
 	if gav, ok := byFileStem[stem]; ok {
 		g := gav
-		return DepJar{Path: path, GAV: &g, Source: SourceDepsList}, nil
+		return DepJar{Path: path, GAV: &g, Source: SourceDepsList, WebAssetsOnly: webAssetsOnly}, nil
 	}
 
-	return DepJar{Path: path, GAV: nil}, nil
+	return DepJar{Path: path, GAV: nil, WebAssetsOnly: webAssetsOnly}, nil
 }
 
 // indexByFileStem maps the file-name stem Maven would use for a dependency

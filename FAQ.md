@@ -402,7 +402,12 @@ method — because a call through a subclass reference records the
 subclass's name in bytecode even when the method is only inherited, not
 overridden.
 
-**Status for a CVE:** no entry from step 6 → `UNKNOWN`. Otherwise:
+**Status for a CVE:** first, if every affected dependency is a WebJar
+(no `.class` file at all, assets under `META-INF/resources/webjars/`) →
+`NOT_APPLICABLE`: client-side JavaScript/CSS a call graph cannot analyze,
+which is not the same as safe. (A merely empty jar does not count: Maven
+aggregators like `spring-boot-starter-web` are empty too, and Spring4Shell
+is filed against exactly that one.) Then: no entry from step 6 → `UNKNOWN`. Otherwise:
 matched nodes visited in search 1 → `REACHABLE` (the shortest such
 path). Visited only in search 2 → `FRAMEWORK`. Neither → `NOT_REACHABLE`.
 

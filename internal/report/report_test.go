@@ -138,3 +138,22 @@ func TestLLMSourceLabelHeaderAndNotes(t *testing.T) {
 		t.Errorf("a run without -llm mentions the LLM:\n%s", md)
 	}
 }
+
+func TestNotApplicableRowAndExplanation(t *testing.T) {
+	results := []reach.Result{{CVE: "CVE-2019-8331", Status: reach.StatusNotApplicable, Note: "org.webjars:bootstrap 3.3.6 contains only client-side web assets"}}
+	list := []cves.CVE{{ID: "CVE-2019-8331", Affected: []cves.Affected{{Package: "org.webjars:bootstrap", Version: "3.3.6"}}}}
+	md, err := RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, list, results, nil))
+	if err != nil {
+		t.Fatalf("RenderMarkdown: %v", err)
+	}
+	for _, want := range []string{"| NOT_APPLICABLE | 1 |", "It is **not** a verdict that the\napp is safe", "| CVE-2019-8331 | org.webjars:bootstrap | 3.3.6 |"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("report is missing %q", want)
+		}
+	}
+
+	md, _ = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil))
+	if !strings.Contains(md, "| NOT_APPLICABLE | 0 |") || strings.Contains(md, "not** a verdict") {
+		t.Errorf("with no NOT_APPLICABLE results the row should read 0 and the explanation be absent")
+	}
+}
