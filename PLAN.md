@@ -224,6 +224,17 @@ this; artifacts live under the gitignored `work/`. Findings:
     `deps.txt` confirms `com.thoughtworks.xstream:xstream:jar:1.4.5` — old XStream, as
     section 2 expects for the control case.
 
+`internal/input` (the Go code, written alongside Phase 2 since Phase 2 needs it as input):
+implemented as planned — `pom.properties` read from inside each jar first, `deps.txt`
+parsing as a fallback for jars with none, unidentified jars reported rather than erroring.
+One real-world wrinkle not in the original plan: a jar can contain *several*
+`pom.properties` files (`ehcache-3.9.2.jar` has 10 — it bundles its internal modules'
+poms), and the first one found is not necessarily the published artifact's own
+coordinates. Fixed by preferring the entry whose `artifact-version` matches the jar's own
+file name, with a warning when there's more than one candidate. Verified on both real
+app dependency sets: petclinic's 87 jars and WebGoat's 126 jars are each 100% identified
+with zero pom.properties/deps.txt disagreements.
+
 ### Phase 2 — CVE list (`internal/cves`, ~45 min)
 - Input: the GAV list from `internal/input`.
 - `POST https://api.osv.dev/v1/querybatch` with
@@ -242,6 +253,15 @@ this; artifacts live under the gitignored `work/`. Findings:
 
 **Done when:** `cves.json` for petclinic is produced, with a non-trivial number of entries,
 and `go test ./internal/cves` covers alias deduplication.
+
+**Status: done.** Pagination support added (`/v1/query` with `page_token` as a fallback
+for packages with more vulns than one querybatch page) but is untested against anything
+real, since no Maven package comes close to that limit. Verified end-to-end against the
+live OSV API: petclinic → **148 CVEs** across 87 resolved GAVs, including the plan's
+SnakeYAML seed example `CVE-2022-1471`; WebGoat → 160 CVEs, including 34 for
+`com.thoughtworks.xstream:xstream:1.4.5` alone (control case confirmed, `CVE-2021-39144`
+among them). Re-running against a warm cache is fast (~0.2s, no network) and produces
+byte-identical `cves.json` output.
 
 ### Phase 3 — Bytecode, call graph, hierarchy (`internal/classfile`, `internal/callgraph`, `internal/hierarchy`, ~2.5 h)
 - `classfile`: a pure-Go `.class` parser (`encoding/binary`, big-endian) that reads:
