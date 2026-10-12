@@ -1,0 +1,107 @@
+# ariadne reachability report
+
+- **App:** {{.App}}
+- **Generated:** {{.GeneratedAt.Format "2006-01-02 15:04:05 MST"}}
+- **ariadne version:** {{.AriadneVersion}}
+- **Profile:** {{.Profile}}
+- **Max bytecode version seen:** {{.MaxBytecodeVer}}
+- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA)
+- **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
+- **Dependencies:** {{.DepsTotal}} total, {{.DepsIdentified}} identified{{if .UnidentifiedJar}}, {{len .UnidentifiedJar}} unidentified{{end}}
+
+## Summary
+
+**{{.TotalCVEs}} CVEs analyzed.**
+
+| Status | Count |
+|---|---|
+| REACHABLE | {{index .StatusCounts "REACHABLE"}} |
+| FRAMEWORK | {{index .StatusCounts "FRAMEWORK"}} |
+| NOT_REACHABLE | {{index .StatusCounts "NOT_REACHABLE"}} |
+| UNKNOWN | {{index .StatusCounts "UNKNOWN"}} |
+
+| Severity | Count |
+|---|---|
+{{range $sev, $count := .SeverityCounts -}}
+| {{$sev}} | {{$count}} |
+{{end}}
+
+## CVEs
+
+| CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source |
+|---|---|---|---|---|---|---|
+{{range .Rows -}}
+| {{.CVE}} | {{.Package}} | {{.Version}} | {{.Severity}} | {{.Status}} | {{.Methods}} | {{.Source}} |
+{{end}}
+
+## REACHABLE — full call paths
+{{if not .Reachable}}
+None.
+{{else}}
+{{range .Reachable}}
+### {{.CVE}}
+
+```
+{{range $i, $node := .Path}}{{if $i}} → {{end}}{{$node}}
+{{end}}```
+{{if .Entry}}
+**Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}`
+{{end}}
+{{end}}
+{{end}}
+
+## FRAMEWORK — needs manual review
+
+These CVEs' vulnerable methods are only reachable by tracing *through*
+framework-package code (Spring MVC, Tomcat, Jackson's `@RequestBody`
+handling, ...), which ariadne's static call graph cannot follow past —
+that code is driven by reflection/dispatch tables the framework builds at
+runtime. A human should check whether the app's own configuration
+actually exposes this path.
+{{if not .Framework}}
+None.
+{{else}}
+{{range .Framework}}
+- **{{.CVE}}**: {{range $i, $m := .Methods}}{{if $i}}, {{end}}`{{$m}}`{{end}}
+  {{if .Entry}}(first app → dependency call: `{{.Entry.From}}` → `{{.Entry.To}}`){{end}}
+{{end}}
+{{end}}
+
+## Unidentified dependency jars
+
+No Maven coordinates could be resolved for these (no `pom.properties` inside the jar
+and no matching entry in `deps.txt`), so they were not checked against OSV at all.
+{{if not .UnidentifiedJar}}
+None.
+{{else}}
+{{range .UnidentifiedJar}}- `{{.}}`
+{{end}}
+{{end}}
+
+## Limitations
+
+- **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
+  and `invokedynamic` sites other than lambdas/method references** are invisible to a
+  static call graph. A Spring Data repository interface, for instance, has no bytecode
+  implementation at all — Spring generates it at runtime — so a call to one can only be
+  seen as reaching the interface method itself, never the generated proxy's body.
+- **Serialization gadgets and config-driven behavior** (XML wiring, `web.xml`,
+  `ServiceLoader`) are not modeled; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only
+  reflects direct and virtual/interface (CHA-expanded) method calls found in bytecode.
+- **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
+  package than its own Maven coordinates is not detected as such.
+- **CHA over-approximates**: a virtual/interface call is treated as reaching every
+  subtype that declares the same-named method, whether or not that specific override is
+  ever actually invoked at runtime for that call site. This produces false positives,
+  never false negatives, for the method-dispatch part of reachability.
+- **Reflection under-approximates**: anything invoked purely via `java.lang.reflect`,
+  `MethodHandle` lookups outside a recognized `LambdaMetafactory` call, or a
+  dependency-injection framework wiring beans by name/type at runtime, is invisible to
+  this analysis and can produce false negatives (a real path exists that ariadne cannot
+  see).
+{{if .WarningMessages}}
+## Build warnings
+
+{{range .WarningMessages}}- {{.}}
+{{end}}
+{{end}}

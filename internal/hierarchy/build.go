@@ -2,6 +2,7 @@ package hierarchy
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"ariadne/internal/input"
@@ -83,19 +84,33 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 		return nil, warnings, firstErr
 	}
 
+	sorted := make([]string, 0, len(classes))
+	for fqcn := range classes {
+		sorted = append(sorted, fqcn)
+	}
+	sort.Strings(sorted)
+
 	return &Hierarchy{
 		classes:       classes,
-		direct:        buildDirectSubtypes(classes),
+		direct:        buildDirectSubtypes(classes, sorted),
 		subtypesCache: make(map[string][]string),
+		sorted:        sorted,
 	}, warnings, nil
 }
 
 // buildDirectSubtypes inverts the superclass/interfaces edges every class
 // already carries, so Subtypes can walk "who extends/implements me"
-// instead of "what do I extend/implement".
-func buildDirectSubtypes(classes map[string]*ClassInfo) map[string][]string {
+// instead of "what do I extend/implement". It iterates sortedFQCNs
+// (rather than ranging over classes directly) purely for determinism: the
+// order each supertype's direct-subtype slice gets built in otherwise
+// depends on Go's randomized map iteration order, which would make
+// Subtypes' result order — and from there, which of several equally
+// short CHA-expanded paths internal/reach ends up reporting — differ
+// between two runs of the exact same analysis.
+func buildDirectSubtypes(classes map[string]*ClassInfo, sortedFQCNs []string) map[string][]string {
 	direct := make(map[string][]string)
-	for fqcn, ci := range classes {
+	for _, fqcn := range sortedFQCNs {
+		ci := classes[fqcn]
 		if ci.SuperClass != "" {
 			direct[ci.SuperClass] = append(direct[ci.SuperClass], fqcn)
 		}

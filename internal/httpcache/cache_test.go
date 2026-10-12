@@ -2,9 +2,11 @@ package httpcache
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 )
 
@@ -111,5 +113,47 @@ func TestCacheSetWritesUnderDir(t *testing.T) {
 	}
 	if len(entries) != 1 || entries[0].Name() != key+".json" {
 		t.Fatalf("dir entries = %v, want exactly %q", entries, key+".json")
+	}
+}
+
+// TestCacheConcurrentSetSameKey reproduces a real failure found running
+// ariadne end-to-end: two CVEs can share the same GitHub fix-commit URL
+// (one commit fixing several CVEs), so two of ResolveAll's worker
+// goroutines legitimately call Set for the *same* key concurrently. A
+// shared "key+.tmp" temp file name let one goroutine's rename steal the
+// other's temp file out from under it, failing with "no such file or
+// directory" — run with -race to also catch a data race on the file
+// itself, not just the renamed-away error.
+func TestCacheConcurrentSetSameKey(t *testing.T) {
+	c, err := New(t.TempDir(), false)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	key := Key("GET", "https://example/shared")
+
+	const n = 20
+	errs := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs <- c.Set(key, []byte(fmt.Sprintf(`{"n":%d}`, i)))
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Errorf("concurrent Set: %v", err)
+		}
+	}
+
+	b, hit, err := c.Get(key)
+	if err != nil || !hit {
+		t.Fatalf("Get after concurrent Set: hit=%v err=%v", hit, err)
+	}
+	if len(b) == 0 {
+		t.Errorf("final cache entry is empty")
 	}
 }

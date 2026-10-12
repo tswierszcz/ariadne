@@ -30,8 +30,12 @@ type ClassInfo struct {
 	SuperClass  string // "" only for java.lang.Object itself
 	Interfaces  []string
 	AccessFlags uint16
-	Methods     []Method
-	Annotations []string
+	// MajorVersion is the class file's own bytecode version (unrelated
+	// to Hierarchy's Go code); the report surfaces the highest one seen
+	// across the whole run.
+	MajorVersion uint16
+	Methods      []Method
+	Annotations  []string
 	// SourceJar is the jar this class was read from ("" for an app class
 	// read from a classes directory/app-classes.jar rather than a
 	// dependency jar).
@@ -85,6 +89,25 @@ type Hierarchy struct {
 	direct map[string][]string
 
 	subtypesCache map[string][]string // memoized transitive subtypes, see Subtypes
+
+	// sorted is every FQCN in classes, sorted once in Build. Anything
+	// that needs a deterministic iteration order over the whole
+	// hierarchy (CHA edge insertion order in internal/callgraph, root
+	// order in internal/reach, and buildDirectSubtypes below, all of
+	// which affect which of several equally-short paths a BFS ends up
+	// recording) must iterate this slice instead of ranging over the
+	// classes map directly, since Go's map iteration order is randomized
+	// per run and would otherwise make results.json's reported paths
+	// nondeterministic between two runs of the very same analysis.
+	sorted []string
+}
+
+// SortedFQCNs returns every class's FQCN, sorted, for callers that need a
+// deterministic iteration order over the whole hierarchy (see the
+// `sorted` field comment above for why this matters). The caller must
+// not modify the returned slice.
+func (h *Hierarchy) SortedFQCNs() []string {
+	return h.sorted
 }
 
 // Lookup returns the ClassInfo for an FQCN, or (nil, false) if it's not

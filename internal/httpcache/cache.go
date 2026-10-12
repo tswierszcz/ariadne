@@ -63,15 +63,31 @@ func (c *Cache) Get(key string) ([]byte, bool, error) {
 	return b, true, nil
 }
 
-// Set writes b under key. It writes to a temp file first and renames, so a
-// crash mid-write never leaves a corrupt cache entry.
+// Set writes b under key. It writes to a uniquely-named temp file first
+// and renames it into place, so a crash mid-write never leaves a corrupt
+// cache entry. The temp name must be unique per call, not just per key:
+// two different CVEs sharing the same fix-commit URL (a single commit
+// fixing more than one CVE) legitimately race to cache the same key from
+// two goroutines, and a shared "key+.tmp" name would let one call's
+// rename steal the other's temp file out from under it.
 func (c *Cache) Set(key string, b []byte) error {
 	final := c.path(key)
-	tmp := final + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return fmt.Errorf("writing cache entry %s: %w", key, err)
+	tmp, err := os.CreateTemp(c.dir, key+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file for cache entry %s: %w", key, err)
 	}
-	if err := os.Rename(tmp, final); err != nil {
+	tmpName := tmp.Name()
+	_, writeErr := tmp.Write(b)
+	closeErr := tmp.Close()
+	if writeErr != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("writing cache entry %s: %w", key, writeErr)
+	}
+	if closeErr != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("writing cache entry %s: %w", key, closeErr)
+	}
+	if err := os.Rename(tmpName, final); err != nil {
 		return fmt.Errorf("committing cache entry %s: %w", key, err)
 	}
 	return nil

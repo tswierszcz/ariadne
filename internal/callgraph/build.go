@@ -24,11 +24,20 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 		byClassMethod: make(map[string][]uint32),
 	}
 
+	// Both passes iterate SortedFQCNs rather than ranging over h.All()
+	// directly: node/edge insertion order is otherwise at the mercy of
+	// Go's randomized map iteration, and since a BFS records the first
+	// parent it reaches a node through, that randomness would make which
+	// of several equally-short paths internal/reach reports nondeterministic
+	// between two runs of the exact same analysis.
+	classes := h.All()
+	fqcns := h.SortedFQCNs()
+
 	// Pass 1: intern every declared method first, so a method with no
 	// outgoing calls at all (a simple getter, an empty override) still
 	// gets a node — internal/reach needs it there to use as a root.
-	for fqcn, ci := range h.All() {
-		for _, m := range ci.Methods {
+	for _, fqcn := range fqcns {
+		for _, m := range classes[fqcn].Methods {
 			g.intern(fqcn, m.Name, m.Descriptor)
 		}
 	}
@@ -38,7 +47,8 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 	// (or a direct call and a CHA-expanded edge landing on the same
 	// node), without the cost of deduping across the whole graph.
 	seen := make(map[Edge]bool)
-	for fqcn, ci := range h.All() {
+	for _, fqcn := range fqcns {
+		ci := classes[fqcn]
 		for _, m := range ci.Methods {
 			if len(m.Calls) == 0 {
 				g.unresolvedDynamic += m.UnresolvedDynamic

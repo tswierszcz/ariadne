@@ -362,6 +362,13 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 			if summary == "" {
 				summary = v.Summary
 			}
+			// A GHSA-sourced qualitative label ("HIGH", "CRITICAL", ...) is
+			// far more report-friendly than the raw CVSS vector string, so
+			// prefer it; only fall back to the vector when OSV has no such
+			// label for this advisory (common for CVE-only, non-GHSA records).
+			if severity == "" && v.DatabaseSpecific.Severity != "" {
+				severity = v.DatabaseSpecific.Severity
+			}
 			if severity == "" && len(v.Severity) > 0 {
 				severity = v.Severity[0].Type + ":" + v.Severity[0].Score
 			}

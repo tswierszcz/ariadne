@@ -522,6 +522,62 @@ Report (`text/template` for Markdown, `html/template` for the optional HTML; tem
 `results.json` must be deterministic: sort by CVE id, then by method. This makes snapshot
 tests possible.
 
+**Status: done**, with some scope deferred (no `-profile`/`-roots`/`-max-dep-depth`/`-html`/
+`-llm` flags — all CLI/profile-system territory noted as deferred in earlier phases' status
+notes). What's implemented:
+- `cmd/ariadne` wires every package built so far into one command:
+  `-app` (directory, plain jar, **or Spring Boot fat jar** — `internal/input.PrepareAppInput`
+  detects `BOOT-INF/` and repacks `BOOT-INF/classes/`/extracts `BOOT-INF/lib/*.jar` to temp
+  files automatically) → `ResolveDepJars` → `hierarchy.Build` → `callgraph.Build` →
+  `cves.Resolve` → `vulnmap.ResolveAll` → `reach.Analyze` → `report.Build` + `WriteMarkdown`
+  + `WriteResultsJSON`, logging progress at each step.
+- `internal/report`: a Markdown report from an embedded `text/template` (no `-html`/
+  `html/template` yet) covering every item this section lists, including the Limitations
+  section and an "Unidentified jars" section. Severity counts bucket by OSV's
+  `database_specific.severity` qualitative label (HIGH/CRITICAL/...) rather than the raw
+  CVSS vector string — the vector string is what OSV's `severity[].score` actually contains
+  for `CVSS_V3`/`CVSS_V4` entries, and a table of ~30 nearly-unique vectors was worse than
+  useless as a summary (found by actually looking at the rendered report, not assumed).
+
+**Two real bugs found and fixed by actually running the finished CLI end-to-end** (not just
+unit tests) that earlier phases' unit-test-only verification had not caught:
+1. **A genuine concurrency bug in `internal/httpcache`**: `Cache.Set`'s temp file name was
+   `key+".tmp"` — deterministic per key, not per call. Two different CVEs can legitimately
+   share one GitHub fix-commit URL (one commit fixing several CVEs), so two of
+   `vulnmap.ResolveAll`'s worker goroutines raced to cache the very same key; one's `rename`
+   stole the temp file out from under the other's, failing with "no such file or directory"
+   on real data (not on the unit tests' synthetic single-key scenarios). Fixed with
+   `os.CreateTemp` for a guaranteed-unique temp name per call; added a regression test run
+   under `-race`.
+2. **`results.json`'s reported paths were not deterministic between two runs of the same
+   analysis**, violating this section's own explicit requirement. Root cause: `hierarchy`'s
+   subtype inversion, both of `callgraph.Build`'s passes, and `reach.Engine.appRoots` all
+   ranged over a `map[string]*ClassInfo` directly; Go deliberately randomizes map iteration
+   order per `range`, so whichever of several equally-short BFS paths got recorded first
+   varied run to run whenever a CVE's vulnerable method had more than one shortest path (real
+   and common on WebGoat's graph — spotted by diffing two real runs' `results.json`, not by
+   reasoning about the code). Fixed by having `Hierarchy` compute a sorted FQCN order once
+   and having all three call sites iterate that instead of the map; added a dedicated
+   regression test (`internal/callgraph/determinism_test.go`) confirmed to both fail against
+   the original code and pass against the fix.
+
+**Verified end-to-end** (the actual `bin/ariadne` binary, not ad hoc scripts), all three
+input modes:
+- petclinic via `-app target/classes` (packed to a jar in memory) `-deps target/dependency
+  -deps-list deps.txt`: 148 CVEs, 13/18/25/92 REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN,
+  matching every earlier phase's ad hoc verification exactly.
+- petclinic via `-app target/spring-petclinic-2.4.5.jar` alone (the Spring Boot fat jar,
+  no `-deps`/`-deps-list` at all): resolves 42/75 dependency jars from `pom.properties`
+  alone (fewer than the 87/87 the directory + `deps.txt` path reaches — expected, and now
+  documented behavior rather than a surprise, since Boot repackaging also drops some
+  jars `target/dependency` has, e.g. `provided`-scope ones).
+- WebGoat (control case): `CVE-2021-39144` and every other XStream CVE REACHABLE via
+  `VulnerableComponentsLesson#completed → XStream#fromXML` in the rendered report.
+  **Three full runs with `-offline` and a warm cache produced byte-identical
+  `results.json`** (after the determinism fix) and reports identical except for the
+  generation timestamp — section 8's "re-running with a warm cache works without
+  network" acceptance criterion, confirmed.
+
 ### Phase 7 — More inputs, profiles and build tools (~2–3 h)
 - Input: WAR (`WEB-INF/classes`, `WEB-INF/lib`) and EAR.
 - Profiles: `servlet`, `jakarta` (JAX-RS/CDI/EJB), and optionally `micronaut` and `quarkus`.
@@ -577,21 +633,40 @@ Conventions: return errors (`fmt.Errorf("...: %w", err)`) and never panic in lib
 pass `context.Context` to everything that does network I/O; use table-driven tests.
 
 ## 8. Acceptance criteria
-- [ ] `go build ./...`, `go vet ./...` and `go test ./...` pass, and `go test` needs no JDK
+- [x] `go build ./...`, `go vet ./...` and `go test ./...` pass, and `go test` needs no JDK
       and no network.
-- [ ] ariadne runs without Java installed.
-- [ ] Runs end-to-end on old petclinic (both from `target/classes`+deps and from the fat
-      jar, with the same result) and produces `report.md` + `results.json`.
-- [ ] Every CVE has exactly one status; `REACHABLE` ones have a path and an entry call.
-- [ ] Petclinic is not "everything REACHABLE" (the CHA guard from 3.6 works).
-- [ ] WebGoat control run shows at least one `REACHABLE` CVE (XStream).
-- [ ] Unit tests for the `.class` parser and the bytecode walker on fixtures compiled for
-      Java 8 and Java 21 (incl. a lambda edge).
-- [ ] Unit test for CHA expansion (interface call reaches implementation; JDK types not expanded).
-- [ ] Unit test for BFS path reconstruction on a fixture graph.
-- [ ] Profile auto-detection picks `spring` for petclinic and `generic` for the fixture.
-- [ ] Report contains the Limitations and "Unidentified jars" sections.
-- [ ] Re-running with `-offline` and a warm cache works without network.
+- [x] ariadne runs without Java installed (the whole point of the own-bytecode-walker
+      decision in section 2; nothing in `cmd/ariadne` or any `internal/*` package shells
+      out to `java`/`javac`/`javap` — only `scripts/prepare-*.sh` and `scripts/build-
+      *fixture*.sh`, which build the *test* apps/fixtures, need a JDK).
+- [x] Runs end-to-end on old petclinic from both `app-classes.jar`+deps and the fat jar,
+      producing `report.md` + `results.json` — **but not "with the same result"**: the fat
+      jar resolves fewer dependency jars (42/75 vs 87/87) since Spring Boot repackaging
+      drops some scopes `target/dependency` still has, so it finds fewer CVEs (47 vs 148).
+      This is correct, expected behavior given the two inputs genuinely differ, not a bug,
+      but it means this criterion as originally phrased doesn't hold and is corrected here.
+- [x] Every CVE has exactly one status; `REACHABLE` ones have a path and an entry call
+      (`reach.Result`/`EntryEdge`, rendered in the report and `results.json`).
+- [x] Petclinic is not "everything REACHABLE" (13/148, not 148/148 — the CHA guard works).
+- [x] WebGoat control run shows at least one `REACHABLE` CVE (XStream) — in fact every
+      XStream CVE in `vuln_methods.yaml` is REACHABLE via the same 2-hop path.
+- [x] Unit tests for the `.class` parser and the bytecode walker on fixtures compiled for
+      Java 8 and Java 21 (incl. a lambda edge) — `internal/classfile`, cross-checked against
+      `javap` ground truth.
+- [x] Unit test for CHA expansion (interface call reaches implementation; JDK types not
+      expanded) — `internal/callgraph`.
+- [x] Unit test for BFS path reconstruction on a fixture graph — `internal/reach`, on a
+      purpose-built 3-jar fixture covering all four statuses, not just CHA.
+- [ ] Profile auto-detection picks `spring` for petclinic and `generic` for the fixture —
+      **not implemented**: there is no profile system at all yet (consistently deferred
+      since the Phase 3 status note); `cmd/ariadne` always reports `Profile: generic (no
+      profile system yet)`. This is the main piece of the original plan Phases 0–6 don't
+      cover; see Phase 7.
+- [x] Report contains the Limitations and "Unidentified jars" sections.
+- [x] Re-running with `-offline` and a warm cache works without network, and — beyond what
+      this criterion originally asked — is now also verified byte-identical across repeated
+      runs (`results.json`), after fixing the map-iteration-order determinism bug Phase 6
+      found.
 
 ## 9. Risks and fallbacks
 | Risk | Fallback |

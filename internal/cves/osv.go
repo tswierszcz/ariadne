@@ -37,13 +37,22 @@ type osvVulnID struct {
 // osvVuln is the detail returned by GET /v1/vulns/{id}. Only the fields
 // ariadne uses are modeled; OSV's schema has more.
 type osvVuln struct {
-	ID         string         `json:"id"`
-	Aliases    []string       `json:"aliases"`
-	Summary    string         `json:"summary"`
-	Details    string         `json:"details"`
-	Severity   []osvSeverity  `json:"severity"`
-	Affected   []osvAffected  `json:"affected"`
-	References []osvReference `json:"references"`
+	ID               string              `json:"id"`
+	Aliases          []string            `json:"aliases"`
+	Summary          string              `json:"summary"`
+	Details          string              `json:"details"`
+	Severity         []osvSeverity       `json:"severity"`
+	Affected         []osvAffected       `json:"affected"`
+	References       []osvReference      `json:"references"`
+	DatabaseSpecific osvDatabaseSpecific `json:"database_specific"`
+}
+
+// osvDatabaseSpecific carries OSV's own (non-schema-standard) extra
+// fields; the only one ariadne uses is a GHSA-sourced qualitative
+// severity label ("LOW"/"MODERATE"/"HIGH"/"CRITICAL"), which is far more
+// report-friendly than the raw CVSS vector string in Severity.
+type osvDatabaseSpecific struct {
+	Severity string `json:"severity"`
 }
 
 type osvSeverity struct {

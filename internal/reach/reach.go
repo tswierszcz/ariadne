@@ -83,7 +83,14 @@ func New(g *callgraph.Graph, h *hierarchy.Hierarchy, framework *FrameworkMatcher
 // here.)
 func (e *Engine) appRoots() []uint32 {
 	var roots []uint32
-	for fqcn, ci := range e.h.All() {
+	// SortedFQCNs, not e.h.All() directly: root order feeds the
+	// multi-source BFS's queue, and a tie between two roots that reach
+	// the same node at the same distance is broken by which one the BFS
+	// happened to enqueue first — which must not depend on Go's
+	// randomized map iteration order if results.json is to report the
+	// same path on every run of the same analysis.
+	for _, fqcn := range e.h.SortedFQCNs() {
+		ci, _ := e.h.Lookup(fqcn)
 		if !ci.IsApp {
 			continue
 		}

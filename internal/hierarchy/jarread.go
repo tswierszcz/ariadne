@@ -60,15 +60,16 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool) ([]*ClassInfo, e
 		}
 
 		out = append(out, &ClassInfo{
-			FQCN:        cf.ThisClass,
-			SuperClass:  cf.SuperClass,
-			Interfaces:  cf.Interfaces,
-			AccessFlags: cf.AccessFlags,
-			Methods:     methods,
-			Annotations: cf.Annotations,
-			SourceJar:   jarPath,
-			GAV:         gav,
-			IsApp:       isApp,
+			FQCN:         cf.ThisClass,
+			SuperClass:   cf.SuperClass,
+			Interfaces:   cf.Interfaces,
+			AccessFlags:  cf.AccessFlags,
+			MajorVersion: cf.MajorVersion,
+			Methods:      methods,
+			Annotations:  cf.Annotations,
+			SourceJar:    jarPath,
+			GAV:          gav,
+			IsApp:        isApp,
 		})
 	}
 	return out, nil
