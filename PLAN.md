@@ -403,6 +403,8 @@ CVEs without methods → status `UNKNOWN`.
 methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
 
 **Status: sources 1 and 2 done (LLM/source 3 deliberately skipped for now, per instruction).**
+- Source 3 (LLM) design, including the exact prompt text, is in
+  [docs/phase4-llm.md](docs/phase4-llm.md); implementation in progress on branch `phase-4-llm`.
 - `vuln_methods.yaml` seeded with the plan's own examples (SnakeYAML, Log4Shell, Text4Shell)
   plus every XStream 1.4.5 CVE id OSV actually returned for WebGoat (37 entries via a
   YAML anchor/alias, since they share one attack surface: an unconfigured XStream's
