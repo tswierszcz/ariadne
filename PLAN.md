@@ -203,6 +203,27 @@ can be repeated. Work in a gitignored `work/` directory.
   logged);
 - WebGoat inputs are ready.
 
+**Status: done.** `scripts/prepare-petclinic.sh` and `scripts/prepare-webgoat.sh` reproduce
+this; artifacts live under the gitignored `work/`. Findings:
+- Petclinic pinned commit `e7c879e` (2021-05-14), Spring Boot 2.4.5, Java 8 source level.
+  Built clean with JDK 11 (`mvnw package -DskipTests`). 87 runtime dependency jars.
+  `deps.txt` confirmed both quirks the plan anticipated: ANSI color codes in the plugin
+  output and ` -- module x [auto]` suffixes — the parser must strip both.
+- WebGoat tag `v8.2.2`, Java 15 source level, built with JDK 17. Two problems hit and
+  worked around (now baked into `prepare-webgoat.sh`):
+  1. `webgoat-lessons/cross-site-scripting` runs `asciidoctor-maven-plugin` at build time
+     to render its lesson plan to HTML; its embedded JRuby fails under JDK 17's module
+     system (`InaccessibleObjectException` even with `--add-opens`). We don't need that
+     lesson, so we build only `webgoat-container` and
+     `webgoat-lessons/vulnerable-components` via `-pl`, which skips the plugin instead of
+     fighting it.
+  2. `vulnerable-components` depends on `webgoat-container` as `provided`, which is only
+     resolvable from the local repo, so `webgoat-container` needs `mvn install` (not just
+     `package`) before `dependency:copy-dependencies`/`dependency:list` work on the lesson.
+  - `app-classes.jar` merges both modules' `target/classes`. 126 runtime dependency jars.
+    `deps.txt` confirms `com.thoughtworks.xstream:xstream:jar:1.4.5` — old XStream, as
+    section 2 expects for the control case.
+
 ### Phase 2 — CVE list (`internal/cves`, ~45 min)
 - Input: the GAV list from `internal/input`.
 - `POST https://api.osv.dev/v1/querybatch` with
