@@ -156,3 +156,18 @@ func TestDedupe_mergesMultipleRecordsSharingAnAlias(t *testing.T) {
 		t.Errorf("Aliases = %v, want [GHSA-aaaa]", got[0].Aliases)
 	}
 }
+
+func TestDedupe_carriesDetailsFromFirstNonEmptyRecord(t *testing.T) {
+	vulns := []osvVuln{
+		{ID: "GHSA-aaaa", Aliases: []string{"CVE-2099-0001"}, Summary: "s"},
+		{ID: "CVE-2099-0001", Aliases: []string{"GHSA-aaaa"}, Details: "long advisory text"},
+	}
+	affectedBy := map[string][]pkgVersion{
+		"GHSA-aaaa":     {{Package: "a:b", Version: "1.0"}},
+		"CVE-2099-0001": {{Package: "a:b", Version: "1.0"}},
+	}
+	got := dedupe(vulns, affectedBy)
+	if len(got) != 1 || got[0].Details != "long advisory text" {
+		t.Fatalf("Details = %+v, want the non-empty one from the second record", got)
+	}
+}

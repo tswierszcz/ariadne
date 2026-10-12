@@ -103,3 +103,38 @@ func TestWriteResultsJSON_deterministicOrder(t *testing.T) {
 		t.Errorf("methods not sorted within a result:\n%s", s)
 	}
 }
+
+func TestLLMSourceLabelHeaderAndNotes(t *testing.T) {
+	list := []cves.CVE{{ID: "CVE-2099-0010"}, {ID: "CVE-2099-0011"}}
+	results := []reach.Result{
+		{CVE: "CVE-2099-0010", Status: reach.StatusUnknown, Methods: []string{"a.B#m"}, Source: "llm", Model: "z-ai/glm-5.3", Evidence: "advisory",
+			Note: "LLM (z-ai/glm-5.3) suggested a.B#m from the advisory text only"},
+		{CVE: "CVE-2099-0011", Status: reach.StatusNotReachable, Methods: []string{"a.C#m"}, Source: "llm", Model: "z-ai/glm-5.3", Evidence: "diff"},
+	}
+	h := Header{App: "app", GeneratedAt: time.Now(), LLMModel: "z-ai/glm-5.3", LLMMapped: 2, LLMSkipped: 3}
+	md, err := RenderMarkdown(Build(h, list, results, nil))
+	if err != nil {
+		t.Fatalf("RenderMarkdown: %v", err)
+	}
+	for _, want := range []string{
+		"**LLM-assisted mapping:** z-ai/glm-5.3 (2 CVEs mapped, 3 skipped)",
+		"| llm (advisory) |",
+		"| llm (diff) |",
+		"Notes on individual results",
+		"from the advisory text only",
+		"LLM-assisted mappings (`llm` in the Source column) are unverified",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("report is missing %q", want)
+		}
+	}
+
+	// Without -llm, none of it appears.
+	md, err = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil))
+	if err != nil {
+		t.Fatalf("RenderMarkdown: %v", err)
+	}
+	if strings.Contains(md, "LLM") {
+		t.Errorf("a run without -llm mentions the LLM:\n%s", md)
+	}
+}

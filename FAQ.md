@@ -359,7 +359,13 @@ class/method/"something else" frames (`if`/`for`/lambda/anonymous-class
 bodies are transparent), and renames a method to `<init>` when its name
 matches the enclosing class (a constructor).
 
-Source 3 (an LLM reading the advisory + diff) **is not implemented**.
+Source 3 is an LLM reading the advisory + fix diff, opt-in with `-llm`
+(design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
+runs only for CVEs sources 1 and 2 left unmapped, and each method it
+names is checked to exist in the analyzed bytecode. When it saw only the
+advisory text (no diff), a `NOT_REACHABLE` result is downgraded to
+`UNKNOWN`, since the model may have named a real method that is not the
+vulnerable one.
 
 Numbers: petclinic — 56/148 mapped (1 from the manual table, 55 from a
 diff); WebGoat — 104/160 (37 from the manual table — the whole XStream

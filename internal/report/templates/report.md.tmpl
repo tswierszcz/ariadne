@@ -8,6 +8,9 @@
 - **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA)
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
 - **Dependencies:** {{.DepsTotal}} total, {{.DepsIdentified}} identified{{if .UnidentifiedJar}}, {{len .UnidentifiedJar}} unidentified{{end}}
+{{- if .LLMModel}}
+- **LLM-assisted mapping:** {{.LLMModel}} ({{.LLMMapped}} CVEs mapped, {{.LLMSkipped}} skipped)
+{{- end}}
 
 ## Summary
 
@@ -34,6 +37,12 @@
 | {{.CVE}} | {{.Package}} | {{.Version}} | {{.Severity}} | {{.Status}} | {{.Methods}} | {{.Source}} |
 {{end}}
 
+{{if .Notes}}
+### Notes on individual results
+{{range .Notes}}
+- **{{.CVE}}** ({{.Status}}): {{.Note}}
+{{end}}
+{{end}}
 ## REACHABLE — full call paths
 {{if not .Reachable}}
 None.
@@ -99,7 +108,12 @@ None.
   dependency-injection framework wiring beans by name/type at runtime, is invisible to
   this analysis and can produce false negatives (a real path exists that ariadne cannot
   see).
-{{if .WarningMessages}}
+{{if .LLMModel}}- **LLM-assisted mappings (`llm` in the Source column) are unverified, machine-suggested
+  method lists.** Each method was checked to exist in the analyzed bytecode, but not that
+  it is the vulnerable one. When the model saw only the advisory text (`llm (advisory)`),
+  a NOT_REACHABLE verdict is reported as UNKNOWN instead, since that is too weak to call
+  safe.
+{{end}}{{if .WarningMessages}}
 ## Build warnings
 
 {{range .WarningMessages}}- {{.}}

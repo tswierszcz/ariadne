@@ -4,10 +4,11 @@
 //  1. a manual table (vuln_methods.yaml), checked by hand against each
 //     advisory/fix commit — always wins when it has an entry;
 //  2. a GitHub fix-commit diff, parsed into the methods its changed lines
-//     fall inside (internal/javadiff).
-//
-// A third source, an LLM asked to read the advisory and diff, is in the
-// plan but not implemented here.
+//     fall inside (internal/javadiff);
+//  3. an LLM asked to read the advisory and, when there is one, the fix
+//     diff (llm*.go; opt-in with -llm; see docs/phase4-llm.md). It only
+//     fills gaps left by sources 1 and 2, and its answer is checked against
+//     the analyzed bytecode before use.
 package vulnmap
 
 import (

@@ -360,7 +360,13 @@ klasa/metoda/„coś innego" (bloki `if`/`for`/lambda/anonimowa klasa są
 przezroczyste), i zmienia nazwę metody na `<init>`, gdy ta zgadza się z
 nazwą otaczającej klasy (konstruktor).
 
-Źródło 3 (LLM czytający advisory + diff) **nie jest zaimplementowane**.
+Źródło 3 to LLM czytający advisory + diff poprawki, włączany opcją
+`-llm` (projekt i dokładny prompt: [docs/phase4-llm.md](docs/phase4-llm.md),
+po angielsku). Uruchamia się tylko dla CVE, których źródła 1 i 2 nie
+zmapowały, a każda metoda, którą model wskaże, jest sprawdzana, czy
+istnieje w analizowanym bytecode. Gdy model widział tylko tekst advisory
+(bez diffu), wynik `NOT_REACHABLE` jest obniżany do `UNKNOWN`, bo model
+mógł wskazać istniejącą metodę, która nie jest tą podatną.
 
 Liczby: petclinic — 56/148 zmapowanych (1 ręcznie, 55 przez diff);
 WebGoat — 104/160 (37 ręcznie — cała rodzina XStream, 67 przez diff).

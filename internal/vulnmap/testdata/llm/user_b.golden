@@ -1,0 +1,15 @@
+Vulnerability: CVE-2099-0001
+Aliases: GHSA-aaaa-bbbb-cccc
+Affected Maven package(s): org.example:example-lib 1.2.3
+
+<advisory_summary>
+Parser bypass in example-lib
+</advisory_summary>
+
+<advisory_details>
+The Parser.parse method accepts crafted input.
+</advisory_details>
+
+No fix diff is provided: the fix commit(s) (https://github.com/example/lib/commit/abc1234) changed no non-test .java files. Follow rules 4 and 5.
+
+Return the JSON object.

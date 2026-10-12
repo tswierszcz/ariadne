@@ -5,6 +5,7 @@
 package reach
 
 import (
+	"fmt"
 	"strings"
 
 	"ariadne/internal/callgraph"
@@ -34,12 +35,19 @@ type EntryEdge struct {
 
 // Result is one CVE's reachability verdict.
 type Result struct {
-	CVE     string     `json:"cve"`
-	Status  Status     `json:"status"`
-	Methods []string   `json:"methods,omitempty"` // from vulnmap, carried through for the report
-	Source  string     `json:"source,omitempty"`  // vulnmap source: "manual" or "diff"
-	Path    []string   `json:"path,omitempty"`    // root -> ... -> vulnerable method, rendered node keys
-	Entry   *EntryEdge `json:"entry,omitempty"`
+	CVE     string   `json:"cve"`
+	Status  Status   `json:"status"`
+	Methods []string `json:"methods,omitempty"` // from vulnmap, carried through for the report
+	Source  string   `json:"source,omitempty"`  // vulnmap source: "manual", "diff" or "llm"
+	// Model/Evidence are set for Source "llm": the model id, and whether
+	// it saw a fix diff ("diff") or only the advisory text ("advisory").
+	Model    string `json:"model,omitempty"`
+	Evidence string `json:"evidence,omitempty"`
+	// Note explains a verdict a reader might not expect, e.g. an LLM
+	// advisory-only NOT_REACHABLE downgraded to UNKNOWN.
+	Note  string     `json:"note,omitempty"`
+	Path  []string   `json:"path,omitempty"` // root -> ... -> vulnerable method, rendered node keys
+	Entry *EntryEdge `json:"entry,omitempty"`
 }
 
 // Engine holds everything needed to answer "is this CVE reachable" for
@@ -144,7 +152,10 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	}
 	matched = dedupeIDs(matched)
 
-	result := Result{CVE: cve.ID, Status: StatusNotReachable, Methods: entry.Methods, Source: entry.Source}
+	result := Result{
+		CVE: cve.ID, Status: StatusNotReachable, Methods: entry.Methods, Source: entry.Source,
+		Model: entry.Model, Evidence: entry.Evidence,
+	}
 
 	// Prefer the shortest REACHABLE path among every matched node; fall
 	// back to the shortest FRAMEWORK path only if no matched node is
@@ -160,6 +171,16 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 		result.Path = renderPath(e.g, path)
 		result.Entry = e.entryEdge(path)
 		return result
+	}
+
+	// An LLM that saw only the advisory text may have named a method that
+	// exists but is not the vulnerable one; bytecode grounding cannot catch
+	// that. A positive finding is still worth surfacing, but "not reachable"
+	// on such weak evidence would read as "safe", so report it as UNKNOWN.
+	if entry.Source == vulnmap.SourceLLM && entry.Evidence == vulnmap.EvidenceAdvisory {
+		result.Status = StatusUnknown
+		result.Note = fmt.Sprintf("LLM (%s) suggested %s from the advisory text only (no fix diff); not reachable, but unverified",
+			entry.Model, strings.Join(entry.Methods, ", "))
 	}
 	return result
 }

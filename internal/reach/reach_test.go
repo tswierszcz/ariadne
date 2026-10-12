@@ -185,3 +185,38 @@ func TestFrameworkMatcher(t *testing.T) {
 		}
 	}
 }
+
+func analyzeEntry(t *testing.T, e *Engine, entry vulnmap.Entry) Result {
+	t.Helper()
+	cve := cves.CVE{ID: "CVE-TEST-0002"}
+	return e.Analyze([]cves.CVE{cve}, map[string]vulnmap.Entry{cve.ID: entry})[0]
+}
+
+// An LLM that saw only the advisory must never produce NOT_REACHABLE, but
+// a positive finding, or any verdict backed by a fix diff, is unchanged.
+func TestAnalyze_llmAdvisoryOnlyNotReachableIsDowngradedToUnknown(t *testing.T) {
+	e, _, _ := buildEngine(t)
+	notReached := []string{"reachfixture.VulnerableLib#unreachable"}
+
+	if r := analyzeEntry(t, e, vulnmap.Entry{Methods: notReached, Source: vulnmap.SourceManual}); r.Status != StatusNotReachable {
+		t.Fatalf("control: manual entry Status = %q, want NOT_REACHABLE (is the fixture method still unreachable?)", r.Status)
+	}
+
+	r := analyzeEntry(t, e, vulnmap.Entry{Methods: notReached, Source: vulnmap.SourceLLM, Model: "m/x", Evidence: vulnmap.EvidenceAdvisory})
+	if r.Status != StatusUnknown {
+		t.Errorf("advisory-only LLM NOT_REACHABLE: Status = %q, want UNKNOWN", r.Status)
+	}
+	if r.Note == "" || r.Model != "m/x" || r.Evidence != vulnmap.EvidenceAdvisory || r.Source != vulnmap.SourceLLM {
+		t.Errorf("result lost its provenance: %+v", r)
+	}
+
+	r = analyzeEntry(t, e, vulnmap.Entry{Methods: notReached, Source: vulnmap.SourceLLM, Model: "m/x", Evidence: vulnmap.EvidenceDiff})
+	if r.Status != StatusNotReachable || r.Note != "" {
+		t.Errorf("diff-backed LLM NOT_REACHABLE: Status = %q Note = %q, want NOT_REACHABLE with no note", r.Status, r.Note)
+	}
+
+	r = analyzeEntry(t, e, vulnmap.Entry{Methods: []string{"reachfixture.VulnerableLib#vulnerable"}, Source: vulnmap.SourceLLM, Model: "m/x", Evidence: vulnmap.EvidenceAdvisory})
+	if r.Status != StatusReachable || r.Note != "" {
+		t.Errorf("advisory-only LLM REACHABLE: Status = %q Note = %q, want REACHABLE unchanged", r.Status, r.Note)
+	}
+}

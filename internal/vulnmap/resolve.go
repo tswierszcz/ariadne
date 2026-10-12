@@ -13,6 +13,7 @@ import (
 const (
 	SourceManual = "manual"
 	SourceDiff   = "diff"
+	SourceLLM    = "llm"
 )
 
 // Entry is one CVE's resolved method mapping, exactly as Phase 4's
@@ -20,12 +21,17 @@ const (
 type Entry struct {
 	Methods []string `json:"methods"`
 	Source  string   `json:"source"`
+	// Model and Evidence are set only for Source == SourceLLM: the model
+	// that answered, and whether it saw a fix diff (EvidenceDiff) or the
+	// advisory text alone (EvidenceAdvisory).
+	Model    string `json:"model,omitempty"`
+	Evidence string `json:"evidence,omitempty"`
 }
 
 const resolveWorkers = 8
 
-// Resolver maps CVEs to vulnerable methods using the manual table first
-// and a GitHub fix-commit diff second.
+// Resolver maps CVEs to vulnerable methods using the manual table first, a
+// GitHub fix-commit diff second, and (when LLM is set) an LLM third.
 type Resolver struct {
 	Manual     map[string][]string
 	HTTPClient *http.Client
@@ -36,6 +42,11 @@ type Resolver struct {
 	// fake HTTP server can stand in for both.
 	GithubBaseURL string
 	RawBaseURL    string
+
+	// LLM enables source 3; nil leaves it disabled. MethodExists grounds
+	// the model's answer in the analyzed bytecode (nil skips the check).
+	LLM          *LLMSource
+	MethodExists func(fqcn, method string) bool
 }
 
 // NewResolver builds a Resolver from an already-loaded manual table (see
@@ -52,8 +63,8 @@ func NewResolver(manual map[string][]string, cache *httpcache.Cache) *Resolver {
 
 // Resolve maps one CVE to its vulnerable methods, trying the CVE's own id
 // and every alias against the manual table before falling back to its
-// fix-commit diffs. ok is false when neither source found anything —
-// internal/reach treats that as status UNKNOWN.
+// fix-commit diffs, then (if enabled) asking the LLM. ok is false when no
+// source found anything — internal/reach treats that as status UNKNOWN.
 func (r *Resolver) Resolve(ctx context.Context, cve cves.CVE) (Entry, bool, error) {
 	for _, id := range append([]string{cve.ID}, cve.Aliases...) {
 		if methods, ok := r.Manual[id]; ok && len(methods) > 0 {
@@ -65,11 +76,15 @@ func (r *Resolver) Resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 	if err != nil {
 		return Entry{}, false, err
 	}
-	if len(methods) == 0 {
+	if len(methods) > 0 {
+		sort.Strings(methods)
+		return Entry{Methods: methods, Source: SourceDiff}, true, nil
+	}
+
+	if r.LLM == nil {
 		return Entry{}, false, nil
 	}
-	sort.Strings(methods)
-	return Entry{Methods: methods, Source: SourceDiff}, true, nil
+	return r.resolveFromLLM(ctx, cve)
 }
 
 // ResolveAll resolves every CVE in list, in parallel (fix-commit/raw-file

@@ -47,6 +47,7 @@ type CVE struct {
 	ID         string      `json:"id"` // a CVE id when one exists among the aliases, else the OSV/GHSA id
 	Aliases    []string    `json:"aliases"`
 	Summary    string      `json:"summary"`
+	Details    string      `json:"details,omitempty"`  // OSV's long-form advisory text; input to vulnmap's LLM source
 	Severity   string      `json:"severity,omitempty"` // CVSS vector/score, verbatim from OSV, if present
 	Affected   []Affected  `json:"affected"`
 	References []Reference `json:"references"`
@@ -351,7 +352,7 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 		// single record, but handle the general case).
 		var allAliases []string
 		seenAlias := map[string]bool{}
-		var summary, severity string
+		var summary, details, severity string
 		var affected []Affected
 		var refs []Reference
 		seenAffected := map[Affected]bool{}
@@ -361,6 +362,9 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 			v := byID[id]
 			if summary == "" {
 				summary = v.Summary
+			}
+			if details == "" {
+				details = v.Details
 			}
 			// A GHSA-sourced qualitative label ("HIGH", "CRITICAL", ...) is
 			// far more report-friendly than the raw CVSS vector string, so
@@ -407,6 +411,7 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 			ID:         primary,
 			Aliases:    allAliases,
 			Summary:    summary,
+			Details:    details,
 			Severity:   severity,
 			Affected:   affected,
 			References: refs,

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"time"
 
@@ -22,7 +23,7 @@ import (
 )
 
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
 }
 
 type config struct {
@@ -35,9 +36,14 @@ type config struct {
 	cacheDir    string
 	offline     bool
 	showVersion bool
+
+	llm        bool
+	llmModel   string
+	llmBaseURL string
+	llmConfig  vulnmap.LLMConfig // resolved from the flags above and the environment; set when llm is true
 }
 
-func run(args []string, stdout, stderr io.Writer) int {
+func run(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
 	fs := flag.NewFlagSet("ariadne", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -50,6 +56,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
 	fs.BoolVar(&cfg.offline, "offline", false, "serve only from the cache; fail clearly on a miss instead of touching the network")
+	fs.BoolVar(&cfg.llm, "llm", false, "also map CVEs no other source could to vulnerable methods by asking an LLM (needs ARIADNE_LLM_API_KEY and a model)")
+	fs.StringVar(&cfg.llmModel, "llm-model", "", "LLM model id; overrides ARIADNE_LLM_MODEL")
+	fs.StringVar(&cfg.llmBaseURL, "llm-base-url", "", "OpenAI-compatible base URL; overrides ARIADNE_LLM_BASE_URL (default "+vulnmap.DefaultLLMBaseURL+")")
 	fs.BoolVar(&cfg.showVersion, "version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -58,6 +67,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if cfg.showVersion {
 		fmt.Fprintf(stdout, "ariadne %s\n", version())
 		return 0
+	}
+
+	if cfg.llm {
+		cfg.llmConfig = vulnmap.LLMConfigFromEnv(getenv)
+		if cfg.llmModel != "" {
+			cfg.llmConfig.Model = cfg.llmModel
+		}
+		if cfg.llmBaseURL != "" {
+			cfg.llmConfig.BaseURL = cfg.llmBaseURL
+		}
 	}
 
 	if err := validate(cfg); err != nil {
@@ -82,6 +101,11 @@ func validate(cfg config) error {
 	}
 	if cfg.jsonOut == "" {
 		return fmt.Errorf("-json is required")
+	}
+	if cfg.llm {
+		if err := cfg.llmConfig.Validate(cfg.offline); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -172,11 +196,34 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("loading vuln_methods.yaml: %w", err)
 	}
-	vm, err := vulnmap.NewResolver(manual, cache).ResolveAll(ctx, cveList)
+	resolver := vulnmap.NewResolver(manual, cache)
+	var llmSrc *vulnmap.LLMSource
+	if cfg.llm {
+		llmCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "llm"), cfg.offline)
+		if err != nil {
+			return fmt.Errorf("opening LLM cache dir: %w", err)
+		}
+		llmSrc = vulnmap.NewLLMSource(cfg.llmConfig, llmCache, nil)
+		resolver.LLM = llmSrc
+		resolver.MethodExists = methodExists(h)
+		log("LLM source enabled: model %s", cfg.llmConfig.Model)
+	}
+	vm, err := resolver.ResolveAll(ctx, cveList)
 	if err != nil {
 		return fmt.Errorf("mapping CVEs to vulnerable methods: %w", err)
 	}
-	log("mapped %d/%d CVEs to vulnerable methods", len(vm), len(cveList))
+	bySource := map[string]int{}
+	for _, e := range vm {
+		bySource[e.Source]++
+	}
+	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d)",
+		len(vm), len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM])
+	if llmSrc != nil {
+		st := llmSrc.Stats()
+		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode",
+			st.Mapped, st.Empty, st.Skipped, st.Invalid, st.Dropped)
+		warnings = append(warnings, llmSrc.Warnings()...)
+	}
 
 	log("analyzing reachability")
 	engine := reach.New(g, h, nil)
@@ -204,6 +251,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		DepsIdentified:  identified,
 		UnidentifiedJar: unidentified,
 	}
+	if llmSrc != nil {
+		st := llmSrc.Stats()
+		header.LLMModel = cfg.llmConfig.Model
+		header.LLMMapped = st.Mapped
+		header.LLMSkipped = st.Skipped + st.Invalid
+	}
 	data := report.Build(header, cveList, results, warnings)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
@@ -217,6 +270,24 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("wrote %s", cfg.jsonOut)
 
 	return nil
+}
+
+// methodExists grounds an LLM-suggested method in the analyzed bytecode: a
+// constructor must be declared on exactly that class; any other method may
+// be inherited, found by the JVM's own lookup order.
+func methodExists(h *hierarchy.Hierarchy) func(fqcn, method string) bool {
+	return func(fqcn, method string) bool {
+		if method == "<init>" || method == "<clinit>" {
+			ci, ok := h.Lookup(fqcn)
+			if !ok {
+				return false
+			}
+			_, declared := ci.MethodByName(method)
+			return declared
+		}
+		_, found := h.ResolveMethod(fqcn, method)
+		return found
+	}
 }
 
 // version returns the module version, or the VCS revision for local builds.

@@ -1,0 +1,15 @@
+Vulnerability: CVE-2099-0001
+Aliases: GHSA-aaaa-bbbb-cccc
+Affected Maven package(s): org.example:example-lib 1.2.3
+
+<advisory_summary>
+Parser bypass in example-lib
+</advisory_summary>
+
+<advisory_details>
+(none)
+</advisory_details>
+
+No fix diff is provided: the advisory links no fix commit. Follow rule 4.
+
+Return the JSON object.

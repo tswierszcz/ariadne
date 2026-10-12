@@ -93,6 +93,11 @@ func (c *Cache) Set(key string, b []byte) error {
 	return nil
 }
 
+// Dir returns the directory the cache stores its entries in.
+func (c *Cache) Dir() string {
+	return c.dir
+}
+
 // Offline reports whether this cache was constructed in offline mode.
 func (c *Cache) Offline() bool {
 	return c.offline

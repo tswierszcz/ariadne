@@ -26,6 +26,11 @@ type Header struct {
 	DepsTotal       int
 	DepsIdentified  int
 	UnidentifiedJar []string
+
+	// LLM* are set only when -llm was used.
+	LLMModel   string
+	LLMMapped  int
+	LLMSkipped int // requests that failed or replies that stayed invalid
 }
 
 // Row is one line of the CVE table.
@@ -46,6 +51,7 @@ type Data struct {
 	StatusCounts    map[string]int
 	SeverityCounts  map[string]int
 	Rows            []Row
+	Notes           []reach.Result // results carrying a Note, e.g. downgraded LLM verdicts
 	Reachable       []reach.Result
 	Framework       []reach.Result
 	TotalCVEs       int
@@ -90,16 +96,19 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string)
 				Severity: sev,
 				Status:   r.Status,
 				Methods:  joinMethods(r.Methods),
-				Source:   r.Source,
+				Source:   sourceLabel(r),
 			})
 		}
 		if len(cve.Affected) == 0 {
 			data.Rows = append(data.Rows, Row{
 				CVE: r.CVE, Severity: sev, Status: r.Status,
-				Methods: joinMethods(r.Methods), Source: r.Source,
+				Methods: joinMethods(r.Methods), Source: sourceLabel(r),
 			})
 		}
 
+		if r.Note != "" {
+			data.Notes = append(data.Notes, r)
+		}
 		switch r.Status {
 		case reach.StatusReachable:
 			data.Reachable = append(data.Reachable, r)
@@ -110,6 +119,15 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string)
 	sort.Slice(data.Rows, func(i, j int) bool { return data.Rows[i].CVE < data.Rows[j].CVE })
 
 	return data
+}
+
+// sourceLabel shows an LLM mapping's evidence next to its source, e.g.
+// "llm (diff)", so a reader can tell a diff-backed mapping from a guess.
+func sourceLabel(r reach.Result) string {
+	if r.Source == "llm" && r.Evidence != "" {
+		return "llm (" + r.Evidence + ")"
+	}
+	return r.Source
 }
 
 func joinMethods(methods []string) string {

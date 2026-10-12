@@ -402,9 +402,7 @@ CVEs without methods → status `UNKNOWN`.
 **Done when:** a unit test on a stored sample `.diff` in `testdata/diffs/` returns the expected
 methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
 
-**Status: sources 1 and 2 done (LLM/source 3 deliberately skipped for now, per instruction).**
-- Source 3 (LLM) design, including the exact prompt text, is in
-  [docs/phase4-llm.md](docs/phase4-llm.md); implementation in progress on branch `phase-4-llm`.
+**Status: sources 1 and 2 done; source 3 (LLM) implemented — see the Source 3 notes below.**
 - `vuln_methods.yaml` seeded with the plan's own examples (SnakeYAML, Log4Shell, Text4Shell)
   plus every XStream 1.4.5 CVE id OSV actually returned for WebGoat (37 entries via a
   YAML anchor/alias, since they share one attack surface: an unconfigured XStream's
@@ -429,6 +427,25 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
   the manual table, confirmed in `vulnmap.json`.
 - Not yet wired into a CLI/`vulnmap.json` output path (no `cmd/ariadne` flags exist yet);
   that happens with Phase 6.
+- **Source 3 (LLM), opt-in with `-llm`.** Design, exact prompt text and test plan:
+  [docs/phase4-llm.md](docs/phase4-llm.md). Files: `internal/vulnmap/llm.go` (config + HTTP
+  client: retries, 401/403 fatal), `llmprompt.go` + `llm_system_prompt.txt` +
+  `llm_user_prompt.tmpl` (the prompt; pinned by golden tests in `testdata/llm/`),
+  `llmanswer.go` (schema validation + bytecode grounding), `llmsource.go` (cache in
+  `<cache-dir>/llm/`, one corrective retry). Runs only when sources 1 and 2 found nothing.
+  Decisions made while implementing:
+  - the model slug is `z-ai/glm-5.3` (`.env` originally held the display name "GLM 5.3",
+    which is not an OpenRouter id);
+  - **advisory-only LLM results never report NOT_REACHABLE**: `reach` downgrades them to
+    UNKNOWN with a `note` (REACHABLE/FRAMEWORK stay). A named method that exists but is not
+    the vulnerable one would otherwise read as a false "safe";
+  - `cves.CVE` gained `Details` (OSV's long advisory text, previously dropped);
+  - source 2's `src/main/` filter hides Tomcat's `java/org/apache/...` layout (35 of
+    petclinic's 43 "has a fix commit but unmapped" CVEs). Source 3 reads those diffs
+    instead; widening source 2's filter is a possible later follow-up.
+  - `-llm`/`-llm-model`/`-llm-base-url` in `cmd/ariadne`; the key is read only from
+    `ARIADNE_LLM_API_KEY`. Unit tests use a fake HTTP server (no key, no network); the one
+    real-endpoint test is skipped unless `ARIADNE_LLM_E2E=1` (`make e2e-llm`).
 
 ### Phase 5 — Reachability engine (`internal/reach`, ~1 h)
 - Roots: all app methods (default) or profile entry points (`--roots profile`).

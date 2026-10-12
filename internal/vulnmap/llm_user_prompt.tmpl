@@ -1,0 +1,29 @@
+Vulnerability: {{.ID}}
+Aliases: {{.Aliases}}
+Affected Maven package(s): {{.Packages}}
+
+<advisory_summary>
+{{.Summary}}
+</advisory_summary>
+
+<advisory_details>
+{{.Details}}
+</advisory_details>
+
+{{if eq .Variant "A" -}}
+The fix diff below contains only the non-test .java files changed by the fix commit(s){{if .Truncated}}; it was truncated to fit, and the omitted files are listed at the end{{end}}.
+
+<fix_diff>
+{{.Diff}}
+</fix_diff>
+
+Return the JSON object.
+{{- else if eq .Variant "B" -}}
+No fix diff is provided: the fix commit(s) ({{.CommitURLs}}) changed no non-test .java files. Follow rules 4 and 5.
+
+Return the JSON object.
+{{- else -}}
+No fix diff is provided: the advisory links no fix commit. Follow rule 4.
+
+Return the JSON object.
+{{- end}}

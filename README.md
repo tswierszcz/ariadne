@@ -199,7 +199,18 @@ For each CVE, in priority order:
    changed line inside one is attributed to the *enclosing* method); a
    method whose name matches its enclosing class is renamed to `<init>`,
    matching bytecode's own convention.
-3. No source 3 (an LLM reading the advisory + diff) is implemented.
+3. **An LLM (opt-in, `-llm`).** Only for a CVE sources 1 and 2 found
+   nothing for. The model gets the advisory (summary + details) and,
+   when the CVE links a fix commit, that commit's non-test `.java` diff;
+   it answers with a JSON list of methods. The reply is validated
+   against a schema (one corrective retry), and every method is then
+   checked to actually exist in the analyzed bytecode — an invented one
+   is dropped. The report marks these `llm (diff)` or `llm (advisory)`.
+   If the model saw only the advisory text, a `NOT_REACHABLE` verdict is
+   reported as `UNKNOWN` instead (it could have named a method that
+   exists but is not the vulnerable one). Prompts, answers and the model
+   id are cached under `<cache-dir>/llm/`. Full design, including the
+   exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md).
 
 A CVE vulnmap finds no methods for at all becomes `UNKNOWN` in the next
 step, not an error.
@@ -287,7 +298,25 @@ Flags:
 | `-json` | yes | `results.json` output path. |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
 | `-offline` | no | Serve only from the cache; a miss is a clear, immediate error. |
+| `-llm` | no | Enable the LLM source for CVEs the manual table and fix-commit diffs could not map. Needs a model and `ARIADNE_LLM_API_KEY`. |
+| `-llm-model` | no | LLM model id; overrides `ARIADNE_LLM_MODEL` (e.g. `z-ai/glm-5.3`). |
+| `-llm-base-url` | no | OpenAI-compatible base URL; overrides `ARIADNE_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`). |
 | `-version` | no | Print the ariadne version and exit. |
+
+### Using the LLM source
+
+The API key is read **only** from the environment (never a flag, so it
+stays out of shell history and `ps`), and ariadne does not read `.env`
+itself. Copy `.env.example` to `.env`, fill it in, then:
+
+```bash
+set -a; . ./.env; set +a
+bin/ariadne -app ... -deps ... -out report.md -json results.json -llm
+```
+
+With `-offline`, `-llm` needs no key: every answer must already be in
+`<cache-dir>/llm/`. To discard cached LLM answers and ask again, delete
+that directory.
 
 ## Building and testing
 
@@ -295,6 +324,7 @@ Flags:
 make build   # -> bin/ariadne
 make test    # go test ./... — no JDK, no network required
 make vet
+make e2e-llm # one real LLM call with the real prompts; needs .env, costs ~nothing
 ```
 
 `go test ./...` never requires a JDK or network access: every package's
@@ -376,8 +406,9 @@ report:
   (roots are always every application method) and no WAR/EAR/Gradle
   input support. See [PLAN.md](PLAN.md)'s Phase 7 for what this would
   involve.
-- **No LLM-assisted vulnerable-method mapping.** `internal/vulnmap`'s
-  third source (asking an LLM to read an advisory and its diff) from the
-  original plan is not implemented.
+- **LLM-assisted vulnerable-method mapping is opt-in and unverified.**
+  Without `-llm` the third `internal/vulnmap` source is off. With it, the
+  methods are a machine's suggestion (checked to exist, not to be the
+  vulnerable ones); see step 6 above.
 
 
