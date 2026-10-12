@@ -306,14 +306,33 @@ Sources, in priority order:
      full file at the fix commit (`raw.githubusercontent.com/<o>/<r>/<sha>/<path>`) and
      map the changed lines to method ranges in that file.
    - Map file path → FQCN using the `package` declaration (and nested-class names `Outer$Inner`).
-3. **LLM verification (GLM):** give the model the advisory summary + the diff, ask for
-   a JSON list of methods that contain the vulnerability or are the public entry points
-   to it (not methods touched only by refactoring or tests). Use a plain HTTP client
-   (OpenAI-compatible chat completions API), with configuration from env:
-   `ARIADNE_LLM_URL`, `ARIADNE_LLM_MODEL`, `ARIADNE_LLM_API_KEY`. Store the prompt and the
-   answer in `.cache/llm/<sha256(prompt)>.json` so results are reproducible. Validate the
-   answer against a schema; on invalid JSON, retry once and then fall back to the `diff` source.
-   Flag this source in the report. Without `--llm`, this step is skipped.
+3. **LLM verification (GLM 5.3 via OpenRouter):** give the model the advisory summary + the
+   diff, ask for a JSON list of methods that contain the vulnerability or are the public
+   entry points to it (not methods touched only by refactoring or tests). Use a plain HTTP
+   client against the OpenAI-compatible chat completions API (`POST <base_url>/chat/completions`).
+   Configuration (all three are config variables; flags override env; nothing is hard-coded
+   except the base URL default):
+
+   | Env var | Flag | Default | Notes |
+   |---|---|---|---|
+   | `ARIADNE_LLM_BASE_URL` | `-llm-base-url` | `https://openrouter.ai/api/v1` | any OpenAI-compatible endpoint |
+   | `ARIADNE_LLM_MODEL` | `-llm-model` | — (required with `-llm`) | the OpenRouter model id of GLM 5.3; check the exact slug on openrouter.ai/models |
+   | `ARIADNE_LLM_API_KEY` | — (env only) | — (required with `-llm`) | never logged, never written to `.cache/` or the report |
+
+   - The API key is read **only from the environment**, so it does not end up in shell
+     history or `ps`. For local work, keep it in `.env`: gitignored, with a committed
+     `.env.example` and loaded by the `Makefile`/shell, not by ariadne.
+   - OpenRouter extras: send the `X-Title: ariadne` header. On HTTP 429/5xx, retry with
+     backoff (max 3 attempts). Use `temperature: 0` and ask for JSON output
+     (`response_format: {"type": "json_object"}` if the model supports it, otherwise parse
+     the first JSON block from the answer).
+   - `-llm` without the model or the key → fail at startup with a clear message, not in the
+     middle of the run.
+   - Store the prompt, the model id and the answer in `.cache/llm/<sha256(model+prompt)>.json`
+     so results are reproducible. Validate the answer against a schema; on invalid JSON,
+     retry once and then fall back to the `diff` source.
+   - Flag this source in the report, together with the model id. Without `-llm`, this step
+     is skipped.
 
 Output: `vulnmap.json`: `{cve_id: {"methods": [...], "source": "manual|diff|llm"}}`.
 CVEs without methods → status `UNKNOWN`.
@@ -350,7 +369,7 @@ go build -o bin/ariadne ./cmd/ariadne
 # petclinic from build output
 bin/ariadne -app target/classes -deps target/dependency [-deps-list deps.txt] \
   [-profile auto|spring|generic] [-roots all|profile] [-max-dep-depth 15] \
-  -out report.md -json results.json [-html report.html] [-llm] [-offline]
+  -out report.md -json results.json [-html report.html] [-llm [-llm-model ID] [-llm-base-url URL]] [-offline]
 
 # or straight from the Spring Boot fat jar
 bin/ariadne -app target/spring-petclinic-2.4.5.jar -out report.md -json results.json
@@ -405,7 +424,7 @@ ariadne/
     vulnmap/                 # CVE -> methods (manual yaml, diffs, LLM)
       vuln_methods.yaml      # embedded default
     javadiff/                # unified-diff parser + brace-aware Java method scanner
-    llm/                     # OpenAI-compatible client for GLM, with cache
+    llm/                     # OpenAI-compatible client (OpenRouter + GLM 5.3 by default), with cache
     reach/                   # CHA expansion, BFS, statuses, paths
     report/                  # Markdown/HTML templates + JSON
       templates/
@@ -419,6 +438,8 @@ ariadne/
     diffs/                   # sample fix-commit diffs
 work/                        # cloned target apps (gitignored)
 .cache/                      # OSV, diffs, LLM answers (gitignored)
+.env                         # ARIADNE_LLM_* incl. the API key (gitignored)
+.env.example                 # template without secrets (committed)
 ```
 
 Conventions: return errors (`fmt.Errorf("...: %w", err)`) and never panic in library code;
