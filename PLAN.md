@@ -455,6 +455,31 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
     (25 reasoning), ~$0.0013, and `Request#parseParts` / `#getParts` / `#getPart` all passed
     bytecode grounding. A full petclinic run with `-llm` (~92 CVEs) has not been done.
 
+- **Deferred follow-up: widen source 2's file filter (not done; do it later).**
+  `isMainJavaSource` (`internal/vulnmap/diffsource.go`) keeps only `.java` files whose path
+  contains `src/main/`. Repositories that do not use the Maven layout, notably Apache
+  Tomcat (`java/org/apache/...` for code, `test/...` for tests), therefore lose every file:
+  source 2 fetches the diff but maps nothing. In petclinic that is 35 of the 43 CVEs that
+  have a fix commit yet stay unmapped after sources 1 and 2. Today only the opt-in LLM
+  source (whose filter, `keepForLLM` in `llmprompt.go`, is "any non-test `.java` file")
+  covers them, at the cost of a model call per CVE.
+  - *Change:* replace the `src/main/` requirement with `keepForLLM`'s rule (a `.java` file
+    that is not test code: no `test`/`tests` path segment, no `*Test.java`/`*Tests.java`),
+    ideally one shared helper used by both sources.
+  - *Effect:* source 2 maps more CVEs deterministically, for free and without
+    hallucination risk, so fewer CVEs reach the LLM. It also changes existing results (more
+    `diff` entries, fewer `UNKNOWN`), so re-run petclinic and WebGoat and compare statuses
+    before and after.
+  - *Trade-off:* source 2 takes every method a fix touched, whereas the LLM can tell the
+    vulnerable method from one changed in passing, so Tomcat mappings would be somewhat
+    less precise than with the model. This is already how source 2 behaves for other
+    libraries.
+  - *Tests:* a Tomcat-style diff fixture (paths `java/...` plus `test/...`) must map the
+    `java/` files and skip the `test/` ones; the existing `src/main/` cases must keep
+    passing.
+  - *Why deferred:* a separate change whose effect on both apps should be measured on its
+    own; doing it first would also shrink the set of CVEs the full `-llm` run exercises.
+
 ### Phase 5 — Reachability engine (`internal/reach`, ~1 h)
 - Roots: all app methods (default) or profile entry points (`--roots profile`).
 - Multi-source BFS over the CHA-expanded graph with parent pointers (`[]int32`, -1 = none)
