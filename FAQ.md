@@ -374,7 +374,7 @@ family, 67 from diffs).
 ### Step 7: `internal/reach` — searching the graph and assigning statuses
 
 Input: the graph from step 4, the hierarchy from step 3, the CVEs from
-step 5, the mapping from step 6. Output: one of four statuses per CVE,
+step 5, the mapping from step 6. Output: one of five statuses per CVE,
 and for `REACHABLE`/`FRAMEWORK`, a concrete path.
 
 **Roots:** every method in the application's own code (`IsApp == true`),
