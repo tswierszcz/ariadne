@@ -14,13 +14,18 @@ import (
 // up on a path from app code. Each entry is "groupId:artifactId", with
 // artifactId "*" matching any artifact in that group.
 //
-// This is deliberately not yet the full profile system section 4
-// describes (framework_packages.yaml, a conditional jackson-databind
-// rule keyed on @RequestBody/@ResponseBody): that's CLI/profile wiring
-// for a later phase. jackson-databind is included unconditionally here
-// rather than left out, since Phase 5 needs *some* answer and an
-// unconditional "maybe this is framework-driven" is more honest than
-// silently treating it as pure app-code reachability.
+// The full profile system section 4 describes now exists
+// (internal/profile): per-framework YAML, auto-detection, a conditional
+// jackson-databind rule keyed on @RequestBody/@ResponseBody/
+// @RestController, and -roots profile. cmd/ariadne always builds its
+// FrameworkMatcher from the active profile's own (richer, and for
+// `spring` further expanded past this list — see
+// internal/profile/profiles/spring.yaml) resolved pattern list, never
+// from DefaultFrameworkPackages. This var remains as New's fallback for
+// a caller that passes a nil FrameworkMatcher directly (tests, or
+// internal/reach used programmatically outside the CLI), kept exactly at
+// this section's own original seed rather than updated to match
+// spring.yaml, so the two can't silently drift apart unnoticed.
 var DefaultFrameworkPackages = []string{
 	"org.apache.tomcat.embed:*",
 	"org.springframework:spring-web",

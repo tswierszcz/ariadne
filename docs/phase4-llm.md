@@ -20,6 +20,18 @@ Tomcat's repository keeps production code under `java/org/apache/...`, not
 (A deterministic fix to that filter is a separate, later follow-up; it is out of
 scope here so that source 3 has realistic material to work on.)
 
+**Follow-up done.** `isMainJavaSource` was replaced by a shared
+`isNonTestJavaFile` helper (`internal/vulnmap/javasource.go`) — the same
+non-test-`.java` rule source 3's own `keepForLLM` already used — so source 2
+now maps Tomcat's files too instead of needing the LLM for them. Measured
+effect: petclinic's mapped count rose from 56/148 to 91/148 (diff: 55 → 90);
+32 of the 35 Tomcat CVEs moved straight from `UNKNOWN` to `FRAMEWORK` (Tomcat
+is a framework package) without ever reaching this source. See
+[PLAN.md](../PLAN.md)'s Phase 4 follow-up note for the full numbers. The
+measurements and prompts in the rest of this document are unaffected by this
+change: they describe source 3's own design and behavior, not how many CVEs
+reach it.
+
 ## 2. What the step does
 
 ### When it runs
