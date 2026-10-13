@@ -550,6 +550,25 @@ how many CVEs `Analyze` is then asked about):
     this isn't a bug — just a sign the seed list may be too narrow once a real profile
     system assigns it, since some of these paths are arguably framework/reflection-mediated
     rather than genuine app-code reachability.
+  - **Fixed in Phase 7's profile system.** `internal/profile/profiles/spring.yaml` adds
+    exactly those four packages to `framework_packages`. Measured effect (live OSV/GitHub,
+    `bin/ariadne`, comparing `-profile spring` against the same run with those four packages
+    left out — i.e. this isn't a change to the 13/18/25/92 numbers printed just above, which
+    predate the Phase 4 follow-up that later moved 18 to 49): **petclinic REACHABLE 13 → 3,
+    FRAMEWORK 49 → 59**. `CVE-2022-22965` (Spring4Shell) is one of the ten that moved: its
+    shortest path now reaches
+    `OwnerController#processFindForm → ... → AbstractNestablePropertyAccessor#getPropertyValue
+    → BeanWrapperImpl#getCachedIntrospectionResults → CachedIntrospectionResults#forClass
+    → CachedIntrospectionResults#<init>`, i.e. the vulnerable constructor is only reached by
+    continuing *through* `spring-beans`, which the old (too-narrow) framework list didn't
+    stop at — so this line's own former claim ("correctly found REACHABLE") no longer holds
+    under the `spring` profile, and `FRAMEWORK` is the more honest status: the same
+    JavaBean-introspection path still needs the manual review Spring4Shell actually requires,
+    it just isn't claimed as reachable from app code alone. WebGoat (which also auto-detects
+    as `spring`, since it embeds Spring Boot too): REACHABLE 51 → 40, FRAMEWORK 32 → 43, same
+    ten-ish-CVE family; the XStream control case (`CVE-2021-39144`) is unaffected — its path
+    never goes near Spring internals. See Phase 7 below for the rest of the profile system
+    this fix shipped as part of.
 
 ### Phase 6 — CLI + report (`cmd/ariadne`, `internal/report`, ~1 h)
 ```bash
@@ -646,6 +665,52 @@ input modes:
   with a known-vulnerable dependency), to show that the `generic`/`jakarta` profiles work.
 - Optional: RTA (restrict CHA to types instantiated with `new`) as `--cha rta`.
 
+**Status: the profile system itself is done; WAR/EAR, Gradle, and every profile besides
+`spring`/`generic` are not.** `internal/profile` implements section 4 as described:
+- YAML profiles (`internal/profile/profiles/{spring,generic}.yaml`), embedded via
+  `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
+  one profile and replaces any existing one of the same name — not a partial per-field
+  merge, matching how `-vuln-methods` already overrides a whole table rather than patching
+  one entry).
+- `-profile auto` (the default): every profile whose `detect` list names a class present
+  anywhere in the analyzed app or its dependencies is merged (`profile.Select`/`merge`);
+  `generic` is the fallback when nothing matches and is never itself auto-detected into.
+  Verified: petclinic and WebGoat (which also embeds Spring Boot) both auto-detect as
+  `spring`; the fixture auto-detects as `generic`, since its `fixture.Entry` annotation is a
+  stand-in for a route annotation, not a real framework marker class.
+- `-roots profile` (default remains `-roots all`, every application method, exactly as
+  before): `Profile.AppRoots` computes the entry-point set section 4 point 4 describes —
+  every method carrying one of `roots.annotations`, every public method of a class itself
+  carrying one, and (when `roots.main` is true, as in both shipped profiles) every public
+  static `main(String[])`. `roots.overrides` parses but matches nothing yet — no shipped
+  profile needs it (`spring.yaml`'s own list is empty, per this section's own example); left
+  for a `servlet`/`jakarta` profile's `HttpServlet#doGet`/`Filter#doFilter`.
+- The conditional jackson-databind `framework_packages` entry (`pkg`/`when_annotation`) is
+  implemented, but evaluated once for the whole app (`Profile.ResolvePatterns`), not
+  per call site: true if *any* app class anywhere carries one of
+  `@RequestBody`/`@ResponseBody`/`@RestController`, not only when the specific caller on a
+  specific path does. A precise per-call-site version would need `internal/reach`'s BFS sink
+  test (`bfs.go`) to see the calling node as well as the callee, which is a substantially
+  bigger change than this simplification buys back — an app using `@RequestBody` anywhere is,
+  in practice, exactly the kind of app where Jackson deserializes attacker-controlled JSON
+  somewhere.
+- Synthetic edges (`internal/callgraph.ApplySyntheticEdges`, called from `cmd/ariadne` after
+  `callgraph.Build`): every transitive subtype of `from_subtypes_of` gets, for each method it
+  declares, an edge to the same-named method on `to`. Verified on real petclinic/WebGoat:
+  spring.yaml's `Repository -> SimpleJpaRepository` entry adds 766/774 edges respectively
+  (every Spring Data repository interface method, e.g. `OwnerRepository#findByLastName`,
+  now has somewhere to go instead of being a bytecode dead end).
+- **Effect on the Phase 5 "observed limitation": fixed.** See that section's own follow-up
+  note for the measured before/after (petclinic REACHABLE 13 → 3, WebGoat 51 → 40,
+  `CVE-2022-22965` specifically moving from REACHABLE to FRAMEWORK) — adding
+  spring-beans/-core/-expression/-aop to `framework_packages` was the one-line YAML change
+  the whole profile system existed to make possible.
+- **Not implemented:** WAR/EAR input, the Gradle dependency-copy script, every profile
+  besides `spring`/`generic` (`servlet`, `jakarta`, `micronaut`, `quarkus`), a non-Spring
+  control app to exercise them, RTA, and `--max-dep-depth`. `internal/reach`'s BFS passes
+  stay unchanged (still computed once for every CVE, same as Phase 5 left them) — only the
+  root set and the framework-package list going into them changed.
+
 ### Phase 8 (optional) — Exploitability check
 For 1–2 `REACHABLE` CVEs: ask the LLM whether user-controlled input actually flows to the
 vulnerable call (look at the path and the code), or run Strix against a **locally running**
@@ -715,11 +780,12 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       expanded) — `internal/callgraph`.
 - [x] Unit test for BFS path reconstruction on a fixture graph — `internal/reach`, on a
       purpose-built 3-jar fixture covering all four statuses, not just CHA.
-- [ ] Profile auto-detection picks `spring` for petclinic and `generic` for the fixture —
-      **not implemented**: there is no profile system at all yet (consistently deferred
-      since the Phase 3 status note); `cmd/ariadne` always reports `Profile: generic (no
-      profile system yet)`. This is the main piece of the original plan Phases 0–6 don't
-      cover; see Phase 7.
+- [x] Profile auto-detection picks `spring` for petclinic and `generic` for the fixture —
+      `internal/profile`, wired into `cmd/ariadne` (Phase 7); `go test ./internal/profile`
+      verifies both, plus merging when several profiles match and `-profile-file`
+      overriding/adding one by name. `--roots profile` and synthetic edges (Spring Data) are
+      implemented too; servlet/jakarta/micronaut/quarkus profiles, WAR/EAR, Gradle, RTA and
+      `--max-dep-depth` are not — see Phase 7's own status note for the line between them.
 - [x] Report contains the Limitations and "Unidentified jars" sections.
 - [x] Re-running with `-offline` and a warm cache works without network, and — beyond what
       this criterion originally asked — is now also verified byte-identical across repeated

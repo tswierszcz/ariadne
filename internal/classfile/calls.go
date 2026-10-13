@@ -15,6 +15,12 @@ const (
 	CallSpecial   CallKind = "special"
 	CallStatic    CallKind = "static"
 	CallDynamic   CallKind = "dynamic"
+	// CallSynthetic is never produced by ExtractCalls; internal/callgraph
+	// uses it to mark an edge added from a profile's synthetic_edges
+	// (PLAN.md section 4) rather than found in any method's own bytecode —
+	// standing in for a runtime-generated proxy (e.g. a Spring Data
+	// repository interface) that has no bytecode implementation at all.
+	CallSynthetic CallKind = "synthetic"
 )
 
 // Call is one call-site edge out of a method: owner/name/desc identify

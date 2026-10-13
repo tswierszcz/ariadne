@@ -17,6 +17,7 @@ import (
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
+	"ariadne/internal/profile"
 	"ariadne/internal/reach"
 	"ariadne/internal/report"
 	"ariadne/internal/vulnmap"
@@ -37,6 +38,10 @@ type config struct {
 	offline     bool
 	showVersion bool
 
+	profile     string
+	profileFile string
+	roots       string
+
 	llm        bool
 	llmModel   string
 	llmBaseURL string
@@ -52,6 +57,9 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.deps, "deps", "", "directory of dependency jars (not needed for a Spring Boot fat jar, which carries its own)")
 	fs.StringVar(&cfg.depsList, "deps-list", "", "optional `mvn dependency:list` output, used as a fallback when a jar has no pom.properties")
 	fs.StringVar(&cfg.vulnMethods, "vuln-methods", "", "override vuln_methods.yaml (default: ariadne's embedded table)")
+	fs.StringVar(&cfg.profile, "profile", "auto", "which profile's framework knowledge to use: auto, generic, spring, or a name from -profile-file")
+	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
+	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default) or "profile" (only the active profile's entry points: annotated methods/classes, main)`)
 	fs.StringVar(&cfg.out, "out", "", "report.md output path (required)")
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
@@ -106,6 +114,9 @@ func validate(cfg config) error {
 		if err := cfg.llmConfig.Validate(cfg.offline); err != nil {
 			return err
 		}
+	}
+	if cfg.roots != "all" && cfg.roots != "profile" {
+		return fmt.Errorf("-roots must be %q or %q, got %q", "all", "profile", cfg.roots)
 	}
 	return nil
 }
@@ -169,10 +180,34 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("hierarchy: %d classes (max bytecode version %d)", h.Len(), maxBytecode)
 
+	catalog, err := profile.LoadDefaultCatalog()
+	if err != nil {
+		return fmt.Errorf("loading default profile catalog: %w", err)
+	}
+	if cfg.profileFile != "" {
+		if err := catalog.AddFile(cfg.profileFile); err != nil {
+			return fmt.Errorf("loading -profile-file %s: %w", cfg.profileFile, err)
+		}
+	}
+	prof, err := profile.Select(catalog, cfg.profile, h)
+	if err != nil {
+		return fmt.Errorf("selecting profile: %w", err)
+	}
+	log("profile: %s", prof.Name)
+
 	log("building call graph")
 	g := callgraph.Build(h, nil)
 	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA), %d unresolved dynamic call sites",
 		g.NodeCount(), g.EdgeCount(), g.PreCHAEdgeCount(), g.CHAEdgeCount(), g.UnresolvedDynamicCount())
+
+	if len(prof.SyntheticEdges) > 0 {
+		var synthetic []callgraph.SyntheticEdge
+		for _, se := range prof.SyntheticEdges {
+			synthetic = append(synthetic, callgraph.SyntheticEdge{FromSubtypesOf: se.FromSubtypesOf, To: se.To})
+		}
+		added := callgraph.ApplySyntheticEdges(g, h, synthetic)
+		log("applied %d synthetic edges from profile %q (e.g. Spring Data repository proxies)", added, prof.Name)
+	}
 
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
@@ -226,7 +261,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 
 	log("analyzing reachability")
-	engine := reach.New(g, h, nil)
+	framework := reach.NewFrameworkMatcher(prof.ResolvePatterns(h))
+	var engine *reach.Engine
+	if cfg.roots == "profile" {
+		roots := prof.AppRoots(g, h)
+		log("roots: profile %q (%d entry-point methods)", prof.Name, len(roots))
+		engine = reach.NewWithRoots(g, h, framework, roots)
+	} else {
+		engine = reach.New(g, h, framework)
+	}
 	webAssets := map[string]bool{}
 	for _, dj := range depJars {
 		if dj.WebAssetsOnly && dj.GAV != nil {
@@ -244,11 +287,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		counts[reach.StatusReachable], counts[reach.StatusFramework], counts[reach.StatusNotReachable], counts[reach.StatusUnknown],
 		counts[reach.StatusNotApplicable])
 
+	profileLabel := prof.Name
+	if cfg.roots == "profile" {
+		profileLabel += " (roots: profile)"
+	}
 	header := report.Header{
 		App:             cfg.app,
 		GeneratedAt:     time.Now(),
 		AriadneVersion:  version(),
-		Profile:         "generic (no profile system yet)",
+		Profile:         profileLabel,
 		MaxBytecodeVer:  maxBytecode,
 		GraphNodes:      g.NodeCount(),
 		GraphEdges:      g.EdgeCount(),

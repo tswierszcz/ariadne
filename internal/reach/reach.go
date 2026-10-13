@@ -97,15 +97,22 @@ func (e *Engine) onlyWebAssets(cve cves.CVE) bool {
 	return true
 }
 
-// New builds an Engine and immediately runs both BFS passes, so
+// New builds an Engine with the default root set (AppRoots: every
+// application method) and immediately runs both BFS passes, so
 // constructing one over a very large graph does the expensive part once
 // regardless of how many CVEs Analyze is later asked about.
 func New(g *callgraph.Graph, h *hierarchy.Hierarchy, framework *FrameworkMatcher) *Engine {
+	return NewWithRoots(g, h, framework, AppRoots(g, h))
+}
+
+// NewWithRoots is New with an explicit root set instead of every
+// application method — --roots profile (internal/profile.Profile.AppRoots
+// computes the profile-filtered set a caller passes in here).
+func NewWithRoots(g *callgraph.Graph, h *hierarchy.Hierarchy, framework *FrameworkMatcher, roots []uint32) *Engine {
 	if framework == nil {
 		framework = NewFrameworkMatcher(DefaultFrameworkPackages)
 	}
-	e := &Engine{g: g, h: h, framework: framework}
-	e.roots = e.appRoots()
+	e := &Engine{g: g, h: h, framework: framework, roots: roots}
 
 	isFramework := e.isFrameworkNode
 	e.appOnly = bfs(g, e.roots, isFramework)
@@ -113,25 +120,23 @@ func New(g *callgraph.Graph, h *hierarchy.Hierarchy, framework *FrameworkMatcher
 	return e
 }
 
-// appRoots returns every method node belonging to an application class —
-// the default root set section 3.4 describes. (An annotation-filtered
-// "--roots annotated" mode is CLI/profile territory, not implemented
-// here.)
-func (e *Engine) appRoots() []uint32 {
+// AppRoots returns every method node belonging to an application class —
+// the default root set section 3.4 describes.
+func AppRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
 	var roots []uint32
-	// SortedFQCNs, not e.h.All() directly: root order feeds the
-	// multi-source BFS's queue, and a tie between two roots that reach
-	// the same node at the same distance is broken by which one the BFS
-	// happened to enqueue first — which must not depend on Go's
-	// randomized map iteration order if results.json is to report the
-	// same path on every run of the same analysis.
-	for _, fqcn := range e.h.SortedFQCNs() {
-		ci, _ := e.h.Lookup(fqcn)
+	// SortedFQCNs, not h.All() directly: root order feeds the multi-source
+	// BFS's queue, and a tie between two roots that reach the same node at
+	// the same distance is broken by which one the BFS happened to
+	// enqueue first — which must not depend on Go's randomized map
+	// iteration order if results.json is to report the same path on every
+	// run of the same analysis.
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
 		if !ci.IsApp {
 			continue
 		}
 		for _, m := range ci.Methods {
-			if id, ok := e.g.ID(fqcn, m.Name, m.Descriptor); ok {
+			if id, ok := g.ID(fqcn, m.Name, m.Descriptor); ok {
 				roots = append(roots, id)
 			}
 		}

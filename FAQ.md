@@ -99,14 +99,18 @@ Quarkus) **should work mechanically**, but has never been run or tested.
   for Gradle — that's planned Phase 7 in [PLAN.md](PLAN.md)).
 - **WAR/EAR** — only a plain jar, a classes directory, or a Spring Boot
   fat jar. WAR (`WEB-INF/`) is also deferred to Phase 7.
-- **A profile system** — the "framework" package list (which decides the
-  `FRAMEWORK` status) is hardcoded for the Spring/Tomcat/Jackson/
-  Hibernate/Logback/Log4j stack. On an app using Jersey/JAX-RS or
-  Quarkus, the core of the analysis (`REACHABLE`/`NOT_REACHABLE`/
-  `UNKNOWN`) will still work correctly, but the `FRAMEWORK`
-  classification will be off — paths going through that other
-  framework's internals might come out as `REACHABLE`, even though in
-  practice they're reflection-driven just like in Spring.
+- **Only two profiles exist: `spring` and `generic`** (`internal/profile`,
+  auto-detected by default, or picked with `-profile`/extended with
+  `-profile-file`). On an app using Jersey/JAX-RS, Quarkus, Micronaut, or
+  plain servlets, nothing in `-profile auto`'s `detect` lists matches, so
+  it falls back to `generic` — no framework packages at all — and the
+  core of the analysis (`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`) still works
+  correctly, but every CVE's status stays `REACHABLE`/`NOT_REACHABLE`
+  rather than being downgraded to `FRAMEWORK` where that other
+  framework's own internals are driving the call, even though in practice
+  they're reflection-driven just like in Spring. `servlet`/`jakarta`/
+  `micronaut`/`quarkus` profiles are Phase 7 follow-up work, not written
+  yet.
 
 ### How to prepare a project
 

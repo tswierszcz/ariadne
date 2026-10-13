@@ -17,6 +17,28 @@ func runWithEnv(args []string, env map[string]string) (code int, stderr string) 
 
 var baseArgs = []string{"-app", "/nonexistent/app", "-out", "r.md", "-json", "r.json"}
 
+func TestRootsFlagRejectsUnknownValue(t *testing.T) {
+	args := append([]string{"-roots", "annotated"}, baseArgs...)
+	code, stderr := runWithEnv(args, nil)
+	if code != 2 || !strings.Contains(stderr, "-roots must be") {
+		t.Errorf("code=%d stderr=%q, want 2 and a -roots message", code, stderr)
+	}
+}
+
+func TestRootsFlagAcceptsAllAndProfile(t *testing.T) {
+	for _, v := range []string{"all", "profile"} {
+		args := append([]string{"-roots", v}, baseArgs...)
+		// -app /nonexistent/app always fails past validation, inside
+		// analyze(); what this checks is that validate() itself accepts
+		// the value (exit code 2 means a flag-validation failure, which
+		// this must not be).
+		code, stderr := runWithEnv(args, nil)
+		if code == 2 {
+			t.Errorf("-roots %s: code=%d stderr=%q, want validation to accept this value", v, code, stderr)
+		}
+	}
+}
+
 func TestLLMFlagNeedsModelAndKeyAtStartup(t *testing.T) {
 	args := append([]string{"-llm"}, baseArgs...)
 

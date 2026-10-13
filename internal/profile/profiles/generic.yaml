@@ -1,0 +1,15 @@
+# Fallback profile for anything no other profile's detect markers match:
+# a plain Java CLI app or library, with no framework-specific knowledge at
+# all. Every application method is a root (reach's own default, since
+# Roots here carries no annotations to filter by); no package is treated
+# as "framework", so every CVE's status is REACHABLE/NOT_REACHABLE/
+# UNKNOWN/NOT_APPLICABLE only, never FRAMEWORK; and no synthetic edges are
+# added, since there's no known proxy mechanism to model.
+name: generic
+detect: []
+roots:
+  annotations: []
+  overrides: []
+  main: true
+framework_packages: []
+synthetic_edges: []

@@ -22,7 +22,12 @@ This file describes how the finished pipeline actually works.
 
 Running `ariadne` executes eight steps in order. Each one is a separate
 Go package under `internal/`, independently testable, and the CLI
-(`cmd/ariadne`) just wires them together.
+(`cmd/ariadne`) just wires them together. One more package,
+`internal/profile` (see step 7), isn't a numbered step of its own: it
+runs right after step 3 to pick the active profile, then feeds step 4
+(synthetic edges) and step 7 (the framework-package list and, with
+`-roots profile`, the root set) rather than sitting in the middle of the
+pipeline by itself.
 
 ```
 -app, -deps, -deps-list
@@ -158,6 +163,18 @@ as the bytecode names it, which for a call through a subclass reference
 is the subclass — even when that subclass never declares the method
 itself. `internal/reach`'s method matching (see below) accounts for this.
 
+**Synthetic edges** (`internal/callgraph.ApplySyntheticEdges`, applied by
+the CLI right after `Build`) cover the one case CHA alone cannot: a proxy
+with *no bytecode implementation at all*. A Spring Data repository
+interface (`OwnerRepository extends JpaRepository<...>`) has zero
+subtypes in the analyzed bytecode — Spring generates the implementation
+at runtime — so without help, a call into it is a dead end even though it
+really dispatches to `SimpleJpaRepository`. The active profile's
+`synthetic_edges` (see step 7's "Profiles" paragraph below) name this
+explicitly: every transitive subtype of a marker interface gets an edge,
+for each method it declares, to the same-named method on the real
+implementation class.
+
 ### 5. CVE resolution (`internal/cves`)
 
 Every unique `(groupId:artifactId, version)` pair is queried against
@@ -246,14 +263,43 @@ checks every non-overriding transitive subtype of the named class, to
 catch the inherited-method-called-through-a-subclass-reference case
 described above.
 
-The default framework package list (`internal/reach.DefaultFrameworkPackages`)
-is exactly OSV's/this project's initial seed:
-`org.apache.tomcat.embed:*`, `org.springframework:spring-web`,
-`org.springframework:spring-webmvc`, `org.springframework.boot:*`,
-`com.fasterxml.jackson.core:jackson-databind`, `org.hibernate:*`,
-`ch.qos.logback:*`, `org.apache.logging.log4j:*`. There is no profile
-system yet (see Limitations) — this list is not configurable from the
-CLI.
+**Profiles (`internal/profile`)** decide the framework-package list, and
+optionally the root set, instead of a single hardcoded list.
+`-profile auto` (the default) selects every embedded profile
+(`internal/profile/profiles/*.yaml`) whose `detect` list names a class
+present anywhere in the app or its dependencies, and merges them
+(`spring` has been verified to auto-detect for both petclinic and
+WebGoat, which embeds Spring Boot too); nothing matching falls back to
+`generic`, which has no framework packages at all, so every CVE's status
+for a plain non-Spring app is `REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/
+`NOT_APPLICABLE` only, never `FRAMEWORK`. `-profile spring`/`-profile
+generic` picks one explicitly; `-profile-file path.yaml` loads a custom
+profile (same YAML shape) and adds it to the catalog, or replaces one of
+the same name.
+
+`spring`'s own list is section 4's original seed plus
+`org.springframework:spring-beans`/`spring-core`/`spring-expression`/
+`spring-aop` — added after a real petclinic run showed several
+`REACHABLE` paths routing through deep Spring Beans/SpEL internals
+(`CachedIntrospectionResults`, `SpelExpression`) that are arguably
+framework-mediated, not genuine app-code reachability (see
+[PLAN.md](PLAN.md)'s Phase 5/7 notes); `com.fasterxml.jackson.core:jackson-databind`
+is conditional on the app carrying `@RequestBody`/`@ResponseBody`/
+`@RestController` anywhere (evaluated once for the whole app, not
+per call site — a precise per-call-site version would need
+`internal/reach`'s BFS sink test to see the calling node as well as the
+callee, a much bigger change than this simplification buys back).
+
+`-roots profile` (default: `-roots all`, every application method, as
+above) narrows the BFS roots to the active profile's own entry points
+instead: a method carrying one of `roots.annotations`
+(`@RequestMapping`/`@GetMapping`/.../`@Scheduled`/`@EventListener`/`@Bean`
+for `spring`), every public method of a class itself carrying one, and
+(when `roots.main` is true) every public static `main(String[])`.
+`roots.overrides` parses but is not yet matched against anything — no
+shipped profile needs it (`spring.yaml`'s own list is empty); it is
+reserved for a `servlet`/`jakarta` profile's `HttpServlet#doGet`/
+`Filter#doFilter`.
 
 ### 8. The report (`internal/report`)
 
@@ -295,6 +341,9 @@ Flags:
 | `-deps` | no* | Directory of dependency jars. *Not needed for a fat jar, which supplies its own via `BOOT-INF/lib/`.* |
 | `-deps-list` | no | `mvn dependency:list` output, used as a fallback for jars with no `pom.properties`. |
 | `-vuln-methods` | no | Override the embedded `vuln_methods.yaml`. |
+| `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, or a name from `-profile-file`. |
+| `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
+| `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
@@ -371,7 +420,9 @@ internal/
   httpcache/             disk cache + --offline support (shared by cves and vulnmap)
   classfile/             .class parser + bytecode walker
   hierarchy/              class universe: super/interfaces/subtypes/methods
-  callgraph/              interning, edges, CHA expansion
+  callgraph/              interning, edges, CHA expansion, synthetic edges
+  profile/                framework knowledge: detect, roots, framework packages, synthetic edges
+    profiles/              spring.yaml, generic.yaml (the embedded defaults)
   vulnmap/                CVE -> vulnerable methods (manual table + fix-commit diffs)
     vuln_methods.yaml      the embedded manual table
   javadiff/               unified-diff parsing + the brace-aware Java method scanner
@@ -412,11 +463,14 @@ report:
   `LambdaMetafactory` call, or dependency injection wiring beans by
   name/type at runtime is invisible, and can produce false negatives (a
   real path exists that ariadne cannot see).
-- **No profile system yet.** The framework-package list that decides
-  `REACHABLE` vs. `FRAMEWORK` is fixed (see step 7 above) and not
-  configurable from the CLI; there is also no `-roots annotated` mode
-  (roots are always every application method) and no WAR/EAR/Gradle
-  input support. See [PLAN.md](PLAN.md)'s Phase 7 for what this would
+- **Only two profiles exist: `spring` and `generic`.** The profile system
+  itself (auto-detection and merging, `-roots profile`, synthetic edges,
+  the conditional jackson-databind rule) is implemented (see step 7
+  above), but `servlet`, `jakarta` (JAX-RS/CDI/EJB), `micronaut` and
+  `quarkus` are not — an app using one of those gets the `generic`
+  fallback (no framework packages at all) unless it also embeds Spring.
+  There is also no WAR/EAR/Gradle input support and no `--max-dep-depth`.
+  See [PLAN.md](PLAN.md)'s Phase 7 for what the rest of this would
   involve.
 - **LLM-assisted vulnerable-method mapping is opt-in and unverified.**
   Without `-llm` the third `internal/vulnmap` source is off. With it, the

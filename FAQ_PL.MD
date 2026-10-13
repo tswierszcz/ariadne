@@ -100,14 +100,18 @@ uruchomione ani przetestowane.
   nie napisano — to zaplanowana Faza 7 w [PLAN.md](PLAN.md)).
 - **WAR/EAR** — tylko zwykły jar, katalog klas, albo fat jar Spring
   Boota. WAR (`WEB-INF/`) też odłożone na Fazę 7.
-- **System profili** — lista pakietów „frameworkowych" (decydująca o
-  statusie `FRAMEWORK`) jest na sztywno dobrana pod stos Spring/Tomcat/
-  Jackson/Hibernate/Logback/Log4j. Na aplikacji z Jersey/JAX-RS albo
-  Quarkusem rdzeń analizy (`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`) będzie
-  działał poprawnie, ale klasyfikacja `FRAMEWORK` będzie niedokładna —
-  ścieżki idące przez wewnętrzności tamtego frameworka mogą wyjść jako
-  `REACHABLE`, mimo że w praktyce są sterowane refleksją tak samo jak w
-  Springu.
+- **Istnieją tylko dwa profile: `spring` i `generic`** (`internal/profile`,
+  wykrywane automatycznie domyślnie, albo wybierane flagą `-profile`,
+  rozszerzane `-profile-file`). Na aplikacji z Jersey/JAX-RS, Quarkusem,
+  Micronautem albo czystymi serwletami żaden marker z list `detect` nie
+  pasuje, więc narzędzie spada do profilu `generic` — bez żadnych
+  pakietów frameworkowych — i rdzeń analizy (`REACHABLE`/
+  `NOT_REACHABLE`/`UNKNOWN`) nadal działa poprawnie, ale żadne CVE nie
+  dostanie statusu `FRAMEWORK` tam, gdzie w rzeczywistości steruje nim
+  wewnętrzny mechanizm tamtego frameworka, mimo że w praktyce jest to
+  sterowane refleksją tak samo jak w Springu. Profile `servlet`/
+  `jakarta`/`micronaut`/`quarkus` to zadanie z Fazy 7, jeszcze nie
+  napisane.
 
 ### Jak przygotować projekt
 

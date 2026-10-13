@@ -1,0 +1,45 @@
+# Spring (Spring Boot) profile — PLAN.md section 4's own example, plus
+# the Phase 5 "observed limitation" fix: spring-beans/spring-core/
+# spring-expression/spring-aop added to framework_packages, since several
+# real petclinic REACHABLE paths routed through Spring Beans/SpEL
+# internals (CachedIntrospectionResults, SpelExpression, ...) that were
+# arguably framework-mediated rather than genuine app-code reachability,
+# and the original seed list only named spring-web/spring-webmvc/
+# spring-boot:*.
+name: spring
+detect:
+  - org.springframework.boot.SpringApplication
+  - org.springframework.context.ApplicationContext
+roots:
+  annotations:
+    - org.springframework.web.bind.annotation.RequestMapping
+    - org.springframework.web.bind.annotation.GetMapping
+    - org.springframework.web.bind.annotation.PostMapping
+    - org.springframework.web.bind.annotation.PutMapping
+    - org.springframework.web.bind.annotation.DeleteMapping
+    - org.springframework.web.bind.annotation.PatchMapping
+    - org.springframework.scheduling.annotation.Scheduled
+    - org.springframework.context.event.EventListener
+    - org.springframework.context.annotation.Bean
+  overrides: []
+  main: true
+framework_packages:
+  - org.apache.tomcat.embed:*
+  - org.springframework:spring-web
+  - org.springframework:spring-webmvc
+  - org.springframework.boot:*
+  - org.springframework:spring-beans
+  - org.springframework:spring-core
+  - org.springframework:spring-expression
+  - org.springframework:spring-aop
+  - org.hibernate:*
+  - ch.qos.logback:*
+  - org.apache.logging.log4j:*
+  - pkg: com.fasterxml.jackson.core:jackson-databind
+    when_annotation:
+      - org.springframework.web.bind.annotation.RequestBody
+      - org.springframework.web.bind.annotation.ResponseBody
+      - org.springframework.web.bind.annotation.RestController
+synthetic_edges:
+  - from_subtypes_of: org.springframework.data.repository.Repository
+    to: org.springframework.data.jpa.repository.support.SimpleJpaRepository
