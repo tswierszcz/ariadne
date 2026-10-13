@@ -368,8 +368,13 @@ istnieje w analizowanym bytecode. Gdy model widział tylko tekst advisory
 (bez diffu), wynik `NOT_REACHABLE` jest obniżany do `UNKNOWN`, bo model
 mógł wskazać istniejącą metodę, która nie jest tą podatną.
 
-Liczby: petclinic — 56/148 zmapowanych (1 ręcznie, 55 przez diff);
-WebGoat — 104/160 (37 ręcznie — cała rodzina XStream, 67 przez diff).
+Liczby: petclinic — 91/148 zmapowanych (1 ręcznie, 90 przez diff);
+WebGoat — 104/160 (37 ręcznie — cała rodzina XStream, 67 przez diff). Filtr
+plików źródła 2 przepuszcza każdy plik `.java`, który nie jest testem,
+zamiast wymagać układu katalogów Mavena (`src/main/`) — to właśnie
+podniosło liczbę CVE zmapowanych przez diff w petclinic: Apache Tomcat
+trzyma swój kod w `java/org/apache/...`, a nie w `src/main/java/...`
+(patrz uzupełnienie Fazy 4 w [PLAN.md](PLAN.md)).
 
 ### Krok 7: `internal/reach` — przeszukiwanie grafu i statusy
 

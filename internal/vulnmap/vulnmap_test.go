@@ -120,6 +120,85 @@ func TestResolve_fallsBackToFixCommitDiff(t *testing.T) {
 	}
 }
 
+// fakeGitHubTomcatLayout serves a fix-commit diff laid out the way Apache
+// Tomcat's own repository is (code under java/..., tests under test/...,
+// neither under a Maven-style src/main/), to confirm source 2 maps the
+// code file and still skips the test file.
+func fakeGitHubTomcatLayout(t *testing.T) *httptest.Server {
+	t.Helper()
+	const diff = `diff --git a/java/org/apache/catalina/Request.java b/java/org/apache/catalina/Request.java
+index 1111111..2222222 100644
+--- a/java/org/apache/catalina/Request.java
++++ b/java/org/apache/catalina/Request.java
+@@ -5,3 +5,4 @@ public class Request {
+     public String getPart(String name) {
++        validate(name);
+         return doGetPart(name);
+     }
+diff --git a/test/org/apache/catalina/TestRequest.java b/test/org/apache/catalina/TestRequest.java
+index 3333333..4444444 100644
+--- a/test/org/apache/catalina/TestRequest.java
++++ b/test/org/apache/catalina/TestRequest.java
+@@ -5,3 +5,4 @@ public class TestRequest {
+     public void testGetPart() {
++        assertNotNull(request.getPart("x"));
+         // ...
+     }
+`
+	const file = `package org.apache.catalina;
+
+public class Request {
+    public String getPart(String name) {
+        validate(name);
+        return doGetPart(name);
+    }
+}
+`
+	mux := http.NewServeMux()
+	mux.HandleFunc("/apache/tomcat/commit/deadbee.diff", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(diff))
+	})
+	mux.HandleFunc("/apache/tomcat/deadbee/java/org/apache/catalina/Request.java", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(file))
+	})
+	mux.HandleFunc("/apache/tomcat/deadbee/test/org/apache/catalina/TestRequest.java", func(w http.ResponseWriter, r *http.Request) {
+		t.Error("the test file must not be fetched: isNonTestJavaFile should have filtered it out")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	return httptest.NewServer(mux)
+}
+
+func TestResolve_diffSourceMapsNonMavenLayout(t *testing.T) {
+	srv := fakeGitHubTomcatLayout(t)
+	defer srv.Close()
+
+	r := NewResolver(nil, mustCache(t))
+	r.HTTPClient = srv.Client()
+	r.GithubBaseURL = srv.URL
+	r.RawBaseURL = srv.URL
+
+	cve := cves.CVE{
+		ID: "CVE-2099-0002",
+		References: []cves.Reference{
+			{Type: "FIX", URL: "https://github.com/apache/tomcat/commit/deadbee"},
+		},
+	}
+	entry, ok, err := r.Resolve(context.Background(), cve)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if !ok {
+		t.Fatalf("Resolve did not find a diff-based mapping for a Tomcat-style (non src/main/) layout")
+	}
+	if entry.Source != SourceDiff {
+		t.Errorf("Source = %q, want %q", entry.Source, SourceDiff)
+	}
+	want := []string{"org.apache.catalina.Request#getPart"}
+	if len(entry.Methods) != 1 || entry.Methods[0] != want[0] {
+		t.Errorf("Methods = %v, want %v", entry.Methods, want)
+	}
+}
+
 func TestResolve_noFixReferenceIsUnknown(t *testing.T) {
 	r := NewResolver(nil, mustCache(t))
 	_, ok, err := r.Resolve(context.Background(), cves.CVE{ID: "CVE-2099-9999"})

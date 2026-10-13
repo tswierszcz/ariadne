@@ -456,30 +456,35 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
     (25 reasoning), ~$0.0013, and `Request#parseParts` / `#getParts` / `#getPart` all passed
     bytecode grounding. A full petclinic run with `-llm` (~92 CVEs) has not been done.
 
-- **Deferred follow-up: widen source 2's file filter (not done; do it later).**
-  `isMainJavaSource` (`internal/vulnmap/diffsource.go`) keeps only `.java` files whose path
-  contains `src/main/`. Repositories that do not use the Maven layout, notably Apache
-  Tomcat (`java/org/apache/...` for code, `test/...` for tests), therefore lose every file:
-  source 2 fetches the diff but maps nothing. In petclinic that is 35 of the 43 CVEs that
-  have a fix commit yet stay unmapped after sources 1 and 2. Today only the opt-in LLM
-  source (whose filter, `keepForLLM` in `llmprompt.go`, is "any non-test `.java` file")
-  covers them, at the cost of a model call per CVE.
-  - *Change:* replace the `src/main/` requirement with `keepForLLM`'s rule (a `.java` file
-    that is not test code: no `test`/`tests` path segment, no `*Test.java`/`*Tests.java`),
-    ideally one shared helper used by both sources.
-  - *Effect:* source 2 maps more CVEs deterministically, for free and without
-    hallucination risk, so fewer CVEs reach the LLM. It also changes existing results (more
-    `diff` entries, fewer `UNKNOWN`), so re-run petclinic and WebGoat and compare statuses
-    before and after.
-  - *Trade-off:* source 2 takes every method a fix touched, whereas the LLM can tell the
-    vulnerable method from one changed in passing, so Tomcat mappings would be somewhat
-    less precise than with the model. This is already how source 2 behaves for other
-    libraries.
-  - *Tests:* a Tomcat-style diff fixture (paths `java/...` plus `test/...`) must map the
-    `java/` files and skip the `test/` ones; the existing `src/main/` cases must keep
-    passing.
-  - *Why deferred:* a separate change whose effect on both apps should be measured on its
-    own; doing it first would also shrink the set of CVEs the full `-llm` run exercises.
+- **Follow-up done: widen source 2's file filter.** `isMainJavaSource`
+  (`internal/vulnmap/diffsource.go`) used to keep only `.java` files whose path contained
+  `src/main/`. Repositories that do not use the Maven layout, notably Apache Tomcat
+  (`java/org/apache/...` for code, `test/...` for tests), lost every file this way: source 2
+  fetched the diff but mapped nothing. In petclinic that was 35 of the 43 CVEs with a fix
+  commit that stayed unmapped after sources 1 and 2.
+  - *Change made:* the `src/main/` requirement was replaced by the same rule `keepForLLM`
+    already used (a `.java` file that is not test code: no `test`/`tests` path segment, no
+    `*Test.java`/`*Tests.java`), as one shared helper, `isNonTestJavaFile`
+    (`internal/vulnmap/javasource.go`), used by both source 2 and the LLM source. `keepForLLM`
+    is now a one-line wrapper around it.
+  - *Test added:* `TestResolve_diffSourceMapsNonMavenLayout`
+    (`internal/vulnmap/vulnmap_test.go`) — a Tomcat-style diff fixture (`java/...` code,
+    `test/...` tests) asserts source 2 now maps the `java/` file and that the `test/` file's
+    raw URL is never even fetched. The existing `src/main/`-based test
+    (`TestResolve_fallsBackToFixCommitDiff`) still passes unchanged.
+  - *Effect, measured end-to-end* (both apps re-run online against live OSV/GitHub,
+    `bin/ariadne`, before vs. after this change):
+    - **petclinic: 56/148 → 91/148 CVEs mapped** (diff: 55 → 90). 37 CVEs changed status, all
+      away from `UNKNOWN` (86 → 51 UNKNOWN): 32 to `FRAMEWORK` (18 → 49) — expected, since
+      nearly all of them are Tomcat CVEs, and Tomcat is a framework package — and 5 to
+      `NOT_REACHABLE` (25 → 29, e.g. `CVE-2025-24813`, `CVE-2025-46701`). `REACHABLE` stayed
+      exactly 13/148: the change surfaces more framework-level detail, it doesn't change what
+      the app's own code can reach.
+    - **WebGoat: 0 CVEs changed status** (104/160 mapped, unchanged) — expected, since
+      WebGoat's unmapped CVEs weren't a Tomcat-filter artifact to begin with.
+  - *Trade-off, as anticipated:* source 2 takes every method a fix touched (not just the one
+    judged vulnerable), so these new Tomcat mappings are coarser than an LLM's would be — the
+    same trade-off source 2 already has for every other library.
 
 ### Phase 5 — Reachability engine (`internal/reach`, ~1 h)
 - Roots: all app methods (default) or profile entry points (`--roots profile`).

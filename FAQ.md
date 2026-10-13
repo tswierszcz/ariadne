@@ -367,9 +367,13 @@ advisory text (no diff), a `NOT_REACHABLE` result is downgraded to
 `UNKNOWN`, since the model may have named a real method that is not the
 vulnerable one.
 
-Numbers: petclinic — 56/148 mapped (1 from the manual table, 55 from a
+Numbers: petclinic — 91/148 mapped (1 from the manual table, 90 from a
 diff); WebGoat — 104/160 (37 from the manual table — the whole XStream
-family, 67 from diffs).
+family, 67 from diffs). Source 2's file filter keeps any non-test `.java`
+file rather than requiring a Maven `src/main/` layout, which is what
+raised petclinic's diff-mapped count: Apache Tomcat lays its code out as
+`java/org/apache/...`, not `src/main/java/...` (see [PLAN.md](PLAN.md)'s
+Phase 4 follow-up).
 
 ### Step 7: `internal/reach` — searching the graph and assigning statuses
 

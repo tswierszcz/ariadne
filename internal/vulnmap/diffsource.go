@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"ariadne/internal/cves"
 	"ariadne/internal/httpcache"
@@ -78,7 +77,7 @@ func (r *Resolver) resolveFromCommit(ctx context.Context, commit commitRef) ([]s
 
 	var methods []string
 	for _, f := range files {
-		if !isMainJavaSource(f.Path) {
+		if !isNonTestJavaFile(f.Path) {
 			continue
 		}
 		rawURL := fmt.Sprintf("%s/%s/%s/%s/%s", r.RawBaseURL, commit.owner, commit.repo, commit.sha, f.Path)
@@ -99,15 +98,6 @@ func (r *Resolver) resolveFromCommit(ctx context.Context, commit commitRef) ([]s
 		}
 	}
 	return methods, nil
-}
-
-// isMainJavaSource reports whether path is a .java file under a
-// (possibly nested, e.g. "mymodule/src/main/java/...") src/main tree —
-// the plan's own filter, meant to exclude test code, which a fix commit
-// often also touches (new regression tests) but which was never
-// vulnerable itself.
-func isMainJavaSource(path string) bool {
-	return strings.HasSuffix(path, ".java") && strings.Contains(path, "src/main/")
 }
 
 func (r *Resolver) fetch(ctx context.Context, url string) ([]byte, error) {

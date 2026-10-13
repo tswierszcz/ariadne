@@ -4,7 +4,6 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"path"
 	"strings"
 	"text/template"
 
@@ -80,23 +79,10 @@ func diffGitPath(header string) string {
 	return ""
 }
 
-// isTestPath reports whether a file path is test code: any path segment
-// named test or tests, or a file named *Test.java / *Tests.java.
-func isTestPath(p string) bool {
-	for _, seg := range strings.Split(path.Dir(p), "/") {
-		if seg == "test" || seg == "tests" {
-			return true
-		}
-	}
-	base := path.Base(p)
-	return strings.HasSuffix(base, "Test.java") || strings.HasSuffix(base, "Tests.java")
-}
-
-// keepForLLM keeps non-test .java files only. Unlike source 2 it does not
-// require src/main/: that is exactly what hides Tomcat's java/org/apache/...
-// layout from source 2, and the model can judge those files fine.
+// keepForLLM is isNonTestJavaFile (see javasource.go) under the name this
+// file's own callers originally used.
 func keepForLLM(p string) bool {
-	return strings.HasSuffix(p, ".java") && !isTestPath(p)
+	return isNonTestJavaFile(p)
 }
 
 // assembleDiff concatenates the kept files of every commit, in order, under
