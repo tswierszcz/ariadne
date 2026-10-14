@@ -101,7 +101,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is the well-known Spring Data repository initializer feature: ResourceReaderRepositoryPopulator uses Jackson2ResourceReader to read data.json via ObjectReader#readTree, which genuinely dispatches to UntypedObjectDeserializer for untyped JSON. The hops correspond to real framework wiring (ContextRefreshedEvent -\u003e populator -\u003e Jackson read), not CHA artifacts.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-22060",
@@ -159,7 +162,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop ApplicationObjectSupport#setApplicationContext -\u003e WebApplicationObjectSupport#initApplicationContext -\u003e ContentNegotiatingViewResolver#initServletContext is a classic CHA spurious edge (generic ApplicationContextAware callback dispatched onto an unrelated view-resolver subtype), and the path then jumps into the reactive WebFlux stack (DefaultServerWebExchange, DefaultPartHttpMessageReader) which a servlet-based PetClinic app would never execute; the jump from initFormData into MultipartHttpMessageReader with a Flux/ReactiveHttpInputMessage descriptor further indicates over-broad virtual dispatch rather than a real call chain.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-23463",
@@ -208,7 +214,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.Owner#getPets()Ljava/util/List;",
       "to": "org.springframework.beans.support.PropertyComparator#sort(Ljava/util/List;Lorg/springframework/beans/support/SortDefinition;)V"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop StaticLoggerBinder#getLoggerFactory() -\u003e ContextJNDISelector#getLoggerContext() is a CHA over-approximation: StaticLoggerBinder returns the default LogbackLoggerContext, and ContextJNDISelector is only installed when logback is explicitly configured with a JNDI selector, so this edge exists only because both implement ILoggerFactory. The earlier hops (getPets -\u003e PropertyComparator.sort -\u003e logging setup) are plausible, but the JNDI-selector connection is not a real dispatch.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-43466",
@@ -264,7 +273,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Boot genuinely loads EnvironmentPostProcessors (including CloudFoundryVcapEnvironmentPostProcessor) via EnvironmentPostProcessorApplicationListener during startup, and its JsonParser implementations include YamlJsonParser, which really calls snakeyaml's Yaml.loadAs to parse VCAP/Application metadata. The only CHA-style hop is the JsonParser.parseMap interface dispatch to YamlJsonParser's lambda, but that is a real framework-selected implementation, not a spurious subtype edge.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-21363",
@@ -300,7 +312,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Boot startup really does multicast context events to @EventListener methods, and ApplicationListenerMethodAdapter evaluates the listener's condition SpEL via EventExpressionEvaluator, so reaching SpelExpression#getValue during SpringApplication.run is a genuine framework flow. The final hop to ConstructorReference#createArray only occurs if an event condition expression contains an array constructor, which is possible but configuration-dependent; the chain itself is a real dispatch path, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22965",
@@ -323,7 +338,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
       "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is the canonical Spring4Shell sink chain: a controller's BindingResult.rejectValue triggers AbstractPropertyBindingResult.getActualFieldValue, which resolves properties via BeanWrapperImpl and CachedIntrospectionResults.forClass, exactly the introspection path (CachedIntrospectionResults#\u003cinit\u003e/introspectInterfaces) that CVE-2022-22965 exploits. The Petclinic OwnerController.processFindForm genuinely calls rejectValue on a BindingResult, and every hop is a real Spring data-binding call, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22968",
@@ -340,7 +358,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.OwnerController#setAllowedFields(Lorg/springframework/web/bind/WebDataBinder;)V",
       "to": "org.springframework.web.bind.WebDataBinder#setDisallowedFields([Ljava/lang/String;)V"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "OwnerController#setAllowedFields is a Spring @InitBinder method invoked during binding of externally supplied HTTP form data to the Owner object, so it runs on attacker-controlled requests. It calls the vulnerable WebDataBinder#setDisallowedFields, which is exactly the case-sensitivity flaw (CVE-2022-22968) allowing disallowed fields like 'id' to be set via case variations.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22970",
@@ -365,7 +386,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
       "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain rejectValue → getActualFieldValue → AbstractNestablePropertyAccessor.getPropertyValue → BeanWrapperImpl.getCachedIntrospectionResults → CachedIntrospectionResults.forClass is the genuine Spring data-binding/property-access path; when a controller method takes BindingResult and validation rejects a field, Spring resolves the field value via BeanWrapper, which introspects the bean class exactly this way.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-23221",
@@ -406,7 +430,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Boot's EnvironmentPostProcessorApplicationListener really does invoke CloudFoundryVcapEnvironmentPostProcessor on the environment-prepared event, and the VCAP_APPLICATION value is parsed through the JsonParser abstraction, for which Spring Boot's JsonParserFactory really selects YamlJsonParser when snakeyaml is on the classpath (its parseMap lambda calls Yaml#loadAs). The hops match real Spring Boot startup behavior; this is not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-38749",
@@ -487,7 +514,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Data's ResourceReaderRepositoryPopulator with Jackson2ResourceReader is a real, documented mechanism that parses JSON data files via Jackson on context refresh, so the chain from SpringApplication.run through populate/readObjectFrom to ObjectReader.readTree and a deserializer is a genuine framework call path, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-42004",
@@ -543,7 +573,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is a genuine Spring Data path: AbstractRepositoryPopulatorFactoryBean listens for ContextRefreshedEvent and ResourceReaderRepositoryPopulator/Jackson2ResourceReader really do use Jackson's ObjectReader.readTree to parse repository initializer JSON (e.g., data.json), so reaching EnumDeserializer#deserialize via _bindAsTree is a real dispatch, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-42252",
@@ -586,7 +619,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The middle segment is implausible: createWebServer/setBasic would never call LifecycleBase#stop(), and Connector#stopInternal() would not invoke UpgradeProcessorInternal#timeoutAsync — these are CHA edges stitching unrelated lifecycle and request-processing code together. The final hops (Http11Processor#service -\u003e parseHeaders -\u003e parseHeader) are the real vulnerable path, but the path as shown does not represent a genuine call chain from the entry point.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-45143",
@@ -631,7 +667,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Boot startup prefix (main → SpringApplication.run → TomcatServletWebServerFactory.getWebServer) is real, but the middle of the path is pure CHA noise: StandardHost#\u003cinit\u003e → StandardPipeline#setBasic, then LifecycleBase#stop → Connector#stopInternal → AbstractProtocol#stop → UpgradeProcessorInternal#timeoutAsync is a spurious interface/virtual dispatch chain (stop() would never route to an upgrade processor's timeoutAsync), so the reported chain to JsonErrorReportValve#report does not correspond to a real call sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-45868",
@@ -691,7 +730,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The tail of the path — AbstractAutowireCapableBeanFactory#initializeBean → invokeInitMethods → HandlerMappingIntrospector#afterPropertiesSet — is the standard Spring InitializingBean lifecycle, so the vulnerable method is genuinely invoked during context startup. The middle hops (EventPublishingRunListener → ApplicationObjectSupport#setApplicationContext) look like CHA noise, but the vulnerable endpoint itself is reached via real framework wiring.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20861",
@@ -723,7 +765,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows a genuine Spring Boot startup flow: SpringApplication.run → prepareContext → bootstrap-context close firing an ApplicationEvent, which SimpleApplicationEventMulticaster dispatches to ApplicationListenerMethodAdapter, whose shouldHandle evaluates the listener's SpEL condition via EventExpressionEvaluator.condition → SpelExpression.getValue → OperatorMatches. Event-listener conditions are a real SpEL evaluation point in Spring, so reaching OperatorMatches there is a plausible runtime path, though it depends on a listener declaring a 'matches' condition expression.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20863",
@@ -755,7 +800,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
       "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The tail (AbstractBeanFactory#predictBeanType → evaluateBeanDefinitionString → StandardBeanExpressionResolver → SpEL parse) is a real Spring chain, but the middle hops are CHA glue: AbstractNestablePropertyAccessor#setDefaultValue does not call setPropertyValue(String,Object) on a JPA wrapper, and ProxyUtils#getUserClass → AopUtils#getTargetClass → AbstractBeanFactoryBasedTargetSource#getTargetClass connects unrelated classes only via same-named virtual dispatch. The link from a controller's rejectValue into bean-factory type prediction during request handling is not a real Spring flow.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20873",
@@ -857,7 +905,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The middle hops are CHA artifacts: StandardPipeline#setBasic -\u003e LifecycleBase#stop, AprEndpoint#stopInternal -\u003e SocketWrapperBase#close, and AjpProcessor#recycle -\u003e CoyoteAdapter#checkRecycled are unrelated methods spuriously connected by over-broad virtual dispatch (e.g., a generic stop()/close() call site), not a real Tomcat startup or request-handling sequence. While the tail (Request#getParameter -\u003e parseParameters -\u003e parseParts) is a genuine Tomcat call chain, it is not actually reachable via this fabricated prefix.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-34055",
@@ -897,7 +948,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "Hop 8→9 is a CHA artifact: EventPublishingRunListener does not extend ApplicationObjectSupport, so contextLoaded cannot dispatch to setApplicationContext; the path then implausibly mixes servlet ContentNegotiatingViewResolver init with a reactive WebFilter chain. The tail (MetricsWebFilter→WebFluxTags#method) is a real runtime chain, but the connecting edges are spurious.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-41080",
@@ -941,7 +995,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain from StandardHost#\u003cinit\u003e() to StandardPipeline#setBasic to LifecycleBase#stop is implausible (a constructor does not trigger a lifecycle stop), and the path then jumps from server shutdown code (Connector#stopInternal, AbstractProtocol#stop) into live request processing (SocketProcessorBase#run, CoyoteAdapter#asyncDispatch) — these are unrelated runtime contexts stitched together by CHA over-approximation. Only the final hops (AuthenticatorBase#invoke -\u003e FormAuthenticator#doAuthenticate -\u003e savedRequestURL) are a genuine Tomcat dispatch, but they are reached via a spurious connection from Spring Boot startup code.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-42795",
@@ -983,7 +1040,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Boot startup portion (main -\u003e SpringApplication.run -\u003e refresh -\u003e createWebServer -\u003e TomcatServletWebServerFactory.getWebServer) is plausible, but the Tomcat portion is nonsense: Tomcat#getHost() does not construct a StandardHost, StandardPipeline#setBasic(Valve) does not call LifecycleBase#stop(), and stop() during server creation leading to AjpProcessor#recycle is a CHA-invented chain of unrelated virtual/overridden methods.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-44487",
@@ -1040,7 +1100,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain contains impossible hops: StandardHost#\u003cinit\u003e -\u003e StandardPipeline#setBasic -\u003e LifecycleBase#stop (a constructor/setter leading to lifecycle stop during startup) and Connector#stopInternal -\u003e UpgradeProcessorInternal#timeoutAsync, which are not real call relationships. While Tomcat's HTTP/2 stack genuinely processes RST_STREAM frames at runtime, this specific path is stitched together by CHA over-approximation rather than a real dispatch sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-45648",
@@ -1081,7 +1144,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from LifecycleBase#init into AuthenticatorBase#register is a CHA artifact — register is a per-request authentication callback, never invoked during container startup/init. The subsequent chain (Request#getAttribute -\u003e coyote action -\u003e Http11Processor#setRequestBody -\u003e addActiveFilter -\u003e ChunkedInputFilter) is likewise not a real call sequence; the vulnerable parseHeader is reached during request parsing, not via this path.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-46589",
@@ -1134,7 +1200,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop StandardPipeline#setBasic -\u003e LifecycleBase#stop is a CHA artifact: setBasic never stops the pipeline, and a chain of stop()/stopInternal() calls during web-server creation at startup makes no sense. Also Tomcat#getHost does not construct a new StandardHost, and the path never reaches any of the listed vulnerable parameter-parsing methods, only Request#recycle via an implausible recycle/log chain.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-6378",
@@ -1175,7 +1244,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain Spring Boot startup logging → Logger#callAppenders → RollingFileAppender#rollover → RenameUtil → EnvUtil#isJDK7OrHigher/isJDK_N_OrHigher is genuine logback behavior (RenameUtil really checks JDK version when renaming across volumes), so the edges are real, not CHA artifacts. However, note this only reaches the EnvUtil version-check methods, not LoggingEventVO#readObject, so the actual receiver-based deserialization vulnerability is not exercised by this path.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-12798",
@@ -1211,7 +1283,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain from Spring Boot's StartupInfoLogger through the SLF4J adapter into logback's Logger→callAppenders→AppenderAttachableImpl pipeline is the genuine default startup logging flow, and SMTPAppenderBase invoking its configured Evaluator#evaluate is real logback behavior — the logback manual itself documents JaninoEventEvaluator as an SMTPAppender evaluator. The final hop is logback.xml-driven wiring rather than a default (the default evaluator is OnErrorEvaluator, and PetClinic ships no SMTPAppender), but it corresponds to a real, documented appender/evaluator pairing — exactly this CVE's config-injection attack vector — not a spurious CHA connection between unrelated classes.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-12801",
@@ -1269,7 +1344,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The startup segment is incoherent: EventPublishingRunListener#contextLoaded cannot dispatch into ApplicationObjectSupport#setApplicationContext, and the path then jumps from servlet-stack ContentNegotiatingViewResolver into AbstractAutowireCapableBeanFactory#initializeBean and a reactive WebFilterChain lambda — mixing bean-initialization callbacks with runtime request handling in a way Spring never performs. While CorsUtils#isSameOrigin really does call UriComponentsBuilder#fromOriginHeader, the chain reaching it (a servlet PetClinic app running reactive CloudFoundry actuator filters during contextLoaded) is a CHA over-approximation, not a real call sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-22262",
@@ -1325,7 +1403,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from StandardHost#\u003cinit\u003e to StandardPipeline#setBasic to LifecycleBase#stop, which is nonsensical — a constructor and a valve setter do not trigger lifecycle stop; this is CHA over-approximation on generic virtual calls. Similarly, AbstractProtocol#stop() reaching UpgradeProcessorInternal#timeoutAsync (a per-connection processor method) is not a real dispatch edge, so the path to WsSession#doClose is spurious.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-24549",
@@ -1370,7 +1451,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The startup chain (Spring Boot main -\u003e embedded Tomcat creation) is real, but the tail is bogus: Tomcat#getHost() does not construct a StandardHost, and StandardHost#\u003cinit\u003e -\u003e StandardPipeline#setBasic -\u003e LifecycleBase#stop() is a nonsensical constructor-to-stop sequence typical of CHA edges into widely-overridden lifecycle methods. The vulnerable Http2Parser#readContinuationFrame is only reached while processing an actual HTTP/2 request at runtime, not during server startup wiring.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-34750",
@@ -1416,7 +1500,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop chain Tomcat#getHost -\u003e StandardHost#\u003cinit\u003e -\u003e StandardPipeline#setBasic -\u003e LifecycleBase#stop is nonsensical: getHost does not construct a StandardHost, and setBasic cannot lead to a lifecycle stop during startup. The rest of the chain (stop -\u003e Connector -\u003e AbstractProtocol -\u003e timeoutAsync -\u003e StreamProcessor -\u003e sendStreamReset) is a plausible runtime sequence, but it is only reachable via the bogus LifecycleBase#stop edge, so the overall path is a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38286",
@@ -1459,7 +1546,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Boot startup portion (main -\u003e SpringApplication.run -\u003e createWebServer -\u003e TomcatServletWebServerFactory) is a real embedded-Tomcat startup chain, but the tail is implausible: LifecycleBase#init does not lead to AuthenticatorBase#register (which runs per-request during authentication), and Request#getAttribute -\u003e coyote action -\u003e AjpProcessor#isReadyForWrite -\u003e Nio2SocketWrapper mixes AJP processor with the NIO2 endpoint wrapper in a way that doesn't correspond to real Tomcat wiring. These hops look like CHA edges through generic lifecycle/action dispatch methods rather than a genuine call sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38808",
@@ -1499,7 +1589,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is the real Spring Boot startup event-dispatch chain: SpringApplication.run → prepareContext → multicaster → ApplicationListenerMethodAdapter → EventExpressionEvaluator.condition, which genuinely evaluates @EventListener condition SpEL expressions. The final hop to Assign#getValueInternal only occurs if a condition expression contains an assignment, which is config-dependent, but the framework wiring itself is authentic, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38809",
@@ -1625,7 +1718,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.OwnerController#setAllowedFields(Lorg/springframework/web/bind/WebDataBinder;)V",
       "to": "org.springframework.web.bind.WebDataBinder#setDisallowedFields([Ljava/lang/String;)V"
-    }
+    },
+    "exploitability": "unlikely",
+    "exploit_reason": "This is the standard Petclinic @InitBinder pattern calling setDisallowedFields with a hardcoded field name (e.g. \"owner.id\"), so the string reaching the vulnerable method is application-fixed configuration, not attacker-controlled input. The locale-dependent toLowerCase() weakness in isAllowed would only matter if attacker data flowed through binder field matching, which this static path does not show.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38828",
@@ -1670,7 +1766,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Boot's embedded Tomcat startup genuinely constructs and initializes Catalina components (including WebResourceRoot/DirResourceSet) via LifecycleBase#init during createWebServer, so reaching DirResourceSet#initInternal from PetClinicApplication#main is a real framework call chain. The addValve-\u003estart hop is slightly imprecise but the overall Spring Boot -\u003e Tomcat lifecycle initialization sequence is authentic.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-56337",
@@ -1700,7 +1799,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.owner.OwnerController#setAllowedFields(Lorg/springframework/web/bind/WebDataBinder;)V",
       "to": "org.springframework.web.bind.WebDataBinder#setDisallowedFields([Ljava/lang/String;)V"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "OwnerController#setAllowedFields is a Spring @InitBinder method invoked per HTTP request, and it configures disallowedFields on the WebDataBinder that subsequently binds attacker-controlled request parameters to the Owner object. This is exactly the configuration-plus-binding flow that CVE-2025-22233's disallowedFields bypass targets.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-22235",
@@ -1831,7 +1933,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows a genuine Spring Boot startup flow (SpringApplication.run -\u003e failure handling -\u003e FailureAnalyzers -\u003e NoSuchBeanDefinitionFailureAnalyzer -\u003e AnnotationsScanner), and the vulnerable method hasSameGenericTypeParameters is actually invoked by processMethodHierarchy/isOverride during annotation scanning, exactly the code path the CVE describes. The only caveat is that reaching it requires a startup failure (handleRunFailure), but the calls themselves are real framework wiring, not CHA artifacts.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-46701",
@@ -1890,7 +1995,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain contains obviously bogus hops: Tomcat#getHost() 'calling' StandardHost#\u003cinit\u003e(), and createWebServer() reaching LifecycleBase#stop()/Connector#stopInternal() during server creation — these are CHA over-approximation edges, not real framework behavior. While Request#parseParts is genuinely exercised at runtime during multipart uploads, this specific path (via endpoint stop, AjpProcessor recycle, and access-log valve parameter parsing) does not correspond to a real call sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-48989",
@@ -1931,7 +2039,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from Tomcat#getHost to StandardHost#\u003cinit\u003e to StandardPipeline#setBasic and then to LifecycleBase#stop(), but setBasic never calls stop(); this is a CHA-style splice of unrelated lifecycle methods. The tail (AbstractProcessor#timeoutAsync -\u003e 'StreamProcessor#process' -\u003e Stream#close -\u003e sendStreamReset) also doesn't correspond to real Tomcat HTTP/2 classes/call flow during server startup.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-49124",
@@ -1974,7 +2085,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Boot's embedded Tomcat startup genuinely initializes the webapp class loader and its StandardRoot resource sets (WebappClassLoaderBase#start → StandardRoot#getResources), and DirResourceSet#getResource is the concrete resource lookup invoked during that initialization, matching the CVE's affected methods.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-49128",
@@ -2010,7 +2124,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is a real Spring Boot/Spring Data chain: a RepositoryPopulator bean (Jackson2ResourceReader) genuinely parses data.json resources via ObjectReader/JsonFactory during ContextRefreshedEvent, and ByteSourceJsonBootstrapper really constructs a ReaderBasedJsonParser for non-UTF8 input. The hops match actual framework wiring rather than generic interface dispatch, so reaching the listed vulnerable constructor is plausible.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-52434",
@@ -2050,7 +2167,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Boot's embedded Tomcat setup (SpringApplication.run -\u003e refresh -\u003e ServletWebServerApplicationContext.createWebServer -\u003e TomcatServletWebServerFactory.getWebServer) is a genuine startup flow, and LifecycleBase.stop -\u003e Connector.stopInternal -\u003e AbstractProtocol.stop -\u003e AbstractEndpoint.stop -\u003e AprEndpoint.stopInternal is the real Tomcat connector shutdown chain. Some middle hops (Tomcat#getHost -\u003e StandardHost#\u003cinit\u003e -\u003e StandardPipeline#setBasic) look like CHA noise, but the overall sequence corresponds to actual framework behavior, so the vulnerable method is plausibly reachable when the APR connector is configured.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-52520",
@@ -2094,7 +2214,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Boot startup chain (steps 1-11) reaching TomcatServletWebServerFactory#getWebServer is a real embedded-Tomcat setup path, but the tail is nonsense: Tomcat#getHost() cannot call StandardHost#\u003cinit\u003e, a pipeline setBasic() would not lead to LifecycleBase#stop(), and the stop/recycle chain hops across unrelated classes (AprEndpoint -\u003e SocketWrapperBase#close -\u003e ConnectionHandler#release -\u003e AjpProcessor#recycle -\u003e CoyoteAdapter#checkRecycled) purely via CHA over-approximation on generic virtual calls.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-52999",
@@ -2141,7 +2264,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The middle hops are CHA noise: Tomcat#getHost() would not construct a fresh StandardHost, StandardPipeline#setBasic(Valve) would never call LifecycleBase#stop(), and Connector#stopInternal() does not dispatch into UpgradeProcessorInternal#timeoutAsync — these are unrelated virtual-call targets strung together. Only the final segment (Http2Protocol#getInternalUpgradeHandler creating an Http2UpgradeHandler) is a genuine Tomcat HTTP/2 flow, but the path as a whole does not correspond to a real call chain.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-55668",
@@ -2182,7 +2308,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain from Tomcat#getHost to StandardHost#\u003cinit\u003e to StandardPipeline#setBasic to LifecycleBase#stop is a nonsensical sequence (a constructor and a setter do not lead to lifecycle stop), and the subsequent Connector/AbstractProtocol/AprEndpoint stop path then jumps into AjpProcessor#recycle and CoyoteAdapter#log, which are unrelated runtime request-processing components, not startup code. These hops are classic CHA over-approximation edges (e.g., virtual dispatch on Valve/Lifecycle/Processor types) with no real call relationship.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-55752",
@@ -2213,7 +2342,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain Spring Boot main -\u003e embedded Tomcat -\u003e TomcatServletWebServerFactory#configureEngine -\u003e StandardPipeline#addValve -\u003e LifecycleBase#start -\u003e RewriteValve#startInternal -\u003e parse is a genuine framework lifecycle: startInternal really does read rewrite rules via parse(BufferedReader). The only caveat is that RewriteValve is only added if the app actually configures URL rewriting, but the call edges themselves are real, not CHA artifacts.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-55754",
@@ -2268,7 +2400,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from StandardHost#\u003cinit\u003e to StandardPipeline#setBasic to LifecycleBase#stop, i.e., a constructor call flowing into a lifecycle shutdown, which is not a real call relationship. The rest of the path (endpoint stop -\u003e ConnectionHandler#release -\u003e AjpProcessor#recycle -\u003e access-log valve -\u003e Request#parseParts) is a chain of unrelated shutdown/recycling/logging methods stitched together by over-approximate virtual dispatch, not a genuine route to multipart parsing.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-66614",
@@ -2320,7 +2455,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The bridge from Tomcat startup code (StandardPipeline#addValve → LifecycleBase#start/init) into AuthenticatorBase#register is implausible: register() is a per-request authentication bookkeeping method, not something invoked during component initialization, so that hop exists only via over-broad virtual dispatch. The tail (doClientAuth → rehandshake → processSNI) is a genuine Tomcat chain, but the path as a whole never reaches it from this entry sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-10532",
@@ -2387,7 +2525,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "Node 6 is a signature-mismatched hop (DefaultBootstrapContext#close takes no arguments, yet is shown receiving a ConfigurableApplicationContext), and the tail is implausible: Jackson2ResourceReader uses ObjectReader#readTree, which binds to JsonNode and never invokes NioPathDeserializer (a typed Path deserializer only runs for POJO fields, not tree binding).",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-22733",
@@ -2450,7 +2591,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from Tomcat#getHost to StandardHost#\u003cinit\u003e (getHost does not construct a host) and then into LifecycleBase#stop / Connector#stopInternal / endpoint stop during server *creation*, which is backwards — shutdown/recycle code is not invoked from createWebServer. The real route to ChunkedInputFilter#recycle is via runtime request processing, so this specific sequence is a CHA over-approximation stitching unrelated lifecycle methods together.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-25854",
@@ -2494,7 +2638,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop StandardHost#\u003cinit\u003e() -\u003e StandardPipeline#setBasic -\u003e LifecycleBase#stop is nonsensical (a constructor leading to pipeline setup then to lifecycle stop), a classic CHA over-approximation; additionally LoadBalancerDrainingValve#invoke is only reached if that valve is explicitly configured, which Spring Boot's embedded Tomcat does not do by default.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-34483",
@@ -2601,7 +2748,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from StandardPipeline#setBasic to LifecycleBase#stop and then into Connector#stopInternal → AbstractProcessor#timeoutAsync → StreamProcessor#process, which is incoherent: setBasic does not call stop, and a stop/timeout path would never flow into StreamException construction during server startup. These are CHA-style virtual-dispatch edges connecting unrelated lifecycle and request-processing code, not a real Tomcat call sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-41711",
@@ -2686,7 +2836,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "PathMatchingResourcePatternResolver genuinely instantiates AntPathMatcher in its constructor, and it is plausibly created via AbstractBeanDefinitionReader/XmlBeanDefinitionReader during BeanDefinitionLoader setup in SpringApplication.run. The chain matches real Spring Boot bootstrap wiring, though it only reaches the AntPathMatcher constructor (setup), not the vulnerable match methods with attacker input.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-41849",
@@ -2787,7 +2940,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "AbstractApplicationContext#refresh really does call prepareBeanFactory, which instantiates a StandardBeanExpressionResolver whose constructor creates a SpelParserConfiguration with a compiler mode and classloader — this is genuine Spring context bootstrap wiring, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-41852",
@@ -2857,7 +3013,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain jumps from server startup (createWebServer -\u003e Tomcat#getHost -\u003e StandardHost#\u003cinit\u003e -\u003e setBasic) directly into LifecycleBase#stop and then into runtime request processing (processSocket, CoyoteAdapter#asyncDispatch), which cannot be a single synchronous call chain — startup never executes a request dispatch inline. Additionally the path reaches the digest-auth vulnerable RealmBase#getDigest via BasicAuthenticator#doAuthenticate, which uses a different authenticate overload and never calls getDigest, a classic CHA over-approximation hop.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-43513",
@@ -2907,7 +3066,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from StandardHost#\u003cinit\u003e to StandardPipeline#setBasic to LifecycleBase#stop() to Connector#stopInternal() during application startup, which is nonsensical — a constructor path does not lead to a lifecycle stop, and the subsequent chain through UpgradeProcessorInternal/Http2UpgradeHandler/AprEndpoint$SocketProcessor is a grab-bag of unrelated runtime dispatch targets (APR endpoint, HTTP/2 upgrade) that would never be invoked from a startup refresh. The final segment (BasicAuthenticator -\u003e LockOutRealm#authenticate -\u003e isLocked) is plausible in isolation, but the middle of the path is a classic CHA over-approximation stitching together unrelated virtual-call targets.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-43514",
@@ -2951,7 +3113,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "While Spring Boot starting an embedded Tomcat (nodes 1-11) is plausible, the chain StandardPipeline#setBasic -\u003e LifecycleBase#stop -\u003e Connector#stopInternal -\u003e AbstractProtocol#stop -\u003e UpgradeProcessorInternal#timeoutAsync is a CHA artifact: setBasic does not call stop, and AbstractProtocol#stop would not dispatch into an UpgradeProcessorInternal#timeoutAsync. The path splices unrelated Tomcat lifecycle/processing methods together via over-broad virtual dispatch to reach AjpProcessor#prepareRequest.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-43515",
@@ -2994,7 +3159,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain hops from StandardHost#\u003cinit\u003e to StandardPipeline#setBasic to LifecycleBase#stop and then into Connector#stopInternal → timeoutAsync → processSocket are classic CHA artifacts: a constructor/setter does not lead to lifecycle stop, and the runtime request-processing chain (SocketProcessor → CoyoteAdapter → AuthenticatorBase#invoke → RealmBase#findSecurityConstraints) is driven by live requests, not reachable from SpringApplication#run at startup.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-47884",
@@ -3020,7 +3188,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from EventPublishingRunListener#contextLoaded to ApplicationObjectSupport#setApplicationContext is a CHA artifact: EventPublishingRunListener is a SpringApplicationRunListener, not an ApplicationObjectSupport, and nothing in the startup path would call setApplicationContext on an XsltView. Additionally, XsltView#loadTemplates/getStylesheetSource only run during actual view rendering of a request, not during SpringApplication.run context preparation, so this chain does not correspond to real framework behavior.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-49844",
@@ -3053,7 +3224,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "Spring Boot's StartupInfoLogger logs a plain String/SimpleMessage ('Started application in N seconds'), not a MapMessage, so the hop SimpleLogger#logMessage -\u003e MapMessage#getFormattedMessage is a CHA over-approximation over the Message interface. Additionally, SimpleLogger does not use JsonTemplateLayout or the JSON format array, so the vulnerable formatting path would not be triggered even if a MapMessage were logged.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-50193",
@@ -3147,7 +3321,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop StandardPipeline#setBasic -\u003e LifecycleBase#stop and then into Connector#stopInternal -\u003e UpgradeProcessorInternal#timeoutAsync splices unrelated lifecycle and request-processing code together via CHA; a real request path (SocketProcessor -\u003e CoyoteAdapter -\u003e AuthenticatorBase -\u003e RealmBase#findSecurityConstraints) exists at runtime but is not connected by this startup sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-65905",
@@ -3203,7 +3380,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Tomcat's embedded-mode FixContextListener really does install a NonLoginAuthenticator during lifecycleEvent when a context lacks a login config, so reaching AuthenticatorBase#\u003cinit\u003e during Spring Boot's embedded Tomcat startup is genuine framework wiring. The StandardPipeline#setBasic -\u003e LifecycleBase#stop hop (13-15) looks like a CHA artifact, but it only shortcuts the path to fireLifecycleEvent, which is otherwise a real lifecycle mechanism, so the endpoint remains believable.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-77310",
@@ -3242,7 +3422,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The path follows a genuine Spring Data repository-populator flow: ContextRefreshedEvent -\u003e AbstractRepositoryPopulatorFactoryBean -\u003e Jackson2ResourceReader.readFrom -\u003e ObjectReader.readTree, which is exactly how Spring Data initializes repositories from data.json. The only weak link is readTree deserializing into JsonNode rather than a typed InetAddress target, so reaching FromStringDeserializer._deserialize would require the JSON to contain a typed InetAddress value, but the wiring itself is real framework behavior.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-83557",
@@ -3292,7 +3475,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Boot startup chain through ResourceReaderRepositoryPopulator/Jackson2ResourceReader#readFrom is a real framework flow, but it calls ObjectReader#readTree(InputStream), which constructs a UTF8StreamJsonParser — the implementation the advisory explicitly confirms is correctly bounded. The hop to UTF8DataInputJsonParser (only created via createParser(DataInput)) is a CHA artifact: this call site never dispatches to the DataInput-backed parser, so the vulnerable code is not actually reached.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-91776",
@@ -3327,7 +3513,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is a real Spring Data code path: ResourceReaderRepositoryPopulator/Jackson2ResourceReader genuinely uses Jackson's ObjectReader (with default typing enabled) to read repository initializer JSON, so the chain down to AsArrayTypeDeserializer._findDeserializer is a genuine framework flow, not a CHA artifact. Note the data source is classpath resources rather than attacker input, so exploitability is questionable, but the call sequence itself is real.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-91777",
@@ -3367,7 +3556,10 @@
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Petclinic actually configures a RepositoryPopulator (data.json) via Jackson2ResourceReader, so the chain SpringApplication.run → ContextRefreshedEvent → AbstractRepositoryPopulatorFactoryBean → Jackson2ResourceReader → ObjectReader → MapDeserializer is a genuine framework wiring path. The only caveat is that the vulnerable forward-reference methods require @JsonIdentityInfo content in the populated JSON, but the call chain itself is real, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-9828",

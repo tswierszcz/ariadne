@@ -434,6 +434,8 @@ Flags:
 | `-llm` | no | Enable the LLM source for CVEs the manual table and fix-commit diffs could not map. Needs a model and `ARIADNE_LLM_API_KEY`. |
 | `-llm-model` | no | LLM model id; overrides `ARIADNE_LLM_MODEL` (e.g. `z-ai/glm-5.3`). |
 | `-llm-base-url` | no | OpenAI-compatible base URL; overrides `ARIADNE_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`). |
+| `-exploit-check` | no | For each REACHABLE CVE, ask an LLM whether its call path plausibly carries attacker-controlled input. Uses the same `ARIADNE_LLM_*` settings as `-llm` (and works without `-llm` itself); one extra request per REACHABLE CVE. |
+| `-framework-check` | no | For each FRAMEWORK CVE, ask an LLM whether its call path looks like a real framework call chain or a CHA over-approximation artifact. Same `ARIADNE_LLM_*` settings; one extra request per FRAMEWORK CVE. |
 | `-version` | no | Print the ariadne version and exit. |
 
 ### Latest full test run with the LLM source
@@ -465,6 +467,61 @@ bin/ariadne -app ... -deps ... -out report.md -json results.json -llm
 With `-offline`, `-llm` needs no key: every answer must already be in
 `<cache-dir>/llm/`. To discard cached LLM answers and ask again, delete
 that directory.
+
+### Exploit-check (PLAN.md Phase 8)
+
+`-exploit-check` asks the same kind of LLM, once per REACHABLE CVE, whether its
+statically-computed call path plausibly carries attacker-controlled input to the
+vulnerable call — a heuristic second opinion, not a proof, since ariadne has no
+decompiler and shows the model method signatures along the path, not Java source. It is
+opt-in: the flag must be passed explicitly, and it is independent of `-llm` (which only
+controls CVE-to-method mapping) though it reads the same `ARIADNE_LLM_*` settings:
+
+```bash
+set -a; . ./.env; set +a
+bin/ariadne -app ... -deps ... -out report.md -json results.json -exploit-check
+```
+
+Each REACHABLE CVE's verdict (`likely`/`unlikely`/`unknown`) and reason are written next to
+its full call path in `report.md`'s "REACHABLE — full call paths" section, and as
+`exploitability`/`exploit_reason`/`exploit_model` fields on that CVE's entry in
+`results.json`. Answers are cached per `(model, prompt)` under `<cache-dir>/exploit/`, same
+as `-llm`'s own cache. Verified against spring-petclinic 2.4.5's 3 REACHABLE CVEs: the model
+correctly told apart `CVE-2022-22968`/`CVE-2025-22233` (`likely` — `OwnerController`'s
+`@InitBinder` method wires `WebDataBinder#setDisallowedFields` from a request-bound
+controller) from `CVE-2024-38820` (`unlikely` — the same call site but with a hardcoded
+field name, not attacker-supplied data). NOT_REACHABLE/UNKNOWN CVEs have no checked path
+to ask about and are left out of this check entirely; FRAMEWORK CVEs do have one, but get
+a different question — see `-framework-check` below.
+
+### Framework-check
+
+`-framework-check` asks the same kind of LLM about each FRAMEWORK CVE instead: not "is this
+exploitable" but "does this specific call path look like a real call chain the named
+framework would make, or like a CHA over-approximation artifact" — the exact risk the
+report's own "FRAMEWORK — needs manual review" section names (a virtual/interface call is
+treated as reaching every subtype that declares a same-named method, whether or not that
+override is ever really invoked for this call site). It is opt-in and independent of both
+`-llm` and `-exploit-check`, though it reads the same `ARIADNE_LLM_*` settings:
+
+```bash
+set -a; . ./.env; set +a
+bin/ariadne -app ... -deps ... -out report.md -json results.json -framework-check
+```
+
+Each FRAMEWORK CVE's verdict (`plausible`/`artifact`/`unknown`) and reason are written next
+to its full call path in `report.md`'s "FRAMEWORK — needs manual review" section, and as
+`path_plausibility`/`path_plausibility_reason`/`path_plausibility_model` fields on that
+CVE's entry in `results.json`. Answers are cached under `<cache-dir>/framework-check/`, a
+separate namespace from `-exploit-check`'s cache so the two never collide even for the same
+CVE. Verified against spring-petclinic 2.4.5's 61 FRAMEWORK CVEs (a real OpenRouter run):
+36 came back `artifact`, and the model independently found the same real pattern in most of
+them — a spurious `StandardHost#<init> → StandardPipeline#setBasic → LifecycleBase#stop`
+hop (a constructor/setter does not trigger a lifecycle shutdown) stitching together
+unrelated Tomcat startup and request-processing code, a textbook CHA over-approximation.
+This is a genuine finding about ariadne's own call graph, not just a plausible-sounding
+guess, and a candidate for a future `cha_skip.yaml` entry to cut this specific false-positive
+pattern at the source. WebGoat's 45 FRAMEWORK CVEs split 26 `plausible`/19 `artifact`.
 
 ## Building and testing
 

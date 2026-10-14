@@ -31,6 +31,16 @@ type Header struct {
 	LLMModel   string
 	LLMMapped  int
 	LLMSkipped int // requests that failed or replies that stayed invalid
+
+	// ExploitModel is set only when -exploit-check was used.
+	ExploitModel   string
+	ExploitChecked int
+	ExploitSkipped int // requests that failed, were invalid, or had no path to ask about
+
+	// FrameworkCheckModel is set only when -framework-check was used.
+	FrameworkCheckModel   string
+	FrameworkChecked      int
+	FrameworkCheckSkipped int
 }
 
 // Row is one line of the CVE table.

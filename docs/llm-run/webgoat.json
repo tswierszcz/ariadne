@@ -14,7 +14,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson is a deliberately vulnerable lesson whose completed(String) handler receives attacker-supplied lesson input and passes it directly to XStream#fromXML, which is the known CVE-2013-7285 command-injection sink.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2016-1000027",
@@ -41,7 +44,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes an attacker-supplied lesson input (String) and passes it directly to XStream#fromXML, which is the classic XXE sink; the lesson is specifically designed to demonstrate vulnerable component usage with user-controlled XML.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2017-7957",
@@ -58,7 +64,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson is a deliberately vulnerable exercise whose completed(String) method takes attacker-supplied HTTP request input and passes it directly to XStream#fromXML, exactly the pattern the CVE describes.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2020-14340",
@@ -79,7 +88,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied HTTP parameter string and passes it directly to XStream#fromXML, which is the documented vulnerable unmarshal entry point for CVE-2020-26217.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2020-26258",
@@ -96,7 +108,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied lesson answer string and passes it directly to XStream#fromXML, which is the vulnerable unmarshal entry point for CVE-2020-26258.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2020-26259",
@@ -113,7 +128,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson passes attacker-supplied lesson input (an HTTP request parameter) directly into XStream#fromXML, which unmarshals it via the CVE-affected unmarshal path.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2020-36518",
@@ -181,7 +199,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Data's ResourceReaderRepositoryPopulator/Jackson2ResourceReader genuinely reads JSON repository seed files via Jackson's ObjectReader, and untyped JSON content is deserialized by UntypedObjectDeserializer, so the final hops are real. The event-multicaster chain (DataSourceInitializerInvoker publishing ContextRefreshedEvent reaching the repository populator) is standard Spring wiring, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21341",
@@ -198,7 +219,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes the user-submitted lesson input string and passes it directly to XStream.fromXML, so attacker-controlled HTTP input reaches the vulnerable unmarshal call.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21342",
@@ -215,7 +239,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes the user-submitted lesson answer (an HTTP request parameter) and passes it directly to XStream#fromXML, so attacker-controlled XML reaches the vulnerable unmarshal call.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21343",
@@ -232,7 +259,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes a user-supplied lesson answer string and passes it directly to XStream#fromXML, which unmarshalls attacker-controlled XML — exactly the input path for CVE-2021-21343.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21344",
@@ -249,7 +279,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson.completed takes an attacker-supplied lesson input string and passes it directly to XStream.fromXML, which is exactly the unmarshal path for CVE-2021-21344.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21345",
@@ -266,7 +299,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes attacker-supplied lesson input (the 'completed' endpoint receives user-submitted XML from the HTTP request) and passes it directly to XStream#fromXML, which is exactly the vulnerable unmarshal path for CVE-2021-21345.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21346",
@@ -283,7 +319,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson passes the attacker-supplied lesson parameter (String) directly into XStream#fromXML, which is exactly the vulnerable unmarshal entry point for CVE-2021-21346.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21347",
@@ -300,7 +339,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson is a deliberately vulnerable exercise whose completed(String) method passes attacker-supplied request input directly to XStream#fromXML, which is the documented vulnerable unmarshal path for CVE-2021-21347.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21348",
@@ -317,7 +359,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson.completed(String) takes attacker-supplied lesson input (HTTP form parameter) and passes it directly to XStream.fromXML, which is exactly the intended vulnerable-component demo for this XStream CVE.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21349",
@@ -334,7 +379,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes the attacker-supplied lesson submission string and passes it directly to XStream#fromXML, which is exactly the unmarshal path for CVE-2021-21349.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21350",
@@ -351,7 +399,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "This is WebGoat's VulnerableComponentsLesson, whose completed(String) method parses the attacker-supplied HTTP parameter (the XStream payload field) directly via XStream#fromXML, so the CVE-2021-21350 unmarshal sink receives user-controlled input with no sanitization in between.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-21351",
@@ -368,7 +419,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson passes attacker-supplied lesson input (an HTTP request parameter) directly to XStream.fromXML, which is exactly the vulnerable unmarshal path for CVE-2021-21351.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-22060",
@@ -421,7 +475,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The latter half (HttpWebHandlerAdapter.handle → DefaultServerWebExchange.\u003cinit\u003e → initFormData → MultipartHttpMessageReader.readMono → DefaultPartHttpMessageReader.read) is the genuine WebFlux request-processing chain that parses multipart form data, and the front half (WebSecurityConfigurerAdapter.authenticationManager → AuthenticationConfiguration → lazyBean → postProcess initialization) is standard Spring Security configuration wiring; these are real framework behaviors, even if the linking of servlet-era config to the reactive stack in WebGoat is unusual.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-22119",
@@ -446,7 +503,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied HTTP parameter (the lesson's attack input) and passes it directly to XStream#fromXML, which is exactly the vulnerable unmarshal entry point for CVE-2021-29505.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-3597",
@@ -494,7 +554,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Security/Spring Boot setup portion (nodes 1-17) plausibly reaches Undertow deployment, but the tail is a CHA mishmash: handleFirstRequest would not dispatch to ServerSentEventHandler, and a generic flush()/invokeChannelListener edge connecting SSE sink channels to the WebSocket BufferedBinaryMessage/FrameHandler pong callback is exactly the kind of spurious listener-interface hop over-approximation produces.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-3859",
@@ -536,7 +599,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from DeploymentManagerImpl#deploy() to ServletInitialHandler$2#call (request-time handling) is a CHA artifact — deployment does not invoke request handlers; likewise handleFirstRequest → ServerSentEventHandler#handleRequest connects unrelated handlers via over-broad dispatch. The Spring setup portion (1–17) is plausible, but the bridge into the vulnerable parseFrame relies on spurious edges.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39139",
@@ -553,7 +619,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes an attacker-supplied lesson parameter (String) and passes it directly to XStream.fromXML, which is the documented vulnerable unmarshal entry point for CVE-2021-39139.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39140",
@@ -570,7 +639,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes attacker-supplied lesson input (an HTTP request parameter) and passes it directly to XStream.fromXML, which is exactly the intended vulnerable demonstration of this CVE.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39141",
@@ -587,7 +659,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied lesson input string and passes it directly to XStream#fromXML, which is exactly the unmarshal path targeted by CVE-2021-39141.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39144",
@@ -604,7 +679,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson is a deliberately vulnerable teaching exercise where the lesson's completed(String) handler passes attacker-supplied HTTP input directly to XStream#fromXML, which is exactly the CVE-2021-39144 unmarshal entry point.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39145",
@@ -621,7 +699,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes a String parameter that is attacker-supplied HTTP input from the lesson form and passes it directly to XStream#fromXML, which is exactly the unmarshal path targeted by CVE-2021-39145.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39146",
@@ -638,7 +719,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied String (the lesson's HTTP form input) and passes it directly to XStream#fromXML, which internally calls the vulnerable unmarshal; this is the intended vulnerable-by-design demonstration of CVE-2021-39146.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39147",
@@ -655,7 +739,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson.completed(String) takes attacker-supplied lesson input and passes it directly to XStream.fromXML, which is exactly the unmarshal path for CVE-2021-39147.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39148",
@@ -672,7 +759,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied HTTP parameter (the lesson's answer field) and passes it directly to XStream#fromXML, which is exactly the vulnerable unmarshal entry point for CVE-2021-39148.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39149",
@@ -689,7 +779,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes an attacker-supplied lesson input string and passes it directly to XStream.fromXML, which unmarshals attacker-controlled XML — exactly the input path CVE-2021-39149 requires.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39150",
@@ -706,7 +799,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes the attacker-supplied lesson input String and feeds it directly to XStream.fromXML, so unmarshalling of untrusted attacker-controlled XML reaches the vulnerable XStream unmarshal path.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39151",
@@ -723,7 +819,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson is a deliberately vulnerable exercise whose completed(String) method takes attacker-supplied HTTP request input and passes it directly to XStream#fromXML, which internally calls the vulnerable unmarshal. This is the exact known exploitable path for this CVE in WebGoat.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39152",
@@ -740,7 +839,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed(String) is an exercise endpoint that feeds attacker-supplied lesson input directly into XStream.fromXML(String), which is exactly the XStream SSRF CVE-2021-39152 pattern of unmarshalling attacker-controlled XML.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39153",
@@ -757,7 +859,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes attacker-supplied lesson input (an HTTP request parameter) and passes it directly to XStream#fromXML, which is exactly the untrusted deserialization entry point for CVE-2021-39153.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-39154",
@@ -774,7 +879,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied HTTP parameter string and passes it directly to XStream#fromXML, which is exactly the unmarshal path CVE-2021-39154 targets.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-42550",
@@ -797,7 +905,10 @@
     "entry": {
       "from": "org.owasp.webgoat.AsciiDoctorTemplateResolver#\u003cclinit\u003e()V",
       "to": "org.slf4j.LoggerFactory#getLogger(Ljava/lang/Class;)Lorg/slf4j/Logger;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "LoggerFactory#getLogger -\u003e StaticLoggerBinder#getLoggerFactory is the standard real SLF4J-to-logback binding path, and ContextJNDISelector is logback's actual JNDI-based selector whose getLoggerContext genuinely calls findConfigFileURL to locate config via JNDI (the CVE's attack vector). The only conditional is that the app is configured to use the JNDI selector, which is exactly the configuration-dependent scenario the advisory describes.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-43466",
@@ -818,7 +929,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson takes user-supplied request input (the String parameter from the HTTP form) and passes it directly to XStream.fromXML, so attacker-controlled XML reaches the vulnerable unmarshal path.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2021-46877",
@@ -865,7 +979,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain relies on CHA over-broad dispatch through generic framework interfaces: InitializingBean#afterPropertiesSet (hop 8→9) and ApplicationListener#onApplicationEvent (hop 14→15) connect unrelated classes, and EnvironmentPostProcessorApplicationListener only handles ApplicationEnvironmentPreparedEvent, not the DataSourceInitializer events published at hop 11. While the final segment (CloudFoundryVcapEnvironmentPostProcessor → YamlJsonParser → Yaml#loadAs) is real Spring Boot code, the path as a whole is stitched together by spurious interface-dispatch edges and does not correspond to an actual runtime call chain from the security configuration entry point.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-2053",
@@ -900,7 +1017,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "Hop 8→9 is a classic CHA over-approximation: invokeInitMethods calls InitializingBean#afterPropertiesSet on whatever bean is being initialized (here an AuthenticationManager from lazyBean), and CHA links it to every implementer, including NameMatchTransactionAttributeSource, which has no relationship to this bean. The rest of the chain (afterPropertiesSet → SpEL evaluation of a transaction attribute string) is internally plausible, but the specific bean being initialized in this path would never be a transaction-attribute source.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22965",
@@ -923,7 +1043,10 @@
     "entry": {
       "from": "org.owasp.webgoat.users.UserValidator#validate(Ljava/lang/Object;Lorg/springframework/validation/Errors;)V",
       "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain rejectValue → getActualFieldValue → AbstractNestablePropertyAccessor → BeanWrapperImpl.getCachedIntrospectionResults → CachedIntrospectionResults.forClass/\u003cinit\u003e is the genuine Spring property-binding/introspection flow used when resolving field values during validation, matching exactly how Spring4Shell reaches CachedIntrospectionResults.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22968",
@@ -957,7 +1080,10 @@
     "entry": {
       "from": "org.owasp.webgoat.users.UserValidator#validate(Ljava/lang/Object;Lorg/springframework/validation/Errors;)V",
       "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is a genuine Spring data-binding flow: rejectValue on an AbstractPropertyBindingResult resolves the actual field value via BeanWrapperImpl, which loads CachedIntrospectionResults.forClass to introspect the target bean — exactly the code the CVE describes. The hops follow real, concrete Spring implementation calls, not generic interface dispatch.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22976",
@@ -993,7 +1119,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#configureGlobal(Lorg/springframework/security/config/annotation/authentication/builders/AuthenticationManagerBuilder;)V",
       "to": "org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder#userDetailsService(Lorg/springframework/security/core/userdetails/UserDetailsService;)Lorg/springframework/security/config/annotation/authentication/configurers/userdetails/DaoAuthenticationConfigurer;"
-    }
+    },
+    "exploitability": "unlikely",
+    "exploit_reason": "The path is a Spring Security configuration-time setup (configureGlobal -\u003e DaoAuthenticationProvider -\u003e createDelegatingPasswordEncoder -\u003e BCryptPasswordEncoder#\u003cinit\u003e) invoked once at startup, not on any attacker-controlled request path. Additionally, the default BCryptPasswordEncoder constructor uses the default work factor (not 31), which the advisory explicitly states is unaffected by this CVE.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-22978",
@@ -1022,7 +1151,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain from WebSecurityConfigurerAdapter#authenticationManager through AuthenticationConfiguration's lazy bean post-processing to FilterChainProxy#afterPropertiesSet is a genuine Spring Security bootstrap flow, and DefaultFilterChainValidator really does inspect the filter chains' security metadata source, which invokes each RequestMatcher's matches() — WebGoat is known to use RegexRequestMatcher in its security config.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-25857",
@@ -1064,7 +1196,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from SimpleApplicationEventMulticaster to EnvironmentPostProcessorApplicationListener is a CHA artifact: that listener only handles ApplicationEnvironmentPreparedEvent (fired very early during environment preparation), not the DataSourceInitializerInvoker events published from bean initialization, so the two halves of the chain are unrelated. Additionally, CloudFoundryVcapEnvironmentPostProcessor only activates on Cloud Foundry, so even the YamlJsonParser-\u003esnakeyaml tail is conditional on an environment WebGoat would not have.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-38749",
@@ -1097,7 +1232,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson#completed takes an attacker-supplied lesson input string and passes it directly to XStream#fromXML, which is exactly the unmarshal path targeted by CVE-2022-40151, so attacker-controlled XML can reach the vulnerable call.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-41853",
@@ -1122,7 +1260,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "WebGoat's VulnerableComponentsLesson.completed takes a user-submitted String (the lesson's attack input from the HTTP request) and passes it directly to XStream.fromXML, so attacker-controlled XML reaches the vulnerable unmarshal call.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-42003",
@@ -1188,7 +1329,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The tail of the path is a genuine, documented Spring Data flow: ResourceReaderRepositoryPopulator uses Jackson2ResourceReader to deserialize repository bootstrap JSON via ObjectReader#readTree, which really dispatches into EnumDeserializer#deserialize. The earlier hops are Spring Security/bean-initialization wiring that plausibly triggers the ContextRefreshedEvent consumed by the repository populator.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-42004",
@@ -1249,7 +1393,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The Spring Data repository populator (Jackson2ResourceReader reading a JSON resource via ObjectReader#readTree) is a real framework feature that genuinely deserializes JSON with Jackson, and the event-multicast hop into AbstractRepositoryPopulatorFactoryBean is standard Spring listener dispatch. The only soft spot is that EnumDeserializer#deserialize requires the populated JSON to contain an enum-typed property, but that is a normal occurrence rather than a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2022-4492",
@@ -1292,7 +1439,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The early hops (Spring Boot onRefresh → createWebServer → UndertowServletWebServerFactory → DeploymentManagerImpl#deploy) are a real embedded-Undertow startup chain, but the jump from deploy() to ServletInitialHandler$2#call/handleFirstRequest (request-time dispatch) and then to ServerSentEventHandler#handleRequest is not a real call relationship — request handling never occurs during deployment, and SSE handler dispatch from generic request handling to SslConduit#flush is exactly the kind of spurious virtual-dispatch edge CHA produces.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-1932",
@@ -1348,7 +1498,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The Undertow portion (SecurityContextImpl.authenticate → sendChallenges → ChallengeSender.transition → FormAuthenticationMechanism.sendChallenge → storeInitialLocation) is the genuine runtime security-challenge flow that fires on every unauthenticated request, and WebGoat really does use form login with embedded Undertow. The Spring prefix (lazyBean → postProcess → initializeBean → DelegatingFilterProxy init → context refresh → createWebServer) matches real Spring Boot bean-lifecycle and embedded-server wiring, so the chain corresponds to actual framework behavior rather than a CHA hop.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20860",
@@ -1380,7 +1533,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows real Spring Security configuration flow (WebSecurityConfigurerAdapter#authenticationManager -\u003e AuthenticationConfiguration -\u003e lazyBean -\u003e postProcess -\u003e initializeBean -\u003e invokeInitMethods), and HandlerMappingIntrospector implements InitializingBean, so invokeInitMethods calling its afterPropertiesSet is genuine Spring bean-lifecycle dispatch, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20861",
@@ -1411,7 +1567,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows real Spring wiring: bean initialization invokes afterPropertiesSet, and NameMatchTransactionAttributeSource's attribute strings (e.g. 'PROPAGATION_REQUIRED, isolation:...') are resolved via EmbeddedValueResolver/StandardBeanExpressionResolver, which evaluates them as SpEL expressions. If such an attribute contains a 'matches' operator, OperatorMatches#getValueInternal is genuinely reached, so this is a real framework path rather than a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20863",
@@ -1440,7 +1599,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Bean initialization (invokeInitMethods) dispatching to InitializingBean#afterPropertiesSet is a real Spring mechanism, and NameMatchTransactionAttributeSource#resolveAttributeStrings genuinely resolves placeholder strings through EmbeddedValueResolver/StandardBeanExpressionResolver, which parses SpEL via TemplateAwareExpressionParser — a real chain Spring executes when a transaction attribute contains an expression.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-20873",
@@ -1505,7 +1667,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The final hop relies on HandlerMappingIntrospector#getMatchableHandlerMapping resolving to WelcomePageHandlerMapping, but at runtime the introspector resolves the specific handler-mapping bean recorded for the request (normally RequestMappingHandlerMapping), so AbstractHandlerMapping#getHandler would not dispatch into WelcomePageHandlerMapping#getHandlerInternal here. The preceding hops (DefaultFilterChainValidator → getAttributes → MvcRequestMatcher) are also generic virtual/interface dispatches that CHA over-approximates across unrelated security-metadata-source implementations.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-34055",
@@ -1540,7 +1705,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The tail is a genuine, coherent Spring Boot actuator chain: MetricsWebFilter#filter → onSuccess → record → DefaultWebFluxTagsProvider#httpRequestTags → WebFluxTags#method is exactly how the framework records HTTP metrics, and the WebFilterChainPostProcessor really does post-process WebFilterChainProxy during bean initialization. The head is generic bean-factory wiring (BeanPostProcessor during initializeBean), which is a real Spring mechanism, though whether the reactive (WebFlux) filter chain actually runs in this servlet-based WebGoat app would need runtime confirmation.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-4639",
@@ -1580,7 +1748,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows real Spring Boot startup wiring (AuthenticationConfiguration lazy bean -\u003e bean initialization -\u003e DelegatingFilterProxy init -\u003e context refresh -\u003e UndertowServletWebServerFactory createWebServer -\u003e DeploymentManagerImpl deploy), and the tail is genuine Undertow request handling: ServletInitialHandler -\u003e HttpServerExchange#requestCookies -\u003e Cookies#parseRequestCookies, which is exactly where cookie parsing occurs. These hops correspond to actual framework behavior, not CHA-invented edges.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-5685",
@@ -1632,7 +1803,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from DeploymentManagerImpl#deploy() (startup-time deployment) to ServletInitialHandler$2#call (per-request handling) is not a real call edge — deployment never invokes the request handler directly. The tail (flush() -\u003e ChannelListeners -\u003e FinishedIoFuture#addNotifier -\u003e HandlingNotifier#notify -\u003e UndertowXnioSsl$3#handleCancelled -\u003e AbstractIoFuture#cancel) is likewise a CHA-stitched chain of unrelated generic dispatch (IoFuture$Notifier.notify reaches every HandlingNotifier implementation), not a coherent runtime sequence.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2023-6378",
@@ -1668,7 +1842,10 @@
     "entry": {
       "from": "org.owasp.webgoat.AsciiDoctorTemplateResolver#computeTemplateResource(Lorg/thymeleaf/IEngineConfiguration;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lorg/thymeleaf/templateresource/ITemplateResource;",
       "to": "ch.qos.logback.classic.Logger#warn(Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain is a genuine logback flow: a Logger#warn from application code goes through filterAndLog/callAppenders to a RollingFileAppender, whose rollover path really calls RenameUtil#areOnDifferentVolumes and EnvUtil#isJDK7OrHigher/isJDK_N_OrHigher. Note the path only reaches the EnvUtil helpers, not the actual vulnerable receiver deserialization (LoggingEventVO#readObject), so exploitability of CVE-2023-6378 via this path is doubtful even though the call sequence itself is real.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-12798",
@@ -1699,7 +1876,10 @@
     "entry": {
       "from": "org.owasp.webgoat.AsciiDoctorTemplateResolver#computeTemplateResource(Lorg/thymeleaf/IEngineConfiguration;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lorg/thymeleaf/templateresource/ITemplateResource;",
       "to": "ch.qos.logback.classic.Logger#warn(Ljava/lang/String;)V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The path is the genuine logback event pipeline: Logger.warn → filterAndLog → callAppenders → AppenderAttachableImpl.appendLoopOnAppenders → AppenderBase.doAppend dispatching to the concrete appender's append, and SMTPAppenderBase really does invoke its configured EventEvaluator (typically a JaninoEventEvaluator) on each event to decide whether to buffer/send mail. The only configuration assumption is that an SMTPAppender with a Janino evaluator is attached, which is a standard logback setup, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-12801",
@@ -1753,7 +1933,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The chain jumps from DeploymentManagerImpl#deploy() into ServletInitialHandler$2#call (a runtime request handler, not part of deployment), then hops handleFirstRequest → ServerSentEventHandler#handleRequest → SplitStreamSinkChannel#flush → ChannelListeners#invokeChannelListener → HttpOpenListener#handleEvent, which reverses the actual data flow (an open listener would lead to request parsing, not be reached from a channel flush during SSE handling). These edges connect unrelated Undertow components purely via generic interface/virtual dispatch, so the path to ParseState#reset is a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-1635",
@@ -1799,7 +1982,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "While the Spring Security → embedded Undertow server creation portion (nodes 1-17) is plausible framework setup, the hop from ServletInitialHandler#handleFirstRequest to ServerSentEventHandler#handleRequest (node 21) is a classic CHA artifact — the SSE handler is a separate HttpHandler added by explicit handler chain configuration, not something the servlet initial handler dispatches to. The subsequent ConduitStreamSinkChannel#resumeWrites edge to WriteTimeoutStreamSinkConduit is likewise a generic conduit-interface dispatch that only occurs if that conduit was actually installed in the pipeline, which the path does not establish.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-22243",
@@ -1831,7 +2017,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is a genuine Spring Security flow: FilterChainProxy#afterPropertiesSet really invokes DefaultFilterChainValidator#validate, whose checkLoginPageIsntProtected really calls the configured AccessDecisionManager (AffirmativeBased#decide) with a null/anonymous Authentication, which dispatches to AuthenticatedVoter#vote and isFullyAuthenticated. The only questionable hop is lazyBean -\u003e AutowireBeanFactoryObjectPostProcessor#postProcess -\u003e initializeBean, but that matches Spring's actual lazy-init bean post-processing wiring, so the chain corresponds to real framework behavior.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-22259",
@@ -1867,7 +2056,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "WebGoat is a servlet (non-reactive) Spring app, yet the path routes through ReactiveCloudFoundryActuatorAutoConfiguration's WebFilterChainPostProcessor, which would only run in a reactive Cloud Foundry deployment; the hop from applyBeanPostProcessorsAfterInitialization to that specific post-processor is a classic CHA over-approximation over BeanPostProcessor#postProcessAfterInitialization. While CorsUtils#isSameOrigin genuinely calls UriComponentsBuilder#fromOriginHeader, the connecting chain is not a real runtime path for this application.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-22262",
@@ -1922,7 +2114,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain is realistic Spring wiring: WebSecurityConfigurerAdapter#authenticationManager delegates to AuthenticationConfiguration, whose lazyBean/ObjectPostProcessor path runs initializeBean/invokeInitMethods on beans; a NameMatchTransactionAttributeSource (an InitializingBean used by WebGoat's transactional proxies) then resolves its attribute strings through EmbeddedValueResolver -\u003e StandardBeanExpressionResolver -\u003e SpelExpression#getValue, which is exactly the SpEL evaluation the CVE concerns. The final SpelNodeImpl#getValue -\u003e Assign#getValueInternal hop is CHA-broad (any AST node), but reaching SpelExpression#getValue on user-influenced bean definitions is the substantive vulnerable sink, so the overall path corresponds to real framework behavior.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38809",
@@ -2058,7 +2253,10 @@
     "entry": {
       "from": "org.owasp.webgoat.users.UserService#createLessonsForUser(Lorg/owasp/webgoat/users/WebGoatUser;)V",
       "to": "org.springframework.jdbc.core.JdbcTemplate#execute(Ljava/lang/String;)V"
-    }
+    },
+    "exploitability": "unlikely",
+    "exploit_reason": "The path starts from an internal user-creation routine doing fixed SQL inserts via JdbcTemplate, and the steps through ServerHttpSecurity CSP configuration to HttpHeaders#\u003cinit\u003e() carry only internal/config data with no attacker-controlled HTTP input reaching the constructor. The listed 'vulnerable method' here is just a trivial HttpHeaders constructor invoked during fixed security-header setup, so the CVE's DataBinder disallowedFields locale-matching issue is not meaningfully exercised.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38821",
@@ -2305,7 +2503,10 @@
     "entry": {
       "from": "org.owasp.webgoat.users.UserService#createLessonsForUser(Lorg/owasp/webgoat/users/WebGoatUser;)V",
       "to": "org.springframework.jdbc.core.JdbcTemplate#execute(Ljava/lang/String;)V"
-    }
+    },
+    "exploitability": "unlikely",
+    "exploit_reason": "The path runs WebGoat's UserService#createLessonsForUser through JdbcTemplate SQL execution and then inexplicably jumps into Spring Security's Kotlin DSL configuration methods (AuthorizeExchangeDsl$get$1#invoke, ServerHttpSecurity$AuthorizeExchangeSpec#matchers), which are build-time configuration code, not request-processing code. The JDBC-to-security-config transition is not a plausible data flow, and these DSL/matcher methods carry fixed configuration rather than attacker-controlled input.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38827",
@@ -2352,7 +2553,10 @@
     "entry": {
       "from": "org.owasp.webgoat.asciidoc.WebGoatTmpDirMacro#process(Lorg/asciidoctor/ast/ContentNode;Ljava/lang/String;Ljava/util/Map;)Ljava/lang/Object;",
       "to": "org.springframework.core.env.AbstractEnvironment#getProperty(Ljava/lang/String;)Ljava/lang/String;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "WebGoatTmpDirMacro#process reading an environment property via AbstractEnvironment#getProperty is a natural thing for a macro expanding a temp-dir path to do, and the resolver chain (PropertySourcesPropertyResolver -\u003e SystemEnvironmentPropertySource#resolvePropertyName) is exactly how Spring resolves system environment properties, so the vulnerable method is genuinely on this dispatch path.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-38828",
@@ -2448,7 +2652,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows the real Spring Boot embedded-Undertow startup flow: ServletWebServerApplicationContext#createWebServer -\u003e UndertowServletWebServerFactory -\u003e DeploymentManagerImpl#deploy -\u003e Bootstrap#handleDeployment -\u003e UndertowContainerProvider#getDefaultContainer, which is exactly how Undertow's JSR-356 websocket extension initializes during servlet deployment. The earlier Spring Security bean-initialization hops are also genuine framework wiring, so this looks like a real setup-time call chain rather than a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-4027",
@@ -2541,7 +2748,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "This is genuine Spring Boot embedded-Undertow startup wiring: UndertowServletWebServerFactory creates a DeploymentManager, deploy() runs deployment extensions, and the JSR-356 websocket Bootstrap.handleDeployment really does call UndertowContainerProvider.getDefaultContainer() to set up the ServerWebSocketContainer. Every hop matches real framework initialization code rather than a CHA-style generic dispatch.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-47072",
@@ -2558,7 +2768,10 @@
     "entry": {
       "from": "org.owasp.webgoat.vulnerable_components.VulnerableComponentsLesson#completed(Ljava/lang/String;)Lorg/owasp/webgoat/assignments/AttackResult;",
       "to": "com.thoughtworks.xstream.XStream#fromXML(Ljava/lang/String;)Ljava/lang/Object;"
-    }
+    },
+    "exploitability": "likely",
+    "exploit_reason": "The WebGoat VulnerableComponentsLesson#completed takes an attacker-supplied lesson answer string and passes it directly to XStream#fromXML, so external input reaches the unmarshal call.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-5971",
@@ -2602,7 +2815,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "While the Spring Boot startup chain into Undertow's DeploymentManagerImpl#deploy is plausible, the tail is not: ServletInitialHandler#handleFirstRequest would not dispatch to ServerSentEventHandler#handleRequest, and a SplitStreamSinkChannel#flush() listener invocation resolving to AjpReadListener#handleEvent is a classic CHA artifact connecting unrelated channel listeners via a generic ChannelListener interface.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2024-7885",
@@ -2641,7 +2857,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The Spring Boot setup portion (WebSecurityConfig -\u003e ... -\u003e UndertowServletWebServerFactory -\u003e DeploymentManagerImpl#deploy) is a plausible embedded-Undertow startup chain, but the tail is a CHA artifact: ServerSentEventHandler.handleFirstRequest -\u003e SplitStreamSinkChannel#flush -\u003e ChannelListeners#invokeChannelListener hops through the generic ChannelListener interface, and ProxyProtocolReadListener is an accept-time proxy-protocol parser, not a listener that SSE flush would ever invoke.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-11226",
@@ -2786,7 +3005,10 @@
     "entry": {
       "from": "org.owasp.webgoat.users.UserRepository#findAll()Ljava/util/List;",
       "to": "org.springframework.data.jpa.repository.support.SimpleJpaRepository#findAll(Lorg/springframework/data/domain/Example;)Ljava/util/List;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain from SimpleJpaRepository through QueryUtils.toOrders/toExpressionRecursively into AnnotationUtils/AnnotationsScanner is a genuine Spring Data JPA query-building flow that really does annotation scanning on entity properties, so the vulnerable method is plausibly reached. The first hop (findAll() vs findAll(Example)) is a signature-mismatched CHA edge, but the framework-internal portion of the path corresponds to real Spring behavior.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-48924",
@@ -2836,7 +3058,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Each hop corresponds to real framework behavior: Spring Security's authenticationManager() really delegates through AuthenticationConfiguration/lazyBean to bean initialization, and InitializingBean.afterPropertiesSet on DataSourceInitializerInvoker publishing a ContextRefreshedEvent that Spring Data's repository populator handles by reading JSON via Jackson2ResourceReader/ObjectReader is a genuine, documented chain. The final hops (JsonFactory.createParser -\u003e ByteSourceJsonBootstrapper.constructParser -\u003e ReaderBasedJsonParser.\u003cinit\u003e) are the actual Jackson parser-construction path named in the advisory, so the chain plausibly reaches the vulnerable code.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2025-52999",
@@ -2916,7 +3141,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The final hop is implausible: ObjectReader#readTree/_bindAsTree binds to a generic JsonNode tree and never invokes a typed deserializer such as NioPathDeserializer, which is only selected for a declared java.nio.file.Path target type. The earlier Spring wiring (event multicaster → repository populator → Jackson2ResourceReader) is plausible, but the JSON read is readTree, so the vulnerable Path deserialization cannot be reached this way.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-22732",
@@ -3065,7 +3293,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#configure(Lorg/springframework/security/config/annotation/web/builders/HttpSecurity;)V",
       "to": "org.springframework.security.config.annotation.web.builders.HttpSecurity#formLogin()Lorg/springframework/security/config/annotation/web/configurers/FormLoginConfigurer;"
-    }
+    },
+    "exploitability": "unlikely",
+    "exploit_reason": "The pattern supplied to AntPathMatcher comes from loginProcessingUrl with a hardcoded application constant (WebSecurityConfig's configure method), not from attacker input. The attacker-controlled path is matched at request time, but the vulnerable pattern here is fixed configuration data.",
+    "exploit_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-41849",
@@ -3170,7 +3401,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Data's RepositoryFactorySupport really does build a SpelAwareProxyProjectionFactory during repository bean initialization, and that class genuinely instantiates a SpelExpressionParser (which constructs a SpelParserConfiguration) — this is standard Spring Data projection wiring, not a CHA artifact.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-41852",
@@ -3214,7 +3448,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "Steps 5-11 are genuine Spring bean-lifecycle wiring, but the hop 11→12 exists only because XsltView extends ApplicationObjectSupport and thus implements setApplicationContext, which ApplicationContextAwareProcessor invokes on ANY such bean via interface dispatch; nothing indicates WebGoat ever defines or instantiates an XsltView bean, so the connection to the vulnerable view is a CHA over-approximation.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-49844",
@@ -3243,7 +3480,10 @@
     "entry": {
       "from": "org.owasp.webgoat.i18n.PluginMessages#refreshProperties(Ljava/lang/String;Lorg/springframework/context/support/ReloadableResourceBundleMessageSource$PropertiesHolder;)Lorg/springframework/context/support/ReloadableResourceBundleMessageSource$PropertiesHolder;",
       "to": "org.apache.commons.logging.LogAdapter$Log4jLog#error(Ljava/lang/Object;)V"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop SimpleLogger#logMessage → MapMessage#getFormattedMessage is a CHA artifact: an error(Object) call wraps the argument as a Simple/ObjectMessage, and SimpleLogger would never invoke MapMessage's JSON-format getFormattedMessage([String) — that path is specific to JsonTemplateLayout. Additionally, SimpleLogger is only used when no real Log4j backend is configured, making the whole chain implausible.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-50193",
@@ -3296,7 +3536,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebGoat#restTemplate()Lorg/springframework/web/client/RestTemplate;",
       "to": "org.springframework.web.client.RestTemplate#\u003cinit\u003e()V"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "Spring Security's SecurityJackson2Modules really does construct a BasicPolymorphicTypeValidator (via createAllowlistedDefaultTyping/AllowlistTypeResolverBuilder) that uses allowIfBaseType/allowIfSubTypeIsArray, and Jackson2ObjectMapperBuilder.build() really registers CoreJackson2Module, so this is a genuine framework wiring path to the vulnerable constructor.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-54514",
@@ -3366,7 +3609,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from AbstractAutowireCapableBeanFactory#invokeInitMethods to DataSourceInitializerInvoker#afterPropertiesSet is a classic CHA over-approximation (any InitializingBean could appear there), and the subsequent chain through event multicasting to a repository populator is unrelated wiring. Moreover, Jackson2ResourceReader uses readTree into a JsonNode, which would not invoke FromStringDeserializer for InetAddress at all — the vulnerable branch requires an InetAddress-typed target, so this path does not correspond to a real call chain.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-83557",
@@ -3421,7 +3667,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The hop from AbstractAutowireCapableBeanFactory#invokeInitMethods to DataSourceInitializerInvoker#afterPropertiesSet is a classic CHA artifact — initializing the authenticationManager bean would not run afterPropertiesSet on an unrelated DataSourceInitializerInvoker bean. Additionally, Jackson2ResourceReader reads from an InputStream (ObjectReader#readTree(InputStream)), which produces UTF8StreamJsonParser, not the DataInput-backed UTF8DataInputJsonParser that is the sole vulnerable implementation.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-91776",
@@ -3461,7 +3710,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "plausible",
+    "path_plausibility_reason": "The chain follows real Spring mechanisms: bean initialization (invokeInitMethods → InitializingBean.afterPropertiesSet), DataSourceInitializerInvoker publishing a ContextRefreshedEvent, and Spring Data's ResourceReaderRepositoryPopulator/Jackson2ResourceReader, which genuinely uses Jackson's ObjectReader to deserialize repository-population JSON with polymorphic typing. The only CHA-style hop is the afterPropertiesSet dispatch, but the target class is a real Spring Boot bean, and the Jackson tail (readTree → TypeWrappedDeserializer → AsArrayTypeDeserializer._findDeserializer) is the actual polymorphic deserialization path.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-91777",
@@ -3506,7 +3758,10 @@
     "entry": {
       "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
       "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
-    }
+    },
+    "path_plausibility": "artifact",
+    "path_plausibility_reason": "The final segment is implausible: ObjectReader#readTree deserializes into JsonNode via JsonNodeDeserializer, and JsonNode maps have no @JsonIdentityInfo, so MapDeserializer#handleUnresolvedReference (which requires an identity-enabled POJO map with forward references) cannot be reached this way. Additionally, the hop from AbstractAutowireCapableBeanFactory#invokeInitMethods to DataSourceInitializerInvoker#afterPropertiesSet is a generic InitializingBean CHA edge, indicating the chain was stitched through over-approximated framework dispatch.",
+    "path_plausibility_model": "z-ai/glm-5.3"
   },
   {
     "cve": "CVE-2026-9828",

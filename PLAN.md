@@ -1053,6 +1053,89 @@ For 1–2 `REACHABLE` CVEs: ask the LLM whether user-controlled input actually f
 vulnerable call (look at the path and the code), or run Strix against a **locally running**
 instance with an instruction targeting that CVE. Never run it against third-party systems.
 
+**Status: done — the LLM half; Strix was not built.** `-exploit-check` (opt-in, independent
+of `-llm`, same `ARIADNE_LLM_*` settings) asks one LLM request per REACHABLE CVE —
+`internal/exploit.Checker`, with its own cache (`<cache-dir>/exploit/`) following
+`internal/vulnmap`'s LLM-source pattern (cache key on `(model, prompt)`, one corrective
+retry on an invalid reply, a fatal auth error or offline cache miss stops the whole run
+rather than skipping one CVE). ariadne has no decompiler and does not assume the app's
+Java source is available, so "look at ... the code" is approximated: the model is shown
+the full call path (every "Class#method(descriptor)" node from the application entry
+point to the vulnerable call) and the CVE's advisory text, and judges plausibility from
+method names/signatures and its own knowledge of the named libraries — a heuristic second
+opinion, not a proof. `internal/vulnmap` exports a small `LLMClient`/`ChatMessage` seam
+(`llmclient_export.go`) wrapping its already-existing retry/backoff/fatal-error client, so
+`internal/exploit` reuses that transport instead of reimplementing it, while keeping its
+own prompt and JSON answer schema (`{"verdict": "likely"|"unlikely"|"unknown", "reason":
+"..."}`). The report's "REACHABLE — full call paths" section and `results.json`
+(`exploitability`/`exploit_reason`/`exploit_model` fields) both carry the verdict next to
+the already-computed path; the FRAMEWORK section was extended at the same time to print
+its full path too (previously only REACHABLE did), since both sections' `reach.Result`
+values already carried `Path` — this was the "save the computed path for every CVE" gap
+closed alongside the exploit-check itself.
+
+**Verified against spring-petclinic 2.4.5's 3 REACHABLE CVEs** (`-llm -exploit-check`, a
+real OpenRouter run against `z-ai/glm-5.3`, ~$0.01): the model correctly told apart two
+CVEs from one. `CVE-2022-22968` and `CVE-2025-22233` were marked `likely` —
+`OwnerController#setAllowedFields`, a Spring `@InitBinder` method invoked per HTTP request,
+wires `WebDataBinder#setDisallowedFields` from request-bound form data. `CVE-2024-38820`
+was marked `unlikely` on the *same* call site, because the field name reaching
+`setDisallowedFields` there is a hardcoded string literal (`"owner.id"`), not attacker
+data — a distinction the path/signature view alone was enough to make correctly. Cost is
+small by construction: only REACHABLE CVEs are checked (3/148 for petclinic, 40/160 for
+WebGoat under the current baseline), one request each, well under a cent at typical
+OpenRouter token pricing for this model.
+
+**Also run against WebGoat 8.2.2's 40 REACHABLE CVEs** (same real run, ~1m40s, all 40
+checked, 0 skipped, 0 invalid replies): the 36 XStream-deserialization CVEs that are
+WebGoat's reason for existing all came back `likely`, as expected for a deliberately
+vulnerable app. The other 4 came back `unlikely`, each for the same real pattern —
+ariadne's static call graph had traced into Spring Security *configuration-time* code
+(`WebSecurityConfig`/DSL setup, run once at startup with fixed arguments) rather than a
+request-time path, and the model correctly named that distinction from the path alone
+(e.g. `CVE-2026-41848`: "the pattern supplied to `AntPathMatcher`... is a hardcoded
+application constant..., not from attacker input"). This is exactly the class of false
+positive CHA-based reachability cannot avoid on its own, and the two runs together (3 then
+40 REACHABLE CVEs) scale close to linearly in request count and cost, both well under
+$0.20.
+
+**Extended beyond this section's original scope: `-framework-check`.** FRAMEWORK results
+carry the same risk REACHABLE results have of being an LLM-second-guessable call path —
+`reach.Result.Path`/`.Entry` are populated for FRAMEWORK exactly the same way (via the
+`full` BFS pass in `internal/reach`), and were only not rendered in full in `report.md`
+before this round of work. Rather than asking "is this exploitable" (which doesn't fit
+FRAMEWORK — the report already tells a human to review these manually), `-framework-check`
+asks a differently-worded question: does this specific path look like a real call chain
+the named framework would make, or like a CHA over-approximation artifact (a spurious hop
+through a generic, widely-overridden method connecting two otherwise-unrelated classes)?
+`internal/exploit.FrameworkChecker` is a second checker in the same package, sharing
+`Checker`'s cache/retry plumbing (factored out into a generic `exchange[T]` in
+`internal/exploit/exchange.go`) but with its own prompt, its own three-value verdict
+(`plausible`/`artifact`/`unknown`), and its own cache namespace (`<cache-dir>/
+framework-check/`, never colliding with `-exploit-check`'s `<cache-dir>/exploit/`), gated
+behind its own flag and independent of both `-llm` and `-exploit-check`.
+
+**Verified against spring-petclinic's 61 FRAMEWORK CVEs** (real OpenRouter run, all 61
+checked, 0 skipped/invalid): 36 came back `artifact`, and — unlike the exploitability
+check's per-CVE judgments — most of them converged on naming the *same* concrete,
+checkable pattern independently: a spurious `StandardHost#<init> → StandardPipeline#
+setBasic → LifecycleBase#stop` hop (a constructor/setter does not trigger a lifecycle
+shutdown) stitching together Tomcat startup code with unrelated request-processing/shutdown
+code, a textbook case of CHA treating a widely-overridden lifecycle method as reachable
+from any caller of any override. This is a genuine, actionable finding about ariadne's own
+call graph — a real candidate for a future `cha_skip.yaml` entry (PLAN.md's own "Risks and
+fallbacks" row for "CHA makes almost everything reachable" names exactly this fallback) —
+not just a plausible-sounding guess, which is a stronger result than the exploitability
+check's generally-correct-but-unverifiable-by-construction verdicts. WebGoat's 45 FRAMEWORK
+CVEs split 26 `plausible`/19 `artifact`, with no single dominant pattern this time (the
+codebase's own Spring Security/Tomcat mix is different from petclinic's).
+
+Strix (an actual exploit attempt against a locally running instance) was deliberately not
+built: PLAN.md's own "never run it against third-party systems" caveat makes it the
+riskier of the two options this phase named, and the LLM-based check already answers the
+same question (is this REACHABLE result plausibly attacker-reachable) without needing a
+live target. Left as a possible future addition, not a gap in this phase's own scope.
+
 ## 7. Project layout
 ```
 ariadne/

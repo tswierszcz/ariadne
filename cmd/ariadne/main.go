@@ -14,6 +14,7 @@ import (
 
 	"ariadne/internal/callgraph"
 	"ariadne/internal/cves"
+	"ariadne/internal/exploit"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
@@ -45,7 +46,10 @@ type config struct {
 	llm        bool
 	llmModel   string
 	llmBaseURL string
-	llmConfig  vulnmap.LLMConfig // resolved from the flags above and the environment; set when llm is true
+	llmConfig  vulnmap.LLMConfig // resolved from the flags above and the environment; set when llm or exploitCheck is true
+
+	exploitCheck   bool
+	frameworkCheck bool
 }
 
 func run(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -67,6 +71,8 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.BoolVar(&cfg.llm, "llm", false, "also map CVEs no other source could to vulnerable methods by asking an LLM (needs ARIADNE_LLM_API_KEY and a model)")
 	fs.StringVar(&cfg.llmModel, "llm-model", "", "LLM model id; overrides ARIADNE_LLM_MODEL")
 	fs.StringVar(&cfg.llmBaseURL, "llm-base-url", "", "OpenAI-compatible base URL; overrides ARIADNE_LLM_BASE_URL (default "+vulnmap.DefaultLLMBaseURL+")")
+	fs.BoolVar(&cfg.exploitCheck, "exploit-check", false, "ask an LLM, for each REACHABLE CVE, whether its call path plausibly carries attacker-controlled input (PLAN.md Phase 8; needs the same ARIADNE_LLM_* settings as -llm, and makes one extra LLM request per REACHABLE CVE)")
+	fs.BoolVar(&cfg.frameworkCheck, "framework-check", false, "ask an LLM, for each FRAMEWORK CVE, whether its call path looks like a real framework call chain or a CHA over-approximation artifact (needs the same ARIADNE_LLM_* settings as -llm, and makes one extra LLM request per FRAMEWORK CVE)")
 	fs.BoolVar(&cfg.showVersion, "version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -77,7 +83,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 		return 0
 	}
 
-	if cfg.llm {
+	if cfg.llm || cfg.exploitCheck || cfg.frameworkCheck {
 		cfg.llmConfig = vulnmap.LLMConfigFromEnv(getenv)
 		if cfg.llmModel != "" {
 			cfg.llmConfig.Model = cfg.llmModel
@@ -110,7 +116,7 @@ func validate(cfg config) error {
 	if cfg.jsonOut == "" {
 		return fmt.Errorf("-json is required")
 	}
-	if cfg.llm {
+	if cfg.llm || cfg.exploitCheck || cfg.frameworkCheck {
 		if err := cfg.llmConfig.Validate(cfg.offline); err != nil {
 			return err
 		}
@@ -287,6 +293,64 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		counts[reach.StatusReachable], counts[reach.StatusFramework], counts[reach.StatusNotReachable], counts[reach.StatusUnknown],
 		counts[reach.StatusNotApplicable])
 
+	var cveByID map[string]cves.CVE
+	if cfg.exploitCheck || cfg.frameworkCheck {
+		cveByID = make(map[string]cves.CVE, len(cveList))
+		for _, c := range cveList {
+			cveByID[c.ID] = c
+		}
+	}
+
+	var exploitStats exploit.Stats
+	if cfg.exploitCheck {
+		log("exploit-check: asking %s about %d REACHABLE CVEs", cfg.llmConfig.Model, counts[reach.StatusReachable])
+		exploitCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "exploit"), cfg.offline)
+		if err != nil {
+			return fmt.Errorf("opening exploit-check cache dir: %w", err)
+		}
+		checker := exploit.NewChecker(cfg.llmConfig, exploitCache, nil)
+		findings, err := checker.CheckAll(ctx, results, cveByID)
+		if err != nil {
+			return fmt.Errorf("exploit-check: %w", err)
+		}
+		for i := range results {
+			if f, ok := findings[results[i].CVE]; ok {
+				results[i].Exploitability = string(f.Verdict)
+				results[i].ExploitReason = f.Reason
+				results[i].ExploitModel = f.Model
+			}
+		}
+		exploitStats = checker.Stats()
+		log("exploit-check: %d checked, %d skipped (request failed), %d invalid reply",
+			exploitStats.Checked, exploitStats.Skipped, exploitStats.Invalid)
+		warnings = append(warnings, checker.Warnings()...)
+	}
+
+	var frameworkCheckStats exploit.Stats
+	if cfg.frameworkCheck {
+		log("framework-check: asking %s about %d FRAMEWORK CVEs", cfg.llmConfig.Model, counts[reach.StatusFramework])
+		frameworkCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "framework-check"), cfg.offline)
+		if err != nil {
+			return fmt.Errorf("opening framework-check cache dir: %w", err)
+		}
+		checker := exploit.NewFrameworkChecker(cfg.llmConfig, frameworkCache, nil)
+		findings, err := checker.CheckAll(ctx, results, cveByID)
+		if err != nil {
+			return fmt.Errorf("framework-check: %w", err)
+		}
+		for i := range results {
+			if f, ok := findings[results[i].CVE]; ok {
+				results[i].PathPlausibility = string(f.Verdict)
+				results[i].PathPlausibilityReason = f.Reason
+				results[i].PathPlausibilityModel = f.Model
+			}
+		}
+		frameworkCheckStats = checker.Stats()
+		log("framework-check: %d checked, %d skipped (request failed), %d invalid reply",
+			frameworkCheckStats.Checked, frameworkCheckStats.Skipped, frameworkCheckStats.Invalid)
+		warnings = append(warnings, checker.Warnings()...)
+	}
+
 	profileLabel := prof.Name
 	if cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
@@ -311,6 +375,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.LLMModel = cfg.llmConfig.Model
 		header.LLMMapped = st.Mapped
 		header.LLMSkipped = st.Skipped + st.Invalid
+	}
+	if cfg.exploitCheck {
+		header.ExploitModel = cfg.llmConfig.Model
+		header.ExploitChecked = exploitStats.Checked
+		header.ExploitSkipped = exploitStats.Skipped + exploitStats.Invalid
+	}
+	if cfg.frameworkCheck {
+		header.FrameworkCheckModel = cfg.llmConfig.Model
+		header.FrameworkChecked = frameworkCheckStats.Checked
+		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
 	data := report.Build(header, cveList, results, warnings)
 

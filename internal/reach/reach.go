@@ -52,6 +52,21 @@ type Result struct {
 	Note  string     `json:"note,omitempty"`
 	Path  []string   `json:"path,omitempty"` // root -> ... -> vulnerable method, rendered node keys
 	Entry *EntryEdge `json:"entry,omitempty"`
+
+	// Exploitability/ExploitReason/ExploitModel are set only when
+	// -exploit-check asked an LLM about this REACHABLE CVE's path
+	// (internal/exploit); this package never sets them itself.
+	Exploitability string `json:"exploitability,omitempty"` // "likely", "unlikely" or "unknown"
+	ExploitReason  string `json:"exploit_reason,omitempty"`
+	ExploitModel   string `json:"exploit_model,omitempty"`
+
+	// PathPlausibility/PathPlausibilityReason/PathPlausibilityModel are set
+	// only when -framework-check asked an LLM about this FRAMEWORK CVE's
+	// path (internal/exploit.FrameworkChecker); this package never sets
+	// them itself.
+	PathPlausibility       string `json:"path_plausibility,omitempty"` // "plausible", "artifact" or "unknown"
+	PathPlausibilityReason string `json:"path_plausibility_reason,omitempty"`
+	PathPlausibilityModel  string `json:"path_plausibility_model,omitempty"`
 }
 
 // Engine holds everything needed to answer "is this CVE reachable" for

@@ -11,6 +11,12 @@
 {{- if .LLMModel}}
 - **LLM-assisted mapping:** {{.LLMModel}} ({{.LLMMapped}} CVEs mapped, {{.LLMSkipped}} skipped)
 {{- end}}
+{{- if .ExploitModel}}
+- **Exploit-check:** {{.ExploitModel}} ({{.ExploitChecked}} REACHABLE CVEs checked, {{.ExploitSkipped}} skipped)
+{{- end}}
+{{- if .FrameworkCheckModel}}
+- **Framework-check:** {{.FrameworkCheckModel}} ({{.FrameworkChecked}} FRAMEWORK CVEs checked, {{.FrameworkCheckSkipped}} skipped)
+{{- end}}
 
 ## Summary
 
@@ -64,6 +70,9 @@ None.
 {{if .Entry}}
 **Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}`
 {{end}}
+{{if .Exploitability}}
+**Exploitability ({{.ExploitModel}}):** {{.Exploitability}} — {{.ExploitReason}}
+{{end}}
 {{end}}
 {{end}}
 
@@ -79,8 +88,17 @@ actually exposes this path.
 None.
 {{else}}
 {{range .Framework}}
-- **{{.CVE}}**: {{range $i, $m := .Methods}}{{if $i}}, {{end}}`{{$m}}`{{end}}
-  {{if .Entry}}(first app → dependency call: `{{.Entry.From}}` → `{{.Entry.To}}`){{end}}
+### {{.CVE}}
+
+```
+{{range $i, $node := .Path}}{{if $i}} → {{end}}{{$node}}
+{{end}}```
+{{if .Entry}}
+**Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}`
+{{end}}
+{{if .PathPlausibility}}
+**Path plausibility ({{.PathPlausibilityModel}}):** {{.PathPlausibility}} — {{.PathPlausibilityReason}}
+{{end}}
 {{end}}
 {{end}}
 
