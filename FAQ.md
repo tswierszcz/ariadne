@@ -492,10 +492,17 @@ the callee isn't — the single most useful line for a human reviewing the
 result, since it shows exactly where in your own code the problem
 starts.
 
-Numbers: petclinic — 13 REACHABLE / 18 FRAMEWORK / 25 NOT_REACHABLE / 92
-UNKNOWN (of 148). WebGoat (control case) — 51/32/21/56 (of 160), with the
-whole XStream family REACHABLE via the two-hop path
-`VulnerableComponentsLesson#completed → XStream#fromXML`.
+Numbers (current, under `-profile spring`, no `-llm`): petclinic — 3
+REACHABLE / 59 FRAMEWORK / 29 NOT_REACHABLE / 51 UNKNOWN / 6
+NOT_APPLICABLE (of 148). WebGoat (control case) — 40/43/21/56 (of 160),
+with the whole XStream family still REACHABLE via the two-hop path
+`VulnerableComponentsLesson#completed → XStream#fromXML`. (Before the
+`spring` profile's `framework_packages` list added `spring-beans`/
+`spring-core`/`spring-expression`/`spring-aop` — see
+[PLAN.md](PLAN.md)'s Phase 5 follow-up note — these were 13/18/25/92 and
+51/32/21/56: several paths that only reach a vulnerable method by
+continuing through Spring Beans/SpEL internals correctly moved from
+REACHABLE to FRAMEWORK.)
 
 ### Step 8: `internal/report` — assembling the result
 

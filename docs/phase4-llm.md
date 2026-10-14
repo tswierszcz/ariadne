@@ -387,10 +387,13 @@ fake server (the same approach as for source 2).
 **Optional live step with the real key, done last:**
 
 - **(a)** One real Tomcat CVE from petclinic (variant A): show the full prompt
-  sent, the raw model reply, and the methods that survive grounding.
-- **(b)** Only if approved separately: a full petclinic run with `-llm`
-  (~92 calls, estimated under $1 at `z-ai/glm-5.3` pricing), showing how the
-  status counts change.
+  sent, the raw model reply, and the methods that survive grounding. Done —
+  see this file's own live-check note under section 2/`PLAN.md`'s Phase 4.
+- **(b)** Only if approved separately: a full petclinic run with `-llm`,
+  showing how the status counts change. Done, and repeated against a later
+  baseline — see [docs/llm-test-report.md](llm-test-report.md) for both
+  runs and [docs/llm-run/petclinic.md](llm-run/petclinic.md)/
+  [webgoat.md](llm-run/webgoat.md) for the full reports.
 
 ## 7. Process
 

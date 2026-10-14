@@ -454,7 +454,11 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
     `finish_reason: "length"` (it would just repeat and double the cost; the CVE is skipped
     with a warning and nothing is cached). After the fix: valid reply, 189 completion tokens
     (25 reasoning), ~$0.0013, and `Request#parseParts` / `#getParts` / `#getPart` all passed
-    bytecode grounding. A full petclinic run with `-llm` (~92 CVEs) has not been done.
+    bytecode grounding. A full petclinic run with `-llm` (then ~92 unmapped CVEs) came later
+    — see [docs/llm-test-report.md](docs/llm-test-report.md), including its 2026-10-14
+    re-run against the current baseline (91/148 already mapped by sources 1/2 by then, down
+    from 56/148 at the time of this live check, after the source-2 filter widening noted
+    just below).
 
 - **Follow-up done: widen source 2's file filter.** `isMainJavaSource`
   (`internal/vulnmap/diffsource.go`) used to keep only `.java` files whose path contained
