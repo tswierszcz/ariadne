@@ -35,6 +35,9 @@ var servletYAML []byte
 //go:embed profiles/jakarta.yaml
 var jakartaYAML []byte
 
+//go:embed profiles/micronaut.yaml
+var micronautYAML []byte
+
 //go:embed profiles/generic.yaml
 var genericYAML []byte
 
@@ -155,11 +158,11 @@ func (c *Catalog) put(p Profile) {
 }
 
 // LoadDefaultCatalog parses ariadne's embedded profiles (spring, servlet,
-// jakarta, generic). generic must always be present: it is
+// jakarta, micronaut, generic). generic must always be present: it is
 // auto-detection's fallback when nothing else matches.
 func LoadDefaultCatalog() (Catalog, error) {
 	var c Catalog
-	for _, raw := range [][]byte{springYAML, servletYAML, jakartaYAML, genericYAML} {
+	for _, raw := range [][]byte{springYAML, servletYAML, jakartaYAML, micronautYAML, genericYAML} {
 		p, err := parseProfile(raw)
 		if err != nil {
 			return Catalog{}, fmt.Errorf("parsing embedded profile: %w", err)

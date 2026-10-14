@@ -64,6 +64,20 @@ func TestLoadDefaultCatalog(t *testing.T) {
 		t.Error("jakarta profile has no framework packages")
 	}
 
+	micronaut, ok := c.Get("micronaut")
+	if !ok {
+		t.Fatal(`catalog has no "micronaut" profile`)
+	}
+	if len(micronaut.Detect) == 0 {
+		t.Error("micronaut profile has no detect markers")
+	}
+	if len(micronaut.Roots.Annotations) == 0 {
+		t.Error("micronaut profile has no roots.annotations")
+	}
+	if len(micronaut.FrameworkPackages) == 0 {
+		t.Error("micronaut profile has no framework packages")
+	}
+
 	generic, ok := c.Get("generic")
 	if !ok {
 		t.Fatal(`catalog has no "generic" fallback profile`)
