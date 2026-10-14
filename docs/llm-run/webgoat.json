@@ -873,7 +873,7 @@
   },
   {
     "cve": "CVE-2022-22950",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.ast.ConstructorReference#checkNumElements",
       "org.springframework.expression.spel.ast.ConstructorReference#createArray"
@@ -904,7 +904,7 @@
   },
   {
     "cve": "CVE-2022-22965",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.beans.CachedIntrospectionResults#\u003cinit\u003e",
       "org.springframework.beans.CachedIntrospectionResults#introspectInterfaces"
@@ -936,7 +936,7 @@
   },
   {
     "cve": "CVE-2022-22970",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.beans.CachedIntrospectionResults#\u003cinit\u003e",
       "org.springframework.beans.CachedIntrospectionResults#introspectInterfaces",
@@ -997,7 +997,7 @@
   },
   {
     "cve": "CVE-2022-22978",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.security.web.util.matcher.RegexRequestMatcher#matches"
     ],
@@ -1352,7 +1352,7 @@
   },
   {
     "cve": "CVE-2023-20860",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.web.servlet.handler.HandlerMappingIntrospector#\u003cinit\u003e",
       "org.springframework.web.servlet.handler.HandlerMappingIntrospector#afterPropertiesSet",
@@ -1384,7 +1384,7 @@
   },
   {
     "cve": "CVE-2023-20861",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.ast.OperatorMatches#\u003cinit\u003e",
       "org.springframework.expression.spel.ast.OperatorMatches#getValueInternal",
@@ -1415,7 +1415,7 @@
   },
   {
     "cve": "CVE-2023-20863",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.standard.InternalSpelExpressionParser#checkExpressionLength",
       "org.springframework.expression.spel.standard.InternalSpelExpressionParser#doParseExpression"
@@ -1807,7 +1807,7 @@
   },
   {
     "cve": "CVE-2024-22257",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.security.access.vote.AuthenticatedVoter#isFullyAuthenticated"
     ],
@@ -1887,7 +1887,7 @@
   },
   {
     "cve": "CVE-2024-38808",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.EvaluationContext#isAssignmentEnabled",
       "org.springframework.expression.spel.ast.Assign#getValueInternal",
@@ -2309,7 +2309,7 @@
   },
   {
     "cve": "CVE-2024-38827",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.aot.agent.InvocationsRecorderClassVisitor#rewriteMethodName",
       "org.springframework.beans.support.PropertyComparator#compare",
@@ -2339,8 +2339,6 @@
       "org.springframework.jms.config.JmsListenerContainerParser#parseSpecificContainerProperties",
       "org.springframework.scheduling.quartz.LocalDataSourceJobStore#initialize",
       "org.springframework.scheduling.support.CronField#replaceOrdinals",
-      "org.springframework.test.context.NestedTestConfiguration#from",
-      "org.springframework.test.context.TestConstructor#from",
       "org.springframework.util.ResourceUtils#isJarFileURL"
     ],
     "source": "diff",
@@ -2758,24 +2756,23 @@
   },
   {
     "cve": "CVE-2025-41249",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.core.annotation.AnnotatedMethod#isOverrideFor",
       "org.springframework.core.annotation.AnnotationsScanner#hasSameGenericTypeParameters"
     ],
     "source": "diff",
     "path": [
-      "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.context.support.AbstractApplicationContext#getBean(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.DefaultListableBeanFactory#getBean(Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.DefaultListableBeanFactory#resolveBean(Lorg/springframework/core/ResolvableType;[Ljava/lang/Object;Z)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.DefaultListableBeanFactory#resolveNamedBean(Lorg/springframework/core/ResolvableType;[Ljava/lang/Object;Z)Lorg/springframework/beans/factory/config/NamedBeanHolder;",
-      "org.springframework.beans.factory.support.DefaultListableBeanFactory#determineHighestPriorityCandidate(Ljava/util/Map;Ljava/lang/Class;)Ljava/lang/String;",
-      "org.springframework.beans.factory.support.DefaultListableBeanFactory#getPriority(Ljava/lang/Object;)Ljava/lang/Integer;",
-      "org.springframework.core.annotation.AnnotationAwareOrderComparator#getPriority(Ljava/lang/Object;)Ljava/lang/Integer;",
-      "org.springframework.core.annotation.OrderUtils#getPriority(Ljava/lang/Class;)Ljava/lang/Integer;",
+      "org.owasp.webgoat.users.UserRepository#findAll()Ljava/util/List;",
+      "org.springframework.data.jpa.repository.support.SimpleJpaRepository#findAll(Lorg/springframework/data/domain/Example;)Ljava/util/List;",
+      "org.springframework.data.jpa.repository.support.SimpleJpaRepository#getQuery(Lorg/springframework/data/jpa/domain/Specification;Ljava/lang/Class;Lorg/springframework/data/domain/Sort;)Ljavax/persistence/TypedQuery;",
+      "org.springframework.data.jpa.repository.query.QueryUtils#toOrders(Lorg/springframework/data/domain/Sort;Ljavax/persistence/criteria/From;Ljavax/persistence/criteria/CriteriaBuilder;)Ljava/util/List;",
+      "org.springframework.data.jpa.repository.query.QueryUtils#toJpaOrder(Lorg/springframework/data/domain/Sort$Order;Ljavax/persistence/criteria/From;Ljavax/persistence/criteria/CriteriaBuilder;)Ljavax/persistence/criteria/Order;",
+      "org.springframework.data.jpa.repository.query.QueryUtils#toExpressionRecursively(Ljavax/persistence/criteria/From;Lorg/springframework/data/mapping/PropertyPath;)Ljavax/persistence/criteria/Expression;",
+      "org.springframework.data.jpa.repository.query.QueryUtils#toExpressionRecursively(Ljavax/persistence/criteria/From;Lorg/springframework/data/mapping/PropertyPath;Z)Ljavax/persistence/criteria/Expression;",
+      "org.springframework.data.jpa.repository.query.QueryUtils#requiresOuterJoin(Ljavax/persistence/metamodel/Bindable;ZZZ)Z",
+      "org.springframework.data.jpa.repository.query.QueryUtils#getAnnotationProperty(Ljavax/persistence/metamodel/Attribute;Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/Object;",
+      "org.springframework.core.annotation.AnnotationUtils#getAnnotation(Ljava/lang/reflect/AnnotatedElement;Ljava/lang/Class;)Ljava/lang/annotation/Annotation;",
       "org.springframework.core.annotation.TypeMappedAnnotations#get(Ljava/lang/Class;Ljava/util/function/Predicate;Lorg/springframework/core/annotation/MergedAnnotationSelector;)Lorg/springframework/core/annotation/MergedAnnotation;",
       "org.springframework.core.annotation.TypeMappedAnnotations#scan(Ljava/lang/Object;Lorg/springframework/core/annotation/AnnotationsProcessor;)Ljava/lang/Object;",
       "org.springframework.core.annotation.AnnotationsScanner#scan(Ljava/lang/Object;Ljava/lang/reflect/AnnotatedElement;Lorg/springframework/core/annotation/MergedAnnotations$SearchStrategy;Lorg/springframework/core/annotation/AnnotationsProcessor;)Ljava/lang/Object;",
@@ -2787,8 +2784,8 @@
       "org.springframework.core.annotation.AnnotationsScanner#hasSameGenericTypeParameters(Ljava/lang/reflect/Method;Ljava/lang/reflect/Method;[Ljava/lang/Class;)Z"
     ],
     "entry": {
-      "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
+      "from": "org.owasp.webgoat.users.UserRepository#findAll()Ljava/util/List;",
+      "to": "org.springframework.data.jpa.repository.support.SimpleJpaRepository#findAll(Lorg/springframework/data/domain/Example;)Ljava/util/List;"
     }
   },
   {
@@ -3051,22 +3048,23 @@
     ],
     "source": "diff",
     "path": [
-      "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#getAuthenticationManagerBean()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration#lazyBean(Ljava/lang/Class;)Ljava/lang/Object;",
-      "org.springframework.security.config.annotation.configuration.AutowireBeanFactoryObjectPostProcessor#postProcess(Ljava/lang/Object;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#invokeInitMethods(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)V",
-      "org.springframework.orm.hibernate5.LocalSessionFactoryBean#afterPropertiesSet()V",
-      "org.springframework.orm.hibernate5.LocalSessionFactoryBean#getResourceLoader()Lorg/springframework/core/io/ResourceLoader;",
-      "org.springframework.core.io.support.PathMatchingResourcePatternResolver#\u003cinit\u003e()V",
+      "org.owasp.webgoat.WebSecurityConfig#configure(Lorg/springframework/security/config/annotation/web/builders/HttpSecurity;)V",
+      "org.springframework.security.config.annotation.web.builders.HttpSecurity#formLogin()Lorg/springframework/security/config/annotation/web/configurers/FormLoginConfigurer;",
+      "org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer#\u003cinit\u003e()V",
+      "org.springframework.security.config.annotation.web.configurers.AbstractAuthenticationFilterConfigurer#\u003cinit\u003e(Lorg/springframework/security/web/authentication/AbstractAuthenticationProcessingFilter;Ljava/lang/String;)V",
+      "org.springframework.security.config.annotation.web.configurers.AbstractAuthenticationFilterConfigurer#loginProcessingUrl(Ljava/lang/String;)Lorg/springframework/security/config/annotation/web/configurers/AbstractAuthenticationFilterConfigurer;",
+      "org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer#createLoginProcessingUrlMatcher(Ljava/lang/String;)Lorg/springframework/security/web/util/matcher/RequestMatcher;",
+      "org.springframework.security.web.util.matcher.AntPathRequestMatcher#\u003cinit\u003e(Ljava/lang/String;Ljava/lang/String;)V",
+      "org.springframework.security.web.util.matcher.AntPathRequestMatcher#\u003cinit\u003e(Ljava/lang/String;Ljava/lang/String;Z)V",
+      "org.springframework.security.web.util.matcher.AntPathRequestMatcher#\u003cinit\u003e(Ljava/lang/String;Ljava/lang/String;ZLorg/springframework/web/util/UrlPathHelper;)V",
+      "org.springframework.security.web.util.matcher.AntPathRequestMatcher$SpringAntMatcher#\u003cinit\u003e(Ljava/lang/String;ZLorg/springframework/security/web/util/matcher/AntPathRequestMatcher$1;)V",
+      "org.springframework.security.web.util.matcher.AntPathRequestMatcher$SpringAntMatcher#\u003cinit\u003e(Ljava/lang/String;Z)V",
+      "org.springframework.security.web.util.matcher.AntPathRequestMatcher$SpringAntMatcher#createMatcher(Z)Lorg/springframework/util/AntPathMatcher;",
       "org.springframework.util.AntPathMatcher#\u003cinit\u003e()V"
     ],
     "entry": {
-      "from": "org.owasp.webgoat.WebSecurityConfig#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;",
-      "to": "org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter#authenticationManager()Lorg/springframework/security/authentication/AuthenticationManager;"
+      "from": "org.owasp.webgoat.WebSecurityConfig#configure(Lorg/springframework/security/config/annotation/web/builders/HttpSecurity;)V",
+      "to": "org.springframework.security.config.annotation.web.builders.HttpSecurity#formLogin()Lorg/springframework/security/config/annotation/web/configurers/FormLoginConfigurer;"
     }
   },
   {
@@ -3079,7 +3077,7 @@
   },
   {
     "cve": "CVE-2026-41851",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.ExpressionState#assignVariable",
       "org.springframework.expression.spel.ExpressionState#lookupVariable",

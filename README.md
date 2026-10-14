@@ -393,14 +393,18 @@ Flags:
 
 ### Latest full test run with the LLM source
 
-[docs/llm-test-report.md](docs/llm-test-report.md) records one complete live run: all unit
+[docs/llm-test-report.md](docs/llm-test-report.md) records a complete live run: all unit
 tests, one live LLM call, and full analyses of **spring-petclinic 2.4.5** and **WebGoat
-8.2.2**, each once without and once with `-llm` (model `z-ai/glm-5.3`, every LLM answer a
-fresh call, ~$0.20 in total), including the `NOT_APPLICABLE` status for WebJar-only CVEs.
-It covers the before/after status counts, how the LLM answered by evidence type (fix diff
-vs. advisory text only), how repeatable the answers were against an earlier run, and links
-to the full reports ([petclinic](docs/llm-run/petclinic.md), [WebGoat](docs/llm-run/webgoat.md))
-and their `results.json` files.
+8.2.2**, each once without and once with `-llm` (model `z-ai/glm-5.3`), including the
+`NOT_APPLICABLE` status for WebJar-only CVEs. It covers the before/after status counts, how
+the LLM answered by evidence type (fix diff vs. advisory text only), how repeatable the
+answers were against an earlier run, and links to the full reports
+([petclinic](docs/llm-run/petclinic.md), [WebGoat](docs/llm-run/webgoat.md)) and their
+`results.json` files. A later re-run (its own "Update" section at the top of that page)
+confirms the LLM source still behaves correctly against the current `spring`-profile
+framework-package list and the widened source-2 file filter — both landed after the
+original run, in unrelated work — with every answer served from the existing cache (no new
+cost).
 
 ### Using the LLM source
 

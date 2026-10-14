@@ -4,6 +4,59 @@ Run on 2026-10-12 against `main` at `33baf95` (LLM source + `NOT_APPLICABLE` sta
 `z-ai/glm-5.3` via OpenRouter. This page records what was run and what came out; it is a
 record of one run, not a benchmark.
 
+## Update, 2026-10-14: re-run against `2223947`
+
+Two things changed on `main` between the run below and `2223947`, neither of them in the
+LLM source itself:
+
+1. Phase 7's profile fix added `spring-beans`/`spring-core`/`spring-expression`/`spring-aop`
+   to the `spring` profile's `framework_packages` (see [PLAN.md](../PLAN.md), Phase 5's
+   follow-up note) — several paths that used to read as `REACHABLE` now correctly stop at
+   `FRAMEWORK` instead, since they only get there by continuing through Spring Beans/SpEL
+   internals.
+2. Source 2's file filter was widened from requiring a Maven `src/main/` layout to any
+   non-test `.java` file (see [PLAN.md](../PLAN.md)'s Phase 4 follow-up) — Tomcat's
+   `java/org/apache/...` layout is now mapped by the diff source directly, so far fewer CVEs
+   reach the LLM source at all.
+
+Both predate this re-run by several sessions; this re-run exists to confirm the LLM source
+still behaves correctly against the now-current baseline, not to test either of those
+changes. **Every LLM answer in this run came from the existing cache** (same model, same
+prompts — the CVE/diff content didn't change) — `.cache/llm/` has zero files newer than the
+2026-10-12 run, so this cost nothing and made no new network calls; it re-validates the
+pipeline end to end rather than re-asking the model anything.
+
+Commands: identical to "Commands" below, just run again (same `-llm`, same output paths,
+overwriting `docs/llm-run/{petclinic,webgoat}.{md,json}`).
+
+| | petclinic baseline | petclinic `-llm` | WebGoat baseline | WebGoat `-llm` |
+|---|---|---|---|---|
+| CVEs | 148 | 148 | 160 | 160 |
+| mapped to methods | 91 (manual 1, diff 90) | 96 (+5 llm) | 104 (manual 37, diff 67) | 110 (+6 llm) |
+| REACHABLE | 3 | 3 | 40 | 40 |
+| FRAMEWORK | 59 | 61 | 43 | 45 |
+| NOT_REACHABLE | 29 | 31 | 21 | 23 |
+| UNKNOWN | 51 | 47 | 56 | 52 |
+| NOT_APPLICABLE | 6 | 6 | 0 | 0 |
+| wall time | — | 5.9 s (cache hits) | — | 11.9 s (cache hits) |
+
+Per-app LLM detail (`llm:` summary line from this run's own log):
+
+- **petclinic**: 57 CVEs reached the LLM source (148 − 91 already mapped by sources 1/2).
+  5 mapped, 52 answered with no usable method, 0 failed requests, 0 invalid replies, 10
+  named methods dropped as not present in the analyzed bytecode.
+- **WebGoat**: 56 CVEs reached the LLM source (160 − 104). 6 mapped, 50 with no usable
+  method, 0 failed, 0 invalid, 10 dropped.
+
+Compared to the 2026-10-12 run below, **no LLM-mapped result is `REACHABLE` in this run**
+(the earlier run's one advisory-only `REACHABLE`, WebGoat's `CVE-2022-22978` via
+`RegexRequestMatcher#matches`, is now `FRAMEWORK`) — consistent with the profile fix making
+`FRAMEWORK` the more honest status for paths through Spring Security/Beans internals, not a
+change in what the LLM itself answered (same cached prompt, same cached answer). Everything
+else the original run found about the LLM source's own behavior (grounding drops
+invented methods, advisory-only answers are the unstable/low-confidence ones, diffs are
+stable) is unaffected and still holds — see below.
+
 Full reports from the `-llm` runs (the `.md` is the human report, the `.json` the same
 results as data, including each LLM result's `model`, `evidence` and `note`):
 
@@ -38,7 +91,7 @@ results as data, including each LLM result's `model`, `evidence` and `note`):
      -llm -out docs/llm-run/webgoat.md -json docs/llm-run/webgoat.json
    ```
 
-## Results
+## Results (as originally run on 2026-10-12 — see the Update above for current numbers)
 
 | | petclinic baseline | petclinic `-llm` | WebGoat baseline | WebGoat `-llm` |
 |---|---|---|---|---|

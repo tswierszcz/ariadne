@@ -272,41 +272,39 @@
   },
   {
     "cve": "CVE-2022-22950",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.ast.ConstructorReference#checkNumElements",
       "org.springframework.expression.spel.ast.ConstructorReference#createArray"
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#setDefaultValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdentifierDerivingDirectFieldAccessFallbackBeanWrapper#setPropertyValue(Ljava/lang/String;Ljava/lang/Object;)V",
-      "org.springframework.data.util.ProxyUtils#getUserClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.support.AopUtils#getTargetClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.target.AbstractBeanFactoryBasedTargetSource#getTargetClass()Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#getType(Ljava/lang/String;Z)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#predictBeanType(Ljava/lang/String;Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#resolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#doResolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#evaluateBeanDefinitionString(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.context.expression.StandardBeanExpressionResolver#evaluate(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanExpressionContext;)Ljava/lang/Object;",
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#prepareContext(Lorg/springframework/boot/DefaultBootstrapContext;Lorg/springframework/context/ConfigurableApplicationContext;Lorg/springframework/core/env/ConfigurableEnvironment;Lorg/springframework/boot/SpringApplicationRunListeners;Lorg/springframework/boot/ApplicationArguments;Lorg/springframework/boot/Banner;)V",
+      "org.springframework.boot.DefaultBootstrapContext#close(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#multicastEvent(Lorg/springframework/context/ApplicationEvent;Lorg/springframework/core/ResolvableType;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#invokeListener(Lorg/springframework/context/ApplicationListener;Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#doInvokeListener(Lorg/springframework/context/ApplicationListener;Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#onApplicationEvent(Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#processEvent(Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#shouldHandle(Lorg/springframework/context/ApplicationEvent;[Ljava/lang/Object;)Z",
+      "org.springframework.context.event.EventExpressionEvaluator#condition(Ljava/lang/String;Lorg/springframework/context/ApplicationEvent;Ljava/lang/reflect/Method;Lorg/springframework/context/expression/AnnotatedElementKey;[Ljava/lang/Object;Lorg/springframework/beans/factory/BeanFactory;)Z",
       "org.springframework.expression.spel.standard.SpelExpression#getValue()Ljava/lang/Object;",
       "org.springframework.expression.spel.ast.SpelNodeImpl#getValue(Lorg/springframework/expression/spel/ExpressionState;)Ljava/lang/Object;",
       "org.springframework.expression.spel.ast.ConstructorReference#getValueInternal(Lorg/springframework/expression/spel/ExpressionState;)Lorg/springframework/expression/TypedValue;",
       "org.springframework.expression.spel.ast.ConstructorReference#createArray(Lorg/springframework/expression/spel/ExpressionState;)Lorg/springframework/expression/TypedValue;"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
     "cve": "CVE-2022-22965",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.beans.CachedIntrospectionResults#\u003cinit\u003e",
       "org.springframework.beans.CachedIntrospectionResults#introspectInterfaces"
@@ -346,7 +344,7 @@
   },
   {
     "cve": "CVE-2022-22970",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.beans.CachedIntrospectionResults#\u003cinit\u003e",
       "org.springframework.beans.CachedIntrospectionResults#introspectInterfaces",
@@ -554,9 +552,7 @@
       "org.apache.coyote.http11.Http11InputBuffer#parseHeader",
       "org.apache.coyote.http11.Http11InputBuffer#skipLine"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -596,12 +592,11 @@
     "cve": "CVE-2022-45143",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.valves.JsonErrorReportValve#invoke",
-      "org.apache.catalina.valves.JsonErrorReportValve#report"
+      "org.apache.catalina.valves.JsonErrorReportValve#report",
+      "org.apache.tomcat.util.json.JSONFilter#\u003cinit\u003e",
+      "org.apache.tomcat.util.json.JSONFilter#escape"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -663,7 +658,7 @@
   },
   {
     "cve": "CVE-2023-20860",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.web.servlet.handler.HandlerMappingIntrospector#\u003cinit\u003e",
       "org.springframework.web.servlet.handler.HandlerMappingIntrospector#afterPropertiesSet",
@@ -678,31 +673,29 @@
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#setDefaultValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdentifierDerivingDirectFieldAccessFallbackBeanWrapper#setPropertyValue(Ljava/lang/String;Ljava/lang/Object;)V",
-      "org.springframework.data.util.ProxyUtils#getUserClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.support.AopUtils#getTargetClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.target.AbstractBeanFactoryBasedTargetSource#getTargetClass()Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#getBean(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean(Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;Z)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(Ljava/lang/String;Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Object;)Ljava/lang/Object;",
-      "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean(Ljava/lang/String;Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Object;)Ljava/lang/Object;",
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#prepareContext(Lorg/springframework/boot/DefaultBootstrapContext;Lorg/springframework/context/ConfigurableApplicationContext;Lorg/springframework/core/env/ConfigurableEnvironment;Lorg/springframework/boot/SpringApplicationRunListeners;Lorg/springframework/boot/ApplicationArguments;Lorg/springframework/boot/Banner;)V",
+      "org.springframework.boot.SpringApplicationRunListeners#contextLoaded(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.boot.SpringApplicationRunListeners#lambda$contextLoaded$4(Lorg/springframework/context/ConfigurableApplicationContext;Lorg/springframework/boot/SpringApplicationRunListener;)V",
+      "org.springframework.boot.context.event.EventPublishingRunListener#contextLoaded(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.support.ApplicationObjectSupport#setApplicationContext(Lorg/springframework/context/ApplicationContext;)V",
+      "org.springframework.web.context.support.WebApplicationObjectSupport#initApplicationContext(Lorg/springframework/context/ApplicationContext;)V",
+      "org.springframework.web.servlet.view.ContentNegotiatingViewResolver#initServletContext(Ljavax/servlet/ServletContext;)V",
       "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)Ljava/lang/Object;",
       "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#invokeInitMethods(Ljava/lang/String;Ljava/lang/Object;Lorg/springframework/beans/factory/support/RootBeanDefinition;)V",
       "org.springframework.web.servlet.handler.HandlerMappingIntrospector#afterPropertiesSet()V"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
     "cve": "CVE-2023-20861",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.ast.OperatorMatches#\u003cinit\u003e",
       "org.springframework.expression.spel.ast.OperatorMatches#getValueInternal",
@@ -710,33 +703,31 @@
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#setDefaultValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdentifierDerivingDirectFieldAccessFallbackBeanWrapper#setPropertyValue(Ljava/lang/String;Ljava/lang/Object;)V",
-      "org.springframework.data.util.ProxyUtils#getUserClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.support.AopUtils#getTargetClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.target.AbstractBeanFactoryBasedTargetSource#getTargetClass()Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#getType(Ljava/lang/String;Z)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#predictBeanType(Ljava/lang/String;Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#resolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#doResolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#evaluateBeanDefinitionString(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.context.expression.StandardBeanExpressionResolver#evaluate(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanExpressionContext;)Ljava/lang/Object;",
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#prepareContext(Lorg/springframework/boot/DefaultBootstrapContext;Lorg/springframework/context/ConfigurableApplicationContext;Lorg/springframework/core/env/ConfigurableEnvironment;Lorg/springframework/boot/SpringApplicationRunListeners;Lorg/springframework/boot/ApplicationArguments;Lorg/springframework/boot/Banner;)V",
+      "org.springframework.boot.DefaultBootstrapContext#close(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#multicastEvent(Lorg/springframework/context/ApplicationEvent;Lorg/springframework/core/ResolvableType;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#invokeListener(Lorg/springframework/context/ApplicationListener;Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#doInvokeListener(Lorg/springframework/context/ApplicationListener;Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#onApplicationEvent(Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#processEvent(Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#shouldHandle(Lorg/springframework/context/ApplicationEvent;[Ljava/lang/Object;)Z",
+      "org.springframework.context.event.EventExpressionEvaluator#condition(Ljava/lang/String;Lorg/springframework/context/ApplicationEvent;Ljava/lang/reflect/Method;Lorg/springframework/context/expression/AnnotatedElementKey;[Ljava/lang/Object;Lorg/springframework/beans/factory/BeanFactory;)Z",
       "org.springframework.expression.spel.standard.SpelExpression#getValue()Ljava/lang/Object;",
       "org.springframework.expression.spel.ast.SpelNodeImpl#getValue(Lorg/springframework/expression/spel/ExpressionState;)Ljava/lang/Object;",
       "org.springframework.expression.spel.ast.OperatorMatches#getValueInternal(Lorg/springframework/expression/spel/ExpressionState;)Lorg/springframework/expression/spel/support/BooleanTypedValue;"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
     "cve": "CVE-2023-20863",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.standard.InternalSpelExpressionParser#checkExpressionLength",
       "org.springframework.expression.spel.standard.InternalSpelExpressionParser#doParseExpression"
@@ -814,15 +805,59 @@
   },
   {
     "cve": "CVE-2023-24998",
-    "status": "NOT_REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
+      "org.apache.catalina.connector.Request#parseParts",
       "org.apache.commons.fileupload.FileCountLimitExceededException#\u003cinit\u003e",
       "org.apache.commons.fileupload.FileCountLimitExceededException#getLimit",
       "org.apache.commons.fileupload.FileUploadBase#getFileCountMax",
       "org.apache.commons.fileupload.FileUploadBase#parseRequest",
-      "org.apache.commons.fileupload.FileUploadBase#setFileCountMax"
+      "org.apache.commons.fileupload.FileUploadBase#setFileCountMax",
+      "org.apache.tomcat.util.http.Parameters#addParameter",
+      "org.apache.tomcat.util.http.Parameters#size",
+      "org.apache.tomcat.util.http.fileupload.FileUploadBase#getFileCountMax",
+      "org.apache.tomcat.util.http.fileupload.FileUploadBase#parseRequest",
+      "org.apache.tomcat.util.http.fileupload.FileUploadBase#setFileCountMax",
+      "org.apache.tomcat.util.http.fileupload.impl.FileCountLimitExceededException#\u003cinit\u003e",
+      "org.apache.tomcat.util.http.fileupload.impl.FileCountLimitExceededException#getLimit"
     ],
-    "source": "diff"
+    "source": "diff",
+    "path": [
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#refreshContext(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.boot.SpringApplication#refresh(Lorg/springframework/context/ApplicationContext;)V",
+      "org.springframework.boot.SpringApplication#refresh(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.support.AbstractApplicationContext#refresh()V",
+      "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh()V",
+      "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#createWebServer()V",
+      "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#getWebServer([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lorg/springframework/boot/web/server/WebServer;",
+      "org.apache.catalina.startup.Tomcat#getHost()Lorg/apache/catalina/Host;",
+      "org.apache.catalina.core.StandardHost#\u003cinit\u003e()V",
+      "org.apache.catalina.core.StandardPipeline#setBasic(Lorg/apache/catalina/Valve;)V",
+      "org.apache.catalina.util.LifecycleBase#stop()V",
+      "org.apache.catalina.connector.Connector#stopInternal()V",
+      "org.apache.coyote.AbstractProtocol#stop()V",
+      "org.apache.tomcat.util.net.AbstractEndpoint#stop()V",
+      "org.apache.tomcat.util.net.AprEndpoint#stopInternal()V",
+      "org.apache.tomcat.util.net.SocketWrapperBase#close()V",
+      "org.apache.coyote.AbstractProtocol$ConnectionHandler#release(Lorg/apache/coyote/Processor;)V",
+      "org.apache.coyote.ajp.AjpProcessor#recycle()V",
+      "org.apache.catalina.connector.CoyoteAdapter#checkRecycled(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;)V",
+      "org.apache.catalina.connector.CoyoteAdapter#log(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;J)V",
+      "org.apache.catalina.core.StandardEngine#logAccess(Lorg/apache/catalina/connector/Request;Lorg/apache/catalina/connector/Response;JZ)V",
+      "org.apache.catalina.valves.AbstractAccessLogValve#log(Lorg/apache/catalina/connector/Request;Lorg/apache/catalina/connector/Response;J)V",
+      "org.apache.catalina.valves.ExtendedAccessLogValve$RequestParameterElement#addElement(Ljava/io/CharArrayWriter;Ljava/util/Date;Lorg/apache/catalina/connector/Request;Lorg/apache/catalina/connector/Response;J)V",
+      "org.apache.catalina.connector.Request#getParameter(Ljava/lang/String;)Ljava/lang/String;",
+      "org.apache.catalina.connector.Request#parseParameters()V",
+      "org.apache.catalina.connector.Request#parseParts(Z)V"
+    ],
+    "entry": {
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
+    }
   },
   {
     "cve": "CVE-2023-34055",
@@ -868,12 +903,9 @@
     "cve": "CVE-2023-41080",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.authenticator.FormAuthenticator#authenticate",
       "org.apache.catalina.authenticator.FormAuthenticator#savedRequestURL"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -920,9 +952,7 @@
       "org.apache.tomcat.util.buf.B2CConverter#recycle",
       "org.apache.tomcat.util.buf.C2BConverter#recycle"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -957,7 +987,7 @@
   },
   {
     "cve": "CVE-2023-44487",
-    "status": "NOT_REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder#buildFromCodec",
       "io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder#decoderEnforceMaxRstFramesPerWindow",
@@ -967,20 +997,59 @@
       "io.netty.handler.codec.http2.Http2MaxRstFrameDecoder#frameListener0",
       "io.netty.handler.codec.http2.Http2MaxRstFrameListener#\u003cinit\u003e",
       "io.netty.handler.codec.http2.Http2MaxRstFrameListener#onRstStreamRead",
-      "io.netty.handler.codec.http2.Http2MultiplexCodecBuilder#decoderEnforceMaxRstFramesPerWindow"
+      "io.netty.handler.codec.http2.Http2MultiplexCodecBuilder#decoderEnforceMaxRstFramesPerWindow",
+      "org.apache.coyote.http2.Http2Protocol#getOverheadResetFactor",
+      "org.apache.coyote.http2.Http2Protocol#setOverheadResetFactor",
+      "org.apache.coyote.http2.Http2UpgradeHandler#priorityUpdate",
+      "org.apache.coyote.http2.Http2UpgradeHandler#reset"
     ],
-    "source": "diff"
+    "source": "diff",
+    "path": [
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#refreshContext(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.boot.SpringApplication#refresh(Lorg/springframework/context/ApplicationContext;)V",
+      "org.springframework.boot.SpringApplication#refresh(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.support.AbstractApplicationContext#refresh()V",
+      "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh()V",
+      "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#createWebServer()V",
+      "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#getWebServer([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lorg/springframework/boot/web/server/WebServer;",
+      "org.apache.catalina.startup.Tomcat#getHost()Lorg/apache/catalina/Host;",
+      "org.apache.catalina.core.StandardHost#\u003cinit\u003e()V",
+      "org.apache.catalina.core.StandardPipeline#setBasic(Lorg/apache/catalina/Valve;)V",
+      "org.apache.catalina.util.LifecycleBase#stop()V",
+      "org.apache.catalina.connector.Connector#stopInternal()V",
+      "org.apache.coyote.AbstractProtocol#stop()V",
+      "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#timeoutAsync(J)V",
+      "org.apache.coyote.http2.Http2UpgradeHandler#timeoutAsync(J)V",
+      "org.apache.tomcat.util.net.SocketWrapperBase#processSocket(Lorg/apache/tomcat/util/net/SocketEvent;Z)V",
+      "org.apache.tomcat.util.net.AbstractEndpoint#processSocket(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;Z)Z",
+      "org.apache.tomcat.util.net.SocketProcessorBase#run()V",
+      "org.apache.tomcat.util.net.AprEndpoint$SocketProcessor#doRun()V",
+      "org.apache.coyote.AbstractProtocol$ConnectionHandler#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
+      "org.apache.coyote.AbstractProcessorLight#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
+      "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#dispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
+      "org.apache.coyote.http2.Http2UpgradeHandler#upgradeDispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
+      "org.apache.coyote.http2.Http2Parser#readFrame(Z)Z",
+      "org.apache.coyote.http2.Http2Parser#readFrame(ZLorg/apache/coyote/http2/FrameType;)Z",
+      "org.apache.coyote.http2.Http2Parser#readRstFrame(ILjava/nio/ByteBuffer;)V",
+      "org.apache.coyote.http2.Http2UpgradeHandler#reset(IJ)V"
+    ],
+    "entry": {
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
+    }
   },
   {
     "cve": "CVE-2023-45648",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.coyote.http11.filters.ChunkedInputFilter#doRead",
+      "org.apache.coyote.http11.Http11InputBuffer#parseHeader",
       "org.apache.coyote.http11.filters.ChunkedInputFilter#parseHeader"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1005,7 +1074,9 @@
       "org.apache.coyote.http11.Http11Processor#setRequestBody(Lorg/apache/tomcat/util/buf/ByteChunk;)V",
       "org.apache.coyote.http11.Http11InputBuffer#addActiveFilter(Lorg/apache/coyote/http11/InputFilter;)V",
       "org.apache.coyote.http11.filters.BufferedInputFilter#setRequest(Lorg/apache/coyote/Request;)V",
-      "org.apache.coyote.http11.filters.ChunkedInputFilter#doRead(Lorg/apache/tomcat/util/net/ApplicationBufferHandler;)I"
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#doRead(Lorg/apache/tomcat/util/net/ApplicationBufferHandler;)I",
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#parseEndChunk()V",
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#parseHeader()Z"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -1016,11 +1087,23 @@
     "cve": "CVE-2023-46589",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.connector.InputBuffer#realReadBytes"
+      "org.apache.catalina.connector.InputBuffer#realReadBytes",
+      "org.apache.catalina.connector.Request#doParseParameters",
+      "org.apache.catalina.connector.Request#getParameter",
+      "org.apache.catalina.connector.Request#getParameterNames",
+      "org.apache.catalina.connector.Request#getParameterValues",
+      "org.apache.catalina.connector.Request#parseParameters",
+      "org.apache.catalina.connector.Request#parseParts",
+      "org.apache.catalina.connector.Request#readChunkedPostBody",
+      "org.apache.catalina.connector.Request#recycle",
+      "org.apache.catalina.core.StandardWrapperValve#exception",
+      "org.apache.catalina.core.StandardWrapperValve#invoke",
+      "org.apache.tomcat.util.http.InvalidParameterException#\u003cinit\u003e",
+      "org.apache.tomcat.util.http.InvalidParameterException#getErrorCode",
+      "org.apache.tomcat.util.http.Parameters#addParameter",
+      "org.apache.tomcat.util.http.Parameters#processParameters"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1033,22 +1116,20 @@
       "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh()V",
       "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#createWebServer()V",
       "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#getWebServer([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lorg/springframework/boot/web/server/WebServer;",
-      "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#configureEngine(Lorg/apache/catalina/Engine;)V",
-      "org.apache.catalina.core.StandardPipeline#addValve(Lorg/apache/catalina/Valve;)V",
-      "org.apache.catalina.util.LifecycleBase#start()V",
-      "org.apache.catalina.util.LifecycleBase#init()V",
-      "org.apache.catalina.util.LifecycleMBeanBase#initInternal()V",
-      "org.apache.catalina.authenticator.AuthenticatorBase#register(Lorg/apache/catalina/connector/Request;Ljavax/servlet/http/HttpServletResponse;Ljava/security/Principal;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZ)V",
-      "org.apache.catalina.connector.Request#getAttribute(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.apache.coyote.Request#action(Lorg/apache/coyote/ActionCode;Ljava/lang/Object;)V",
-      "org.apache.coyote.AbstractProcessor#action(Lorg/apache/coyote/ActionCode;Ljava/lang/Object;)V",
-      "org.apache.coyote.http11.Http11Processor#setRequestBody(Lorg/apache/tomcat/util/buf/ByteChunk;)V",
-      "org.apache.coyote.http11.Http11InputBuffer#addActiveFilter(Lorg/apache/coyote/http11/InputFilter;)V",
-      "org.apache.coyote.http11.filters.BufferedInputFilter#setRequest(Lorg/apache/coyote/Request;)V",
-      "org.apache.coyote.http11.filters.SavedRequestInputFilter#doRead(Lorg/apache/tomcat/util/net/ApplicationBufferHandler;)I",
-      "org.apache.tomcat.util.buf.ByteChunk#subtract(Ljava/nio/ByteBuffer;)I",
-      "org.apache.tomcat.util.buf.ByteChunk#checkEof()Z",
-      "org.apache.catalina.connector.InputBuffer#realReadBytes()I"
+      "org.apache.catalina.startup.Tomcat#getHost()Lorg/apache/catalina/Host;",
+      "org.apache.catalina.core.StandardHost#\u003cinit\u003e()V",
+      "org.apache.catalina.core.StandardPipeline#setBasic(Lorg/apache/catalina/Valve;)V",
+      "org.apache.catalina.util.LifecycleBase#stop()V",
+      "org.apache.catalina.connector.Connector#stopInternal()V",
+      "org.apache.coyote.AbstractProtocol#stop()V",
+      "org.apache.tomcat.util.net.AbstractEndpoint#stop()V",
+      "org.apache.tomcat.util.net.AprEndpoint#stopInternal()V",
+      "org.apache.tomcat.util.net.SocketWrapperBase#close()V",
+      "org.apache.coyote.AbstractProtocol$ConnectionHandler#release(Lorg/apache/coyote/Processor;)V",
+      "org.apache.coyote.ajp.AjpProcessor#recycle()V",
+      "org.apache.catalina.connector.CoyoteAdapter#checkRecycled(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;)V",
+      "org.apache.catalina.connector.CoyoteAdapter#log(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;J)V",
+      "org.apache.catalina.connector.Request#recycle()V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -1198,16 +1279,19 @@
     "cve": "CVE-2024-23672",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.tomcat.websocket.WsSession#close",
+      "org.apache.tomcat.websocket.WsSession#checkCloseTimeout",
+      "org.apache.tomcat.websocket.WsSession#closeConnection",
       "org.apache.tomcat.websocket.WsSession#doClose",
+      "org.apache.tomcat.websocket.WsSession#getSessionCloseTimeout",
+      "org.apache.tomcat.websocket.WsSession#getUserPrincipal",
+      "org.apache.tomcat.websocket.WsSession#getUserPrincipalInternal",
       "org.apache.tomcat.websocket.WsSession#onClose",
       "org.apache.tomcat.websocket.WsSession#sendCloseMessage",
       "org.apache.tomcat.websocket.WsWebSocketContainer#backgroundProcess",
+      "org.apache.tomcat.websocket.WsWebSocketContainer#getOpenSessions",
       "org.apache.tomcat.websocket.server.WsServerContainer#unregisterSession"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1236,7 +1320,7 @@
       "org.apache.coyote.AbstractProcessorLight#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
       "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#dispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
       "org.apache.tomcat.websocket.server.WsHttpUpgradeHandler#upgradeDispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.tomcat.websocket.WsSession#close(Ljavax/websocket/CloseReason;)V"
+      "org.apache.tomcat.websocket.WsSession#doClose(Ljavax/websocket/CloseReason;Ljavax/websocket/CloseReason;)V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -1247,13 +1331,10 @@
     "cve": "CVE-2024-24549",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.coyote.http2.Http2Parser#onHeadersComplete",
       "org.apache.coyote.http2.Http2Parser#readContinuationFrame",
       "org.apache.coyote.http2.Http2Parser#readHeadersFrame"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1296,13 +1377,17 @@
     "status": "FRAMEWORK",
     "methods": [
       "org.apache.coyote.http2.Http2AsyncUpgradeHandler#sendStreamReset",
+      "org.apache.coyote.http2.Http2UpgradeHandler#decrementActiveRemoteStreamCount",
+      "org.apache.coyote.http2.Http2UpgradeHandler#getStream",
       "org.apache.coyote.http2.Http2UpgradeHandler#headersEnd",
       "org.apache.coyote.http2.Http2UpgradeHandler#headersStart",
-      "org.apache.coyote.http2.Http2UpgradeHandler#sendStreamReset"
+      "org.apache.coyote.http2.Http2UpgradeHandler#receivedEndOfStream",
+      "org.apache.coyote.http2.Http2UpgradeHandler#reset",
+      "org.apache.coyote.http2.Http2UpgradeHandler#sendStreamReset",
+      "org.apache.coyote.http2.Http2UpgradeHandler#sentEndOfStream",
+      "org.apache.coyote.http2.Stream#decrementAndGetActiveRemoteStreamCount"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1337,13 +1422,14 @@
     "cve": "CVE-2024-38286",
     "status": "FRAMEWORK",
     "methods": [
+      "org.apache.tomcat.util.net.SecureNio2Channel#completed",
+      "org.apache.tomcat.util.net.SecureNio2Channel#unwrap",
+      "org.apache.tomcat.util.net.SecureNio2Channel#wrap",
       "org.apache.tomcat.util.net.SecureNio2Channel#write",
       "org.apache.tomcat.util.net.SecureNioChannel#read",
       "org.apache.tomcat.util.net.SecureNioChannel#write"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1377,7 +1463,7 @@
   },
   {
     "cve": "CVE-2024-38808",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.EvaluationContext#isAssignmentEnabled",
       "org.springframework.expression.spel.ast.Assign#getValueInternal",
@@ -1393,28 +1479,26 @@
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#setDefaultValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdentifierDerivingDirectFieldAccessFallbackBeanWrapper#setPropertyValue(Ljava/lang/String;Ljava/lang/Object;)V",
-      "org.springframework.data.util.ProxyUtils#getUserClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.support.AopUtils#getTargetClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.target.AbstractBeanFactoryBasedTargetSource#getTargetClass()Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#getType(Ljava/lang/String;Z)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#predictBeanType(Ljava/lang/String;Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#resolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#doResolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#evaluateBeanDefinitionString(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.context.expression.StandardBeanExpressionResolver#evaluate(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanExpressionContext;)Ljava/lang/Object;",
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#prepareContext(Lorg/springframework/boot/DefaultBootstrapContext;Lorg/springframework/context/ConfigurableApplicationContext;Lorg/springframework/core/env/ConfigurableEnvironment;Lorg/springframework/boot/SpringApplicationRunListeners;Lorg/springframework/boot/ApplicationArguments;Lorg/springframework/boot/Banner;)V",
+      "org.springframework.boot.DefaultBootstrapContext#close(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#multicastEvent(Lorg/springframework/context/ApplicationEvent;Lorg/springframework/core/ResolvableType;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#invokeListener(Lorg/springframework/context/ApplicationListener;Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.SimpleApplicationEventMulticaster#doInvokeListener(Lorg/springframework/context/ApplicationListener;Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#onApplicationEvent(Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#processEvent(Lorg/springframework/context/ApplicationEvent;)V",
+      "org.springframework.context.event.ApplicationListenerMethodAdapter#shouldHandle(Lorg/springframework/context/ApplicationEvent;[Ljava/lang/Object;)Z",
+      "org.springframework.context.event.EventExpressionEvaluator#condition(Ljava/lang/String;Lorg/springframework/context/ApplicationEvent;Ljava/lang/reflect/Method;Lorg/springframework/context/expression/AnnotatedElementKey;[Ljava/lang/Object;Lorg/springframework/beans/factory/BeanFactory;)Z",
       "org.springframework.expression.spel.standard.SpelExpression#getValue()Ljava/lang/Object;",
       "org.springframework.expression.spel.ast.SpelNodeImpl#getValue(Lorg/springframework/expression/spel/ExpressionState;)Ljava/lang/Object;",
       "org.springframework.expression.spel.ast.Assign#getValueInternal(Lorg/springframework/expression/spel/ExpressionState;)Lorg/springframework/expression/TypedValue;"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
@@ -1551,13 +1635,20 @@
     "cve": "CVE-2024-50379",
     "status": "FRAMEWORK",
     "methods": [
+      "org.apache.catalina.WebResourceLockSet#\u003cinit\u003e",
+      "org.apache.catalina.webresources.DirResourceSet#getLockKey",
       "org.apache.catalina.webresources.DirResourceSet#getResource",
+      "org.apache.catalina.webresources.DirResourceSet#initInternal",
+      "org.apache.catalina.webresources.DirResourceSet#isCaseSensitive",
+      "org.apache.catalina.webresources.DirResourceSet#lockForRead",
+      "org.apache.catalina.webresources.DirResourceSet#lockForWrite",
+      "org.apache.catalina.webresources.DirResourceSet#unlockForRead",
+      "org.apache.catalina.webresources.DirResourceSet#unlockForWrite",
       "org.apache.catalina.webresources.DirResourceSet#write",
+      "org.apache.catalina.webresources.FileResource#\u003cinit\u003e",
       "org.apache.catalina.webresources.FileResource#delete"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1572,10 +1663,9 @@
       "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#getWebServer([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lorg/springframework/boot/web/server/WebServer;",
       "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#configureEngine(Lorg/apache/catalina/Engine;)V",
       "org.apache.catalina.core.StandardPipeline#addValve(Lorg/apache/catalina/Valve;)V",
-      "org.apache.catalina.loader.WebappClassLoaderBase#start()V",
-      "org.apache.catalina.webresources.StandardRoot#getResources(Ljava/lang/String;Z)[Lorg/apache/catalina/WebResource;",
-      "org.apache.catalina.webresources.StandardRoot#getResourcesInternal(Ljava/lang/String;Z)[Lorg/apache/catalina/WebResource;",
-      "org.apache.catalina.webresources.DirResourceSet#getResource(Ljava/lang/String;)Lorg/apache/catalina/WebResource;"
+      "org.apache.catalina.util.LifecycleBase#start()V",
+      "org.apache.catalina.util.LifecycleBase#init()V",
+      "org.apache.catalina.webresources.DirResourceSet#initInternal()V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -1623,9 +1713,7 @@
       "org.apache.catalina.servlets.DefaultServlet#doPut",
       "org.apache.catalina.servlets.DefaultServlet#executePartialPut"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff"
+    "source": "diff"
   },
   {
     "cve": "CVE-2025-35036",
@@ -1714,24 +1802,22 @@
   },
   {
     "cve": "CVE-2025-41249",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.core.annotation.AnnotatedMethod#isOverrideFor",
       "org.springframework.core.annotation.AnnotationsScanner#hasSameGenericTypeParameters"
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#setDefaultValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdentifierDerivingDirectFieldAccessFallbackBeanWrapper#setPropertyValue(Ljava/lang/String;Ljava/lang/Object;)V",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation#getIdType()Ljava/lang/Class;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdMetadata#getType()Ljava/lang/Class;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdMetadata#tryExtractIdTypeWithFallbackToIdTypeLookup()Ljava/lang/Class;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdMetadata#fallbackIdTypeLookup(Ljavax/persistence/metamodel/IdentifiableType;)Ljava/lang/Class;",
-      "org.springframework.core.annotation.AnnotationUtils#findAnnotation(Ljava/lang/Class;Ljava/lang/Class;)Ljava/lang/annotation/Annotation;",
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#handleRunFailure(Lorg/springframework/context/ConfigurableApplicationContext;Ljava/lang/Throwable;Lorg/springframework/boot/SpringApplicationRunListeners;)V",
+      "org.springframework.boot.SpringApplication#reportFailure(Ljava/util/Collection;Ljava/lang/Throwable;)V",
+      "org.springframework.boot.diagnostics.FailureAnalyzers#reportException(Ljava/lang/Throwable;)Z",
+      "org.springframework.boot.diagnostics.FailureAnalyzers#analyze(Ljava/lang/Throwable;Ljava/util/List;)Lorg/springframework/boot/diagnostics/FailureAnalysis;",
+      "org.springframework.boot.autoconfigure.diagnostics.analyzer.NoSuchBeanDefinitionFailureAnalyzer#analyze(Ljava/lang/Throwable;Lorg/springframework/beans/factory/NoSuchBeanDefinitionException;Ljava/lang/String;)Lorg/springframework/boot/diagnostics/FailureAnalysis;",
       "org.springframework.core.annotation.TypeMappedAnnotations#get(Ljava/lang/Class;Ljava/util/function/Predicate;Lorg/springframework/core/annotation/MergedAnnotationSelector;)Lorg/springframework/core/annotation/MergedAnnotation;",
       "org.springframework.core.annotation.TypeMappedAnnotations#scan(Ljava/lang/Object;Lorg/springframework/core/annotation/AnnotationsProcessor;)Ljava/lang/Object;",
       "org.springframework.core.annotation.AnnotationsScanner#scan(Ljava/lang/Object;Ljava/lang/reflect/AnnotatedElement;Lorg/springframework/core/annotation/MergedAnnotations$SearchStrategy;Lorg/springframework/core/annotation/AnnotationsProcessor;)Ljava/lang/Object;",
@@ -1743,33 +1829,32 @@
       "org.springframework.core.annotation.AnnotationsScanner#hasSameGenericTypeParameters(Ljava/lang/reflect/Method;Ljava/lang/reflect/Method;[Ljava/lang/Class;)Z"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
     "cve": "CVE-2025-46701",
     "status": "NOT_REACHABLE",
     "methods": [
-      "org.apache.catalina.servlets.CGIServlet#doGet",
-      "org.apache.catalina.servlets.CGIServlet#doPost",
-      "org.apache.catalina.servlets.CGIServlet$CGIEnvironment#findCGI"
+      "org.apache.catalina.servlets.CGIServlet#findCGI",
+      "org.apache.catalina.servlets.CGIServlet#init",
+      "org.apache.catalina.servlets.CGIServlet#run",
+      "org.apache.catalina.servlets.CGIServlet#setCGIEnvironment"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff"
+    "source": "diff"
   },
   {
     "cve": "CVE-2025-48988",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.connector.Request#getPart",
-      "org.apache.catalina.connector.Request#getParts",
+      "org.apache.catalina.connector.Connector#getMaxPartCount",
+      "org.apache.catalina.connector.Connector#getMaxPartHeaderSize",
+      "org.apache.catalina.connector.Connector#setMaxPartCount",
+      "org.apache.catalina.connector.Connector#setMaxPartHeaderSize",
       "org.apache.catalina.connector.Request#parseParts"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1817,9 +1902,7 @@
       "org.apache.coyote.http2.Http2UpgradeHandler#reduceOverheadCount",
       "org.apache.coyote.http2.Http2UpgradeHandler#sendStreamReset"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1861,15 +1944,14 @@
       "org.apache.catalina.webresources.AbstractArchiveResourceSet#getResource",
       "org.apache.catalina.webresources.AbstractArchiveResourceSet#list",
       "org.apache.catalina.webresources.AbstractArchiveResourceSet#listWebAppPaths",
+      "org.apache.catalina.webresources.AbstractResourceSet#isPathMounted",
       "org.apache.catalina.webresources.DirResourceSet#getResource",
       "org.apache.catalina.webresources.DirResourceSet#list",
       "org.apache.catalina.webresources.DirResourceSet#listWebAppPaths",
       "org.apache.catalina.webresources.DirResourceSet#mkdir",
       "org.apache.catalina.webresources.DirResourceSet#write"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1934,17 +2016,16 @@
     "cve": "CVE-2025-52434",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.tomcat.util.net.AprEndpoint#stopInternal",
-      "org.apache.tomcat.util.net.AprEndpoint$AprSocketWrapper#close",
-      "org.apache.tomcat.util.net.AprEndpoint$AprSocketWrapper#populateLocalName",
-      "org.apache.tomcat.util.net.AprEndpoint$AprSocketWrapper#populateLocalPort",
-      "org.apache.tomcat.util.net.AprEndpoint$AprSocketWrapper#populateRemoteAddr",
-      "org.apache.tomcat.util.net.AprEndpoint$AprSocketWrapper#populateRemoteHost",
-      "org.apache.tomcat.util.net.AprEndpoint$AprSocketWrapper#populateRemotePort"
+      "org.apache.tomcat.util.net.AprEndpoint#close",
+      "org.apache.tomcat.util.net.AprEndpoint#populateLocalAddr",
+      "org.apache.tomcat.util.net.AprEndpoint#populateLocalName",
+      "org.apache.tomcat.util.net.AprEndpoint#populateLocalPort",
+      "org.apache.tomcat.util.net.AprEndpoint#populateRemoteAddr",
+      "org.apache.tomcat.util.net.AprEndpoint#populateRemoteHost",
+      "org.apache.tomcat.util.net.AprEndpoint#populateRemotePort",
+      "org.apache.tomcat.util.net.AprEndpoint#stopInternal"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -1975,12 +2056,9 @@
     "cve": "CVE-2025-52520",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.connector.Request#getParts",
       "org.apache.catalina.connector.Request#parseParts"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2028,11 +2106,9 @@
     "methods": [
       "org.apache.coyote.http2.ConnectionSettingsBase#set",
       "org.apache.coyote.http2.ConnectionSettingsLocal#set",
-      "org.apache.coyote.http2.Http2UpgradeHandler#init"
+      "org.apache.coyote.http2.Http2UpgradeHandler#\u003cinit\u003e"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2060,8 +2136,7 @@
       "org.apache.coyote.AbstractProtocol$ConnectionHandler#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
       "org.apache.coyote.http2.Http2Protocol#getProcessor(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/coyote/Adapter;)Lorg/apache/coyote/Processor;",
       "org.apache.coyote.http2.Http2Protocol#getInternalUpgradeHandler(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/coyote/Adapter;Lorg/apache/coyote/Request;)Lorg/apache/coyote/http11/upgrade/InternalHttpUpgradeHandler;",
-      "org.apache.coyote.http2.Http2UpgradeHandler#\u003cinit\u003e(Lorg/apache/coyote/http2/Http2Protocol;Lorg/apache/coyote/Adapter;Lorg/apache/coyote/Request;)V",
-      "org.apache.coyote.http2.ConnectionSettingsLocal#set(Lorg/apache/coyote/http2/Setting;J)V"
+      "org.apache.coyote.http2.Http2UpgradeHandler#\u003cinit\u003e(Lorg/apache/coyote/http2/Http2Protocol;Lorg/apache/coyote/Adapter;Lorg/apache/coyote/Request;)V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -2072,11 +2147,10 @@
     "cve": "CVE-2025-55668",
     "status": "FRAMEWORK",
     "methods": [
+      "org.apache.catalina.connector.Request#recycleSessionInfo",
       "org.apache.catalina.valves.rewrite.RewriteValve#invoke"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2095,17 +2169,15 @@
       "org.apache.catalina.util.LifecycleBase#stop()V",
       "org.apache.catalina.connector.Connector#stopInternal()V",
       "org.apache.coyote.AbstractProtocol#stop()V",
-      "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#timeoutAsync(J)V",
-      "org.apache.coyote.http2.Http2UpgradeHandler#timeoutAsync(J)V",
-      "org.apache.tomcat.util.net.SocketWrapperBase#processSocket(Lorg/apache/tomcat/util/net/SocketEvent;Z)V",
-      "org.apache.tomcat.util.net.AbstractEndpoint#processSocket(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;Z)Z",
-      "org.apache.tomcat.util.net.SocketProcessorBase#run()V",
-      "org.apache.tomcat.util.net.AprEndpoint$SocketProcessor#doRun()V",
-      "org.apache.coyote.AbstractProtocol$ConnectionHandler#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.AbstractProcessorLight#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.AbstractProcessor#dispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.catalina.connector.CoyoteAdapter#asyncDispatch(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;Lorg/apache/tomcat/util/net/SocketEvent;)Z",
-      "org.apache.catalina.valves.rewrite.RewriteValve#invoke(Lorg/apache/catalina/connector/Request;Lorg/apache/catalina/connector/Response;)V"
+      "org.apache.tomcat.util.net.AbstractEndpoint#stop()V",
+      "org.apache.tomcat.util.net.AprEndpoint#stopInternal()V",
+      "org.apache.tomcat.util.net.SocketWrapperBase#close()V",
+      "org.apache.coyote.AbstractProtocol$ConnectionHandler#release(Lorg/apache/coyote/Processor;)V",
+      "org.apache.coyote.ajp.AjpProcessor#recycle()V",
+      "org.apache.catalina.connector.CoyoteAdapter#checkRecycled(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;)V",
+      "org.apache.catalina.connector.CoyoteAdapter#log(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;J)V",
+      "org.apache.catalina.connector.Request#recycle()V",
+      "org.apache.catalina.connector.Request#recycleSessionInfo()V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -2119,9 +2191,7 @@
       "org.apache.catalina.valves.rewrite.RewriteValve#invoke",
       "org.apache.catalina.valves.rewrite.RewriteValve#parse"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2150,22 +2220,19 @@
     "status": "NOT_REACHABLE",
     "methods": [
       "org.apache.juli.JdkLoggerFormatter#format",
+      "org.apache.juli.LogUtil#\u003cinit\u003e",
+      "org.apache.juli.LogUtil#escape",
       "org.apache.juli.OneLineFormatter#format"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff"
+    "source": "diff"
   },
   {
     "cve": "CVE-2025-61795",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.connector.Request#getParts",
       "org.apache.catalina.connector.Request#parseParts"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2207,14 +2274,22 @@
     "cve": "CVE-2025-66614",
     "status": "FRAMEWORK",
     "methods": [
+      "org.apache.coyote.AbstractProtocol#checkSni",
+      "org.apache.coyote.http11.AbstractHttp11Protocol#checkSni",
       "org.apache.coyote.http11.Http11Processor#prepareRequest",
+      "org.apache.coyote.http2.Http2UpgradeHandler#getSniHostName",
+      "org.apache.coyote.http2.Stream#parseAuthority",
+      "org.apache.tomcat.util.net.AbstractEndpoint#checkSni",
+      "org.apache.tomcat.util.net.AbstractEndpoint#getStrictSni",
+      "org.apache.tomcat.util.net.AbstractEndpoint#setStrictSni",
       "org.apache.tomcat.util.net.AprEndpoint#getSslContext",
+      "org.apache.tomcat.util.net.AprEndpoint#setSocketOptions",
       "org.apache.tomcat.util.net.SecureNio2Channel#processSNI",
-      "org.apache.tomcat.util.net.SecureNioChannel#processSNI"
+      "org.apache.tomcat.util.net.SecureNioChannel#processSNI",
+      "org.apache.tomcat.util.net.SocketWrapperBase#getSniHostName",
+      "org.apache.tomcat.util.net.SocketWrapperBase#setSniHostName"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2338,12 +2413,14 @@
     "cve": "CVE-2026-24880",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.coyote.http11.filters.ChunkedInputFilter#doRead",
-      "org.apache.coyote.http11.filters.ChunkedInputFilter#parseChunkHeader"
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#parseChunkHeader",
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#recycle",
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#skipChunkHeader",
+      "org.apache.tomcat.util.http.parser.ChunkExtension#\u003cinit\u003e",
+      "org.apache.tomcat.util.http.parser.ChunkExtension#parse",
+      "org.apache.tomcat.util.http.parser.HttpParser#isWhiteSpace"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2356,19 +2433,19 @@
       "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh()V",
       "org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#createWebServer()V",
       "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#getWebServer([Lorg/springframework/boot/web/servlet/ServletContextInitializer;)Lorg/springframework/boot/web/server/WebServer;",
-      "org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#configureEngine(Lorg/apache/catalina/Engine;)V",
-      "org.apache.catalina.core.StandardPipeline#addValve(Lorg/apache/catalina/Valve;)V",
-      "org.apache.catalina.util.LifecycleBase#start()V",
-      "org.apache.catalina.util.LifecycleBase#init()V",
-      "org.apache.catalina.util.LifecycleMBeanBase#initInternal()V",
-      "org.apache.catalina.authenticator.AuthenticatorBase#register(Lorg/apache/catalina/connector/Request;Ljavax/servlet/http/HttpServletResponse;Ljava/security/Principal;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZ)V",
-      "org.apache.catalina.connector.Request#getAttribute(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.apache.coyote.Request#action(Lorg/apache/coyote/ActionCode;Ljava/lang/Object;)V",
-      "org.apache.coyote.AbstractProcessor#action(Lorg/apache/coyote/ActionCode;Ljava/lang/Object;)V",
-      "org.apache.coyote.http11.Http11Processor#setRequestBody(Lorg/apache/tomcat/util/buf/ByteChunk;)V",
-      "org.apache.coyote.http11.Http11InputBuffer#addActiveFilter(Lorg/apache/coyote/http11/InputFilter;)V",
-      "org.apache.coyote.http11.filters.BufferedInputFilter#setRequest(Lorg/apache/coyote/Request;)V",
-      "org.apache.coyote.http11.filters.ChunkedInputFilter#doRead(Lorg/apache/tomcat/util/net/ApplicationBufferHandler;)I"
+      "org.apache.catalina.startup.Tomcat#getHost()Lorg/apache/catalina/Host;",
+      "org.apache.catalina.core.StandardHost#\u003cinit\u003e()V",
+      "org.apache.catalina.core.StandardPipeline#setBasic(Lorg/apache/catalina/Valve;)V",
+      "org.apache.catalina.util.LifecycleBase#stop()V",
+      "org.apache.catalina.connector.Connector#stopInternal()V",
+      "org.apache.coyote.AbstractProtocol#stop()V",
+      "org.apache.tomcat.util.net.AbstractEndpoint#stop()V",
+      "org.apache.tomcat.util.net.AprEndpoint#stopInternal()V",
+      "org.apache.tomcat.util.net.SocketWrapperBase#close()V",
+      "org.apache.coyote.AbstractProtocol$ConnectionHandler#release(Lorg/apache/coyote/Processor;)V",
+      "org.apache.coyote.http11.Http11Processor#recycle()V",
+      "org.apache.coyote.http11.Http11InputBuffer#recycle()V",
+      "org.apache.coyote.http11.filters.ChunkedInputFilter#recycle()V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -2425,7 +2502,12 @@
   },
   {
     "cve": "CVE-2026-34487",
-    "status": "UNKNOWN"
+    "status": "NOT_REACHABLE",
+    "methods": [
+      "org.apache.catalina.tribes.membership.cloud.AbstractStreamProvider#openConnection",
+      "org.apache.catalina.tribes.membership.cloud.TokenStreamProvider#openStream"
+    ],
+    "source": "diff"
   },
   {
     "cve": "CVE-2026-40477",
@@ -2466,13 +2548,13 @@
     "cve": "CVE-2026-41284",
     "status": "NOT_REACHABLE",
     "methods": [
-      "org.apache.catalina.servlets.DefaultServlet#service",
+      "org.apache.catalina.servlets.WebdavServlet#\u003cinit\u003e",
       "org.apache.catalina.servlets.WebdavServlet#doLock",
-      "org.apache.catalina.servlets.WebdavServlet#doPropfind"
+      "org.apache.catalina.servlets.WebdavServlet#doPropfind",
+      "org.apache.catalina.servlets.WebdavServlet#init",
+      "org.apache.catalina.servlets.WebdavServlet#write"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff"
+    "source": "diff"
   },
   {
     "cve": "CVE-2026-41293",
@@ -2480,12 +2562,18 @@
     "methods": [
       "org.apache.coyote.http2.HPackHuffman#decode",
       "org.apache.coyote.http2.HpackDecoder#decode",
+      "org.apache.coyote.http2.HpackDecoder#readHeaderName",
       "org.apache.coyote.http2.HpackDecoder#readHpackString",
-      "org.apache.coyote.http2.Http2Parser#readHeaderPayload"
+      "org.apache.coyote.http2.HpackDecoder#readHuffmanString",
+      "org.apache.coyote.http2.HpackEncoder#encode",
+      "org.apache.coyote.http2.Http2Parser#readHeaderPayload",
+      "org.apache.coyote.http2.Stream#emitHeader",
+      "org.apache.coyote.http2.StreamException#\u003cinit\u003e",
+      "org.apache.tomcat.util.http.parser.HttpParser#isControl",
+      "org.apache.tomcat.util.http.parser.HttpParser#isFieldContent",
+      "org.apache.tomcat.util.http.parser.HttpParser#isFieldVChar"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2504,20 +2592,11 @@
       "org.apache.catalina.util.LifecycleBase#stop()V",
       "org.apache.catalina.connector.Connector#stopInternal()V",
       "org.apache.coyote.AbstractProtocol#stop()V",
-      "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#timeoutAsync(J)V",
-      "org.apache.coyote.http2.Http2UpgradeHandler#timeoutAsync(J)V",
-      "org.apache.tomcat.util.net.SocketWrapperBase#processSocket(Lorg/apache/tomcat/util/net/SocketEvent;Z)V",
-      "org.apache.tomcat.util.net.AbstractEndpoint#processSocket(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;Z)Z",
-      "org.apache.tomcat.util.net.SocketProcessorBase#run()V",
-      "org.apache.tomcat.util.net.AprEndpoint$SocketProcessor#doRun()V",
-      "org.apache.coyote.AbstractProtocol$ConnectionHandler#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.AbstractProcessorLight#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#dispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.http2.Http2UpgradeHandler#upgradeDispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.http2.Http2Parser#readFrame(Z)Z",
-      "org.apache.coyote.http2.Http2Parser#readFrame(ZLorg/apache/coyote/http2/FrameType;)Z",
-      "org.apache.coyote.http2.Http2Parser#readHeadersFrame(IIILjava/nio/ByteBuffer;)V",
-      "org.apache.coyote.http2.Http2Parser#readHeaderPayload(IILjava/nio/ByteBuffer;)V"
+      "org.apache.coyote.AbstractProcessor#timeoutAsync(J)V",
+      "org.apache.coyote.AbstractProcessor#doTimeoutAsync()V",
+      "org.apache.coyote.http2.StreamProcessor#processSocketEvent(Lorg/apache/tomcat/util/net/SocketEvent;Z)V",
+      "org.apache.coyote.http2.StreamProcessor#process(Lorg/apache/tomcat/util/net/SocketEvent;)V",
+      "org.apache.coyote.http2.StreamException#\u003cinit\u003e(Ljava/lang/String;Lorg/apache/coyote/http2/Http2Error;I)V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -2579,7 +2658,7 @@
   },
   {
     "cve": "CVE-2026-41848",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.util.AntPathMatcher#\u003cinit\u003e",
       "org.springframework.util.AntPathMatcher#charAt",
@@ -2591,22 +2670,22 @@
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#convertIfNecessary(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Class;Lorg/springframework/core/convert/TypeDescriptor;)Ljava/lang/Object;",
-      "org.springframework.beans.TypeConverterDelegate#convertIfNecessary(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Class;Lorg/springframework/core/convert/TypeDescriptor;)Ljava/lang/Object;",
-      "org.springframework.beans.TypeConverterDelegate#findDefaultEditor(Ljava/lang/Class;)Ljava/beans/PropertyEditor;",
-      "org.springframework.beans.PropertyEditorRegistrySupport#getDefaultEditor(Ljava/lang/Class;)Ljava/beans/PropertyEditor;",
-      "org.springframework.beans.PropertyEditorRegistrySupport#createDefaultEditors()V",
-      "org.springframework.core.io.support.ResourceArrayPropertyEditor#\u003cinit\u003e()V",
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#prepareContext(Lorg/springframework/boot/DefaultBootstrapContext;Lorg/springframework/context/ConfigurableApplicationContext;Lorg/springframework/core/env/ConfigurableEnvironment;Lorg/springframework/boot/SpringApplicationRunListeners;Lorg/springframework/boot/ApplicationArguments;Lorg/springframework/boot/Banner;)V",
+      "org.springframework.boot.SpringApplication#load(Lorg/springframework/context/ApplicationContext;[Ljava/lang/Object;)V",
+      "org.springframework.boot.SpringApplication#createBeanDefinitionLoader(Lorg/springframework/beans/factory/support/BeanDefinitionRegistry;[Ljava/lang/Object;)Lorg/springframework/boot/BeanDefinitionLoader;",
+      "org.springframework.boot.BeanDefinitionLoader#\u003cinit\u003e(Lorg/springframework/beans/factory/support/BeanDefinitionRegistry;[Ljava/lang/Object;)V",
+      "org.springframework.beans.factory.xml.XmlBeanDefinitionReader#\u003cinit\u003e(Lorg/springframework/beans/factory/support/BeanDefinitionRegistry;)V",
+      "org.springframework.beans.factory.support.AbstractBeanDefinitionReader#\u003cinit\u003e(Lorg/springframework/beans/factory/support/BeanDefinitionRegistry;)V",
       "org.springframework.core.io.support.PathMatchingResourcePatternResolver#\u003cinit\u003e()V",
       "org.springframework.util.AntPathMatcher#\u003cinit\u003e()V"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
@@ -2619,7 +2698,7 @@
   },
   {
     "cve": "CVE-2026-41851",
-    "status": "REACHABLE",
+    "status": "FRAMEWORK",
     "methods": [
       "org.springframework.expression.spel.ExpressionState#assignVariable",
       "org.springframework.expression.spel.ExpressionState#lookupVariable",
@@ -2693,28 +2772,21 @@
     ],
     "source": "diff",
     "path": [
-      "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V",
-      "org.springframework.validation.AbstractPropertyBindingResult#getActualFieldValue(Ljava/lang/String;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#getPropertyValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.beans.AbstractNestablePropertyAccessor#setDefaultValue(Lorg/springframework/beans/AbstractNestablePropertyAccessor$PropertyTokenHolder;)Ljava/lang/Object;",
-      "org.springframework.data.jpa.repository.support.JpaMetamodelEntityInformation$IdentifierDerivingDirectFieldAccessFallbackBeanWrapper#setPropertyValue(Ljava/lang/String;Ljava/lang/Object;)V",
-      "org.springframework.data.util.ProxyUtils#getUserClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.support.AopUtils#getTargetClass(Ljava/lang/Object;)Ljava/lang/Class;",
-      "org.springframework.aop.target.AbstractBeanFactoryBasedTargetSource#getTargetClass()Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#getType(Ljava/lang/String;Z)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#predictBeanType(Ljava/lang/String;Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#resolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#doResolveBeanClass(Lorg/springframework/beans/factory/support/RootBeanDefinition;[Ljava/lang/Class;)Ljava/lang/Class;",
-      "org.springframework.beans.factory.support.AbstractBeanFactory#evaluateBeanDefinitionString(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanDefinition;)Ljava/lang/Object;",
-      "org.springframework.context.expression.StandardBeanExpressionResolver#evaluate(Ljava/lang/String;Lorg/springframework/beans/factory/config/BeanExpressionContext;)Ljava/lang/Object;",
-      "org.springframework.expression.spel.standard.SpelExpression#getValue()Ljava/lang/Object;",
-      "org.springframework.expression.spel.ast.SpelNodeImpl#getValue(Lorg/springframework/expression/spel/ExpressionState;)Ljava/lang/Object;",
-      "org.springframework.expression.spel.ast.Assign#getValueInternal(Lorg/springframework/expression/spel/ExpressionState;)Lorg/springframework/expression/TypedValue;"
+      "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#run([Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
+      "org.springframework.boot.SpringApplication#refreshContext(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.boot.SpringApplication#refresh(Lorg/springframework/context/ApplicationContext;)V",
+      "org.springframework.boot.SpringApplication#refresh(Lorg/springframework/context/ConfigurableApplicationContext;)V",
+      "org.springframework.context.support.AbstractApplicationContext#refresh()V",
+      "org.springframework.context.support.AbstractApplicationContext#prepareBeanFactory(Lorg/springframework/beans/factory/config/ConfigurableListableBeanFactory;)V",
+      "org.springframework.context.expression.StandardBeanExpressionResolver#\u003cinit\u003e(Ljava/lang/ClassLoader;)V",
+      "org.springframework.expression.spel.SpelParserConfiguration#\u003cinit\u003e(Lorg/springframework/expression/spel/SpelCompilerMode;Ljava/lang/ClassLoader;)V"
     ],
     "entry": {
-      "from": "org.springframework.samples.petclinic.owner.OwnerController#processFindForm(Lorg/springframework/samples/petclinic/owner/Owner;Lorg/springframework/validation/BindingResult;Ljava/util/Map;)Ljava/lang/String;",
-      "to": "org.springframework.validation.AbstractBindingResult#rejectValue(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V"
+      "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
+      "to": "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;"
     }
   },
   {
@@ -2733,23 +2805,22 @@
     "cve": "CVE-2026-42498",
     "status": "NOT_REACHABLE",
     "methods": [
-      "org.apache.tomcat.websocket.WsWebSocketContainer#connectToServer",
-      "org.apache.tomcat.websocket.WsWebSocketContainer#connectToServerRecursive"
+      "org.apache.tomcat.websocket.Authenticator#getAuthorization",
+      "org.apache.tomcat.websocket.BasicAuthenticator#getAuthorization",
+      "org.apache.tomcat.websocket.DigestAuthenticator#calculateRequestDigest",
+      "org.apache.tomcat.websocket.DigestAuthenticator#getAuthorization",
+      "org.apache.tomcat.websocket.WsWebSocketContainer#connectToServerRecursive",
+      "org.apache.tomcat.websocket.WsWebSocketContainer#processAuthenticationChallenge"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff"
+    "source": "diff"
   },
   {
     "cve": "CVE-2026-43512",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.realm.RealmBase#authenticate",
       "org.apache.catalina.realm.RealmBase#getDigest"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2780,7 +2851,8 @@
       "org.apache.catalina.connector.CoyoteAdapter#asyncDispatch(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;Lorg/apache/tomcat/util/net/SocketEvent;)Z",
       "org.apache.catalina.authenticator.AuthenticatorBase#invoke(Lorg/apache/catalina/connector/Request;Lorg/apache/catalina/connector/Response;)V",
       "org.apache.catalina.authenticator.BasicAuthenticator#doAuthenticate(Lorg/apache/catalina/connector/Request;Ljavax/servlet/http/HttpServletResponse;)Z",
-      "org.apache.catalina.realm.RealmBase#authenticate(Ljava/lang/String;)Ljava/security/Principal;"
+      "org.apache.catalina.realm.RealmBase#authenticate(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/security/Principal;",
+      "org.apache.catalina.realm.RealmBase#getDigest(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
@@ -2791,13 +2863,13 @@
     "cve": "CVE-2026-43513",
     "status": "FRAMEWORK",
     "methods": [
+      "org.apache.catalina.realm.LockOutRealm#getCaseSensitive",
       "org.apache.catalina.realm.LockOutRealm#isLocked",
       "org.apache.catalina.realm.LockOutRealm#registerAuthFailure",
-      "org.apache.catalina.realm.LockOutRealm#registerAuthSuccess"
+      "org.apache.catalina.realm.LockOutRealm#registerAuthSuccess",
+      "org.apache.catalina.realm.LockOutRealm#setCaseSensitive"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2841,11 +2913,12 @@
     "cve": "CVE-2026-43514",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.coyote.ajp.AjpProcessor#prepareRequest"
+      "org.apache.catalina.realm.DigestCredentialHandlerBase#equals",
+      "org.apache.coyote.ajp.AjpProcessor#prepareRequest",
+      "org.apache.tomcat.util.security.ConstantTime#\u003cinit\u003e",
+      "org.apache.tomcat.util.security.ConstantTime#equals"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -2886,9 +2959,7 @@
     "methods": [
       "org.apache.catalina.realm.RealmBase#findSecurityConstraints"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -3041,9 +3112,7 @@
     "methods": [
       "org.apache.catalina.realm.RealmBase#findSecurityConstraints"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -3098,14 +3167,18 @@
     "cve": "CVE-2026-68525",
     "status": "FRAMEWORK",
     "methods": [
-      "org.apache.catalina.authenticator.AuthenticatorBase#doAuthenticate",
+      "org.apache.catalina.authenticator.AuthenticatorBase#\u003cinit\u003e",
+      "org.apache.catalina.authenticator.AuthenticatorBase#authenticate",
+      "org.apache.catalina.authenticator.AuthenticatorBase#checkUserDataConstraints",
+      "org.apache.catalina.authenticator.AuthenticatorBase#disableCaching",
+      "org.apache.catalina.authenticator.AuthenticatorBase#doAuthenticateExtended",
+      "org.apache.catalina.authenticator.AuthenticatorBase#getAuthenticated",
       "org.apache.catalina.authenticator.AuthenticatorBase#invoke",
       "org.apache.catalina.authenticator.FormAuthenticator#doAuthenticate",
+      "org.apache.catalina.authenticator.FormAuthenticator#doAuthenticateExtended",
       "org.apache.catalina.authenticator.FormAuthenticator#restoreRequest"
     ],
-    "source": "llm",
-    "model": "z-ai/glm-5.3",
-    "evidence": "diff",
+    "source": "diff",
     "path": [
       "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
       "org.springframework.boot.SpringApplication#run(Ljava/lang/Class;[Ljava/lang/String;)Lorg/springframework/context/ConfigurableApplicationContext;",
@@ -3122,19 +3195,10 @@
       "org.apache.catalina.core.StandardHost#\u003cinit\u003e()V",
       "org.apache.catalina.core.StandardPipeline#setBasic(Lorg/apache/catalina/Valve;)V",
       "org.apache.catalina.util.LifecycleBase#stop()V",
-      "org.apache.catalina.connector.Connector#stopInternal()V",
-      "org.apache.coyote.AbstractProtocol#stop()V",
-      "org.apache.coyote.http11.upgrade.UpgradeProcessorInternal#timeoutAsync(J)V",
-      "org.apache.coyote.http2.Http2UpgradeHandler#timeoutAsync(J)V",
-      "org.apache.tomcat.util.net.SocketWrapperBase#processSocket(Lorg/apache/tomcat/util/net/SocketEvent;Z)V",
-      "org.apache.tomcat.util.net.AbstractEndpoint#processSocket(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;Z)Z",
-      "org.apache.tomcat.util.net.SocketProcessorBase#run()V",
-      "org.apache.tomcat.util.net.AprEndpoint$SocketProcessor#doRun()V",
-      "org.apache.coyote.AbstractProtocol$ConnectionHandler#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.AbstractProcessorLight#process(Lorg/apache/tomcat/util/net/SocketWrapperBase;Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.coyote.AbstractProcessor#dispatch(Lorg/apache/tomcat/util/net/SocketEvent;)Lorg/apache/tomcat/util/net/AbstractEndpoint$Handler$SocketState;",
-      "org.apache.catalina.connector.CoyoteAdapter#asyncDispatch(Lorg/apache/coyote/Request;Lorg/apache/coyote/Response;Lorg/apache/tomcat/util/net/SocketEvent;)Z",
-      "org.apache.catalina.authenticator.AuthenticatorBase#invoke(Lorg/apache/catalina/connector/Request;Lorg/apache/catalina/connector/Response;)V"
+      "org.apache.catalina.util.LifecycleBase#fireLifecycleEvent(Ljava/lang/String;Ljava/lang/Object;)V",
+      "org.apache.catalina.startup.Tomcat$FixContextListener#lifecycleEvent(Lorg/apache/catalina/LifecycleEvent;)V",
+      "org.apache.catalina.authenticator.NonLoginAuthenticator#\u003cinit\u003e()V",
+      "org.apache.catalina.authenticator.AuthenticatorBase#\u003cinit\u003e()V"
     ],
     "entry": {
       "from": "org.springframework.samples.petclinic.PetClinicApplication#main([Ljava/lang/String;)V",
