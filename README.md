@@ -313,12 +313,12 @@ matches, confirmed not to change either app's CVE status counts, since
 `spring`'s own `org.apache.tomcat.embed:*` pattern already covers that
 exact dependency); nothing matching falls back to `generic`, which has
 no framework packages at all, so every CVE's status for a plain
-non-Spring, non-servlet, non-Jakarta-EE, non-Micronaut app is
-`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/`NOT_APPLICABLE` only, never
+non-Spring, non-servlet, non-Jakarta-EE, non-Micronaut, non-Quarkus app
+is `REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/`NOT_APPLICABLE` only, never
 `FRAMEWORK`. `-profile spring`/`-profile servlet`/`-profile jakarta`/
-`-profile micronaut`/`-profile generic` picks one explicitly; `-profile-file path.yaml` loads
-a custom profile (same YAML shape) and adds it to the catalog, or
-replaces one of the same name.
+`-profile micronaut`/`-profile quarkus`/`-profile generic` picks one
+explicitly; `-profile-file path.yaml` loads a custom profile (same YAML
+shape) and adds it to the catalog, or replaces one of the same name.
 
 `spring`'s own list is section 4's original seed plus
 `org.springframework:spring-beans`/`spring-core`/`spring-expression`/
@@ -370,6 +370,16 @@ Micronaut's own annotation processor *at compile time*, as a real class
 in the app's own compiled output, not a JDK runtime proxy with zero
 bytecode the way Spring Data's are — CHA already finds it like any other
 subtype.
+
+`quarkus.yaml` (`@Scheduled`, MicroProfile Reactive Messaging's
+`@Incoming`/`@Outgoing`) is a fourth `roots.annotations` user. Quarkus's
+own REST layer is plain JAX-RS, already covered by `jakarta.yaml` — a
+Quarkus REST app auto-detects as `jakarta+quarkus`, the same way a Spring
+Boot app auto-detects as `spring+servlet` — so this profile only adds
+what's genuinely Quarkus-/MicroProfile-specific on top. No
+`roots.overrides`/`synthetic_edges` either: Quarkus builds its bean/route
+wiring at build time via Jandex indexing and bytecode recording, the same
+"real class, not a runtime proxy" story as Micronaut.
 
 ### 8. The report (`internal/report`)
 
@@ -497,7 +507,7 @@ internal/
   callgraph/              interning, edges, CHA expansion, synthetic edges
   profile/                framework knowledge: detect, roots, framework packages, synthetic edges
     profiles/              spring.yaml, servlet.yaml, jakarta.yaml, micronaut.yaml,
-                             generic.yaml (embedded defaults)
+                             quarkus.yaml, generic.yaml (embedded defaults)
   vulnmap/                CVE -> vulnerable methods (manual table + fix-commit diffs)
     vuln_methods.yaml      the embedded manual table
   javadiff/               unified-diff parsing + the brace-aware Java method scanner
@@ -505,7 +515,7 @@ internal/
   report/                 Markdown/JSON rendering
     templates/
 scripts/                 prepare-{petclinic,webgoat,petclinic-gradle,servlet-demo,
-                         jakarta-demo,micronaut-demo}.sh, build-*fixture*.sh,
+                         jakarta-demo,micronaut-demo,quarkus-demo}.sh, build-*fixture*.sh,
                          gradle-copy-deps.init.gradle (Gradle equivalent of
                          mvn dependency:copy-dependencies/dependency:list)
 testdata/
@@ -541,14 +551,13 @@ report:
   `LambdaMetafactory` call, or dependency injection wiring beans by
   name/type at runtime is invisible, and can produce false negatives (a
   real path exists that ariadne cannot see).
-- **Only five profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`
-  and `generic`.** The profile system itself (auto-detection and merging,
-  `-roots profile`, synthetic edges, the conditional jackson-databind
-  rule, `roots.overrides`/`roots.annotations`) is implemented (see step 7
-  above), but `quarkus` is not — an app using it gets the `generic`
-  fallback (no framework packages at all) unless it also embeds Spring or
-  a plain servlet/JAX-RS/EJB/Micronaut container. There is
-  also no `--max-dep-depth`. **`jakarta`'s own CDI support is
+- **Six profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
+  `quarkus` and `generic`** — every framework PLAN.md section 4 originally
+  named for Phase 7, plus the `spring`/`generic` pair from the base plan.
+  The profile system itself (auto-detection and merging, `-roots profile`,
+  synthetic edges, the conditional jackson-databind rule,
+  `roots.overrides`/`roots.annotations`) is implemented (see step 7
+  above); there is no `--max-dep-depth`. **`jakarta`'s own CDI support is
   incomplete:** `@Observes` is a method-*parameter* annotation, and
   ariadne's bytecode parser never reads
   `RuntimeVisibleParameterAnnotations` — only class-/method-level

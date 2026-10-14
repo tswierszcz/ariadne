@@ -78,6 +78,20 @@ func TestLoadDefaultCatalog(t *testing.T) {
 		t.Error("micronaut profile has no framework packages")
 	}
 
+	quarkus, ok := c.Get("quarkus")
+	if !ok {
+		t.Fatal(`catalog has no "quarkus" profile`)
+	}
+	if len(quarkus.Detect) == 0 {
+		t.Error("quarkus profile has no detect markers")
+	}
+	if len(quarkus.Roots.Annotations) == 0 {
+		t.Error("quarkus profile has no roots.annotations")
+	}
+	if len(quarkus.FrameworkPackages) == 0 {
+		t.Error("quarkus profile has no framework packages")
+	}
+
 	generic, ok := c.Get("generic")
 	if !ok {
 		t.Fatal(`catalog has no "generic" fallback profile`)

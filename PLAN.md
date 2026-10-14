@@ -964,11 +964,45 @@ input modes:
     - **`-roots profile`**: `roots: profile "micronaut" (1 entry-point methods)` — exactly
       `demo.YamlController#get` — and CVE-2022-1471 is still `REACHABLE` via the identical
       path.
-- **Not implemented:** `quarkus` profile, a non-Spring control app for it, RTA, and
-  `--max-dep-depth`; CDI's `@Observes` remains unimplemented (see the `jakarta` note above).
-  `internal/reach`'s BFS passes stay unchanged (still computed once for every CVE, same as
-  Phase 5 left them) — only the root set and the framework-package list going into them
-  changed.
+- **`quarkus` profile: done** (`internal/profile/profiles/quarkus.yaml`). Quarkus's own REST
+  layer is plain JAX-RS (`javax.ws.rs`/`jakarta.ws.rs`), already covered by `jakarta.yaml` —
+  a Quarkus REST app auto-detects as `jakarta+quarkus`, the same way a Spring Boot app on
+  embedded Tomcat auto-detects as `spring+servlet` — so this profile only adds what's
+  genuinely Quarkus-/MicroProfile-specific on top: `io.quarkus.scheduler.Scheduled` and
+  MicroProfile Reactive Messaging's `@Incoming`/`@Outgoing`
+  (`org.eclipse.microprofile.reactive.messaging`), as a fourth `roots.annotations` user —
+  again no new matching code needed. Confirmed via `javap` on the published jars (the same
+  diligence applied to `micronaut.yaml`): all three are `@Target(METHOD)`,
+  `@Retention(RUNTIME)` — real `RuntimeVisibleAnnotations` ariadne's parser already reads,
+  not compile-time-only markers. No `roots.overrides`/`synthetic_edges`: Quarkus, like
+  Micronaut, builds its bean/route wiring at build time via Jandex indexing and bytecode
+  recording, not JDK runtime proxies with zero bytecode.
+  - **Verified against both existing baselines first**: petclinic and WebGoat still
+    auto-detect `spring+servlet` only (`quarkus`'s own detect markers,
+    `io.quarkus.runtime.Quarkus`/`io.quarkus.runtime.Application`, are absent from both),
+    confirmed by running `bin/ariadne` against both (identical status counts to before this
+    profile existed).
+  - **Verified against a new, real, Quarkus control app** —
+    `scripts/prepare-quarkus-demo.sh` generates and builds a three-class Maven project:
+    `demo.YamlResource` (a `jakarta.ws.rs` `@Path("/yaml")`/`@GET` REST resource),
+    `demo.ScheduledYamlJob` (`@Scheduled(every = "15m")`), and
+    `demo.YamlMessageConsumer` (`@Incoming("yaml-in")`) — all three calling straight into
+    `org.yaml.snakeyaml:1.30`'s `Yaml#load`, the same manual-table seed CVE-2022-1471 the
+    other control apps use. Needs JDK 17+ (Quarkus 3.x's own jars require it) and pulls
+    ~100 transitive dependencies (mostly Vert.x/Netty, Quarkus's own runtime — not anything
+    this demo's three classes use directly). Run through `bin/ariadne` unmodified, twice:
+    - **`-roots all`**: profile auto-detects `jakarta+quarkus` (not `generic`), confirming
+      both profiles' own detect markers fire on the same real app and merge correctly;
+      CVE-2022-1471 is `REACHABLE`.
+    - **`-roots profile`**: `roots: profile "jakarta+quarkus" (3 entry-point methods)` —
+      confirmed directly via a one-off call to `Profile.AppRoots` (not just the log's count)
+      to be exactly `demo.YamlResource#get`, `demo.ScheduledYamlJob#run`, and
+      `demo.YamlMessageConsumer#consume` — all three annotation families correctly
+      recognized as entry points in one run. CVE-2022-1471 is still `REACHABLE`.
+- **Not implemented:** RTA and `--max-dep-depth`; CDI's `@Observes` remains unimplemented
+  (see the `jakarta` note above). `internal/reach`'s BFS passes stay unchanged (still
+  computed once for every CVE, same as Phase 5 left them) — only the root set and the
+  framework-package list going into them changed.
 
 ### Phase 8 (optional) — Exploitability check
 For 1–2 `REACHABLE` CVEs: ask the LLM whether user-controlled input actually flows to the
@@ -989,7 +1023,8 @@ ariadne/
     callgraph/               # interning, edges, adjacency
     hierarchy/               # super/interfaces/subtypes, method resolution, annotations
     profile/                 # profile loading, detection, merging
-      profiles/              # spring.yaml, servlet.yaml, jakarta.yaml, micronaut.yaml, generic.yaml (later: quarkus)
+      profiles/              # spring.yaml, servlet.yaml, jakarta.yaml, micronaut.yaml,
+                             #   quarkus.yaml, generic.yaml
     vulnmap/                 # CVE -> methods (manual yaml, diffs, LLM)
       vuln_methods.yaml      # embedded default
     javadiff/                # unified-diff parser + brace-aware Java method scanner
@@ -1045,8 +1080,8 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       `-profile-file` overriding/adding one by name. `--roots profile`, synthetic edges
       (Spring Data), and `Roots.Overrides`-based roots (the `servlet` profile) are
       implemented too; the `jakarta` profile is implemented for JAX-RS and EJB (not CDI's
-      `@Observes` — see Phase 7's own status note for why); the `micronaut` profile is
-      implemented too; `quarkus`, RTA and `--max-dep-depth` are not. Gradle input
+      `@Observes` — see Phase 7's own status note for why); the `micronaut` and `quarkus`
+      profiles are implemented too; only RTA and `--max-dep-depth` are not. Gradle input
       (`scripts/gradle-copy-deps.init.gradle`)
       and WAR/EAR input (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's
       own status note for the line between all of these.

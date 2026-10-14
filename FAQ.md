@@ -81,7 +81,7 @@ data naturally exists in**, rather than dogmatically sticking to one.
 **At the mechanism level:** any application compiled to JVM bytecode —
 technically Java, Kotlin, Scala, Groovy, since they all compile to the
 same `.class` format (see point 4 above). In practice, though, **only
-six builds have actually been tested and verified**:
+seven builds have actually been tested and verified**:
 
 - **old spring-petclinic** (Spring Boot 2.4.5, a commit from before June
   2021), built with **Maven** — the realistic case: lots of CVEs, few
@@ -109,8 +109,13 @@ six builds have actually been tested and verified**:
   4.x/5.x line's jars are compiled for a newer Java than this project's
   demo scripts assume (a `javac` constraint on the demo app, not a limit
   of ariadne's own bytecode parser).
+- a tiny hand-written **Quarkus** app (`scripts/prepare-quarkus-demo.sh`):
+  a `jakarta.ws.rs` `@Path`/`@GET` REST resource, an
+  `io.quarkus.scheduler` `@Scheduled` job, and a MicroProfile Reactive
+  Messaging `@Incoming` consumer, all three calling the same vulnerable
+  SnakeYAML — the control case for the `quarkus` profile. Needs JDK 17+.
 
-Everything else (Kotlin, CDI's own `@Observes`, Quarkus)
+Everything else (Kotlin, CDI's own `@Observes`)
 **should work mechanically** (CDI's framework-package classification
 aside — see the `jakarta` entry below), but has never been run or
 tested.
@@ -177,15 +182,6 @@ tested.
   `-roots profile` (which narrows to exactly the one `doGet` override and
   still finds the same `REACHABLE` CVE). Full details: [PLAN.md](PLAN.md)'s
   Phase 7.
-  - **Still missing:** a `quarkus` profile — on an app using it, nothing
-    in `-profile auto`'s `detect` lists matches, so it falls back to
-    `generic` (no framework packages at all), and the core of the
-    analysis (`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`) still works
-    correctly, but every CVE's status stays `REACHABLE`/`NOT_REACHABLE`
-    rather than being downgraded to `FRAMEWORK` where that other
-    framework's own internals are driving the call, even though in
-    practice they're reflection-driven just like in Spring or plain
-    Servlet.
 - **A `jakarta` profile is supported too**, for JAX-RS (the HTTP-verb
   annotations `@GET`/`@POST`/`@PUT`/`@DELETE`/`@PATCH`/`@HEAD`/`@OPTIONS`
   as entry points — deliberately not `@Path` itself, which is routinely
@@ -236,6 +232,26 @@ tested.
   a real class in the app's own output — not a Spring-Data-style runtime
   proxy with zero bytecode — so CHA already finds it like any other
   subtype. Full details: [PLAN.md](PLAN.md)'s Phase 7.
+- **A `quarkus` profile is supported too** — the last of PLAN.md section
+  4's originally-named Phase 7 frameworks. Quarkus's own REST layer is
+  plain JAX-RS, already covered by `jakarta.yaml`: a Quarkus REST app
+  auto-detects as `jakarta+quarkus`, the same way a Spring Boot app
+  auto-detects as `spring+servlet`, so this profile only adds what's
+  genuinely Quarkus-/MicroProfile-specific — `@Scheduled`
+  (`io.quarkus.scheduler`) and reactive messaging's `@Incoming`/
+  `@Outgoing` (`org.eclipse.microprofile.reactive.messaging`) — as entry
+  points, both confirmed via `javap` to be real
+  `@Target(METHOD)`/`@Retention(RUNTIME)`, the same diligence applied to
+  Micronaut's annotations. Verified against both existing baselines
+  (unaffected) and against a new, real, three-class Quarkus control app
+  (`scripts/prepare-quarkus-demo.sh`, needs JDK 17+): auto-detects
+  `jakarta+quarkus` (confirming both profiles' detect markers fire on the
+  same app and merge correctly), and `-roots profile` narrows to exactly
+  the three annotated methods (confirmed directly via `Profile.AppRoots`,
+  not just the log's count), finding the same `REACHABLE` CVE-2022-1471
+  either way. No `roots.overrides`/`synthetic_edges`: Quarkus, like
+  Micronaut, builds its wiring at build time via Jandex indexing and
+  bytecode recording, not runtime proxies with zero bytecode.
 
 ### How to prepare a project
 

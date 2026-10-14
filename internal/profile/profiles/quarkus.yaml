@@ -1,0 +1,39 @@
+# Quarkus profile (PLAN.md section 4's "Later profiles (Phase 7): ...
+# micronaut, quarkus" entry).
+#
+# Quarkus's own REST layer (classic RESTEasy or "Quarkus REST", formerly
+# RESTEasy Reactive) is built on standard JAX-RS annotations
+# (javax.ws.rs/jakarta.ws.rs @Path/@GET/...), already covered by
+# jakarta.yaml -- a Quarkus REST app auto-detects as jakarta+quarkus, the
+# same way a Spring Boot app on embedded Tomcat auto-detects as
+# spring+servlet. This profile only adds what's genuinely Quarkus-/
+# MicroProfile-specific on top: its own scheduler and reactive messaging.
+#
+# roots.annotations lists only @Scheduled and @Incoming/@Outgoing, every
+# one of them method-level (confirmed via javap: @Target(METHOD),
+# @Retention(RUNTIME) on both io.quarkus.scheduler.Scheduled and
+# org.eclipse.microprofile.reactive.messaging.Incoming/Outgoing) -- unlike
+# @Path/@Controller/@WebServlet in the other profiles, there is no
+# class-level marker here to worry about excluding.
+#
+# No roots.overrides, no synthetic_edges: Quarkus, like Micronaut, builds
+# its bean/route wiring at build time via Jandex indexing and bytecode
+# recording, not JDK runtime proxies with zero bytecode -- any generated
+# implementation ends up as a real class CHA already walks like any other
+# subtype.
+name: quarkus
+detect:
+  - io.quarkus.runtime.Quarkus
+  - io.quarkus.runtime.Application
+roots:
+  annotations:
+    - io.quarkus.scheduler.Scheduled
+    - org.eclipse.microprofile.reactive.messaging.Incoming
+    - org.eclipse.microprofile.reactive.messaging.Outgoing
+  overrides: []
+  main: true
+framework_packages:
+  - io.quarkus:*
+  - io.vertx:*
+  - org.jboss.resteasy.reactive:*
+synthetic_edges: []
