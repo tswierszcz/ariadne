@@ -81,7 +81,7 @@ data naturally exists in**, rather than dogmatically sticking to one.
 **At the mechanism level:** any application compiled to JVM bytecode —
 technically Java, Kotlin, Scala, Groovy, since they all compile to the
 same `.class` format (see point 4 above). In practice, though, **only
-four builds have actually been tested and verified**:
+five builds have actually been tested and verified**:
 
 - **old spring-petclinic** (Spring Boot 2.4.5, a commit from before June
   2021), built with **Maven** — the realistic case: lots of CVEs, few
@@ -98,9 +98,15 @@ four builds have actually been tested and verified**:
   into an old, vulnerable SnakeYAML — the control case for the `servlet`
   profile, the same role WebGoat plays for `spring`. See the `servlet`
   profile entry just below.
+- a tiny hand-written **Jakarta EE (JAX-RS + EJB, no Spring)** app
+  (`scripts/prepare-jakarta-demo.sh`): a `@Path`/`@GET` JAX-RS resource
+  and an `@Schedule`d EJB bean, both calling the same vulnerable
+  SnakeYAML — the control case for the `jakarta` profile.
 
-Everything else (Kotlin, JAX-RS/CDI/EJB, Micronaut, Quarkus)
-**should work mechanically**, but has never been run or tested.
+Everything else (Kotlin, CDI's own `@Observes`, Micronaut, Quarkus)
+**should work mechanically** (CDI's framework-package classification
+aside — see the `jakarta` entry below), but has never been run or
+tested.
 
 ### What's genuinely NOT supported
 
@@ -164,16 +170,44 @@ Everything else (Kotlin, JAX-RS/CDI/EJB, Micronaut, Quarkus)
   `-roots profile` (which narrows to exactly the one `doGet` override and
   still finds the same `REACHABLE` CVE). Full details: [PLAN.md](PLAN.md)'s
   Phase 7.
-  - **Still missing:** `jakarta` (JAX-RS `@Path`/`@GET`/..., CDI
-    `@Observes`, EJB `@Schedule`), `micronaut`, and `quarkus` profiles —
-    on an app using one of those, nothing in `-profile auto`'s `detect`
-    lists matches, so it falls back to `generic` (no framework packages
-    at all), and the core of the analysis
+  - **Still missing:** `micronaut` and `quarkus` profiles — on an app
+    using one of those, nothing in `-profile auto`'s `detect` lists
+    matches, so it falls back to `generic` (no framework packages at
+    all), and the core of the analysis
     (`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`) still works correctly, but
     every CVE's status stays `REACHABLE`/`NOT_REACHABLE` rather than
     being downgraded to `FRAMEWORK` where that other framework's own
     internals are driving the call, even though in practice they're
     reflection-driven just like in Spring or plain Servlet.
+- **A `jakarta` profile is supported too**, for JAX-RS (the HTTP-verb
+  annotations `@GET`/`@POST`/`@PUT`/`@DELETE`/`@PATCH`/`@HEAD`/`@OPTIONS`
+  as entry points — deliberately not `@Path` itself, which is routinely
+  class-level and would otherwise turn every public helper method of a
+  resource class into an entry point, not just its actual endpoints) and
+  EJB (`@Schedule`/`@Schedules`), across both the `javax.*` and
+  post-Jakarta-EE9 `jakarta.*` namespaces. Verified the same two ways as
+  `servlet`: against both existing baselines (petclinic, WebGoat — still
+  auto-detect `spring+servlet` only, confirming `jakarta`'s own detect
+  markers don't accidentally fire on a Spring app); and against the new
+  JAX-RS+EJB control app above, with both `-roots all` and `-roots
+  profile` (which narrows to exactly the resource's `@GET` method and the
+  EJB's `@Schedule` method — confirmed directly via a one-off call to
+  `Profile.AppRoots`, not just the log's entry-point count) finding the
+  same `REACHABLE` CVE-2022-1471 either way.
+  - **CDI's `@Observes` is NOT implemented, and this is a real gap, not
+    an oversight**: it annotates a method *parameter*
+    (`void onEvent(@Observes SomeEvent e)`), not the method or the class,
+    and ariadne's bytecode parser never reads the
+    `RuntimeVisibleParameterAnnotations` attribute at all — only
+    class-/method-level `RuntimeVisibleAnnotations`. Implementing it
+    would touch three packages (a new attribute parser in
+    `internal/classfile`, a per-parameter-annotations field on
+    `hierarchy.Method`, and a new matching rule in `internal/profile`),
+    not just a YAML addition like the rest of this profile. CDI's own
+    framework packages (Weld and friends) are still listed, so CDI
+    container internals are classified `FRAMEWORK` on any path that
+    reaches them — just not via an observer-method root. Full details:
+    [PLAN.md](PLAN.md)'s Phase 7.
 
 ### How to prepare a project
 

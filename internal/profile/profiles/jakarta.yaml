@@ -1,0 +1,66 @@
+# Jakarta EE profile (PLAN.md section 4's "jakarta (JAX-RS @Path/@GET/...,
+# CDI @Observes, EJB @Schedule)" entry; distinct from the plain Servlet API
+# profile in servlet.yaml). Covers both the pre-Jakarta-EE9 javax.* namespace
+# and the post-EE9 jakarta.* one (same specs, renamed packages).
+#
+# roots.annotations only lists the HTTP-verb annotations (@GET/@POST/...)
+# and @Schedule/@Schedules, never @Path itself: @Path is often class-level,
+# marking a JAX-RS resource class, and this profile's roots.annotations
+# class-level rule ("a class carrying one of these makes every one of its
+# public methods a root") would then wrongly turn every public helper
+# method of that class into an entry point, not just the ones actually
+# exposed as endpoints (which also carry an HTTP-verb annotation). The
+# verb annotations are always method-level and are always real entry
+# points by themselves, so @Path is a detect-only marker here.
+#
+# CDI's @Observes is NOT implemented as a root: it annotates a method
+# *parameter*, not the method or the class, and ariadne's bytecode parser
+# does not read RuntimeVisibleParameterAnnotations at all today (only
+# class- and method-level RuntimeVisibleAnnotations) -- see Known
+# limitations / PLAN.md's Phase 7 status note. CDI's own framework
+# packages are still listed below, so CDI container internals (Weld) are
+# at least classified FRAMEWORK, even though an observer method itself is
+# not added as a root.
+name: jakarta
+detect:
+  - javax.ws.rs.Path
+  - jakarta.ws.rs.Path
+  - javax.ejb.Stateless
+  - jakarta.ejb.Stateless
+  - javax.enterprise.inject.spi.Extension
+  - jakarta.enterprise.inject.spi.Extension
+roots:
+  annotations:
+    - javax.ws.rs.GET
+    - javax.ws.rs.POST
+    - javax.ws.rs.PUT
+    - javax.ws.rs.DELETE
+    - javax.ws.rs.PATCH
+    - javax.ws.rs.HEAD
+    - javax.ws.rs.OPTIONS
+    - javax.ejb.Schedule
+    - javax.ejb.Schedules
+    - jakarta.ws.rs.GET
+    - jakarta.ws.rs.POST
+    - jakarta.ws.rs.PUT
+    - jakarta.ws.rs.DELETE
+    - jakarta.ws.rs.PATCH
+    - jakarta.ws.rs.HEAD
+    - jakarta.ws.rs.OPTIONS
+    - jakarta.ejb.Schedule
+    - jakarta.ejb.Schedules
+  overrides: []
+  main: true
+framework_packages:
+  - javax.ws.rs:*
+  - jakarta.ws.rs:*
+  - org.glassfish.jersey:*
+  - org.glassfish.jersey.core:*
+  - org.jboss.resteasy:*
+  - org.apache.cxf:*
+  - javax.ejb:*
+  - jakarta.ejb:*
+  - javax.enterprise:*
+  - jakarta.enterprise:*
+  - org.jboss.weld:*
+synthetic_edges: []

@@ -39,6 +39,31 @@ func TestLoadDefaultCatalog(t *testing.T) {
 	if len(spring.SyntheticEdges) == 0 {
 		t.Error("spring profile has no synthetic edges")
 	}
+	servlet, ok := c.Get("servlet")
+	if !ok {
+		t.Fatal(`catalog has no "servlet" profile`)
+	}
+	if len(servlet.Detect) == 0 {
+		t.Error("servlet profile has no detect markers")
+	}
+	if len(servlet.Roots.Overrides) == 0 {
+		t.Error("servlet profile has no roots.overrides")
+	}
+
+	jakarta, ok := c.Get("jakarta")
+	if !ok {
+		t.Fatal(`catalog has no "jakarta" profile`)
+	}
+	if len(jakarta.Detect) == 0 {
+		t.Error("jakarta profile has no detect markers")
+	}
+	if len(jakarta.Roots.Annotations) == 0 {
+		t.Error("jakarta profile has no roots.annotations")
+	}
+	if len(jakarta.FrameworkPackages) == 0 {
+		t.Error("jakarta profile has no framework packages")
+	}
+
 	generic, ok := c.Get("generic")
 	if !ok {
 		t.Fatal(`catalog has no "generic" fallback profile`)

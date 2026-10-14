@@ -313,11 +313,12 @@ matches, confirmed not to change either app's CVE status counts, since
 `spring`'s own `org.apache.tomcat.embed:*` pattern already covers that
 exact dependency); nothing matching falls back to `generic`, which has
 no framework packages at all, so every CVE's status for a plain
-non-Spring, non-servlet app is `REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/
-`NOT_APPLICABLE` only, never `FRAMEWORK`. `-profile spring`/`-profile
-servlet`/`-profile generic` picks one explicitly; `-profile-file
-path.yaml` loads a custom profile (same YAML shape) and adds it to the
-catalog, or replaces one of the same name.
+non-Spring, non-servlet, non-Jakarta-EE app is
+`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/`NOT_APPLICABLE` only, never
+`FRAMEWORK`. `-profile spring`/`-profile servlet`/`-profile jakarta`/
+`-profile generic` picks one explicitly; `-profile-file path.yaml` loads
+a custom profile (same YAML shape) and adds it to the catalog, or
+replaces one of the same name.
 
 `spring`'s own list is section 4's original seed plus
 `org.springframework:spring-beans`/`spring-core`/`spring-expression`/
@@ -345,6 +346,19 @@ one of its transitive subtypes **and declares that method itself**
 of this (`HttpServlet#do*`/`Filter#doFilter`, both the `javax.servlet.*`
 and `jakarta.servlet.*` namespaces) is the first shipped profile to need
 it; `spring.yaml`'s own list is still empty.
+
+`jakarta.yaml` (JAX-RS `@GET`/`@POST`/`@PUT`/`@DELETE`/`@PATCH`/`@HEAD`/
+`@OPTIONS`, EJB `@Schedule`/`@Schedules`, both namespaces) is a second
+`roots.annotations` user, deliberately *not* including `@Path` itself:
+`@Path` is often class-level (marking a JAX-RS resource class), and the
+class-level rule above ("every public method of a class carrying one
+becomes a root") would then wrongly turn every public helper method into
+an entry point, not just the ones actually exposed as endpoints (which
+also carry an HTTP-verb annotation). **CDI's `@Observes` is not
+implemented**: it annotates a method *parameter*, not the method or the
+class, and ariadne's bytecode parser does not read
+`RuntimeVisibleParameterAnnotations` at all — only class-/method-level
+`RuntimeVisibleAnnotations` (see Known limitations).
 
 ### 8. The report (`internal/report`)
 
@@ -471,16 +485,16 @@ internal/
   hierarchy/              class universe: super/interfaces/subtypes/methods
   callgraph/              interning, edges, CHA expansion, synthetic edges
   profile/                framework knowledge: detect, roots, framework packages, synthetic edges
-    profiles/              spring.yaml, servlet.yaml, generic.yaml (the embedded defaults)
+    profiles/              spring.yaml, servlet.yaml, jakarta.yaml, generic.yaml (embedded defaults)
   vulnmap/                CVE -> vulnerable methods (manual table + fix-commit diffs)
     vuln_methods.yaml      the embedded manual table
   javadiff/               unified-diff parsing + the brace-aware Java method scanner
   reach/                  BFS, status assignment, path reconstruction
   report/                 Markdown/JSON rendering
     templates/
-scripts/                 prepare-{petclinic,webgoat,petclinic-gradle,servlet-demo}.sh,
-                         build-*fixture*.sh, gradle-copy-deps.init.gradle (Gradle
-                         equivalent of mvn dependency:copy-dependencies/dependency:list)
+scripts/                 prepare-{petclinic,webgoat,petclinic-gradle,servlet-demo,
+                         jakarta-demo}.sh, build-*fixture*.sh, gradle-copy-deps.init.gradle
+                         (Gradle equivalent of mvn dependency:copy-dependencies/dependency:list)
 testdata/
   fixture/                hand-written Java project, compiled for Java 8 and 21
   reachfixture/           a 3-jar fixture (app + framework dep + plain dep) covering
@@ -514,14 +528,21 @@ report:
   `LambdaMetafactory` call, or dependency injection wiring beans by
   name/type at runtime is invisible, and can produce false negatives (a
   real path exists that ariadne cannot see).
-- **Only three profiles exist: `spring`, `servlet` and `generic`.** The
-  profile system itself (auto-detection and merging, `-roots profile`,
-  synthetic edges, the conditional jackson-databind rule, `roots.overrides`)
-  is implemented (see step 7 above), but `jakarta` (JAX-RS/CDI/EJB),
-  `micronaut` and `quarkus` are not — an app using one of those gets the
-  `generic` fallback (no framework packages at all) unless it also embeds
-  Spring or a plain servlet container. There is also no `--max-dep-depth`.
-  See [PLAN.md](PLAN.md)'s Phase 7 for what the rest of this would involve.
+- **Only four profiles exist: `spring`, `servlet`, `jakarta` and
+  `generic`.** The profile system itself (auto-detection and merging,
+  `-roots profile`, synthetic edges, the conditional jackson-databind
+  rule, `roots.overrides`/`roots.annotations`) is implemented (see step 7
+  above), but `micronaut` and `quarkus` are not — an app using one of
+  those gets the `generic` fallback (no framework packages at all) unless
+  it also embeds Spring or a plain servlet/JAX-RS/EJB container. There is
+  also no `--max-dep-depth`. **`jakarta`'s own CDI support is
+  incomplete:** `@Observes` is a method-*parameter* annotation, and
+  ariadne's bytecode parser never reads
+  `RuntimeVisibleParameterAnnotations` — only class-/method-level
+  annotations — so a CDI observer method is not added as an entry point
+  (CDI container internals are still classified `FRAMEWORK`, just not via
+  an observer-method root). See [PLAN.md](PLAN.md)'s Phase 7 for what the
+  rest of this would involve.
 - **An EAR's own top-level modules are never read as app code**, only as
   dependency jars — there is no reliable signal in a zip listing alone to
   tell an EJB module's jar apart from a shared library jar without

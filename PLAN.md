@@ -866,8 +866,65 @@ input modes:
       `javax.servlet.http.HttpServlet#doGet` entry, nothing else — and CVE-2022-1471 is
       still `REACHABLE` via the identical path, confirming the narrower, profile-driven root
       set finds the same vulnerability the unrestricted "every app method" root set does.
-- **Not implemented:** `jakarta` (JAX-RS/CDI/EJB), `micronaut`, `quarkus` profiles, a
-  non-Spring control app for any of those three, RTA, and `--max-dep-depth`. `internal/
+- **`jakarta` profile: done for JAX-RS and EJB; CDI is partial by design**
+  (`internal/profile/profiles/jakarta.yaml`). Covers JAX-RS's HTTP-verb annotations
+  (`@GET`/`@POST`/`@PUT`/`@DELETE`/`@PATCH`/`@HEAD`/`@OPTIONS`) and EJB's
+  `@Schedule`/`@Schedules`, across both the `javax.*` and `jakarta.*` namespaces, as
+  `roots.annotations` — no new matching code was needed, since `Profile.AppRoots` already
+  implements that mechanism generically for `spring.yaml`; `jakarta.yaml` is simply its
+  second real user.
+  - **Deliberately excludes `@Path` from `roots.annotations`**: `@Path` is routinely
+    class-level (marking a JAX-RS resource class), and the class-level rule ("every public
+    method of a class carrying one of these becomes a root") would then wrongly turn every
+    public helper method of that class into an entry point, not just the ones actually
+    exposed as endpoints — which always also carry an HTTP-verb annotation, the actual
+    entry-point signal. `@Path` is listed only in `detect`.
+  - **CDI's `@Observes` is not implemented as a root**, and this is a real gap, not an
+    oversight to paper over: `@Observes` annotates a method *parameter*
+    (`void onEvent(@Observes SomeEvent e)`), not the method or the class, and ariadne's
+    bytecode parser (`internal/classfile`) does not read the `RuntimeVisibleParameterAnnotations`
+    attribute at all — only class- and method-level `RuntimeVisibleAnnotations`.
+    Implementing it would need: parsing that attribute in `internal/classfile`, a new
+    per-parameter-annotations field on `hierarchy.Method`, and a new `Profile` YAML field
+    (e.g. `roots.parameter_annotations`) plus matching logic in `internal/profile` — a
+    three-package change, not a YAML-only addition like the rest of this profile, so it was
+    scoped out rather than rushed. CDI's own framework packages
+    (`javax.enterprise:*`/`jakarta.enterprise:*`/`org.jboss.weld:*`) are still listed, so CDI
+    container internals are at least classified `FRAMEWORK` on any path that reaches them,
+    just not via an observer-method root.
+  - `framework_packages`: `javax.ws.rs:*`/`jakarta.ws.rs:*` plus the three common JAX-RS
+    implementations (`org.glassfish.jersey:*`, `org.jboss.resteasy:*`, `org.apache.cxf:*`,
+    picked since no single one is "the" JAX-RS runtime the way embedded Tomcat is for
+    `spring`/`servlet`), `javax.ejb:*`/`jakarta.ejb:*`, and
+    `javax.enterprise:*`/`jakarta.enterprise:*`/`org.jboss.weld:*` for CDI. No
+    `synthetic_edges`: no interface-with-zero-bytecode-implementation case like Spring Data's
+    here to bridge.
+  - **Verified against both existing baselines first**: petclinic and WebGoat still
+    auto-detect `spring+servlet` only — `jakarta`'s own `detect` markers
+    (`javax.ws.rs.Path`/`javax.ejb.Stateless`/`javax.enterprise.inject.spi.Extension`, plus
+    the `jakarta.*` namespace equivalents) are absent from both, confirmed by running
+    `bin/ariadne` against both (identical status counts to before this profile existed).
+  - **Verified against a new, real, non-Spring, non-servlet control app** —
+    `scripts/prepare-jakarta-demo.sh` generates and builds a tiny two-class Maven project:
+    `demo.YamlResource` (a JAX-RS `@Path("/yaml")` resource, `@GET`-annotated `get` method)
+    and `demo.ScheduledYamlJob` (an EJB `@Stateless` bean, `@Schedule`-annotated `run`
+    method), both calling straight into `org.yaml.snakeyaml:1.30`'s `Yaml#load` — the same
+    manual-table seed CVE-2022-1471 the `servlet` profile's own control app uses. Run through
+    `bin/ariadne` unmodified, twice:
+    - **`-roots all`**: profile auto-detects `jakarta` (not `generic`) purely from
+      `javax.ws.rs.Path` being present on the classpath; CVE-2022-1471 is `REACHABLE`.
+    - **`-roots profile`**: `roots: profile "jakarta" (2 entry-point methods)` — confirmed
+      directly (not just by the log line) to be exactly `demo.YamlResource#get` and
+      `demo.ScheduledYamlJob#run`, via a one-off debug test calling `Profile.AppRoots`
+      straight — and CVE-2022-1471 is still `REACHABLE`. (The report's own recorded path for
+      both of this demo's two CVEs happens to go through `ScheduledYamlJob#run` rather than
+      `YamlResource#get`: both roots reach `Yaml#load` in exactly one hop, and
+      `internal/reach`'s BFS deterministically breaks same-distance ties by sorted FQCN
+      order, which puts `ScheduledYamlJob` first — not a sign `YamlResource#get` wasn't
+      actually a root, just that the report only ever records one shortest path per CVE by
+      design.)
+- **Not implemented:** `micronaut`, `quarkus` profiles, a non-Spring control app for either,
+  CDI's `@Observes` (see above), RTA, and `--max-dep-depth`. `internal/
   reach`'s BFS passes stay unchanged (still computed once for every CVE, same as Phase 5
   left them) — only the root set and the framework-package list going into them changed.
 
@@ -890,7 +947,7 @@ ariadne/
     callgraph/               # interning, edges, adjacency
     hierarchy/               # super/interfaces/subtypes, method resolution, annotations
     profile/                 # profile loading, detection, merging
-      profiles/              # spring.yaml, servlet.yaml, generic.yaml (later: jakarta, ...)
+      profiles/              # spring.yaml, servlet.yaml, jakarta.yaml, generic.yaml (later: micronaut, ...)
     vulnmap/                 # CVE -> methods (manual yaml, diffs, LLM)
       vuln_methods.yaml      # embedded default
     javadiff/                # unified-diff parser + brace-aware Java method scanner
@@ -945,10 +1002,11 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       ./internal/profile` verifies both, plus merging when several profiles match and
       `-profile-file` overriding/adding one by name. `--roots profile`, synthetic edges
       (Spring Data), and `Roots.Overrides`-based roots (the `servlet` profile) are
-      implemented too; `jakarta`/micronaut/quarkus profiles, RTA and `--max-dep-depth` are
-      not. Gradle input (`scripts/gradle-copy-deps.init.gradle`) and WAR/EAR input
-      (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's own status note
-      for the line between all of these.
+      implemented too; the `jakarta` profile is implemented for JAX-RS and EJB (not CDI's
+      `@Observes` — see Phase 7's own status note for why); micronaut/quarkus profiles, RTA
+      and `--max-dep-depth` are not. Gradle input (`scripts/gradle-copy-deps.init.gradle`)
+      and WAR/EAR input (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's
+      own status note for the line between all of these.
 - [x] Report contains the Limitations and "Unidentified jars" sections.
 - [x] Re-running with `-offline` and a warm cache works without network, and — beyond what
       this criterion originally asked — is now also verified byte-identical across repeated
