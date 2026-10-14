@@ -680,15 +680,20 @@ input modes:
   anywhere in the analyzed app or its dependencies is merged (`profile.Select`/`merge`);
   `generic` is the fallback when nothing matches and is never itself auto-detected into.
   Verified: petclinic and WebGoat (which also embeds Spring Boot) both auto-detect as
-  `spring`; the fixture auto-detects as `generic`, since its `fixture.Entry` annotation is a
+  `spring` at the time this was first written; after the `servlet` profile below was added,
+  both auto-detect as `spring+servlet` instead (their embedded Tomcat jar bundles the
+  `javax.servlet.*` classes, which `servlet`'s own `detect` list matches too — confirmed not
+  to change either app's CVE status counts, since `spring.yaml`'s own
+  `org.apache.tomcat.embed:*` pattern already covered that exact dependency). The fixture
+  still auto-detects as `generic`, since its `fixture.Entry` annotation is a
   stand-in for a route annotation, not a real framework marker class.
 - `-roots profile` (default remains `-roots all`, every application method, exactly as
   before): `Profile.AppRoots` computes the entry-point set section 4 point 4 describes —
   every method carrying one of `roots.annotations`, every public method of a class itself
-  carrying one, and (when `roots.main` is true, as in both shipped profiles) every public
-  static `main(String[])`. `roots.overrides` parses but matches nothing yet — no shipped
-  profile needs it (`spring.yaml`'s own list is empty, per this section's own example); left
-  for a `servlet`/`jakarta` profile's `HttpServlet#doGet`/`Filter#doFilter`.
+  carrying one, (when `roots.main` is true, as in every shipped profile) every public
+  static `main(String[])`, and (added along with the `servlet` profile below)
+  `roots.overrides`: see that profile's own status note for the matching rule and how it was
+  verified.
 - The conditional jackson-databind `framework_packages` entry (`pkg`/`when_annotation`) is
   implemented, but evaluated once for the whole app (`Profile.ResolvePatterns`), not
   per call site: true if *any* app class anywhere carries one of
@@ -809,11 +814,62 @@ input modes:
   - **Not covered:** a multi-WAR-module EAR (the merge logic is written to support it —
     `extractModule`'s dedup — but has not actually been run against one), and an EJB module
     whose classes should count as app code (see the decision above).
-- **Not implemented:** every profile besides `spring`/`generic` (`servlet`, `jakarta`,
-  `micronaut`, `quarkus`), a non-Spring control app to exercise them, RTA, and
-  `--max-dep-depth`. `internal/reach`'s BFS passes stay unchanged (still computed once for
-  every CVE, same as Phase 5 left them) — only the
-  root set and the framework-package list going into them changed.
+- **`servlet` profile: done** (`internal/profile/profiles/servlet.yaml`), covering plain
+  (non-Spring) Servlet API apps — `HttpServlet#do*`/`Filter#doFilter`/lifecycle listeners —
+  across both the pre-Jakarta-EE9 `javax.servlet.*` namespace and the post-EE9
+  `jakarta.servlet.*` one (same spec, renamed packages; one profile lists both rather than
+  forcing an app onto one).
+  - **`Roots.Overrides` wired up**, the one piece this section's own earlier status note
+    left as "parses but matches nothing yet": a new `Profile.overrideRoots` (`internal/
+    profile/profile.go`) matches each `"fqcn#method"` spec (e.g.
+    `javax.servlet.http.HttpServlet#doGet`) against every app class that is that class
+    itself or one of its transitive subtypes (`hierarchy.Subtypes` — this works even though
+    `HttpServlet` itself is never read: subtype inversion only needs an app class's own
+    recorded superclass name, not the superclass's own class file) **and declares that
+    method itself** — an actual override, not an inherited no-op. A new
+    `classfile.Method.IsAbstract()` (mirroring the existing `IsStatic`/`IsPublic`) excludes
+    an interface's own abstract declaration from matching as a root — caught by a unit test
+    using the existing fixture's `Greeter` interface (two app implementations,
+    `FormalGreeter`/`CasualGreeter`, both become roots for `Roots.Overrides:
+    ["fixture.Greeter#greet"]`; `fixture.Greeter#greet` itself, the abstract declaration,
+    does not).
+  - **No `roots.annotations`** for `servlet.yaml`: `@WebServlet`/`@WebFilter` are
+    class-level-only markers (unlike `@RequestMapping`), and the container only ever
+    dispatches to the specific lifecycle methods below, not "every public method" the way
+    `spring.yaml`'s annotation handling assumes for `@Controller` — `roots.overrides` is the
+    tool actually built for this, not a misuse of `roots.annotations`.
+  - `framework_packages`: `javax.servlet:*`, `jakarta.servlet:*`, `org.apache.tomcat:*`,
+    `org.apache.tomcat.embed:*`, `org.eclipse.jetty:*`. No `synthetic_edges`: a servlet
+    container instantiates the app's own servlet/filter classes directly and calls their
+    real, analyzable lifecycle methods — there is no Spring-Data-style interface-with-
+    zero-bytecode-implementation case here to bridge.
+  - **Verified against both existing baselines first** (petclinic, WebGoat — both Spring
+    Boot apps on an embedded Tomcat, so both now auto-detect `servlet` too): both now report
+    `-profile auto` as `spring+servlet`, and **both apps' CVE status counts are
+    byte-identical to before** (petclinic 3/59/29/51/6, WebGoat 40/43/21/56/0) — the merge is
+    additive with no regression, confirmed by running `bin/ariadne` against both, not
+    assumed.
+  - **Verified against a new, real, non-Spring control app** —
+    `scripts/prepare-servlet-demo.sh` generates and builds a tiny one-class, one-dependency
+    Maven project (`demo.YamlServlet`, whose `doGet` calls straight into
+    `org.yaml.snakeyaml:1.30`'s `Yaml#load`, the manual-table seed CVE-2022-1471 this file's
+    own section 4 example already names) — small enough to generate from a script rather
+    than clone, filling the "non-Spring control app" gap this section's own earlier status
+    note left open, at least for `servlet` (`jakarta`/`micronaut`/`quarkus` still have none).
+    Run through `bin/ariadne` unmodified, twice:
+    - **`-roots all`** (the default): profile auto-detects `servlet` (not `generic`) purely
+      from `javax.servlet.http.HttpServlet` being present on the classpath;
+      `demo.YamlServlet#doGet → org.yaml.snakeyaml.Yaml#load` is the reported `REACHABLE`
+      path for CVE-2022-1471.
+    - **`-roots profile`**: `roots: profile "servlet" (1 entry-point methods)` — exactly
+      `demo.YamlServlet#doGet`, matched via `Roots.Overrides`'
+      `javax.servlet.http.HttpServlet#doGet` entry, nothing else — and CVE-2022-1471 is
+      still `REACHABLE` via the identical path, confirming the narrower, profile-driven root
+      set finds the same vulnerability the unrestricted "every app method" root set does.
+- **Not implemented:** `jakarta` (JAX-RS/CDI/EJB), `micronaut`, `quarkus` profiles, a
+  non-Spring control app for any of those three, RTA, and `--max-dep-depth`. `internal/
+  reach`'s BFS passes stay unchanged (still computed once for every CVE, same as Phase 5
+  left them) — only the root set and the framework-package list going into them changed.
 
 ### Phase 8 (optional) — Exploitability check
 For 1–2 `REACHABLE` CVEs: ask the LLM whether user-controlled input actually flows to the
@@ -834,7 +890,7 @@ ariadne/
     callgraph/               # interning, edges, adjacency
     hierarchy/               # super/interfaces/subtypes, method resolution, annotations
     profile/                 # profile loading, detection, merging
-      profiles/              # spring.yaml, generic.yaml (later: servlet, jakarta, ...)
+      profiles/              # spring.yaml, servlet.yaml, generic.yaml (later: jakarta, ...)
     vulnmap/                 # CVE -> methods (manual yaml, diffs, LLM)
       vuln_methods.yaml      # embedded default
     javadiff/                # unified-diff parser + brace-aware Java method scanner
@@ -884,14 +940,15 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       expanded) — `internal/callgraph`.
 - [x] Unit test for BFS path reconstruction on a fixture graph — `internal/reach`, on a
       purpose-built 3-jar fixture covering all four statuses, not just CHA.
-- [x] Profile auto-detection picks `spring` for petclinic and `generic` for the fixture —
-      `internal/profile`, wired into `cmd/ariadne` (Phase 7); `go test ./internal/profile`
-      verifies both, plus merging when several profiles match and `-profile-file`
-      overriding/adding one by name. `--roots profile` and synthetic edges (Spring Data) are
-      implemented too; servlet/jakarta/micronaut/quarkus profiles, RTA and
-      `--max-dep-depth` are not. Gradle input (`scripts/gradle-copy-deps.init.gradle`) and
-      WAR/EAR input (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's
-      own status note for the line between all of these.
+- [x] Profile auto-detection picks `spring+servlet` for petclinic and `generic` for the
+      fixture — `internal/profile`, wired into `cmd/ariadne` (Phase 7); `go test
+      ./internal/profile` verifies both, plus merging when several profiles match and
+      `-profile-file` overriding/adding one by name. `--roots profile`, synthetic edges
+      (Spring Data), and `Roots.Overrides`-based roots (the `servlet` profile) are
+      implemented too; `jakarta`/micronaut/quarkus profiles, RTA and `--max-dep-depth` are
+      not. Gradle input (`scripts/gradle-copy-deps.init.gradle`) and WAR/EAR input
+      (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's own status note
+      for the line between all of these.
 - [x] Report contains the Limitations and "Unidentified jars" sections.
 - [x] Re-running with `-offline` and a warm cache works without network, and — beyond what
       this criterion originally asked — is now also verified byte-identical across repeated

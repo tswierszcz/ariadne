@@ -29,6 +29,9 @@ import (
 //go:embed profiles/spring.yaml
 var springYAML []byte
 
+//go:embed profiles/servlet.yaml
+var servletYAML []byte
+
 //go:embed profiles/generic.yaml
 var genericYAML []byte
 
@@ -90,13 +93,15 @@ type Roots struct {
 	// (PLAN.md section 4: "method-level, or class-level = all public
 	// methods").
 	Annotations []string `yaml:"annotations"`
-	// Overrides is accepted (so a profile YAML matching PLAN.md's own
-	// shape parses) but not yet matched against anything: no profile
-	// shipped today needs it (spring.yaml's own list is empty, exactly
-	// PLAN.md's own example), and "overrides method X of class Y" needs
-	// hierarchy.ResolveMethod wired into root selection in a way nothing
-	// has needed before now. Left for the servlet/jakarta profiles
-	// PLAN.md's Phase 7 would add (HttpServlet#doGet, Filter#doFilter).
+	// Overrides is a list of "fqcn#methodName" specs (PLAN.md section 4's
+	// own example: "javax.servlet.http.HttpServlet#doGet"). An app class
+	// is a root if it is fqcn itself or one of its transitive subtypes
+	// (hierarchy.Subtypes) AND it declares a method of that name itself
+	// (not merely inherits it) — i.e. it actually overrides the named
+	// framework method, which is how a container (a servlet engine
+	// dispatching to HttpServlet#doGet, say) invokes app code without
+	// any annotation ariadne could instead match on. Overload-insensitive
+	// by name, like every other method match in ariadne. See overrideRoots.
 	Overrides []string `yaml:"overrides"`
 	// Main: every public static "main(String[])" method is also a root.
 	Main bool `yaml:"main"`
@@ -146,12 +151,12 @@ func (c *Catalog) put(p Profile) {
 	c.profiles[p.Name] = p
 }
 
-// LoadDefaultCatalog parses ariadne's two embedded profiles (spring,
+// LoadDefaultCatalog parses ariadne's embedded profiles (spring, servlet,
 // generic). generic must always be present: it is auto-detection's
 // fallback when nothing else matches.
 func LoadDefaultCatalog() (Catalog, error) {
 	var c Catalog
-	for _, raw := range [][]byte{springYAML, genericYAML} {
+	for _, raw := range [][]byte{springYAML, servletYAML, genericYAML} {
 		p, err := parseProfile(raw)
 		if err != nil {
 			return Catalog{}, fmt.Errorf("parsing embedded profile: %w", err)
@@ -329,5 +334,45 @@ func (p Profile) AppRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
 			}
 		}
 	}
+	roots = append(roots, p.overrideRoots(g, h)...)
 	return roots
+}
+
+// overrideRoots implements Roots.Overrides: for each "fqcn#method" spec,
+// every app class that is fqcn itself or one of its transitive subtypes
+// and declares a method of that name itself becomes a root.
+func (p Profile) overrideRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
+	var roots []uint32
+	for _, spec := range p.Roots.Overrides {
+		fqcn, method, ok := parseOverrideSpec(spec)
+		if !ok {
+			continue
+		}
+		candidates := append([]string{fqcn}, h.Subtypes(fqcn)...)
+		for _, candidate := range candidates {
+			ci, ok := h.Lookup(candidate)
+			if !ok || !ci.IsApp {
+				continue
+			}
+			for _, m := range ci.MethodsByName(method) {
+				if m.IsAbstract() {
+					continue // an interface's own abstract declaration has no body to call into
+				}
+				if id, ok := g.ID(candidate, m.Name, m.Descriptor); ok {
+					roots = append(roots, id)
+				}
+			}
+		}
+	}
+	return roots
+}
+
+// parseOverrideSpec splits a Roots.Overrides entry ("fqcn#method") into
+// its class and method name.
+func parseOverrideSpec(spec string) (fqcn, method string, ok bool) {
+	i := strings.LastIndex(spec, "#")
+	if i < 0 {
+		return "", "", false
+	}
+	return spec[:i], spec[i+1:], true
 }

@@ -192,6 +192,43 @@ func TestAppRoots(t *testing.T) {
 	}
 }
 
+func TestAppRoots_overrides(t *testing.T) {
+	h, g := buildFixture(t)
+
+	// fixture.Greeter#greet has two app implementations (FormalGreeter,
+	// CasualGreeter), neither named in Roots.Overrides directly -- both
+	// should become roots via hierarchy.Subtypes, the same way an app's
+	// own HttpServlet subclass would for a real servlet profile's
+	// "javax.servlet.http.HttpServlet#doGet".
+	prof := Profile{Roots: Roots{Overrides: []string{"fixture.Greeter#greet"}}}
+	roots := prof.AppRoots(g, h)
+
+	want := map[string]bool{
+		"fixture.FormalGreeter#greet(Ljava/lang/String;)Ljava/lang/String;": true,
+		"fixture.CasualGreeter#greet(Ljava/lang/String;)Ljava/lang/String;": true,
+	}
+	got := map[string]bool{}
+	for _, id := range roots {
+		got[g.Key(id)] = true
+	}
+	if len(got) != len(want) {
+		t.Fatalf("AppRoots = %v, want exactly %v", got, want)
+	}
+	for k := range want {
+		if !got[k] {
+			t.Errorf("AppRoots is missing expected override root %q; got %v", k, got)
+		}
+	}
+}
+
+func TestAppRoots_overrides_malformedSpecIgnored(t *testing.T) {
+	h, g := buildFixture(t)
+	prof := Profile{Roots: Roots{Overrides: []string{"no-hash-sign-here"}}}
+	if roots := prof.AppRoots(g, h); len(roots) != 0 {
+		t.Errorf("AppRoots = %v, want none (a spec with no '#' should be ignored, not panic)", roots)
+	}
+}
+
 func TestAppRoots_mainFalseExcludesMain(t *testing.T) {
 	h, g := buildFixture(t)
 	prof := Profile{Roots: Roots{Annotations: []string{"fixture.Entry"}, Main: false}}

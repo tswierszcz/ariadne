@@ -1,0 +1,55 @@
+# Plain Servlet API profile (PLAN.md section 4's "servlet (HttpServlet#do*,
+# Filter#doFilter)" entry; distinct from a future "jakarta" profile for
+# JAX-RS/CDI/EJB, which is a separate set of annotations on a separate
+# framework). Covers both the pre-Jakarta-EE9 javax.servlet.* namespace and
+# the post-EE9 jakarta.servlet.* one — same spec, same class/method names,
+# just renamed packages, so one profile lists both rather than forcing an
+# app on one or the other.
+#
+# No roots.annotations: @WebServlet/@WebFilter are class-level only and mark
+# a class as a servlet, not a specific method as an entry point the way
+# @RequestMapping does — the container still only ever calls the specific
+# lifecycle methods below, not "every public method" the way spring.yaml's
+# annotation handling assumes for a Spring @Controller. roots.overrides is
+# the right tool for this: see Profile.Roots.Overrides in internal/profile.
+name: servlet
+detect:
+  - javax.servlet.http.HttpServlet
+  - javax.servlet.Filter
+  - jakarta.servlet.http.HttpServlet
+  - jakarta.servlet.Filter
+roots:
+  annotations: []
+  overrides:
+    - javax.servlet.http.HttpServlet#service
+    - javax.servlet.http.HttpServlet#doGet
+    - javax.servlet.http.HttpServlet#doPost
+    - javax.servlet.http.HttpServlet#doPut
+    - javax.servlet.http.HttpServlet#doDelete
+    - javax.servlet.http.HttpServlet#doHead
+    - javax.servlet.http.HttpServlet#doOptions
+    - javax.servlet.http.HttpServlet#doTrace
+    - javax.servlet.GenericServlet#init
+    - javax.servlet.Filter#doFilter
+    - javax.servlet.ServletContextListener#contextInitialized
+    - javax.servlet.ServletContextListener#contextDestroyed
+    - jakarta.servlet.http.HttpServlet#service
+    - jakarta.servlet.http.HttpServlet#doGet
+    - jakarta.servlet.http.HttpServlet#doPost
+    - jakarta.servlet.http.HttpServlet#doPut
+    - jakarta.servlet.http.HttpServlet#doDelete
+    - jakarta.servlet.http.HttpServlet#doHead
+    - jakarta.servlet.http.HttpServlet#doOptions
+    - jakarta.servlet.http.HttpServlet#doTrace
+    - jakarta.servlet.GenericServlet#init
+    - jakarta.servlet.Filter#doFilter
+    - jakarta.servlet.ServletContextListener#contextInitialized
+    - jakarta.servlet.ServletContextListener#contextDestroyed
+  main: true
+framework_packages:
+  - javax.servlet:*
+  - jakarta.servlet:*
+  - org.apache.tomcat:*
+  - org.apache.tomcat.embed:*
+  - org.eclipse.jetty:*
+synthetic_edges: []

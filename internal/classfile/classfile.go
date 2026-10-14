@@ -32,8 +32,9 @@ type Method struct {
 	Code []byte
 }
 
-func (m Method) IsStatic() bool { return m.AccessFlags&AccStatic != 0 }
-func (m Method) IsPublic() bool { return m.AccessFlags&AccPublic != 0 }
+func (m Method) IsStatic() bool   { return m.AccessFlags&AccStatic != 0 }
+func (m Method) IsPublic() bool   { return m.AccessFlags&AccPublic != 0 }
+func (m Method) IsAbstract() bool { return m.AccessFlags&AccAbstract != 0 }
 
 // Field is one field_info entry.
 type Field struct {

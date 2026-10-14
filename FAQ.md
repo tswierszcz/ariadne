@@ -81,7 +81,7 @@ data naturally exists in**, rather than dogmatically sticking to one.
 **At the mechanism level:** any application compiled to JVM bytecode —
 technically Java, Kotlin, Scala, Groovy, since they all compile to the
 same `.class` format (see point 4 above). In practice, though, **only
-three builds have actually been tested and verified**:
+four builds have actually been tested and verified**:
 
 - **old spring-petclinic** (Spring Boot 2.4.5, a commit from before June
   2021), built with **Maven** — the realistic case: lots of CVEs, few
@@ -93,8 +93,13 @@ three builds have actually been tested and verified**:
   `4df621b`, 2021-05-10, still Spring Boot 2.4.5 — the oldest commit in
   the repo's history with a `build.gradle` at all), via
   `scripts/gradle-copy-deps.init.gradle` — see "Gradle" just below.
+- a tiny hand-written, **plain Servlet (no Spring)** app
+  (`scripts/prepare-servlet-demo.sh`): one `HttpServlet` calling straight
+  into an old, vulnerable SnakeYAML — the control case for the `servlet`
+  profile, the same role WebGoat plays for `spring`. See the `servlet`
+  profile entry just below.
 
-Everything else (Kotlin, plain JAX-RS/Jakarta EE, Micronaut, Quarkus)
+Everything else (Kotlin, JAX-RS/CDI/EJB, Micronaut, Quarkus)
 **should work mechanically**, but has never been run or tested.
 
 ### What's genuinely NOT supported
@@ -139,18 +144,36 @@ Everything else (Kotlin, plain JAX-RS/Jakarta EE, Micronaut, Quarkus)
   `application.xml`'s module list); and a multi-WAR-module EAR has not
   actually been tried, only a single-WAR one. Full details:
   [PLAN.md](PLAN.md)'s Phase 7.
-- **Only two profiles exist: `spring` and `generic`** (`internal/profile`,
-  auto-detected by default, or picked with `-profile`/extended with
-  `-profile-file`). On an app using Jersey/JAX-RS, Quarkus, Micronaut, or
-  plain servlets, nothing in `-profile auto`'s `detect` lists matches, so
-  it falls back to `generic` — no framework packages at all — and the
-  core of the analysis (`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`) still works
-  correctly, but every CVE's status stays `REACHABLE`/`NOT_REACHABLE`
-  rather than being downgraded to `FRAMEWORK` where that other
-  framework's own internals are driving the call, even though in practice
-  they're reflection-driven just like in Spring. `servlet`/`jakarta`/
-  `micronaut`/`quarkus` profiles are Phase 7 follow-up work, not written
-  yet.
+- **A plain-Servlet `servlet` profile is supported**, alongside `spring`
+  and the `generic` fallback (`internal/profile`, auto-detected by
+  default, or picked with `-profile`/extended with `-profile-file`).
+  Covers both the pre-Jakarta-EE9 `javax.servlet.*` namespace and the
+  post-EE9 `jakarta.servlet.*` one (same spec, renamed packages), with
+  `HttpServlet#do*`/`Filter#doFilter`/lifecycle-listener methods as entry
+  points (via the newly-wired-up `roots.overrides`, not
+  `roots.annotations` — `@WebServlet` is class-level-only, unlike
+  `@RequestMapping`, so it can't mark "every public method" an entry
+  point the way `spring.yaml` does for `@Controller`) and
+  `javax.servlet:*`/`jakarta.servlet:*`/`org.apache.tomcat:*`/
+  `org.eclipse.jetty:*` as framework packages. Verified two ways: against
+  both existing baselines (petclinic, WebGoat — both now auto-detect
+  `spring+servlet`, since their embedded Tomcat bundles the
+  `javax.servlet.*` classes too, with **no change to either app's CVE
+  status counts** — confirmed, not assumed); and against the new
+  `servlet`-only control app above, both with `-roots all` and with
+  `-roots profile` (which narrows to exactly the one `doGet` override and
+  still finds the same `REACHABLE` CVE). Full details: [PLAN.md](PLAN.md)'s
+  Phase 7.
+  - **Still missing:** `jakarta` (JAX-RS `@Path`/`@GET`/..., CDI
+    `@Observes`, EJB `@Schedule`), `micronaut`, and `quarkus` profiles —
+    on an app using one of those, nothing in `-profile auto`'s `detect`
+    lists matches, so it falls back to `generic` (no framework packages
+    at all), and the core of the analysis
+    (`REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`) still works correctly, but
+    every CVE's status stays `REACHABLE`/`NOT_REACHABLE` rather than
+    being downgraded to `FRAMEWORK` where that other framework's own
+    internals are driving the call, even though in practice they're
+    reflection-driven just like in Spring or plain Servlet.
 
 ### How to prepare a project
 

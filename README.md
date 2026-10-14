@@ -306,14 +306,18 @@ optionally the root set, instead of a single hardcoded list.
 `-profile auto` (the default) selects every embedded profile
 (`internal/profile/profiles/*.yaml`) whose `detect` list names a class
 present anywhere in the app or its dependencies, and merges them
-(`spring` has been verified to auto-detect for both petclinic and
-WebGoat, which embeds Spring Boot too); nothing matching falls back to
-`generic`, which has no framework packages at all, so every CVE's status
-for a plain non-Spring app is `REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/
+(petclinic and WebGoat, both Spring Boot apps on an embedded Tomcat,
+auto-detect and merge as `spring+servlet` — the embedded Tomcat jar
+bundles the `javax.servlet.*` classes `servlet`'s own `detect` list
+matches, confirmed not to change either app's CVE status counts, since
+`spring`'s own `org.apache.tomcat.embed:*` pattern already covers that
+exact dependency); nothing matching falls back to `generic`, which has
+no framework packages at all, so every CVE's status for a plain
+non-Spring, non-servlet app is `REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/
 `NOT_APPLICABLE` only, never `FRAMEWORK`. `-profile spring`/`-profile
-generic` picks one explicitly; `-profile-file path.yaml` loads a custom
-profile (same YAML shape) and adds it to the catalog, or replaces one of
-the same name.
+servlet`/`-profile generic` picks one explicitly; `-profile-file
+path.yaml` loads a custom profile (same YAML shape) and adds it to the
+catalog, or replaces one of the same name.
 
 `spring`'s own list is section 4's original seed plus
 `org.springframework:spring-beans`/`spring-core`/`spring-expression`/
@@ -332,12 +336,15 @@ callee, a much bigger change than this simplification buys back).
 above) narrows the BFS roots to the active profile's own entry points
 instead: a method carrying one of `roots.annotations`
 (`@RequestMapping`/`@GetMapping`/.../`@Scheduled`/`@EventListener`/`@Bean`
-for `spring`), every public method of a class itself carrying one, and
-(when `roots.main` is true) every public static `main(String[])`.
-`roots.overrides` parses but is not yet matched against anything — no
-shipped profile needs it (`spring.yaml`'s own list is empty); it is
-reserved for a `servlet`/`jakarta` profile's `HttpServlet#doGet`/
-`Filter#doFilter`.
+for `spring`), every public method of a class itself carrying one,
+(when `roots.main` is true) every public static `main(String[])`, and
+every `roots.overrides` entry (`"fqcn#method"`, e.g. `javax.servlet.
+http.HttpServlet#doGet`): every app class that is that class itself or
+one of its transitive subtypes **and declares that method itself**
+(an actual override, not an inherited no-op) — `servlet.yaml`'s own use
+of this (`HttpServlet#do*`/`Filter#doFilter`, both the `javax.servlet.*`
+and `jakarta.servlet.*` namespaces) is the first shipped profile to need
+it; `spring.yaml`'s own list is still empty.
 
 ### 8. The report (`internal/report`)
 
@@ -464,16 +471,16 @@ internal/
   hierarchy/              class universe: super/interfaces/subtypes/methods
   callgraph/              interning, edges, CHA expansion, synthetic edges
   profile/                framework knowledge: detect, roots, framework packages, synthetic edges
-    profiles/              spring.yaml, generic.yaml (the embedded defaults)
+    profiles/              spring.yaml, servlet.yaml, generic.yaml (the embedded defaults)
   vulnmap/                CVE -> vulnerable methods (manual table + fix-commit diffs)
     vuln_methods.yaml      the embedded manual table
   javadiff/               unified-diff parsing + the brace-aware Java method scanner
   reach/                  BFS, status assignment, path reconstruction
   report/                 Markdown/JSON rendering
     templates/
-scripts/                 prepare-{petclinic,webgoat,petclinic-gradle}.sh, build-*fixture*.sh,
-                         gradle-copy-deps.init.gradle (Gradle equivalent of
-                         mvn dependency:copy-dependencies/dependency:list)
+scripts/                 prepare-{petclinic,webgoat,petclinic-gradle,servlet-demo}.sh,
+                         build-*fixture*.sh, gradle-copy-deps.init.gradle (Gradle
+                         equivalent of mvn dependency:copy-dependencies/dependency:list)
 testdata/
   fixture/                hand-written Java project, compiled for Java 8 and 21
   reachfixture/           a 3-jar fixture (app + framework dep + plain dep) covering
@@ -507,14 +514,14 @@ report:
   `LambdaMetafactory` call, or dependency injection wiring beans by
   name/type at runtime is invisible, and can produce false negatives (a
   real path exists that ariadne cannot see).
-- **Only two profiles exist: `spring` and `generic`.** The profile system
-  itself (auto-detection and merging, `-roots profile`, synthetic edges,
-  the conditional jackson-databind rule) is implemented (see step 7
-  above), but `servlet`, `jakarta` (JAX-RS/CDI/EJB), `micronaut` and
-  `quarkus` are not — an app using one of those gets the `generic`
-  fallback (no framework packages at all) unless it also embeds Spring.
-  There is also no `--max-dep-depth`. See [PLAN.md](PLAN.md)'s Phase 7
-  for what the rest of this would involve.
+- **Only three profiles exist: `spring`, `servlet` and `generic`.** The
+  profile system itself (auto-detection and merging, `-roots profile`,
+  synthetic edges, the conditional jackson-databind rule, `roots.overrides`)
+  is implemented (see step 7 above), but `jakarta` (JAX-RS/CDI/EJB),
+  `micronaut` and `quarkus` are not — an app using one of those gets the
+  `generic` fallback (no framework packages at all) unless it also embeds
+  Spring or a plain servlet container. There is also no `--max-dep-depth`.
+  See [PLAN.md](PLAN.md)'s Phase 7 for what the rest of this would involve.
 - **An EAR's own top-level modules are never read as app code**, only as
   dependency jars — there is no reliable signal in a zip listing alone to
   tell an EJB module's jar apart from a shared library jar without
