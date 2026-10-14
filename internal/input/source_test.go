@@ -2,6 +2,7 @@ package input
 
 import (
 	"archive/zip"
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -101,6 +102,99 @@ func TestPrepareAppInput_springBootFatJar(t *testing.T) {
 	}
 }
 
+func TestPrepareAppInput_war(t *testing.T) {
+	war := filepath.Join(t.TempDir(), "app.war")
+	writeZip(t, war, map[string][]byte{
+		"WEB-INF/classes/com/example/App.class": []byte("fake app class bytes"),
+		"WEB-INF/lib/dep-1.0.jar":               []byte("fake nested jar bytes"),
+	})
+
+	p, err := PrepareAppInput(war)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	if p.ExtractedLibs == "" {
+		t.Fatalf("ExtractedLibs is empty, want a directory of extracted dependency jars")
+	}
+
+	names := jarEntryNames(t, p.AppClassesJar)
+	if !contains(names, "com/example/App.class") {
+		t.Errorf("repacked jar entries = %v, want it to contain com/example/App.class (WEB-INF/classes/ prefix stripped)", names)
+	}
+	for _, n := range names {
+		if n == "WEB-INF/classes/com/example/App.class" {
+			t.Errorf("repacked jar still has the WEB-INF/classes/ prefix: %q", n)
+		}
+	}
+
+	libPath := filepath.Join(p.ExtractedLibs, "dep-1.0.jar")
+	if _, err := os.Stat(libPath); err != nil {
+		t.Errorf("extracted lib jar %s not found: %v", libPath, err)
+	}
+}
+
+func TestPrepareAppInput_ear(t *testing.T) {
+	warBytes := zipBytes(t, map[string][]byte{
+		"WEB-INF/classes/com/example/web/WebApp.class": []byte("fake web app class bytes"),
+		"WEB-INF/lib/web-only-dep-1.0.jar":             []byte("fake web-only dep bytes"),
+	})
+
+	ear := filepath.Join(t.TempDir(), "app.ear")
+	writeZip(t, ear, map[string][]byte{
+		"META-INF/application.xml": []byte("<application/>"),
+		"app.war":                  warBytes,
+		"lib/shared-dep-2.0.jar":   []byte("fake shared dep bytes"),
+	})
+
+	p, err := PrepareAppInput(ear)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	if p.ExtractedLibs == "" {
+		t.Fatalf("ExtractedLibs is empty, want a directory of extracted dependency jars")
+	}
+
+	names := jarEntryNames(t, p.AppClassesJar)
+	if !contains(names, "com/example/web/WebApp.class") {
+		t.Errorf("repacked jar entries = %v, want the nested WAR's class (WEB-INF/classes/ prefix stripped)", names)
+	}
+
+	for _, want := range []string{"web-only-dep-1.0.jar", "shared-dep-2.0.jar"} {
+		if _, err := os.Stat(filepath.Join(p.ExtractedLibs, want)); err != nil {
+			t.Errorf("extracted lib jar %s not found: %v", want, err)
+		}
+	}
+}
+
+// TestPrepareAppInput_ear_detectedWithoutApplicationXml confirms EAR
+// detection also works via a nested *.war entry alone, since
+// META-INF/application.xml has been optional since Java EE 5.
+func TestPrepareAppInput_ear_detectedWithoutApplicationXml(t *testing.T) {
+	warBytes := zipBytes(t, map[string][]byte{
+		"WEB-INF/classes/com/example/App.class": []byte("fake app class bytes"),
+	})
+
+	ear := filepath.Join(t.TempDir(), "app.ear")
+	writeZip(t, ear, map[string][]byte{
+		"app.war": warBytes,
+	})
+
+	p, err := PrepareAppInput(ear)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	names := jarEntryNames(t, p.AppClassesJar)
+	if !contains(names, "com/example/App.class") {
+		t.Errorf("repacked jar entries = %v, want the nested WAR's class even with no application.xml", names)
+	}
+}
+
 func contains(ss []string, s string) bool {
 	for _, x := range ss {
 		if x == s {
@@ -139,4 +233,51 @@ func writeFatJar(t *testing.T, path string) {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// zipBytes builds an in-memory zip archive from entries (name -> raw
+// content, written byte-for-byte, same as writeFatJar's "fake jar"
+// entries — the test never needs these to be real jars) and returns its
+// serialized bytes, for embedding as a nested archive (a WAR inside an
+// EAR) or for writing straight to disk via writeZip.
+func zipBytes(t *testing.T, entries map[string][]byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, content := range entries {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// writeZip writes entries (see zipBytes) to a new zip file at path.
+func writeZip(t *testing.T, path string, entries map[string][]byte) {
+	t.Helper()
+	if err := os.WriteFile(path, zipBytes(t, entries), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// jarEntryNames lists every entry name in the jar at path.
+func jarEntryNames(t *testing.T, path string) []string {
+	t.Helper()
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		t.Fatalf("opening %s: %v", path, err)
+	}
+	defer zr.Close()
+	var names []string
+	for _, f := range zr.File {
+		names = append(names, f.Name)
+	}
+	return names
 }

@@ -665,8 +665,8 @@ input modes:
   with a known-vulnerable dependency), to show that the `generic`/`jakarta` profiles work.
 - Optional: RTA (restrict CHA to types instantiated with `new`) as `--cha rta`.
 
-**Status: the profile system and Gradle input are done; WAR/EAR and every profile besides
-`spring`/`generic` are not.** `internal/profile` implements section 4 as described:
+**Status: the profile system, Gradle input, and WAR/EAR input are done; every profile besides
+`spring`/`generic` is not.** `internal/profile` implements section 4 as described:
 - YAML profiles (`internal/profile/profiles/{spring,generic}.yaml`), embedded via
   `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
   one profile and replaces any existing one of the same name — not a partial per-field
@@ -762,8 +762,51 @@ input modes:
     ...`), the same way `prepare-webgoat.sh` already runs Maven's
     `dependency:copy-dependencies` once per WebGoat module — but no multi-module Gradle
     project has actually been run through this yet.
-- **Not implemented:** WAR/EAR input, every profile besides `spring`/`generic` (`servlet`,
-  `jakarta`, `micronaut`, `quarkus`), a non-Spring control app to exercise them, RTA, and
+- **WAR/EAR input: done**, entirely inside `internal/input/source.go`, with **no changes to
+  any other Go package** — `PrepareAppInput` already turned a Spring Boot fat jar into one
+  app-classes jar + one extracted lib directory, and a WAR (`WEB-INF/classes`,
+  `WEB-INF/lib`) is the exact same shape with a different prefix, so the fat-jar extraction
+  logic (`prepareFromBootJar`) was generalized into `prepareFromFatArchive(files,
+  classesPrefix, libPrefix)`, parameterized over the prefix pair, and reused for both.
+  - **Detection** (`detectArchiveKind`): an EAR is checked *before* a WAR, since an EAR's
+    own top-level entries are nested `*.war`/`*.jar` modules rather than a `WEB-INF:`/
+    `BOOT-INF:` prefix of their own — `META-INF/application.xml` if present, else (that
+    file has been optional since Java EE 5) a nested `*.war` entry at any depth.
+  - **EAR** (`prepareFromEar`): opens every nested `*.war` entry as its own `zip.Reader`
+    (`readNestedZip` — reads it fully into memory first, since `archive/zip` can only open
+    a `*zip.File` as a one-shot stream, not re-seek into a nested archive in place) and
+    merges its `WEB-INF/classes`/`WEB-INF/lib` the same way a standalone WAR would; every
+    top-level `*.jar` entry is extracted as a dependency jar. A class name two modules both
+    declare keeps whichever module was processed first (`extractModule`'s `written` map) —
+    the same "first one wins" rule `internal/hierarchy` already applies to a class
+    duplicated across two dependency jars, now also documented as the rule for this case.
+  - **Decision made while implementing:** an EAR's own top-level module jars are always
+    treated as dependency jars, never as app code, even though a top-level jar could in
+    principle be an EJB module carrying real application classes — there is no reliable
+    signal in a zip listing alone to tell that apart from a shared library jar without
+    parsing `META-INF/application.xml`'s `<module><ejb>` entries (itself optional), which
+    was out of scope for this pass. Recorded under Known limitations, not treated as a bug.
+  - **Verified end-to-end**, not just on synthetic test fixtures: repackaged the existing
+    Maven-built petclinic (`target/classes` + `target/dependency/*.jar`, the same input
+    Phase 1's baseline uses) as a real WAR and as a real EAR wrapping that WAR, and ran both
+    through `bin/ariadne` unmodified. Both reproduced the Maven-built baseline exactly:
+    87/87 dependency jars identified (with `-deps-list`; 42/87 from `pom.properties` alone,
+    the same fat-jar-style gap the Spring Boot case already has and already documents), 148
+    CVEs, **REACHABLE 3/3**. (The WAR-only run's own class hierarchy was additionally
+    cross-checked against the directory-based baseline: 29123 classes, 273180 call-graph
+    nodes, 766 synthetic edges — identical to the Maven baseline in README.md/FAQ.md, which
+    is exactly what byte-for-byte repackaging should produce.)
+  - **New unit tests** (`internal/input/source_test.go`, no JDK or network needed, synthetic
+    in-memory zips via a new `zipBytes`/`writeZip`/`jarEntryNames` test-helper trio):
+    `TestPrepareAppInput_war`; `TestPrepareAppInput_ear` (one nested WAR module plus one
+    top-level shared-lib jar, both ending up correctly merged); and
+    `TestPrepareAppInput_ear_detectedWithoutApplicationXml`, confirming detection falls back
+    to the nested-`*.war`-entry signal when `application.xml` is absent.
+  - **Not covered:** a multi-WAR-module EAR (the merge logic is written to support it —
+    `extractModule`'s dedup — but has not actually been run against one), and an EJB module
+    whose classes should count as app code (see the decision above).
+- **Not implemented:** every profile besides `spring`/`generic` (`servlet`, `jakarta`,
+  `micronaut`, `quarkus`), a non-Spring control app to exercise them, RTA, and
   `--max-dep-depth`. `internal/reach`'s BFS passes stay unchanged (still computed once for
   every CVE, same as Phase 5 left them) — only the
   root set and the framework-package list going into them changed.
@@ -780,7 +823,7 @@ ariadne/
   Makefile
   cmd/ariadne/main.go        # flags, orchestration
   internal/
-    input/                   # dirs, jars, Boot fat jar, (WAR/EAR); GAV from pom.properties / deps.txt
+    input/                   # dirs, jars, Boot fat jar, WAR, EAR; GAV from pom.properties / deps.txt
     cves/                    # GAVs -> OSV -> cves.json
     httpcache/               # disk cache for OSV, diffs, raw files; --offline
     classfile/               # pure-Go .class parser + bytecode walker
@@ -841,10 +884,10 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       `internal/profile`, wired into `cmd/ariadne` (Phase 7); `go test ./internal/profile`
       verifies both, plus merging when several profiles match and `-profile-file`
       overriding/adding one by name. `--roots profile` and synthetic edges (Spring Data) are
-      implemented too; servlet/jakarta/micronaut/quarkus profiles, WAR/EAR, RTA and
-      `--max-dep-depth` are not. Gradle input *is* implemented (`scripts/
-      gradle-copy-deps.init.gradle`) — see Phase 7's own status note for the line between
-      all of these.
+      implemented too; servlet/jakarta/micronaut/quarkus profiles, RTA and
+      `--max-dep-depth` are not. Gradle input (`scripts/gradle-copy-deps.init.gradle`) and
+      WAR/EAR input (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's
+      own status note for the line between all of these.
 - [x] Report contains the Limitations and "Unidentified jars" sections.
 - [x] Re-running with `-offline` and a warm cache works without network, and — beyond what
       this criterion originally asked — is now also verified byte-identical across repeated

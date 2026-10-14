@@ -70,7 +70,7 @@ pipeline by itself.
 
 ### 1. Input normalization (`internal/input`)
 
-`-app` accepts three forms, auto-detected:
+`-app` accepts five forms, auto-detected:
 
 - a **directory** of `.class` files (e.g. `target/classes`) — packed into
   a temporary jar;
@@ -79,10 +79,23 @@ pipeline by itself.
   `BOOT-INF/classes/` is repacked into a temporary jar (with the
   `BOOT-INF/classes/` prefix stripped) and every `BOOT-INF/lib/*.jar` is
   extracted to a temporary directory, which is then used as the
-  dependency source automatically (`-deps` is not needed in this case).
+  dependency source automatically (`-deps` is not needed in this case);
+- a **WAR** — detected by a `WEB-INF/` entry. `WEB-INF/classes/` and
+  `WEB-INF/lib/*.jar` are handled exactly like a fat jar's
+  `BOOT-INF/classes`/`BOOT-INF/lib`;
+- an **EAR** — detected by `META-INF/application.xml`, or (since that
+  file has been optional since Java EE 5) by a nested `*.war` entry when
+  it's missing. Every nested WAR module's `WEB-INF/classes`/`WEB-INF/lib`
+  is merged the same way (a class name shared by two modules keeps
+  whichever module was read first, same "first one wins" rule
+  `internal/hierarchy` already applies to a class duplicated across two
+  dependency jars), and every top-level `*.jar` is extracted as a
+  dependency jar — an EAR's own EJB-module jars are not distinguished
+  from shared library jars, so an EJB module's own classes are not
+  picked up as app code (see Known limitations).
 
-Every dependency jar (from `-deps`, or extracted from a fat jar) is then
-resolved to a Maven coordinate, in priority order:
+Every dependency jar (from `-deps`, or extracted from a fat
+jar/WAR/EAR) is then resolved to a Maven coordinate, in priority order:
 
 1. `META-INF/maven/<group>/<artifact>/pom.properties` **inside the jar
    itself** — works regardless of which build tool produced it. If a jar
@@ -114,6 +127,13 @@ Maven-built baseline exactly (3/3). See
 [PLAN.md](PLAN.md)'s Phase 7 for the full verification, including a
 build quirk the script works around (a dead JCenter-only Gradle plugin in
 that exact petclinic commit).
+
+**WAR and EAR support was verified the same way**, by repackaging the
+same Maven-built petclinic (`target/classes` + `target/dependency/*.jar`)
+as a WAR (`WEB-INF/classes`, `WEB-INF/lib`) and as an EAR wrapping that
+WAR: both ran with no code path other than `-app`/`-deps-list`, and both
+reproduced the Maven-built baseline exactly — 87/87 dependency jars
+identified, 148 CVEs, `REACHABLE` 3/3.
 
 ### 2–3. Bytecode parsing and the class hierarchy (`internal/classfile`, `internal/hierarchy`)
 
@@ -489,8 +509,15 @@ report:
   above), but `servlet`, `jakarta` (JAX-RS/CDI/EJB), `micronaut` and
   `quarkus` are not — an app using one of those gets the `generic`
   fallback (no framework packages at all) unless it also embeds Spring.
-  There is also no WAR/EAR input support and no `--max-dep-depth`. See
-  [PLAN.md](PLAN.md)'s Phase 7 for what the rest of this would involve.
+  There is also no `--max-dep-depth`. See [PLAN.md](PLAN.md)'s Phase 7
+  for what the rest of this would involve.
+- **An EAR's own top-level modules are never read as app code**, only as
+  dependency jars — there is no reliable signal in a zip listing alone to
+  tell an EJB module's jar apart from a shared library jar without
+  parsing `META-INF/application.xml`, which is itself optional. A
+  multi-WAR EAR has only been verified with one WAR module; each
+  additional module's classes/jars are merged in, but no multi-module
+  EAR has actually been run through this.
 - **LLM-assisted vulnerable-method mapping is opt-in and unverified.**
   Without `-llm` the third `internal/vulnmap` source is off. With it, the
   methods are a machine's suggestion (checked to exist, not to be the

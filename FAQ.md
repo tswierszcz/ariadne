@@ -121,8 +121,24 @@ Everything else (Kotlin, plain JAX-RS/Jakarta EE, Micronaut, Quarkus)
   invoking once per subproject, same as `prepare-webgoat.sh` already does
   for Maven), and there's no Gradle equivalent of a Spring Boot fat jar's
   one-input convenience.
-- **WAR/EAR** — only a plain jar, a classes directory, or a Spring Boot
-  fat jar. WAR (`WEB-INF/`) is also deferred to Phase 7.
+- **WAR and EAR are supported**, inside `internal/input` alone (no other
+  package changed): a WAR (detected by a `WEB-INF/` entry) is handled
+  exactly like a Spring Boot fat jar, with `WEB-INF/classes`/
+  `WEB-INF/lib` in place of `BOOT-INF/classes`/`BOOT-INF/lib`; an EAR
+  (detected by `META-INF/application.xml`, or by a nested `*.war` entry
+  when that optional file is missing) merges every nested WAR module's
+  classes/libs the same way, plus every top-level `*.jar` as a dependency
+  jar. Verified by repackaging the existing Maven-built petclinic as a
+  real WAR and as a real EAR wrapping that WAR: both ran through
+  `bin/ariadne` unmodified and reproduced the Maven baseline exactly
+  (87/87 dependencies, 148 CVEs, `REACHABLE` 3/3) — not just a synthetic
+  fixture test. **Still missing:** an EAR's own top-level jars are always
+  treated as dependency jars, never as app code, so an EJB module's own
+  classes aren't picked up as app code (there's no reliable way to tell
+  an EJB jar from a shared library jar without parsing
+  `application.xml`'s module list); and a multi-WAR-module EAR has not
+  actually been tried, only a single-WAR one. Full details:
+  [PLAN.md](PLAN.md)'s Phase 7.
 - **Only two profiles exist: `spring` and `generic`** (`internal/profile`,
   auto-detected by default, or picked with `-profile`/extended with
   `-profile-file`). On an app using Jersey/JAX-RS, Quarkus, Micronaut, or
@@ -202,11 +218,18 @@ one path to the app's jar, and a `[]input.DepJar` list (each entry is
   relative path, writes it to a temp file;
 - a **plain jar** → used as-is, no copying;
 - a **Spring Boot fat jar** (detected by an entry starting with
-  `BOOT-INF/`) → `prepareFromBootJar`: rewrites `BOOT-INF/classes/**`
-  into a new jar **stripping the prefix** (without that, the `.class`
-  parser would look for the class under the wrong path), and extracts
-  every `BOOT-INF/lib/*.jar` byte-for-byte into its own file — as if
-  someone had run `mvn dependency:copy-dependencies` by hand.
+  `BOOT-INF/`), a **WAR** (`WEB-INF/`), or an **EAR** (`META-INF/
+  application.xml`, or a nested `*.war` entry when that optional file is
+  missing) → `prepareFromFatArchive`/`prepareFromEar`: rewrites
+  `BOOT-INF/classes/**` or `WEB-INF/classes/**` into a new jar **stripping
+  the prefix** (without that, the `.class` parser would look for the
+  class under the wrong path), and extracts every `*/lib/*.jar`
+  byte-for-byte into its own file — as if someone had run `mvn
+  dependency:copy-dependencies` by hand. An EAR repeats this once per
+  nested WAR module (opened as its own `zip.Reader` read fully into
+  memory first, since a zip entry can only be opened as a one-shot
+  stream) and additionally pulls every top-level `*.jar` in as a
+  dependency jar.
 
 **`ResolveDepJars(depsDir, depsList)`** for every dependency jar, in this
 order:
