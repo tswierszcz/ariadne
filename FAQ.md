@@ -81,22 +81,46 @@ data naturally exists in**, rather than dogmatically sticking to one.
 **At the mechanism level:** any application compiled to JVM bytecode —
 technically Java, Kotlin, Scala, Groovy, since they all compile to the
 same `.class` format (see point 4 above). In practice, though, **only
-two projects have actually been tested and verified**, both Maven
-builds:
+three builds have actually been tested and verified**:
 
 - **old spring-petclinic** (Spring Boot 2.4.5, a commit from before June
-  2021) — the realistic case: lots of CVEs, few actually reachable.
-- **WebGoat v8.2.2** — the control case, deliberately vulnerable (old
-  XStream), there to confirm the tool doesn't always say "safe".
+  2021), built with **Maven** — the realistic case: lots of CVEs, few
+  actually reachable.
+- **WebGoat v8.2.2**, built with **Maven** — the control case,
+  deliberately vulnerable (old XStream), there to confirm the tool
+  doesn't always say "safe".
+- the same old spring-petclinic, built with **Gradle** instead (commit
+  `4df621b`, 2021-05-10, still Spring Boot 2.4.5 — the oldest commit in
+  the repo's history with a `build.gradle` at all), via
+  `scripts/gradle-copy-deps.init.gradle` — see "Gradle" just below.
 
-Everything else (Kotlin, Gradle, plain JAX-RS/Jakarta EE, Micronaut,
-Quarkus) **should work mechanically**, but has never been run or tested.
+Everything else (Kotlin, plain JAX-RS/Jakarta EE, Micronaut, Quarkus)
+**should work mechanically**, but has never been run or tested.
 
 ### What's genuinely NOT supported
 
-- **Gradle** — there's no ready way to pull out the dependencies (Maven
-  has `mvn dependency:copy-dependencies`; nothing equivalent was written
-  for Gradle — that's planned Phase 7 in [PLAN.md](PLAN.md)).
+- **Gradle is supported** as of `scripts/gradle-copy-deps.init.gradle` +
+  `scripts/prepare-petclinic-gradle.sh`, with **no changes to any Go
+  package**: the init script's two tasks reproduce `mvn
+  dependency:copy-dependencies`/`dependency:list` closely enough
+  (`ariadneCopyDeps` copies every `runtimeClasspath` jar to a directory;
+  `ariadneDepsList` writes a `deps.txt` in the exact format
+  `internal/input.ParseDepsList` already parses) that `-deps`/
+  `-deps-list` need no Gradle-specific code at all. Verified against
+  spring-petclinic built with Gradle (see above): 80/80 dependency jars
+  identified, 144 CVEs, and the same 3/3 `REACHABLE` count as the
+  Maven-built baseline. One real build quirk hit and worked around (not
+  upstream-fixable): that exact commit's `build.gradle` depends on a
+  Gradle plugin (`wro4j`, for LESS→CSS bundling, irrelevant to bytecode
+  analysis) that was only ever published on JCenter, which shut down in
+  2021–2022 — the prep script drops that plugin and its CSS-bundling
+  config from its own clone rather than trying to resolve a now-gone
+  artifact. Full details, including why this needed no new Go test:
+  [PLAN.md](PLAN.md)'s Phase 7. **Still missing:** a multi-module Gradle
+  project has not been tried (the init script's tasks would need
+  invoking once per subproject, same as `prepare-webgoat.sh` already does
+  for Maven), and there's no Gradle equivalent of a Spring Boot fat jar's
+  one-input convenience.
 - **WAR/EAR** — only a plain jar, a classes directory, or a Spring Boot
   fat jar. WAR (`WEB-INF/`) is also deferred to Phase 7.
 - **Only two profiles exist: `spring` and `generic`** (`internal/profile`,
@@ -139,6 +163,24 @@ no `-deps`/`-deps-list` needed — ariadne pulls `BOOT-INF/classes` and
 `BOOT-INF/lib/*.jar` out itself. Downside: dependency identification is
 then lower (only from `pom.properties`, since there's no `deps.txt` to
 fall back on), so this mode finds fewer CVEs than the `-deps-list` mode.
+
+**Alternative — a Gradle build:** the equivalent three steps use
+`scripts/gradle-copy-deps.init.gradle` in place of Maven's
+`dependency:copy-dependencies`/`dependency:list`:
+
+```bash
+./gradlew classes
+./gradlew -I /path/to/ariadne/scripts/gradle-copy-deps.init.gradle \
+  ariadneCopyDeps ariadneDepsList \
+  -PariadneOutputDir=build/ariadne-dependency \
+  -PariadneDepsListFile=build/deps.txt
+```
+
+then `-app build/classes/java/main -deps build/ariadne-dependency
+-deps-list build/deps.txt`, same as the Maven case. See
+`scripts/prepare-petclinic-gradle.sh` for a complete, working example
+(including a real build quirk it has to work around for that specific
+target).
 
 **What you do NOT need on the machine running `ariadne`:** a JDK. It's
 only needed to build the application being analyzed — `ariadne` itself

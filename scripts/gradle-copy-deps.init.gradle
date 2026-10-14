@@ -1,0 +1,76 @@
+// An init script that gives a Gradle build the same two outputs
+// internal/input already knows how to consume from a Maven build:
+//
+//   ariadneCopyDeps     ~ mvn dependency:copy-dependencies
+//       copies every jar on the "runtimeClasspath" configuration into
+//       -PariadneOutputDir=<dir>, ready for ariadne's -deps.
+//
+//   ariadneDepsList     ~ mvn dependency:list
+//       writes -PariadneDepsListFile=<file> in the exact
+//       "group:artifact:type[:classifier]:version:scope" shape
+//       internal/input.ParseDepsList already parses. Deliberate: this way
+//       no new Go parser is needed for Gradle at all, only this script.
+//
+// Usage (single-module project; see scripts/prepare-petclinic-gradle.sh):
+//   ./gradlew -I gradle-copy-deps.init.gradle ariadneCopyDeps ariadneDepsList \
+//     -PariadneOutputDir=/abs/path/dependency \
+//     -PariadneDepsListFile=/abs/path/deps.txt
+//
+// A multi-module build needs these run per subproject
+// (./gradlew -I ... :sub:ariadneCopyDeps :sub:ariadneDepsList ...), one at
+// a time per module, the same way prepare-webgoat.sh already runs Maven's
+// dependency:copy-dependencies once per module.
+//
+// Only applies to a project carrying the 'java' (or 'java-library')
+// plugin, which is what makes a "runtimeClasspath" configuration exist.
+
+allprojects {
+    afterEvaluate { proj ->
+        if (!(proj.plugins.hasPlugin('java') || proj.plugins.hasPlugin('java-library'))) {
+            return
+        }
+
+        proj.tasks.register('ariadneCopyDeps', Copy) {
+            group = 'ariadne'
+            description = 'Copies every runtimeClasspath jar into -PariadneOutputDir (like mvn dependency:copy-dependencies).'
+
+            def outDirProp = proj.findProperty('ariadneOutputDir')
+            from proj.configurations.getByName('runtimeClasspath')
+            into project.file(outDirProp ?: "${proj.buildDir}/ariadne-dependency")
+
+            doFirst {
+                if (!outDirProp) {
+                    throw new GradleException("ariadneCopyDeps: pass -PariadneOutputDir=<dir>")
+                }
+            }
+        }
+
+        proj.tasks.register('ariadneDepsList') {
+            group = 'ariadne'
+            description = 'Writes a deps.txt (mvn dependency:list format) from runtimeClasspath (like mvn dependency:list).'
+
+            doLast {
+                def outFileProp = proj.findProperty('ariadneDepsListFile')
+                if (!outFileProp) {
+                    throw new GradleException("ariadneDepsList: pass -PariadneDepsListFile=<file>")
+                }
+                def outFile = proj.file(outFileProp)
+                outFile.parentFile?.mkdirs()
+                outFile.withWriter { w ->
+                    def artifacts = proj.configurations.getByName('runtimeClasspath')
+                        .resolvedConfiguration.resolvedArtifacts
+                    artifacts.each { art ->
+                        def id = art.moduleVersion.id
+                        def type = art.extension ?: 'jar'
+                        def classifier = art.classifier
+                        if (classifier) {
+                            w.writeLine("${id.group}:${id.name}:${type}:${classifier}:${id.version}:runtime")
+                        } else {
+                            w.writeLine("${id.group}:${id.name}:${type}:${id.version}:runtime")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

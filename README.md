@@ -97,6 +97,24 @@ resolved to a Maven coordinate, in priority order:
    in the final report and excluded from the OSV query — it is never
    silently dropped.
 
+**Gradle builds** need no dedicated code path: `-app` already accepts a
+directory of classes (e.g. `build/classes/java/main`), and most
+Gradle-resolved jars from Maven Central already carry their own
+`pom.properties`. The one piece Maven's wrapper scripts give for free —
+`mvn dependency:copy-dependencies`/`dependency:list` — has a Gradle
+equivalent in `scripts/gradle-copy-deps.init.gradle`: an init script with
+two tasks, `ariadneCopyDeps` (copies every `runtimeClasspath` jar into one
+directory) and `ariadneDepsList` (writes a `deps.txt` in the exact format
+step 2 above already parses), so `-deps`/`-deps-list` consume a Gradle
+build exactly as they do a Maven one — no new Go parser. Verified
+end-to-end against spring-petclinic built with Gradle instead of Maven
+(same Spring Boot 2.4.5 era as the Maven-built target below): 80/80
+dependency jars identified, and `REACHABLE` CVE count matched the
+Maven-built baseline exactly (3/3). See
+[PLAN.md](PLAN.md)'s Phase 7 for the full verification, including a
+build quirk the script works around (a dead JCenter-only Gradle plugin in
+that exact petclinic commit).
+
 ### 2–3. Bytecode parsing and the class hierarchy (`internal/classfile`, `internal/hierarchy`)
 
 `internal/classfile` is a from-scratch, pure-Go JVM class-file parser: the
@@ -429,7 +447,9 @@ internal/
   reach/                  BFS, status assignment, path reconstruction
   report/                 Markdown/JSON rendering
     templates/
-scripts/                 prepare-{petclinic,webgoat}.sh, build-*fixture*.sh
+scripts/                 prepare-{petclinic,webgoat,petclinic-gradle}.sh, build-*fixture*.sh,
+                         gradle-copy-deps.init.gradle (Gradle equivalent of
+                         mvn dependency:copy-dependencies/dependency:list)
 testdata/
   fixture/                hand-written Java project, compiled for Java 8 and 21
   reachfixture/           a 3-jar fixture (app + framework dep + plain dep) covering
@@ -469,9 +489,8 @@ report:
   above), but `servlet`, `jakarta` (JAX-RS/CDI/EJB), `micronaut` and
   `quarkus` are not — an app using one of those gets the `generic`
   fallback (no framework packages at all) unless it also embeds Spring.
-  There is also no WAR/EAR/Gradle input support and no `--max-dep-depth`.
-  See [PLAN.md](PLAN.md)'s Phase 7 for what the rest of this would
-  involve.
+  There is also no WAR/EAR input support and no `--max-dep-depth`. See
+  [PLAN.md](PLAN.md)'s Phase 7 for what the rest of this would involve.
 - **LLM-assisted vulnerable-method mapping is opt-in and unverified.**
   Without `-llm` the third `internal/vulnmap` source is off. With it, the
   methods are a machine's suggestion (checked to exist, not to be the

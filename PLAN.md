@@ -665,7 +665,7 @@ input modes:
   with a known-vulnerable dependency), to show that the `generic`/`jakarta` profiles work.
 - Optional: RTA (restrict CHA to types instantiated with `new`) as `--cha rta`.
 
-**Status: the profile system itself is done; WAR/EAR, Gradle, and every profile besides
+**Status: the profile system and Gradle input are done; WAR/EAR and every profile besides
 `spring`/`generic` are not.** `internal/profile` implements section 4 as described:
 - YAML profiles (`internal/profile/profiles/{spring,generic}.yaml`), embedded via
   `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
@@ -705,10 +705,67 @@ input modes:
   `CVE-2022-22965` specifically moving from REACHABLE to FRAMEWORK) — adding
   spring-beans/-core/-expression/-aop to `framework_packages` was the one-line YAML change
   the whole profile system existed to make possible.
-- **Not implemented:** WAR/EAR input, the Gradle dependency-copy script, every profile
-  besides `spring`/`generic` (`servlet`, `jakarta`, `micronaut`, `quarkus`), a non-Spring
-  control app to exercise them, RTA, and `--max-dep-depth`. `internal/reach`'s BFS passes
-  stay unchanged (still computed once for every CVE, same as Phase 5 left them) — only the
+- **Gradle input: done**, as `scripts/gradle-copy-deps.init.gradle` + `scripts/
+  prepare-petclinic-gradle.sh`, with **no changes to any Go package**. Decision made while
+  implementing: rather than write a second Go parser for Gradle's own dependency-report
+  format, the init script's two tasks (`ariadneCopyDeps`, `ariadneDepsList`) deliberately
+  reproduce what `mvn dependency:copy-dependencies`/`dependency:list` already produce —
+  every `runtimeClasspath` jar copied into one directory, plus a `deps.txt` in the exact
+  `group:artifact:type[:classifier]:version:scope` shape `internal/input.ParseDepsList`
+  already parses — so `-deps`/`-deps-list` consume a Gradle build exactly as they do a
+  Maven one.
+  - **Verified end-to-end** against spring-petclinic at commit `4df621b` (2021-05-10, "Make
+    build work with Gradle") — the oldest commit in the repo's history with a `build.gradle`
+    at all, and still Spring Boot 2.4.5, the same version `prepare-petclinic.sh`'s Maven
+    target uses (commit `e7c879e`, 4 days later) — chosen specifically so the run could be
+    checked against that already-known baseline instead of against an unfamiliar app.
+    `go build ./cmd/ariadne` unchanged; `bin/ariadne -app app-classes.jar -deps dependency
+    -deps-list deps.txt` ran with no code changes and no errors. Result, reproduced
+    identically from a clean `git clone` (and byte-identical to the cached run): 80/80
+    dependency jars identified, 144 CVEs, **3/56/29/50/6**
+    REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN/NOT_APPLICABLE under `-profile spring` (auto
+    still selects `spring`). **REACHABLE matches the Maven baseline exactly (3/3)**; the
+    other counts differ in step with the dependency-count gap (80 vs. the Maven build's 87,
+    itself expected — see the pom.xml note just below), not because anything in `internal/
+    reach` behaves differently for a Gradle-built input.
+  - **A genuine build problem found and worked around, not upstream-fixed.** As committed,
+    this commit's `build.gradle` pulls in `ro.isdc.wro4j.gradle:wro4j-gradle-plugin:
+    1.8.0.Beta4` (for LESS→CSS compilation) with no repository configured to resolve it
+    from — and the artifact no longer exists on Maven Central or the Gradle Plugin Portal
+    either; it was a JCenter-only release, and JCenter shut down in 2021–2022, so there is
+    no live source to restore it from even by fixing the missing repository declaration.
+    `prepare-petclinic-gradle.sh` drops the `wro4j` plugin and its `webResources` block
+    (CSS/LESS bundling — irrelevant to bytecode analysis) from its own clone before
+    building, and remaps the dependencies it declared via the plugin's own `webjarsRuntime`
+    configuration (the webjar jars themselves — relevant, since e.g.
+    `org.webjars:bootstrap` is exactly what the `NOT_APPLICABLE` status above covers) to the
+    stock `runtimeOnly` configuration, which is all `ariadneCopyDeps`/`ariadneDepsList`
+    need them on.
+  - **Also found:** this commit's `pom.xml` had already moved on to Spring Boot 2.5.6 by
+    the time `build.gradle` was added (2.4.5) — the two build files were briefly out of
+    sync during the Maven→Gradle migration — so the Gradle- and Maven-built dependency sets
+    for "the same commit" are not expected to match jar-for-jar; the 80-vs-87 count above is
+    that gap, not a bug in dependency resolution.
+  - **Not covered by `go test ./...`** (deliberately, consistent with `prepare-petclinic.sh`/
+    `prepare-webgoat.sh` having no unit tests of their own): the init script's output format
+    is already exercised by `internal/input`'s existing `ParseDepsList`/`ResolveDepJars`
+    tests, since it was designed to match that format byte-for-byte, so a dedicated
+    regression test would just re-run those same tests against another sample of the same
+    shape. What's actually new here — the Groovy init script and the Gradle build itself —
+    can't be driven by `go test` without a JDK and Gradle on the test machine, which would
+    break that package's "no JDK, no network" guarantee; this end-to-end run is the
+    verification instead, the same evidentiary standard Phase 1's prepare scripts already
+    use.
+  - **Multi-module Gradle projects are untested.** The init script's two tasks are written
+    per-subproject (`allprojects { afterEvaluate { ... } }`), so a multi-module build would
+    need them invoked once per module (`./gradlew :sub:ariadneCopyDeps :sub:ariadneDepsList
+    ...`), the same way `prepare-webgoat.sh` already runs Maven's
+    `dependency:copy-dependencies` once per WebGoat module — but no multi-module Gradle
+    project has actually been run through this yet.
+- **Not implemented:** WAR/EAR input, every profile besides `spring`/`generic` (`servlet`,
+  `jakarta`, `micronaut`, `quarkus`), a non-Spring control app to exercise them, RTA, and
+  `--max-dep-depth`. `internal/reach`'s BFS passes stay unchanged (still computed once for
+  every CVE, same as Phase 5 left them) — only the
   root set and the framework-package list going into them changed.
 
 ### Phase 8 (optional) — Exploitability check
@@ -784,8 +841,10 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       `internal/profile`, wired into `cmd/ariadne` (Phase 7); `go test ./internal/profile`
       verifies both, plus merging when several profiles match and `-profile-file`
       overriding/adding one by name. `--roots profile` and synthetic edges (Spring Data) are
-      implemented too; servlet/jakarta/micronaut/quarkus profiles, WAR/EAR, Gradle, RTA and
-      `--max-dep-depth` are not — see Phase 7's own status note for the line between them.
+      implemented too; servlet/jakarta/micronaut/quarkus profiles, WAR/EAR, RTA and
+      `--max-dep-depth` are not. Gradle input *is* implemented (`scripts/
+      gradle-copy-deps.init.gradle`) — see Phase 7's own status note for the line between
+      all of these.
 - [x] Report contains the Limitations and "Unidentified jars" sections.
 - [x] Re-running with `-offline` and a warm cache works without network, and — beyond what
       this criterion originally asked — is now also verified byte-identical across repeated
