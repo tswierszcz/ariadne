@@ -454,11 +454,11 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
     `finish_reason: "length"` (it would just repeat and double the cost; the CVE is skipped
     with a warning and nothing is cached). After the fix: valid reply, 189 completion tokens
     (25 reasoning), ~$0.0013, and `Request#parseParts` / `#getParts` / `#getPart` all passed
-    bytecode grounding. A full petclinic run with `-llm` (then ~92 unmapped CVEs) came later
-    — see [docs/llm-test-report.md](docs/llm-test-report.md), including its 2026-10-14
-    re-run against the current baseline (91/148 already mapped by sources 1/2 by then, down
-    from 56/148 at the time of this live check, after the source-2 filter widening noted
-    just below).
+    bytecode grounding. Full runs with `-llm` on petclinic and WebGoat were done later
+    (2026-10-12) — see [docs/llm-test-report.md](docs/llm-test-report.md), including its
+    2026-10-14 re-run against the current baseline (petclinic: 91/148 already mapped by
+    sources 1/2 by then, down from 56/148 at the time of this live check, after the source-2
+    filter widening noted just below).
 
 - **Follow-up done: widen source 2's file filter.** `isMainJavaSource`
   (`internal/vulnmap/diffsource.go`) used to keep only `.java` files whose path contained
@@ -603,9 +603,9 @@ Report (`text/template` for Markdown, `html/template` for the optional HTML; tem
 `results.json` must be deterministic: sort by CVE id, then by method. This makes snapshot
 tests possible.
 
-**Status: done**, with some scope deferred (no `-profile`/`-roots`/`-max-dep-depth`/`-html`/
-`-llm` flags — all CLI/profile-system territory noted as deferred in earlier phases' status
-notes). What's implemented:
+**Status: done**, with some scope deferred (no `-profile`/`-roots`/`-max-dep-depth`/`-html`
+flags — all CLI/profile-system territory noted as deferred in earlier phases' status
+notes; the `-llm` flags were added later with Phase 4's source 3). What's implemented:
 - `cmd/ariadne` wires every package built so far into one command:
   `-app` (directory, plain jar, **or Spring Boot fat jar** — `internal/input.PrepareAppInput`
   detects `BOOT-INF/` and repacks `BOOT-INF/classes/`/extracts `BOOT-INF/lib/*.jar` to temp

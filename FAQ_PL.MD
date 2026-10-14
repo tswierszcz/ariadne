@@ -383,7 +383,7 @@ trzyma swój kod w `java/org/apache/...`, a nie w `src/main/java/...`
 ### Krok 7: `internal/reach` — przeszukiwanie grafu i statusy
 
 Wejście: graf z kroku 4, hierarchia z kroku 3, CVE z kroku 5, mapowanie
-z kroku 6. Wyjście: dla każdego CVE jeden z czterech statusów, a dla
+z kroku 6. Wyjście: dla każdego CVE jeden z pięciu statusów, a dla
 `REACHABLE`/`FRAMEWORK` — konkretna ścieżka.
 
 **Korzenie:** wszystkie metody kodu aplikacji (`IsApp == true`), bez
