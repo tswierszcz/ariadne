@@ -354,11 +354,14 @@ it; `spring.yaml`'s own list is still empty.
 class-level rule above ("every public method of a class carrying one
 becomes a root") would then wrongly turn every public helper method into
 an entry point, not just the ones actually exposed as endpoints (which
-also carry an HTTP-verb annotation). **CDI's `@Observes` is not
-implemented**: it annotates a method *parameter*, not the method or the
-class, and ariadne's bytecode parser does not read
-`RuntimeVisibleParameterAnnotations` at all — only class-/method-level
-`RuntimeVisibleAnnotations` (see Known limitations).
+also carry an HTTP-verb annotation). **CDI's `@Observes`** needs a third
+kind of root, since it annotates a method *parameter*, not the method or
+the class: `roots.parameter_annotations` (`javax.enterprise.event.Observes`/
+`jakarta.enterprise.event.Observes`) matches a method whose own
+`RuntimeVisibleParameterAnnotations` attribute — a separate, per-parameter
+attribute `internal/classfile` now also parses, alongside the
+class-/method-level `RuntimeVisibleAnnotations` it already read — carries
+one of these on any parameter.
 
 `micronaut.yaml` (`@Get`/`@Post`/`@Put`/`@Delete`/`@Patch`/`@Head`/
 `@Options`, `@Scheduled`, `@EventListener`) is a third `roots.annotations`
@@ -556,15 +559,9 @@ report:
   named for Phase 7, plus the `spring`/`generic` pair from the base plan.
   The profile system itself (auto-detection and merging, `-roots profile`,
   synthetic edges, the conditional jackson-databind rule,
-  `roots.overrides`/`roots.annotations`) is implemented (see step 7
-  above); there is no `--max-dep-depth`. **`jakarta`'s own CDI support is
-  incomplete:** `@Observes` is a method-*parameter* annotation, and
-  ariadne's bytecode parser never reads
-  `RuntimeVisibleParameterAnnotations` — only class-/method-level
-  annotations — so a CDI observer method is not added as an entry point
-  (CDI container internals are still classified `FRAMEWORK`, just not via
-  an observer-method root). See [PLAN.md](PLAN.md)'s Phase 7 for what the
-  rest of this would involve.
+  `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`,
+  including CDI's `@Observes`) is implemented (see step 7 above); there is
+  no `--max-dep-depth`. See [PLAN.md](PLAN.md)'s Phase 7 for what's left.
 - **An EAR's own top-level modules are never read as app code**, only as
   dependency jars — there is no reliable signal in a zip listing alone to
   tell an EJB module's jar apart from a shared library jar without

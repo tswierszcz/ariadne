@@ -282,6 +282,35 @@ func TestAppRoots_overrides_malformedSpecIgnored(t *testing.T) {
 	}
 }
 
+func TestAppRoots_parameterAnnotations(t *testing.T) {
+	h, g := buildFixture(t)
+
+	// fixture.Observer#onEvent's first parameter carries fixture.Param (a
+	// parameter-level annotation, CDI's @Observes stand-in); its second
+	// parameter carries nothing. A method whose parameter list contains
+	// the annotation anywhere should become a root, regardless of which
+	// parameter position it's in.
+	prof := Profile{Roots: Roots{ParameterAnnotations: []string{"fixture.Param"}}}
+	roots := prof.AppRoots(g, h)
+
+	want := "fixture.Observer#onEvent(Ljava/lang/String;Ljava/lang/String;)V"
+	got := map[string]bool{}
+	for _, id := range roots {
+		got[g.Key(id)] = true
+	}
+	if len(got) != 1 || !got[want] {
+		t.Errorf("AppRoots = %v, want exactly [%s]", got, want)
+	}
+}
+
+func TestAppRoots_parameterAnnotations_noneConfiguredMatchesNothing(t *testing.T) {
+	h, g := buildFixture(t)
+	prof := Profile{} // ParameterAnnotations left empty
+	if roots := prof.AppRoots(g, h); len(roots) != 0 {
+		t.Errorf("AppRoots = %v, want none (no roots configured at all)", roots)
+	}
+}
+
 func TestAppRoots_mainFalseExcludesMain(t *testing.T) {
 	h, g := buildFixture(t)
 	prof := Profile{Roots: Roots{Annotations: []string{"fixture.Entry"}, Main: false}}

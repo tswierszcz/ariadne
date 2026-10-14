@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Generates and builds a tiny, hand-written Jakarta EE application (no
-# Spring, no plain Servlet): a JAX-RS resource (@Path/@GET) and an EJB
-# (@Schedule), both calling straight into org.yaml.snakeyaml:1.30's
-# Yaml#load (CVE-2022-1471, the same manual-table seed CVE
-# scripts/prepare-servlet-demo.sh and PLAN.md section 4 already use).
+# Spring, no plain Servlet): a JAX-RS resource (@Path/@GET), an EJB
+# (@Schedule), and a CDI observer method (@Observes), all three calling
+# straight into org.yaml.snakeyaml:1.30's Yaml#load (CVE-2022-1471, the
+# same manual-table seed CVE scripts/prepare-servlet-demo.sh and PLAN.md
+# section 4 already use).
 #
 # This is the control app for the "jakarta" profile (PLAN.md Phase 7),
 # the same role prepare-servlet-demo.sh plays for "servlet": small enough
@@ -12,16 +13,13 @@
 #   - profile auto-detection picks "jakarta", not "generic", purely from
 #     javax.ws.rs.Path being present on the classpath;
 #   - -roots profile's root set narrows to exactly the resource's @GET
-#     method and the EJB's @Schedule method (via roots.annotations,
-#     already implemented for spring.yaml/servlet.yaml -- jakarta.yaml is
-#     just a new user of it, not new matching logic);
+#     method, the EJB's @Schedule method (via roots.annotations, already
+#     implemented for spring.yaml/servlet.yaml -- jakarta.yaml is just a
+#     new user of it, not new matching logic), and the CDI observer
+#     method (via roots.parameter_annotations, matching @Observes on the
+#     method's own event parameter -- internal/classfile now reads
+#     RuntimeVisibleParameterAnnotations);
 #   - CVE-2022-1471 is REACHABLE either way.
-#
-# Not covered: CDI's @Observes, which annotates a method *parameter*, not
-# a method -- ariadne's bytecode parser does not read
-# RuntimeVisibleParameterAnnotations at all today, so there is nothing
-# for this demo to exercise there. See jakarta.yaml's own comment and
-# PLAN.md's Phase 7 status note.
 #
 # Produces under work/jakarta-demo/:
 #   target/classes, target/dependency/*.jar, deps.txt
@@ -65,6 +63,11 @@ cat > pom.xml <<'EOF'
       <version>3.2.2</version>
     </dependency>
     <dependency>
+      <groupId>javax.enterprise</groupId>
+      <artifactId>cdi-api</artifactId>
+      <version>2.0.SP1</version>
+    </dependency>
+    <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
       <version>1.30</version>
@@ -103,6 +106,20 @@ public class ScheduledYamlJob {
     @Schedule(hour = "*", minute = "*/15")
     public void run() {
         Object parsed = new Yaml().load("scheduled: true");
+        System.out.println(parsed);
+    }
+}
+EOF
+
+cat > src/main/java/demo/YamlObserver.java <<'EOF'
+package demo;
+
+import javax.enterprise.event.Observes;
+import org.yaml.snakeyaml.Yaml;
+
+public class YamlObserver {
+    public void onEvent(@Observes String payload) {
+        Object parsed = new Yaml().load(payload);
         System.out.println(parsed);
     }
 }

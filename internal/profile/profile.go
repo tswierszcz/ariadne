@@ -112,6 +112,13 @@ type Roots struct {
 	// any annotation ariadne could instead match on. Overload-insensitive
 	// by name, like every other method match in ariadne. See overrideRoots.
 	Overrides []string `yaml:"overrides"`
+	// ParameterAnnotations: a method with any parameter carrying one of
+	// these is a root by itself — unlike Annotations, this never has a
+	// class-level meaning, since a parameter-level annotation (e.g. CDI's
+	// "javax.enterprise.event.Observes" on an observer method's event
+	// parameter) has no class-level equivalent to begin with. See
+	// classfile.Method.ParameterAnnotations and parameterAnnotationRoots.
+	ParameterAnnotations []string `yaml:"parameter_annotations"`
 	// Main: every public static "main(String[])" method is also a root.
 	Main bool `yaml:"main"`
 }
@@ -258,6 +265,7 @@ func merge(profiles []Profile) Profile {
 		m.Detect = append(m.Detect, p.Detect...)
 		m.Roots.Annotations = append(m.Roots.Annotations, p.Roots.Annotations...)
 		m.Roots.Overrides = append(m.Roots.Overrides, p.Roots.Overrides...)
+		m.Roots.ParameterAnnotations = append(m.Roots.ParameterAnnotations, p.Roots.ParameterAnnotations...)
 		m.Roots.Main = m.Roots.Main || p.Roots.Main
 		m.FrameworkPackages = append(m.FrameworkPackages, p.FrameworkPackages...)
 		m.SyntheticEdges = append(m.SyntheticEdges, p.SyntheticEdges...)
@@ -310,6 +318,18 @@ func hasAny(haystack, needles []string) bool {
 	return false
 }
 
+// anyParamHasAny reports whether any parameter's own annotation list (as
+// found in classfile.Method.ParameterAnnotations, one slice per
+// parameter) contains one of needles.
+func anyParamHasAny(paramAnnotations [][]string, needles []string) bool {
+	for _, paramAnns := range paramAnnotations {
+		if hasAny(paramAnns, needles) {
+			return true
+		}
+	}
+	return false
+}
+
 // mainDescriptor is the JVM descriptor of "void main(String[])".
 const mainDescriptor = "([Ljava/lang/String;)V"
 
@@ -332,6 +352,9 @@ func (p Profile) AppRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
 		classAnnotated := hasAny(ci.Annotations, p.Roots.Annotations)
 		for _, m := range ci.Methods {
 			include := (classAnnotated && m.IsPublic()) || hasAny(m.Annotations, p.Roots.Annotations)
+			if !include && len(p.Roots.ParameterAnnotations) > 0 {
+				include = anyParamHasAny(m.ParameterAnnotations, p.Roots.ParameterAnnotations)
+			}
 			if !include && p.Roots.Main && isMainMethod(m) {
 				include = true
 			}

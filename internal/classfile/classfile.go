@@ -27,6 +27,14 @@ type Method struct {
 	// Annotations are the FQCNs of this method's RuntimeVisibleAnnotations
 	// (e.g. "org.springframework.web.bind.annotation.GetMapping").
 	Annotations []string
+	// ParameterAnnotations are the FQCNs of each parameter's own
+	// RuntimeVisibleParameterAnnotations (e.g. CDI's
+	// "javax.enterprise.event.Observes" on an observer method's event
+	// parameter), nil if the method has no such attribute at all. Index i
+	// holds parameter i's annotations; a parameter with none gets an empty
+	// (not nil) slice, so len(ParameterAnnotations) still tells apart "no
+	// attribute" from "attribute present, nothing annotated".
+	ParameterAnnotations [][]string
 	// Code is the raw bytecode from this method's Code attribute, or nil
 	// for an abstract/native method.
 	Code []byte
@@ -261,6 +269,7 @@ func readMethod(rd *reader, p pool) (Method, error) {
 	attrCount := rd.u2()
 
 	var annotations []string
+	var paramAnnotations [][]string
 	var code []byte
 	for i := uint16(0); i < attrCount && rd.err == nil; i++ {
 		name, data, err := readAttribute(rd, p)
@@ -272,6 +281,11 @@ func readMethod(rd *reader, p pool) (Method, error) {
 			annotations, err = parseAnnotations(data, p)
 			if err != nil {
 				return Method{}, fmt.Errorf("RuntimeVisibleAnnotations: %w", err)
+			}
+		case "RuntimeVisibleParameterAnnotations":
+			paramAnnotations, err = parseParameterAnnotations(data, p)
+			if err != nil {
+				return Method{}, fmt.Errorf("RuntimeVisibleParameterAnnotations: %w", err)
 			}
 		case "Code":
 			code, err = parseCodeAttribute(data)
@@ -293,11 +307,12 @@ func readMethod(rd *reader, p pool) (Method, error) {
 		return Method{}, fmt.Errorf("descriptor: %w", err)
 	}
 	return Method{
-		AccessFlags: accessFlags,
-		Name:        name,
-		Descriptor:  desc,
-		Annotations: annotations,
-		Code:        code,
+		AccessFlags:          accessFlags,
+		Name:                 name,
+		Descriptor:           desc,
+		Annotations:          annotations,
+		ParameterAnnotations: paramAnnotations,
+		Code:                 code,
 	}, nil
 }
 

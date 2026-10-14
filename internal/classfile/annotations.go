@@ -27,6 +27,43 @@ func parseAnnotations(data []byte, p pool) ([]string, error) {
 	return names, nil
 }
 
+// parseParameterAnnotations parses a RuntimeVisibleParameterAnnotations
+// attribute's bytes (JVM spec 4.7.18: a u1 num_parameters, then that many
+// annotation lists, each shaped exactly like RuntimeVisibleAnnotations'
+// own body) into one FQCN slice per parameter.
+//
+// Known javac quirk, not handled here: for a few parameter kinds (e.g. a
+// non-static inner class constructor's implicit outer-class parameter,
+// or an enum constructor's implicit name/ordinal parameters), some javac
+// versions emit a num_parameters lower than the method descriptor's own
+// parameter count, omitting the synthetic ones from the front. Nothing
+// in ariadne looks at parameter annotations on a constructor today (CDI
+// observer methods, @Observes' own use, are never constructors), so this
+// is not realigned against the descriptor; a caller matching
+// ParameterAnnotations[i] against descriptor parameter i could be off by
+// one for such a method.
+func parseParameterAnnotations(data []byte, p pool) ([][]string, error) {
+	rd := newReader(bytes.NewReader(data))
+	numParams := rd.u1()
+	out := make([][]string, 0, numParams)
+	for i := 0; i < int(numParams) && rd.err == nil; i++ {
+		count := rd.u2()
+		names := make([]string, 0, count)
+		for j := uint16(0); j < count && rd.err == nil; j++ {
+			name, err := skipAnnotation(rd, p)
+			if err != nil {
+				return nil, fmt.Errorf("parameter %d, annotation %d: %w", i, j, err)
+			}
+			names = append(names, name)
+		}
+		out = append(out, names)
+	}
+	if rd.err != nil {
+		return nil, rd.err
+	}
+	return out, nil
+}
+
 // skipAnnotation reads one `annotation` structure (type_index,
 // num_element_value_pairs, then that many (name_index, element_value)
 // pairs) and returns its FQCN. It must correctly skip every

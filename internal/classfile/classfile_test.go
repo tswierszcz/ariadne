@@ -179,6 +179,28 @@ func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 	}
 }
 
+func TestParse_parameterAnnotations(t *testing.T) {
+	for _, release := range []int{8, 21} {
+		t.Run(releaseName(release), func(t *testing.T) {
+			cf := readFixtureClass(t, release, "fixture/Observer.class")
+
+			onEvent := methodByName(cf, "onEvent")
+			if onEvent == nil {
+				t.Fatalf("no onEvent method found")
+			}
+			if len(onEvent.ParameterAnnotations) != 2 {
+				t.Fatalf("ParameterAnnotations = %v, want 2 entries (one per parameter)", onEvent.ParameterAnnotations)
+			}
+			if got := onEvent.ParameterAnnotations[0]; len(got) != 1 || got[0] != "fixture.Param" {
+				t.Errorf("parameter 0 annotations = %v, want [fixture.Param]", got)
+			}
+			if got := onEvent.ParameterAnnotations[1]; len(got) != 0 {
+				t.Errorf("parameter 1 annotations = %v, want none", got)
+			}
+		})
+	}
+}
+
 func TestParseAndExtractCalls_greetWithIsInvokeinterfaceOnFunction(t *testing.T) {
 	cf := readFixtureClass(t, 8, "fixture/App.class")
 	m := methodByName(cf, "greetWith")

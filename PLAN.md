@@ -879,19 +879,10 @@ input modes:
     public helper method of that class into an entry point, not just the ones actually
     exposed as endpoints — which always also carry an HTTP-verb annotation, the actual
     entry-point signal. `@Path` is listed only in `detect`.
-  - **CDI's `@Observes` is not implemented as a root**, and this is a real gap, not an
-    oversight to paper over: `@Observes` annotates a method *parameter*
-    (`void onEvent(@Observes SomeEvent e)`), not the method or the class, and ariadne's
-    bytecode parser (`internal/classfile`) does not read the `RuntimeVisibleParameterAnnotations`
-    attribute at all — only class- and method-level `RuntimeVisibleAnnotations`.
-    Implementing it would need: parsing that attribute in `internal/classfile`, a new
-    per-parameter-annotations field on `hierarchy.Method`, and a new `Profile` YAML field
-    (e.g. `roots.parameter_annotations`) plus matching logic in `internal/profile` — a
-    three-package change, not a YAML-only addition like the rest of this profile, so it was
-    scoped out rather than rushed. CDI's own framework packages
-    (`javax.enterprise:*`/`jakarta.enterprise:*`/`org.jboss.weld:*`) are still listed, so CDI
-    container internals are at least classified `FRAMEWORK` on any path that reaches them,
-    just not via an observer-method root.
+  - **CDI's `@Observes` is implemented too, as a follow-up in the same session** (initially
+    scoped out as "a three-package change, not a YAML-only addition", then actually checked
+    against the code rather than assumed to be bigger than it was — see the dedicated
+    status note below).
   - `framework_packages`: `javax.ws.rs:*`/`jakarta.ws.rs:*` plus the three common JAX-RS
     implementations (`org.glassfish.jersey:*`, `org.jboss.resteasy:*`, `org.apache.cxf:*`,
     picked since no single one is "the" JAX-RS runtime the way embedded Tomcat is for
@@ -999,10 +990,60 @@ input modes:
       to be exactly `demo.YamlResource#get`, `demo.ScheduledYamlJob#run`, and
       `demo.YamlMessageConsumer#consume` — all three annotation families correctly
       recognized as entry points in one run. CVE-2022-1471 is still `REACHABLE`.
-- **Not implemented:** RTA and `--max-dep-depth`; CDI's `@Observes` remains unimplemented
-  (see the `jakarta` note above). `internal/reach`'s BFS passes stay unchanged (still
-  computed once for every CVE, same as Phase 5 left them) — only the root set and the
-  framework-package list going into them changed.
+- **CDI's `@Observes` (parameter-level roots): done**, as a follow-up once actually checked
+  against the code rather than estimated. The original "jakarta" status note above scoped
+  this out as "a three-package change, not a YAML-only addition", true in the literal sense
+  (it does touch `internal/classfile`, `internal/hierarchy` and `internal/profile`) but
+  misleading about the actual size of each touch:
+  - **`internal/classfile`**: a new `parseParameterAnnotations` (`annotations.go`) parses
+    the `RuntimeVisibleParameterAnnotations` attribute (JVM spec 4.7.18: a `u1
+    num_parameters`, then one annotation list per parameter, each shaped exactly like
+    `RuntimeVisibleAnnotations`' own body) by **reusing the existing `skipAnnotation` helper**
+    `parseAnnotations` already has — about 15 lines, not a new parser from scratch. A new
+    `Method.ParameterAnnotations [][]string` field and a `case
+    "RuntimeVisibleParameterAnnotations"` in `readMethod` wire it in. Known, undealt-with
+    javac quirk, documented in the function's own comment: for a few parameter kinds (e.g. a
+    non-static inner class constructor's implicit outer-class parameter), some javac
+    versions emit a `num_parameters` lower than the method descriptor's own parameter count,
+    omitting synthetic ones from the front — not realigned against the descriptor, since
+    nothing matches parameter annotations on a constructor today.
+  - **`internal/hierarchy`**: **zero new code** — `hierarchy.Method` already embeds
+    `classfile.Method` directly, so the new field was exposed automatically.
+  - **`internal/profile`**: a new `Roots.ParameterAnnotations []string` YAML field
+    (`roots.parameter_annotations`), merged across matched profiles like every other `Roots`
+    field, and one new condition in `AppRoots`'s existing per-method loop (`anyParamHasAny`,
+    a small sibling of the already-existing `hasAny`) — no new loop structure, no new pass
+    over the hierarchy.
+  - **Verified via `javap`** (same diligence as Micronaut's/Quarkus's annotations):
+    `javax.enterprise.event.Observes`/`jakarta.enterprise.event.Observes` are real
+    `@Target(PARAMETER)`, `@Retention(RUNTIME)` — genuinely present in a using method's
+    `RuntimeVisibleParameterAnnotations`, not a compile-time-only marker.
+  - **New fixture classes** (`testdata/fixture/src/fixture/{Param,Observer}.java`:
+    `Param` is a `@Target(PARAMETER)` stand-in annotation; `Observer#onEvent` takes two
+    parameters, only the first carrying `@Param`, to exercise "found on some parameter" and
+    "absent on another" in the same `RuntimeVisibleParameterAnnotations` attribute). Fixture
+    jars rebuilt via `scripts/build-fixtures.sh`; `go test ./...` passed unchanged afterward,
+    confirming the rebuild didn't alter any existing expectation (the release-8/21
+    bytecode-shape differences `TestParseAndExtractCalls_handleMethod` already covers, e.g.
+    `invokespecial` vs. `invokevirtual` for a private-method call, held even though this
+    rebuild used different host `javac` versions than whatever built the previously-committed
+    jars — `--release` pins the *target* shape, which is what matters here).
+  - **`jakarta.yaml`** now lists `roots.parameter_annotations:
+    [javax.enterprise.event.Observes, jakarta.enterprise.event.Observes]`; its own comment
+    about this being unimplemented was removed.
+  - **Verified against a new, real app**: `scripts/prepare-jakarta-demo.sh` gained a third
+    class, `demo.YamlObserver` (`void onEvent(@Observes String payload)`), alongside its
+    existing JAX-RS resource and EJB. `-roots profile` now reports `"jakarta" (3 entry-point
+    methods)` (previously 2), and CVE-2022-1471 is still `REACHABLE`, with the report's own
+    recorded path for this run going through `YamlObserver#onEvent` specifically — confirming
+    the parameter-annotation route end to end, not just via a unit test.
+  - **CDI's own framework packages** (`javax.enterprise:*`/`jakarta.enterprise:*`/
+    `org.jboss.weld:*`) were already listed in `jakarta.yaml` before this; unchanged.
+- **Not implemented:** RTA and `--max-dep-depth` — both still speculative, with no evidence
+  from any real run so far that either is actually needed (see Phase 5's own note on
+  `--max-dep-depth`). `internal/reach`'s BFS passes stay unchanged (still computed once for
+  every CVE, same as Phase 5 left them) — only the root set and the framework-package list
+  going into them changed.
 
 ### Phase 8 (optional) — Exploitability check
 For 1–2 `REACHABLE` CVEs: ask the LLM whether user-controlled input actually flows to the
@@ -1079,8 +1120,8 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       ./internal/profile` verifies both, plus merging when several profiles match and
       `-profile-file` overriding/adding one by name. `--roots profile`, synthetic edges
       (Spring Data), and `Roots.Overrides`-based roots (the `servlet` profile) are
-      implemented too; the `jakarta` profile is implemented for JAX-RS and EJB (not CDI's
-      `@Observes` — see Phase 7's own status note for why); the `micronaut` and `quarkus`
+      implemented too; the `jakarta` profile is implemented for JAX-RS, EJB and CDI's
+      `@Observes` (via a new `Roots.ParameterAnnotations`); the `micronaut` and `quarkus`
       profiles are implemented too; only RTA and `--max-dep-depth` are not. Gradle input
       (`scripts/gradle-copy-deps.init.gradle`)
       and WAR/EAR input (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's

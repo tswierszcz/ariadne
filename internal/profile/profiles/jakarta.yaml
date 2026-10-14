@@ -13,14 +13,12 @@
 # verb annotations are always method-level and are always real entry
 # points by themselves, so @Path is a detect-only marker here.
 #
-# CDI's @Observes is NOT implemented as a root: it annotates a method
-# *parameter*, not the method or the class, and ariadne's bytecode parser
-# does not read RuntimeVisibleParameterAnnotations at all today (only
-# class- and method-level RuntimeVisibleAnnotations) -- see Known
-# limitations / PLAN.md's Phase 7 status note. CDI's own framework
-# packages are still listed below, so CDI container internals (Weld) are
-# at least classified FRAMEWORK, even though an observer method itself is
-# not added as a root.
+# CDI's @Observes annotates a method *parameter*, not the method or the
+# class, so it can't go in roots.annotations -- it needs
+# roots.parameter_annotations instead (confirmed via javap:
+# javax.enterprise.event.Observes/jakarta.enterprise.event.Observes are
+# real @Target(PARAMETER), @Retention(RUNTIME) annotations, which
+# internal/classfile's RuntimeVisibleParameterAnnotations parser reads).
 name: jakarta
 detect:
   - javax.ws.rs.Path
@@ -50,6 +48,9 @@ roots:
     - jakarta.ejb.Schedule
     - jakarta.ejb.Schedules
   overrides: []
+  parameter_annotations:
+    - javax.enterprise.event.Observes
+    - jakarta.enterprise.event.Observes
   main: true
 framework_packages:
   - javax.ws.rs:*

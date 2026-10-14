@@ -98,10 +98,12 @@ seven builds have actually been tested and verified**:
   into an old, vulnerable SnakeYAML — the control case for the `servlet`
   profile, the same role WebGoat plays for `spring`. See the `servlet`
   profile entry just below.
-- a tiny hand-written **Jakarta EE (JAX-RS + EJB, no Spring)** app
-  (`scripts/prepare-jakarta-demo.sh`): a `@Path`/`@GET` JAX-RS resource
-  and an `@Schedule`d EJB bean, both calling the same vulnerable
-  SnakeYAML — the control case for the `jakarta` profile.
+- a tiny hand-written **Jakarta EE (JAX-RS + EJB + CDI, no Spring)** app
+  (`scripts/prepare-jakarta-demo.sh`): a `@Path`/`@GET` JAX-RS resource,
+  an `@Schedule`d EJB bean, and a CDI observer method
+  (`void onEvent(@Observes String payload)`), all three calling the same
+  vulnerable SnakeYAML — the control case for the `jakarta` profile,
+  including CDI's `@Observes`.
 - a tiny hand-written **Micronaut (no Spring)** app
   (`scripts/prepare-micronaut-demo.sh`): one `@Controller`/`@Get` method
   calling the same vulnerable SnakeYAML — the control case for the
@@ -115,10 +117,8 @@ seven builds have actually been tested and verified**:
   Messaging `@Incoming` consumer, all three calling the same vulnerable
   SnakeYAML — the control case for the `quarkus` profile. Needs JDK 17+.
 
-Everything else (Kotlin, CDI's own `@Observes`)
-**should work mechanically** (CDI's framework-package classification
-aside — see the `jakarta` entry below), but has never been run or
-tested.
+Everything else (Kotlin, Scala, Groovy) **should work mechanically**,
+but has never been run or tested.
 
 ### What's genuinely NOT supported
 
@@ -188,29 +188,28 @@ tested.
   class-level and would otherwise turn every public helper method of a
   resource class into an entry point, not just its actual endpoints) and
   EJB (`@Schedule`/`@Schedules`), across both the `javax.*` and
-  post-Jakarta-EE9 `jakarta.*` namespaces. Verified the same two ways as
-  `servlet`: against both existing baselines (petclinic, WebGoat — still
-  auto-detect `spring+servlet` only, confirming `jakarta`'s own detect
-  markers don't accidentally fire on a Spring app); and against the new
-  JAX-RS+EJB control app above, with both `-roots all` and `-roots
-  profile` (which narrows to exactly the resource's `@GET` method and the
-  EJB's `@Schedule` method — confirmed directly via a one-off call to
-  `Profile.AppRoots`, not just the log's entry-point count) finding the
-  same `REACHABLE` CVE-2022-1471 either way.
-  - **CDI's `@Observes` is NOT implemented, and this is a real gap, not
-    an oversight**: it annotates a method *parameter*
-    (`void onEvent(@Observes SomeEvent e)`), not the method or the class,
-    and ariadne's bytecode parser never reads the
-    `RuntimeVisibleParameterAnnotations` attribute at all — only
-    class-/method-level `RuntimeVisibleAnnotations`. Implementing it
-    would touch three packages (a new attribute parser in
-    `internal/classfile`, a per-parameter-annotations field on
-    `hierarchy.Method`, and a new matching rule in `internal/profile`),
-    not just a YAML addition like the rest of this profile. CDI's own
-    framework packages (Weld and friends) are still listed, so CDI
-    container internals are classified `FRAMEWORK` on any path that
-    reaches them — just not via an observer-method root. Full details:
-    [PLAN.md](PLAN.md)'s Phase 7.
+  post-Jakarta-EE9 `jakarta.*` namespaces — plus **CDI's `@Observes`**,
+  which needed real new code, not just YAML: `@Observes` annotates a
+  method *parameter*
+  (`void onEvent(@Observes SomeEvent e)`), not the method or the class,
+  so it needed a new kind of root (`roots.parameter_annotations`) and a
+  parser for the `RuntimeVisibleParameterAnnotations` attribute in
+  `internal/classfile`, which ariadne didn't read at all before (only
+  class-/method-level `RuntimeVisibleAnnotations`). Turned out smaller
+  than first estimated: the new parser reuses the existing
+  `RuntimeVisibleAnnotations` parser's own `skipAnnotation` helper
+  (~15 lines), and `hierarchy.Method` already embeds `classfile.Method`
+  directly, so the new field needed zero changes there. Verified the same
+  two ways as `servlet`/`micronaut`: against both existing baselines
+  (petclinic, WebGoat — still auto-detect `spring+servlet` only,
+  confirming `jakarta`'s own detect markers don't accidentally fire on a
+  Spring app); and against the control app above (now three classes: the
+  JAX-RS resource, the EJB bean, and a CDI observer method), with both
+  `-roots all` and `-roots profile` (which narrows to exactly those three
+  methods — confirmed directly via a one-off call to `Profile.AppRoots`,
+  not just the log's entry-point count, and the observer method's own
+  path is the one the report records) finding the same `REACHABLE`
+  CVE-2022-1471 either way. Full details: [PLAN.md](PLAN.md)'s Phase 7.
 - **A `micronaut` profile is supported too**, for HTTP routing
   (`@Get`/`@Post`/`@Put`/`@Delete`/`@Patch`/`@Head`/`@Options`) and
   `@Scheduled`/`@EventListener` as entry points — again deliberately not
