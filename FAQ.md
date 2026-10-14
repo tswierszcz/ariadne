@@ -120,7 +120,11 @@ seven builds have actually been tested and verified**:
 Everything else (Kotlin, Scala, Groovy) **should work mechanically**,
 but has never been run or tested.
 
-### What's genuinely NOT supported
+### Build tools and profiles: what's supported, and what's still missing
+
+Everything in this list started life as "not supported"; each bullet below records what
+actually got built, how it was verified, and what — if anything — is still missing from
+that one piece.
 
 - **Gradle is supported** as of `scripts/gradle-copy-deps.init.gradle` +
   `scripts/prepare-petclinic-gradle.sh`, with **no changes to any Go
@@ -362,8 +366,10 @@ the class refers to — class names, method signatures, literals,
 `MethodHandle`s; every entry type through Java 21; a `Long`/`Double`
 entry takes two slots, not one — a spec quirk), access flags/superclass/
 interfaces, methods (name, signature, `RuntimeVisibleAnnotations` parsed
-recursively, the raw `Code` bytes), and class attributes, especially
-`BootstrapMethods` (needed for lambdas — see below).
+recursively, `RuntimeVisibleParameterAnnotations` — needed for CDI's
+`@Observes`, a *parameter*-level annotation — parsed the same way, the
+raw `Code` bytes), and class attributes, especially `BootstrapMethods`
+(needed for lambdas — see below).
 
 **`ExtractCalls()`** walks a method's bytecode instruction by
 instruction — each instruction is an opcode byte plus an operand whose

@@ -420,11 +420,11 @@ Flags:
 
 | Flag | Required | Meaning |
 |---|---|---|
-| `-app` | yes | A directory, a plain jar, or a Spring Boot fat jar. |
-| `-deps` | no* | Directory of dependency jars. *Not needed for a fat jar, which supplies its own via `BOOT-INF/lib/`.* |
-| `-deps-list` | no | `mvn dependency:list` output, used as a fallback for jars with no `pom.properties`. |
+| `-app` | yes | A directory, a plain jar, a Spring Boot fat jar, a WAR, or an EAR. |
+| `-deps` | no* | Directory of dependency jars. *Not needed for a fat jar/WAR/EAR, which supply their own.* |
+| `-deps-list` | no | `mvn dependency:list` output (or its Gradle equivalent, see `scripts/gradle-copy-deps.init.gradle`), used as a fallback for jars with no `pom.properties`. |
 | `-vuln-methods` | no | Override the embedded `vuln_methods.yaml`. |
-| `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, or a name from `-profile-file`. |
+| `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
 | `-out` | yes | `report.md` output path. |
@@ -488,13 +488,18 @@ make fixtures JAVAC8=/path/to/jdk11-or-later/bin/javac JAVAC21=/path/to/jdk21-or
 ./scripts/build-reachfixture.sh /path/to/javac
 ```
 
-Preparing the two target applications this project was developed and
+Preparing the target/control applications this project was developed and
 verified against (also JDK-dependent; not needed to run or test ariadne
 itself) uses the scripts in `scripts/`:
 
 ```bash
-./scripts/prepare-petclinic.sh /path/to/jdk11/JAVA_HOME
-./scripts/prepare-webgoat.sh   /path/to/jdk17-or-later/JAVA_HOME
+./scripts/prepare-petclinic.sh        /path/to/jdk11/JAVA_HOME         # Maven, Spring Boot
+./scripts/prepare-webgoat.sh          /path/to/jdk17-or-later/JAVA_HOME # Maven, Spring Boot, control case
+./scripts/prepare-petclinic-gradle.sh /path/to/jdk11/JAVA_HOME         # same app, Gradle instead
+./scripts/prepare-servlet-demo.sh     /path/to/jdk11-or-later/JAVA_HOME # plain Servlet, control case
+./scripts/prepare-jakarta-demo.sh     /path/to/jdk11-or-later/JAVA_HOME # JAX-RS+EJB+CDI, control case
+./scripts/prepare-micronaut-demo.sh   /path/to/jdk11-or-later/JAVA_HOME # Micronaut, control case
+./scripts/prepare-quarkus-demo.sh     /path/to/jdk17-or-later/JAVA_HOME # Quarkus, control case
 ```
 
 ## Project layout

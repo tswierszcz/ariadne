@@ -669,9 +669,12 @@ input modes:
   with a known-vulnerable dependency), to show that the `generic`/`jakarta` profiles work.
 - Optional: RTA (restrict CHA to types instantiated with `new`) as `--cha rta`.
 
-**Status: the profile system, Gradle input, and WAR/EAR input are done; every profile besides
-`spring`/`generic` is not.** `internal/profile` implements section 4 as described:
-- YAML profiles (`internal/profile/profiles/{spring,generic}.yaml`), embedded via
+**Status: done.** Every input format (Gradle, WAR, EAR) and every profile this section's own
+plan bullets name (`servlet`, `jakarta` including CDI, `micronaut`, `quarkus`) is
+implemented; only RTA and `--max-dep-depth` (both called out as optional/a later addition
+above) are not. `internal/profile` implements section 4 as described:
+- YAML profiles (`internal/profile/profiles/{spring,servlet,jakarta,micronaut,quarkus,
+  generic}.yaml`), embedded via
   `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
   one profile and replaces any existing one of the same name — not a partial per-field
   merge, matching how `-vuln-methods` already overrides a whole table rather than patching
@@ -1105,7 +1108,9 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       but it means this criterion as originally phrased doesn't hold and is corrected here.
 - [x] Every CVE has exactly one status; `REACHABLE` ones have a path and an entry call
       (`reach.Result`/`EntryEdge`, rendered in the report and `results.json`).
-- [x] Petclinic is not "everything REACHABLE" (13/148, not 148/148 — the CHA guard works).
+- [x] Petclinic is not "everything REACHABLE" (3/148 under `-profile spring`, not 148/148 —
+      the CHA guard works; this was 13/148 before the Phase 7 framework-package fix, see
+      Phase 5's own follow-up note).
 - [x] WebGoat control run shows at least one `REACHABLE` CVE (XStream) — in fact every
       XStream CVE in `vuln_methods.yaml` is REACHABLE via the same 2-hop path.
 - [x] Unit tests for the `.class` parser and the bytecode walker on fixtures compiled for
