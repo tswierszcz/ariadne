@@ -13,6 +13,10 @@ No JDK is required to run it: ariadne parses `.class` files itself. A JDK
 is only needed to build the Java *target* applications and test fixtures
 this repository ships with.
 
+See [supported capabilities and limitations](docs/SUPPORT.MD) for the current
+scope and evidence behind support claims. Future implementation plans are
+listed separately in [RECOMMENDATION](RECOMMENDATION/README.MD).
+
 See [PLAN.md](PLAN.md) for the full design rationale, phase-by-phase
 history, and every finding made while building this (including two real
 bugs found by running the tool end-to-end, with before/after numbers).

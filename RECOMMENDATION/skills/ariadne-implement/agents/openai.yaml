@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ariadne — realizacja faz"
+  short_description: "Wdrażaj fazy Ariadne i utrzymuj opis wsparcia"
+  default_prompt: "Użyj $ariadne-implement: przedstaw plan kolejnej fazy, zaczekaj na moją zgodę, a potem wykonaj go z weryfikacją i aktualizacją opisu wsparcia."
