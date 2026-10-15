@@ -1136,6 +1136,157 @@ riskier of the two options this phase named, and the LLM-based check already ans
 same question (is this REACHABLE result plausibly attacker-reachable) without needing a
 live target. Left as a possible future addition, not a gap in this phase's own scope.
 
+### Phase 9 (optional, future) — Closing known blind spots
+Section 3 point 8 lists several blind spots that are structural, not bugs: reflection,
+dynamic proxies beyond Spring Data, `invokedynamic` other than lambdas/method refs,
+serialization gadgets, config-driven behaviour, ServiceLoader, shaded/relocated
+dependencies. Not all are equally tractable; priority order by how mechanical the fix is:
+
+1. **ServiceLoader (highest priority — fully mechanical).** `META-INF/services/<Interface>`
+   is a declarative text file naming implementation classes. Parse it per dependency/app
+   jar and add a synthetic edge from each `ServiceLoader.load(Interface.class)` call site
+   (or, more coarsely, from the interface type) to every listed implementation — the same
+   `synthetic_edges` mechanism `internal/callgraph.ApplySyntheticEdges` already has for
+   Spring Data, just driven by jar contents instead of a YAML pattern.
+2. **More dynamic-proxy patterns (JDK `Proxy`, non-Spring-Data frameworks).** Same
+   `synthetic_edges` mechanism, but needs a hand-maintained pattern per framework (no single
+   declarative signal like ServiceLoader's file) — extend `spring.yaml` and add patterns to
+   other profiles as concrete cases come up.
+3. **Reflection heuristics.** Only tractable for the literal-string case:
+   `Class.forName("some.Literal")` / `clazz.getMethod("literalName", ...)` with a constant
+   argument → add a best-effort edge. Reflection driven by a runtime-computed string
+   (config, user input) is undecidable statically and stays a documented limitation, not a
+   future fix.
+4. **Shaded/relocated dependency detection.** Heuristic: detect `maven-shade-plugin`
+   relocation metadata when present and known gadget chains for common serialization
+   libraries; not a general solution.
+
+**Status: not started.** No code written yet; this is a priority list for a future session,
+captured after discussing ecosystem coverage gaps on 2026-10-14.
+
+### Phase 10 (optional, future) — External/offline CVE data file input (`-cves-file`)
+Today Phase 2 (`internal/cves`) always gets CVE data by querying the live OSV API.
+Add a flag, e.g. `-cves-file cves.json`, that **replaces that query** with a file already
+in `internal/cves`' own output schema (CVE/GHSA id, aliases, summary, severity, affected
+GAV+version range, references incl. `FIX` commit URLs) — the rest of the pipeline (Phase 4
+mapping, Phase 5 reachability, the report) needs no change, since it already consumes that
+same struct today.
+
+Intended use case raised in discussion: letting an external LLM (e.g. "Mythos") produce
+this file instead of/alongside OSV, for offline or custom CVE-data workflows.
+
+- What such a model would need to produce, to actually be usable by the later phases:
+  - CVE/GHSA id + affected GAV + version range — checkable against OSV, so hallucination
+    here is at least detectable.
+  - A real fix-commit URL (GitHub). Without one, Phase 4 has nothing to map to a method and
+    the CVE just becomes `UNKNOWN` — and this is also the field most exposed to
+    hallucination (a model inventing a plausible-looking SHA), so it should be validated
+    (commit exists, diff parses) rather than trusted as-is.
+  - Severity in OSV's own shape (`database_specific.severity`), to not break the report's
+    existing severity-count section.
+- **Risk, front and center:** this is a security tool — CVE data silently fabricated by an
+  LLM without retrieval/grounding is a worse failure mode than OSV simply having no answer
+  (false negatives are worse than `UNKNOWN`). Treat `-cves-file` as an explicit
+  alternative/offline source, not a drop-in replacement for OSV, and mark it in the report
+  the same way `vulnmap`'s `source: llm` is already flagged, so a reader knows the CVE list
+  itself (not just the method mapping) is unverified.
+
+**Status: not started.** Captured after discussing this idea on 2026-10-14; no code written.
+
+### Phase 11 (optional, future) — Strix integration (`-exploit-attempt`?)
+Phase 8 built the LLM half of exploitability checking (`-exploit-check`/
+`-framework-check`) but deliberately left out Strix (an actual exploit attempt), citing
+PLAN.md's own "never run it against third-party systems" caveat. This phase is about
+actually building that integration, scoped tightly to stay inside that caveat.
+
+Sketch:
+- A new flag (name TBD, e.g. `-exploit-attempt`), independent of `-exploit-check` but
+  presumably run after it — target only CVEs already `REACHABLE` (or `FRAMEWORK`) with a
+  known entry call/path from `reach.Result`, the same set `-exploit-check` already scopes
+  itself to.
+- **Hard requirement, not a default-on convenience: the target must be a locally running
+  instance the user explicitly points at** (e.g. `-target-url http://localhost:PORT`), never
+  a URL discovered or guessed by ariadne itself. Refuse to run against anything that isn't
+  explicitly local/loopback unless the user overrides it, and warn loudly either way — this
+  is the one place in the tool that can cause real side effects outside the analysis itself.
+- Strix needs an instruction/target for the specific CVE: likely built from the same
+  call-path + CVE-advisory context `-exploit-check`'s prompt already assembles, reused
+  rather than re-derived.
+- Open design questions for when this is actually scoped: how Strix is invoked (CLI
+  subprocess vs. its own API), what a "confirmed exploitable" result changes in the report
+  (a new status, or an annotation on the existing REACHABLE/FRAMEWORK entry), and how
+  findings get cached (same `.cache/`-keyed pattern as everything else, presumably keyed on
+  CVE + target so a repeat run against the same instance doesn't re-attempt automatically).
+
+**Status: not started.** Captured after discussing this idea on 2026-10-14; no code written.
+Given the blast radius (actually attempting exploitation, even against a local instance),
+this should get an explicit design/confirmation pass before implementation starts, not go
+straight to code.
+
+### Phase 12 (optional, future) — Go ecosystem support, as a separate command
+Raised in discussion: extending ariadne beyond the JVM to cover Go. **Not just a change to
+graph building** — most of the bottom of the stack is JVM-specific and would need
+replacing, not extending:
+- `internal/classfile`'s whole premise (a portable, well-specified bytecode format to parse
+  opcode-by-opcode) has no Go analogue — Go compiles to native machine code, not bytecode.
+  Building a Go call graph means analyzing **source**, not a compiled artifact (e.g.
+  `go/ast` + `golang.org/x/tools/go/callgraph`), which means ariadne would need source
+  access as an input, not just built artifacts/jars the way it does today.
+- Dispatch model differs: Go interfaces are structural/duck-typed, not resolved via a class
+  hierarchy the way CHA walks `.class` superclass/interface chains — the CHA-expansion
+  logic in `internal/callgraph`/`internal/hierarchy` doesn't transfer as-is.
+- Dependency identification is actually easier: `go.mod`/`go.sum` give exact module+version
+  directly (no GAV-resolution-from-jar-metadata problem), and OSV already covers the Go
+  ecosystem natively — Phase 2's OSV client could likely be reused with just a different
+  ecosystem string.
+- What plausibly **does** carry over: `internal/profile`/`internal/reach`/`internal/report`
+  operate on an abstract graph shape (interned method-node ids, `[][]uint32` adjacency,
+  BFS, statuses, report templates) — if a Go front-end produced a graph in that same shape,
+  the whole upper half of the pipeline could apply with minimal change.
+
+**Conclusion: this would ship as a separate command/binary (e.g. `ariadne-go` or a
+subcommand), not a flag on the existing Java pipeline** — the input/parsing/call-graph
+layer is a different implementation end to end; only the reach/report layer is a candidate
+for sharing code.
+
+**Status: not started — not yet decided whether this is worth doing at all.** Captured
+after discussing it on 2026-10-14; revisit only if there's real demand, since it's a
+separate project in scope, not an incremental extension.
+
+### Phase 13 (optional, future) — Further Java-ecosystem improvements
+A batch of ideas raised in discussion on 2026-10-14, staying inside the existing JVM
+pipeline rather than extending scope (contrast with Phase 12). Roughly ordered by how much
+they reuse data `internal/reach`/`internal/report` already compute vs. need new analysis:
+
+1. **SARIF output (`-sarif report.sarif`).** Standard format for GitHub Code Scanning/IDE
+   integration. Likely the cheapest of this batch — a new `internal/report` template
+   consuming the same `reach.Result`/CVE data the Markdown/JSON output already has; no new
+   analysis.
+2. **Baseline/diff mode (`-baseline prev-results.json`).** Compare against a previous run's
+   `results.json` so CI can gate on *newly introduced* REACHABLE CVEs rather than failing on
+   every pre-existing one every time. Needed for realistic CI adoption — "148 CVEs found"
+   on every run is not actionable, "2 new REACHABLE CVEs since last run" is.
+3. **Suppression / accepted-risk file (`-suppress suppressions.yaml`).** Lets a team mark a
+   CVE as reviewed/accepted so it doesn't keep surfacing as new in every report — the same
+   role a `retire.js` ignore-file or similar SCA suppression list plays elsewhere. Pairs
+   naturally with baseline mode (an accepted CVE shouldn't count as "new").
+4. **RTA (`--cha rta`).** Already named as deferred in Phase 7/section 9's own risk table;
+   restated here because it's the most direct lever on CHA's own false-positive rate
+   (restricting virtual-dispatch expansion to types actually instantiated via `new`,
+   instead of every subtype) — worth real measurement once a case shows CHA over-expansion
+   actually matters in practice (the Phase 8 `-framework-check` run against petclinic
+   already surfaced one concrete candidate: the `StandardHost`/`StandardPipeline`/
+   `LifecycleBase` CHA artifact).
+5. **JDK-itself CVEs, not just Maven-dependency CVEs.** OSV's Maven ecosystem covers
+   libraries resolved via GAV; it does not cover CVEs in the JDK's own classes
+   (`java.*`/`javax.*` internals, security providers), which ariadne's call graph does
+   reach and record calls into. Would need a separate CVE source for the JDK itself and
+   matching by the target JDK/bytecode version rather than by GAV — a bigger, separate
+   piece of work, not a one-line addition like 1–3 above.
+
+**Status: not started.** No code written; captured as a backlog, not committed to in this
+order.
+
 ## 7. Project layout
 ```
 ariadne/
