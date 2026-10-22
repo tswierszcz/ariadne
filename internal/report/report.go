@@ -9,6 +9,7 @@ import (
 
 	"ariadne/internal/cves"
 	"ariadne/internal/reach"
+	"ariadne/internal/serviceload"
 )
 
 // Header carries everything section 6's report header asks for.
@@ -68,13 +69,20 @@ type Data struct {
 	Framework       []reach.Result
 	TotalCVEs       int
 	WarningMessages []string
+
+	// ServiceRegistrations is SERVICE_LOADING S0's own inventory: every
+	// META-INF/services/<Interface> provider declaration found across the
+	// app and its dependencies. These are declarative facts, not
+	// call-graph edges — see serviceload.ServiceRegistration's own doc
+	// comment for why S0 deliberately stops there.
+	ServiceRegistrations []serviceload.ServiceRegistration
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -90,8 +98,9 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string)
 		Header:          h,
 		StatusCounts:    map[string]int{},
 		SeverityCounts:  map[string]int{},
-		TotalCVEs:       len(sorted),
-		WarningMessages: warnings,
+		TotalCVEs:            len(sorted),
+		WarningMessages:      warnings,
+		ServiceRegistrations: svcRegs,
 	}
 
 	for _, r := range sorted {

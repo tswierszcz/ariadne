@@ -114,6 +114,23 @@ None.
 {{end}}
 {{end}}
 
+## ServiceLoader provider registrations
+
+A declarative inventory of `META-INF/services/<Interface>` files across the app and
+its dependencies (SERVICE_LOADING S0) — **not call-graph edges**: a registration here
+says a jar *declares* a provider, not that anything in the app ever calls
+`ServiceLoader.load` for it, or that the provider is ever actually instantiated (that
+needs SERVICE_LOADING S1/S2, not yet implemented). "found" means the provider class
+exists somewhere in the analyzed classes/dependencies, not that it is reachable.
+{{if not .ServiceRegistrations}}
+None found.
+{{else}}
+| Interface | Provider | Found | Source |
+|---|---|---|---|
+{{range .ServiceRegistrations}}| `{{.Interface}}` | `{{.ProviderClass}}` | {{if .ProviderFound}}yes{{else}}**no**{{end}} | `{{.SourceJar}}` |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
@@ -121,9 +138,11 @@ None.
   static call graph. A Spring Data repository interface, for instance, has no bytecode
   implementation at all — Spring generates it at runtime — so a call to one can only be
   seen as reaching the interface method itself, never the generated proxy's body.
-- **Serialization gadgets and config-driven behavior** (XML wiring, `web.xml`,
-  `ServiceLoader`) are not modeled; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only
-  reflects direct and virtual/interface (CHA-expanded) method calls found in bytecode.
+- **Serialization gadgets and config-driven behavior** (XML wiring, `web.xml`) are not
+  modeled; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only reflects direct and
+  virtual/interface (CHA-expanded) method calls found in bytecode. **ServiceLoader**
+  provider *declarations* are inventoried (see the section above, SERVICE_LOADING S0),
+  but materialization/execution is not — a registration is not a reachability verdict.
 - **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
   package than its own Maven coordinates is not detected as such.
 - **CHA over-approximates**: a virtual/interface call is treated as reaching every

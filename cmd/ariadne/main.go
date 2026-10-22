@@ -21,6 +21,7 @@ import (
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
 	"ariadne/internal/report"
+	"ariadne/internal/serviceload"
 	"ariadne/internal/vulnmap"
 )
 
@@ -199,6 +200,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	} else {
 		log("hierarchy: %d classes (max bytecode version %d)", h.Len(), maxBytecode)
 	}
+
+	// SERVICE_LOADING S0: a declarative inventory of META-INF/services
+	// provider registrations, never a call-graph edge (see
+	// serviceload.ServiceRegistration's own doc comment).
+	svcRegs, svcWarnings, err := serviceload.Inventory(h, prepared.AppClassesJar, depJars)
+	if err != nil {
+		return fmt.Errorf("inventorying ServiceLoader providers: %w", err)
+	}
+	warnings = append(warnings, svcWarnings...)
+	log("ServiceLoader: %d provider registrations found", len(svcRegs))
 
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {
@@ -402,7 +413,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings)
+	data := report.Build(header, cveList, results, warnings, svcRegs)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

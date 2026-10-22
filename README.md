@@ -640,7 +640,12 @@ report:
   all* — Spring generates it at run time — so a call to one can only be
   seen reaching the interface method itself.
 - **Serialization gadgets and config-driven behavior** (XML wiring,
-  `web.xml`, `ServiceLoader`) are not modeled.
+  `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
+  are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
+  report's own "ServiceLoader provider registrations" section), but
+  this is not a call-graph edge: no connection yet from a
+  `ServiceLoader.load(...)` call site to the interface it names, and no
+  provider construction modeled as reachable.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

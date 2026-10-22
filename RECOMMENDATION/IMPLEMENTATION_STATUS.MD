@@ -16,7 +16,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 wymaga DATA_FLOW D0–D2 (nieodnotowane) — rozwiązania argumentu `Class` przy `ServiceLoader.load(...)`. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Katalog API i powiązanie callbacka z właściwym obiektem. |
@@ -520,6 +520,74 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - Polecenia rzeczywiście wykonane, ich wyniki i zakres; osobno kontrole niewykonane z powodem.
 - Zmiany w SUPPORT, README, raporcie i innych dotkniętych opisach, albo uzasadnienie braku zmiany zakresu wsparcia.
 - Pozostałe ograniczenia, konieczne decyzje oraz następny krok.
+
+### SERVICE_LOADING:S0 — Inwentaryzacja zasobów i kontrakt zdarzeń — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** B0–B1 (wspólne), `JVM_GRAPH:G1`
+  (gotowe, zarchiwizowane) — żadna zależność na DATA_FLOW, zgodnie z
+  tym, co S0's własny plan deklaruje (S1 jest pierwszą fazą tego
+  obszaru, która faktycznie potrzebuje DATA_FLOW D0–D2).
+- **Zmienione pliki:** `internal/input/serviceresources.go`
+  (`ListServiceFiles` — czyta surowe wpisy `META-INF/services/*` z jara,
+  z hashem SHA-256 treści; żadnej semantyki parsowania, czysty dostęp do
+  zasobu, zgodnie z planu rozkazem umieszczenia "indeksu zasobów" w
+  `internal/input`); nowy pakiet `internal/serviceload`
+  (`parse.go`: `Parse`/`Entry`/`ParseResult`, implementujące dokładnie
+  reguły parsowania z javadoc `java.util.ServiceLoader` — komentarz `#`
+  do końca linii, białe znaki ucinane, puste linie ignorowane,
+  duplikaty tolerowane ale raportowane, nazwa musi być poprawną
+  kwalifikowaną nazwą binarną; `inventory.go`: `ServiceRegistration`
+  (fakt deklaratywny) + stubowe `ServiceLoadSite`/`ProviderMaterialization`
+  (kontrakty dla S1/S2, jeszcze nigdy nie konstruowane w tej fazie) +
+  `Inventory` — orkiestracja: dla app i każdego dep jara, listuje pliki
+  serwisowe, parsuje, sprawdza każdą nazwę providera względem
+  `*hierarchy.Hierarchy`); `internal/report/report.go`/`report.md.tmpl`
+  (nowa sekcja "ServiceLoader provider registrations" — tabela
+  interfejs/provider/found/source, jawnie opisana jako "not call-graph
+  edges"); `cmd/ariadne/main.go` (wywołanie `Inventory` po zbudowaniu
+  hierarchii, log z liczbą rejestracji).
+- **Zachowanie dostępne użytkownikowi:** raport ma teraz tabelę
+  wszystkich deklaracji dostawców usług (`META-INF/services/*`) w
+  aplikacji i zależnościach, z informacją czy klasa providera istnieje
+  w analizowanym świecie klas — **bez żadnej fałszywej krawędzi w
+  grafie wywołań** (S0's własny wymóg: "Rejestracja nie jest krawędzią
+  wykonania").
+- **Spełnione kryteria (z S0's "Gotowe"):** "poprawna lista kandydatów
+  i diagnostyka bez tworzenia fikcyjnych wywołań" — potwierdzone: (1)
+  żadna nowa krawędź/węzeł w `internal/callgraph`/`internal/reach` nie
+  powstaje z tej fazy (kod jej nie dotyka w ogóle); (2) realny przebieg
+  na petclinic/WebGoat: 44/158 prawdziwych rejestracji, 0 fałszywych
+  "not found" (sprawdzone wprost, nie założone — np. wszystkie wpisy
+  `org.ehcache.core.spi.service.ServiceFactory` z `ehcache-3.9.2.jar`
+  poprawnie znalezione, bo ehcache sam dostarcza swoje klasy providerów
+  w tym samym jarze).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, w tym nowe testy `internal/input`:
+  `TestListServiceFiles_*`; `internal/serviceload`: `TestParse_*`,
+  `TestIsBinaryClassName`, `TestInventory_*`); `go test -race ./...`
+  dla całego projektu (zielone); `bin/ariadne -offline` na petclinic
+  (REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN bez zmian: 3/62/26/51/6 —
+  potwierdzone, że S0 nie wpływa na reachability) i WebGoat
+  (42/44/18/56/0, bez zmian); dwa przebiegi petclinic dają
+  bajt-identyczny `results.json` i `report.md` (poza samym znacznikiem
+  czasu) — sekcja ServiceLoader też jest deterministyczna.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "ServiceLoader
+  and JPMS service models": Not implemented → Partial, z pełnym opisem
+  zakresu i dowodami); `README.md` ("Known limitations" — poprawiony
+  bullet o ServiceLoader, już nieaktualny po tej fazie).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie
+  przez przeoczenie):** `ServiceLoadSite`/`ProviderMaterialization` są
+  zdefiniowane, ale nigdy nie konstruowane — to S1 (potrzebuje
+  DATA_FLOW D0–D2 do rozwiązania argumentu `Class` w wywołaniu
+  `ServiceLoader.load`) i S2 (modelowanie konstruktora providera jako
+  celu w grafie). JPMS (`module-info`, `uses`/`provides`) to S3,
+  nietknięte.
+- **Następny krok:** `SERVICE_LOADING:S1` wymaga `DATA_FLOW:D0–D2`
+  jako zależności (nieodnotowane) — więc naturalny następny krok to
+  albo zacząć `DATA_FLOW:D0` (kontrakt IR/wartości), żeby odblokować
+  S1 i resztę R1, albo pozostać przy mechanicznych, niezależnych
+  krokach w innych obszarach, jeśli takie się znajdą. Wymaga propozycji
+  i zgody użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
 
