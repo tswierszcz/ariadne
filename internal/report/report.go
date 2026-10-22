@@ -99,13 +99,19 @@ type Data struct {
 	// call-graph edge, and not yet resolving which concrete object the
 	// callback argument is (that's A1/A2).
 	CallbackRegistrationSites []callback.RegistrationSite
+
+	// ResolvedCallbacks is ASYNC_CALLBACKS A1's own result: each
+	// cataloged registration site's callback argument resolved to a
+	// concrete class, where it was a direct `new` allocation — still
+	// not a call-graph edge (that's A2).
+	ResolvedCallbacks []callback.ResolvedCallback
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -127,6 +133,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		ServiceLoadSites:          svcLoadSites,
 		ServiceMaterializations:   svcMaterializations,
 		CallbackRegistrationSites: callbackSites,
+		ResolvedCallbacks:         resolvedCallbacks,
 	}
 
 	for _, r := range sorted {

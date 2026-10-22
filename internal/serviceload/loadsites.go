@@ -1,10 +1,7 @@
 package serviceload
 
 import (
-	"archive/zip"
-	"bytes"
 	"fmt"
-	"io"
 
 	"ariadne/internal/bytecodeir"
 	"ariadne/internal/classfile"
@@ -55,12 +52,8 @@ var serviceLoaderOverloads = map[overloadKey]struct {
 func FindLoadSites(h *hierarchy.Hierarchy) ([]ServiceLoadSite, []string, error) {
 	var sites []ServiceLoadSite
 	var warnings []string
-	jarCache := map[string]*zip.ReadCloser{}
-	defer func() {
-		for _, zr := range jarCache {
-			zr.Close()
-		}
-	}()
+	var jarReader classfile.JarClassReader
+	defer jarReader.Close()
 
 	for _, fqcn := range h.SortedFQCNs() {
 		ci, ok := h.Lookup(fqcn)
@@ -71,7 +64,7 @@ func FindLoadSites(h *hierarchy.Hierarchy) ([]ServiceLoadSite, []string, error) 
 			continue
 		}
 
-		cf, err := parseClassFromJar(jarCache, ci.SourceJar, ci.SourceEntry)
+		cf, err := jarReader.ReadClass(ci.SourceJar, ci.SourceEntry)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf(
 				"re-reading %s (%s) for ServiceLoader call-site analysis: %v", ci.SourceJar, ci.SourceEntry, err))
@@ -148,35 +141,4 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method)
 		sites = append(sites, site)
 	}
 	return sites, nil
-}
-
-// parseClassFromJar re-reads one class entry's raw bytes — the only way
-// to get DecodeLocalOps the real constant pool it needs, since
-// hierarchy.Build does not retain one.
-func parseClassFromJar(cache map[string]*zip.ReadCloser, jarPath, entryName string) (*classfile.ClassFile, error) {
-	zr, ok := cache[jarPath]
-	if !ok {
-		var err error
-		zr, err = zip.OpenReader(jarPath)
-		if err != nil {
-			return nil, err
-		}
-		cache[jarPath] = zr
-	}
-	for _, f := range zr.File {
-		if f.Name != entryName {
-			continue
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return nil, err
-		}
-		data, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil {
-			return nil, err
-		}
-		return classfile.Parse(bytes.NewReader(data))
-	}
-	return nil, fmt.Errorf("entry %q not found in %s", entryName, jarPath)
 }

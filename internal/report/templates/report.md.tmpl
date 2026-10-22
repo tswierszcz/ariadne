@@ -193,6 +193,22 @@ None found.
 {{end}}
 {{end}}
 
+## Callback identities resolved
+
+For every cataloged registration call site above, the concrete class actually passed
+as the callback argument (ASYNC_CALLBACKS A1), when it was a direct `new` allocation —
+still not a call-graph edge to that class's own callback method (ASYNC_CALLBACKS A2,
+not yet implemented). A lambda or method reference is correctly left unresolved (needs
+DYNAMIC_LINKAGE L1), not guessed at.
+{{if not .ResolvedCallbacks}}
+None found.
+{{else}}
+| Caller | Target class | Callback method |
+|---|---|---|
+{{range .ResolvedCallbacks}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}{{.Site.CallerDesc}}` (pc={{.Site.PC}}) | {{if .TargetFQCN}}`{{.TargetFQCN}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} | `{{.Site.Model.CallbackInterface}}#{{.Site.Model.CallbackMethod}}` |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

@@ -646,10 +646,12 @@ report:
   seen reaching the interface method itself.
 - **Callbacks and async execution** (`Thread`, `Executor`/
   `ExecutorService`): every call site registering one is inventoried
-  (ASYNC_CALLBACKS A0 — see the report's own "Callback registration
-  call sites" section), but which concrete `Runnable`/`Callable` it
-  registers, and any resulting call-graph edge to that callback's own
-  method, are not modeled yet.
+  (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),
+  and the concrete `Runnable`/`Callable` class passed directly is
+  resolved where possible (ASYNC_CALLBACKS A1 — "Callback identities
+  resolved" section), but no call-graph edge to that class's own
+  `run`/`call` method exists yet, and a lambda/method reference is left
+  unresolved rather than guessed at.
 - **Serialization gadgets and config-driven behavior** (XML wiring,
   `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the

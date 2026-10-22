@@ -81,21 +81,21 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 		return ""
 
 	case classfile.LocalOpNew:
-		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew)), op.Width)
+		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew), op.TypeName), op.Width)
 		return ""
 
 	case classfile.LocalOpNewArray:
 		if _, ok := st.pop(); !ok {
 			return "stack underflow at an array-allocation instruction"
 		}
-		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew)), op.Width)
+		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew), op.TypeName), op.Width)
 		return ""
 
 	case classfile.LocalOpMultiNewArray:
 		if _, ok := st.popN(op.Dims); !ok {
 			return "stack underflow at a multianewarray instruction"
 		}
-		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew)), op.Width)
+		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew), op.TypeName), op.Width)
 		return ""
 
 	case classfile.LocalOpArrayLength:

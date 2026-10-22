@@ -103,6 +103,28 @@ func TestFindRegistrationSites_unrelatedCallIsIgnored(t *testing.T) {
 	}
 }
 
+// TestFindRegistrationSites_methodReferenceImplIsNotACallSite is a
+// regression test for a real false positive found running against
+// petclinic: a method reference used as a value (e.g. `Thread::new`
+// passed as a ThreadFactory) is recorded as a classfile.CallDynamic
+// entry whose Owner/Name/Desc name the reference's *resolved
+// implementation* — here, coincidentally identical to this package's
+// own Thread(Runnable) catalog entry — not an actual invocation
+// matching that shape. Must never be treated as a registration call.
+func TestFindRegistrationSites_methodReferenceImplIsNotACallSite(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{FQCN: "test.Caller", Methods: []hierarchy.Method{
+			callerMethod("m", classfile.Call{
+				Kind: classfile.CallDynamic, Owner: fqcnThread, Name: "<init>",
+				Desc: "(Ljava/lang/Runnable;)V", PC: 2,
+			}),
+		}},
+	})
+	if sites := FindRegistrationSites(h); len(sites) != 0 {
+		t.Errorf("sites = %+v, want none (a CallDynamic entry names a lambda impl, not a call site)", sites)
+	}
+}
+
 func TestLookup_andLooksLikeUncatalogedRegistration(t *testing.T) {
 	if _, ok := Lookup(fqcnThread, "<init>", "(Ljava/lang/Runnable;)V"); !ok {
 		t.Errorf("Lookup(Thread(Runnable)) = not found, want found")

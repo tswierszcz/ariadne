@@ -242,6 +242,19 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("callbacks: %d registration call sites found (%d a known API's uncataloged overload)", len(callbackSites), unsupportedCallbackAPIs)
 
+	// ASYNC_CALLBACKS A1: resolve each cataloged site's callback
+	// argument to a concrete class via DATA_FLOW D0-D2, where the
+	// argument was a direct `new` allocation.
+	resolvedCallbacks, callbackResolveWarnings := callback.ResolveCallbacks(h, callbackSites)
+	warnings = append(warnings, callbackResolveWarnings...)
+	resolvedCallbackCount := 0
+	for _, rc := range resolvedCallbacks {
+		if rc.TargetFQCN != "" {
+			resolvedCallbackCount++
+		}
+	}
+	log("callbacks: %d of %d cataloged sites resolved to a concrete class", resolvedCallbackCount, len(resolvedCallbacks))
+
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {
 		return fmt.Errorf("loading default profile catalog: %w", err)
@@ -461,7 +474,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

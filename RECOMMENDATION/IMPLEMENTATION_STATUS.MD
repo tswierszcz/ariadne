@@ -19,7 +19,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
-| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0: DONE; A1–A4: UNASSESSED | A0 inwentaryzuje wywołania Thread/Executor (138/140 na petclinic/WebGoat), ale nie rozwiązuje jeszcze, czym konkretnie jest callback (A1) ani nie tworzy krawędzi (A2). |
+| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0, A1: DONE; A2–A4: UNASSESSED | A1 rozwiązuje konkretną klasę przekazaną jako callback dla bezpośredniej alokacji (53/35 z 135/134 na petclinic/WebGoat), ale żadna krawędź grafu wywołań do `run`/`call` jeszcze nie powstaje (A2); lambdy odłożone do DYNAMIC_LINKAGE L1. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Uporządkować istniejące lambda/method references przed szerszymi uchwytami. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
@@ -1111,6 +1111,102 @@ Przy dodawaniu kolejnego wpisu zapisz:
   istniejącego `Alloc`; świadomie odłożyć lambdy/referencje metod do
   DYNAMIC_LINKAGE L1) albo dokończenie `SERVICE_LOADING:S3` (JPMS).
   Wymaga propozycji i zgody użytkownika przed startem.
+
+### ASYNC_CALLBACKS:A1 — Tożsamość zadania i funkcji — DONE for direct `new` allocation; lambdy/referencje metod odłożone do DYNAMIC_LINKAGE L1 (2026-10-22)
+
+- **Zakres zlecenia i zależności:** A0 (gotowe wyżej), DATA_FLOW D0–D2
+  (gotowe wyżej). DYNAMIC_LINKAGE L1 (wartości funkcyjne — lambdy,
+  referencje metod) nie istnieje jeszcze (nieodnotowane) — A1 celowo
+  ogranicza się do przypadku "bezpośrednia alokacja `new X(...)`
+  przekazana do skatalogowanego wywołania", zgodnie z A1's własnym
+  zapisem ("powiązać... wartości funkcyjne z DYNAMIC_LINKAGE L1" —
+  czytane jako zależność tej *części* zakresu, nie całej fazy).
+- **Zmienione pliki:** `internal/valueflow/value.go` (`Value.Type`
+  rozszerzone, by obejmować też `KindAlloc` — konkretny typ alokacji,
+  nie tylko miejsce; `Alloc` zyskuje drugi parametr `typ string`);
+  `internal/dataflow/step.go` (trzy miejsca produkujące `KindAlloc`
+  przekazują teraz `op.TypeName`); nowy `internal/classfile/jarclass.go`
+  (`JarClassReader` — wydzielony z `serviceload`'s własnego
+  `parseClassFromJar`, bo ta sama potrzeba — ponowny odczyt klasy z
+  jara dla jej prawdziwej tablicy stałych — wystąpiła teraz drugi raz;
+  `internal/serviceload/loadsites.go` zrefaktoryzowany, by z niego
+  korzystać, usuwając duplikat); nowy `internal/callback/identity.go`
+  (`ResolveCallbacks`/`ResolvedCallback`/`resolveOne` — dla każdego
+  skatalogowanego `RegistrationSite` (A0) odczytuje klasę z jara przez
+  `JarClassReader`, woła `internal/dataflow.Analyze`, i odczytuje
+  wartość argumentu callbacku przez `Facts.ArgumentAt`);
+  `internal/report/report.go`/`report.md.tmpl` (nowa sekcja "Callback
+  identities resolved"); `cmd/ariadne/main.go` (wywołanie
+  `ResolveCallbacks` po A0's inwentaryzacji, log z liczbą rozwiązanych).
+- **Zachowanie dostępne użytkownikowi:** raport ma teraz tabelę
+  każdego skatalogowanego wywołania rejestrującego callback z
+  rozwiązaną konkretną klasą (gdy argument był bezpośrednią alokacją
+  `new`) albo jawnym powodem braku rozwiązania (parametr, pole, wynik
+  wywołania, lambda/referencja metody) — **wciąż bez żadnej krawędzi
+  grafu wywołań** (to A2).
+- **Spełnione kryteria (z A1's "Gotowe", częściowo — patrz
+  "Niespełnione"):** "dwa zadania i niewykorzystana lambda nie tworzą
+  nieuzasadnionych połączeń" —
+  `TestResolveOne_directAllocationResolves` (dodatnie: `new Thread(new
+  MyRunnable())` rozwiązuje się do `test.MyRunnable`, nie do samego
+  `Thread`a ani do `java.lang.Runnable`) i
+  `TestResolveOne_parameterStaysUnresolved` (ujemne: parametr `Runnable`
+  przekazany dalej pozostaje nierozwiązany, z jawnym powodem). Lambda
+  jako wartość funkcyjna — jawnie odłożona (patrz "Niespełnione"), nie
+  fałszywie rozwiązana ani fałszywie oznaczona jako "nieznana" bez
+  powodu.
+- **Błąd złapany i naprawiony w trakcie pracy, nie przemilczany:**
+  pierwszy przebieg na realnym petclinic **spanikował** —
+  `ArgumentAt: argument index 0 out of range (call has 0 arguments)`
+  dla `LiveReloadServer#<init>(I)V`. Przyczyna ustalona wprost (nie
+  zgadywana): `classfile.ExtractCalls` dla `invokedynamic` zapisuje w
+  `Call.Owner/Name/Desc` **rozwiązaną implementację referencji metody**
+  (`Thread::new` użyte jako `ThreadFactory`), nie kształt samego miejsca
+  wywołania — a ta implementacja przypadkiem ma identyczną sygnaturę co
+  katalogowy wpis `Thread(Runnable)`. `FindRegistrationSites` (A0)
+  błędnie dopasowywał też `classfile.CallDynamic`, tworząc fikcyjny
+  `RegistrationSite`, którego PC w rzeczywistości wskazywało na
+  wywołanie zero-argumentowe. Naprawione: A0 teraz **pomija każdy wpis
+  `CallDynamic`** przy dopasowywaniu do katalogu (dodany test
+  regresyjny `TestFindRegistrationSites_methodReferenceImplIsNotACallSite`);
+  po naprawie: 137 (nie 138) miejsc na petclinic, zero paniki na obu
+  aplikacjach kontrolnych.
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  `bin/ariadne -offline` na petclinic: **53 z 135 skatalogowanych
+  miejsc rozwiązanych** do prawdziwej klasy — np.
+  `ch.qos.logback.core.net.AbstractSocketAppender$1#run`,
+  `com.mysql.cj.jdbc.ConnectionImpl$NetworkTimeoutSetter#run`,
+  `io.github.classgraph.ClassGraph$1#run`. WebGoat: **35 z 134**.
+  **Zero zmian w REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN** na obu
+  aplikacjach (ta faza nie dotyka grafu wywołań). Dwa przebiegi
+  petclinic dają bajt-identyczny `results.json` i `report.md` (poza
+  znacznikiem czasu).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/callback`:
+  `TestResolveOne_*` [2], `TestFindRegistrationSites_methodReferenceImplIsNotACallSite`;
+  `internal/valueflow`/`internal/dataflow` bez regresji po zmianie
+  sygnatury `Alloc`); `go test -race ./...` dla całego projektu
+  (zielone); `bin/ariadne -offline` na petclinic (dwa przebiegi) i
+  WebGoat (opisane wyżej, w tym pierwszy przebieg, który spanikował,
+  i drugi po naprawie, który nie).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "General
+  callbacks and asynchronous execution models" rozszerzony o A1's
+  zakres, złapany błąd i zmierzone dowody). `README.md` ("Known
+  limitations" — bullet o callbackach zaktualizowany).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy):**
+  lambdy/referencje metod (DYNAMIC_LINKAGE L1, nieodnotowane) — wynik
+  wywołania `invokedynamic` jest `KindUnknown` z D2's własnego powodu
+  ("call return value is not tracked"), nigdy fałszywie rozwiązany;
+  wzorzec "podklasa Thread z własnym override `run()`, bez żadnego
+  obiektu Runnable" — nie wykryty w ogóle (katalog A0 dopasowuje tylko
+  konstruktory przyjmujące `Runnable`); A2 (realna krawędź grafu
+  wywołań), A3, A4 — nietknięte.
+- **Następny krok:** `ASYNC_CALLBACKS:A2` (podstawowe wykonanie i
+  ścieżki — realna krawędź z miejsca rejestracji do `run`/`call` na
+  rozwiązanej klasie, zależna od `JVM_GRAPH:G3` dla powiązanej
+  inicjalizacji, tym samym wzorcem co `SERVICE_LOADING:S2`) albo
+  dokończenie `SERVICE_LOADING:S3` (JPMS). Wymaga propozycji i zgody
+  użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
 

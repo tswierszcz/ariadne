@@ -62,8 +62,13 @@ type Value struct {
 	Const any
 
 	// Type is set when Kind == KindConst (the constant's own runtime
-	// type, e.g. "java.lang.String") or KindTyped (the upper bound with
-	// no known constant).
+	// type, e.g. "java.lang.String"), KindTyped (the upper bound with
+	// no known constant), or KindAlloc (the allocated class's own FQCN,
+	// e.g. "com.example.MyRunnable" for `new MyRunnable()` — the static
+	// type `new`/`anewarray`/`multianewarray` itself names, not a claim
+	// about the object's contents; ASYNC_CALLBACKS A1's own first
+	// consumer, to tell which concrete Runnable/Callable a registration
+	// call's argument actually is).
 	Type string
 
 	// AllocSite is set only when Kind == KindAlloc.
@@ -88,8 +93,12 @@ func Const(typ string, v any) Value { return Value{Kind: KindConst, Type: typ, C
 func Typed(typ string) Value { return Value{Kind: KindTyped, Type: typ} }
 
 // Alloc returns a value identified by the allocation site that produced
-// it, with no further knowledge of its contents.
-func Alloc(site bytecodeir.Site) Value { return Value{Kind: KindAlloc, AllocSite: &site} }
+// it and that site's own static type (the class `new` named, or the
+// element type for `anewarray`/`multianewarray`) — not a claim about the
+// object's contents, just which allocation and what static type it was.
+func Alloc(site bytecodeir.Site, typ string) Value {
+	return Value{Kind: KindAlloc, AllocSite: &site, Type: typ}
+}
 
 // Null returns the null value.
 func Null() Value { return Value{Kind: KindNull} }

@@ -1,6 +1,9 @@
 package callback
 
-import "ariadne/internal/hierarchy"
+import (
+	"ariadne/internal/classfile"
+	"ariadne/internal/hierarchy"
+)
 
 // Outcome says what FindRegistrationSites could determine about one
 // call — ASYNC_CALLBACKS A0's own "diagnostykę ... nieobsługiwanego
@@ -44,6 +47,17 @@ type RegistrationSite struct {
 // unlike SERVICE_LOADING S1's argument resolution, since this phase
 // resolves nothing about the callback's identity yet) for a call
 // matching, or nearly matching, DefaultCatalog.
+//
+// A classfile.CallDynamic entry is always skipped: its Owner/Name/Desc
+// name the lambda/method-reference's *resolved implementation target*,
+// not an invocation's own call-site shape — a real instruction decoded
+// at that PC may take no arguments at all despite an impl method that
+// happens to share a cataloged API's exact signature (observed on real
+// petclinic bytecode: a `Thread::new` method reference passed as a
+// ThreadFactory resolves to Thread#<init>(Runnable) — identical to this
+// catalog's own Thread(Runnable) entry — even though the actual
+// invokedynamic call site there takes zero arguments). Matching on it
+// would misclassify a method-reference *value* as a registration call.
 func FindRegistrationSites(h *hierarchy.Hierarchy) []RegistrationSite {
 	var sites []RegistrationSite
 	for _, fqcn := range h.SortedFQCNs() {
@@ -53,6 +67,9 @@ func FindRegistrationSites(h *hierarchy.Hierarchy) []RegistrationSite {
 		}
 		for _, m := range ci.Methods {
 			for _, c := range m.Calls {
+				if c.Kind == classfile.CallDynamic {
+					continue
+				}
 				if model, ok := Lookup(c.Owner, c.Name, c.Desc); ok {
 					sites = append(sites, RegistrationSite{
 						CallerFQCN: fqcn, CallerName: m.Name, CallerDesc: m.Descriptor,
