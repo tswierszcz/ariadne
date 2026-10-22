@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"ariadne/internal/callback"
 	"ariadne/internal/cves"
 	"ariadne/internal/reach"
 	"ariadne/internal/serviceload"
@@ -91,13 +92,20 @@ type Data struct {
 	// implementacji daje lukę, nie brak podatności", never silently
 	// dropped.
 	ServiceMaterializations []serviceload.ProviderMaterialization
+
+	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
+	// every call site matching (or nearly matching) a cataloged
+	// callback-registration API (Thread/Executor so far) — not yet a
+	// call-graph edge, and not yet resolving which concrete object the
+	// callback argument is (that's A1/A2).
+	CallbackRegistrationSites []callback.RegistrationSite
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -110,14 +118,15 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 	}
 
 	data := Data{
-		Header:                  h,
-		StatusCounts:            map[string]int{},
-		SeverityCounts:          map[string]int{},
-		TotalCVEs:               len(sorted),
-		WarningMessages:         warnings,
-		ServiceRegistrations:    svcRegs,
-		ServiceLoadSites:        svcLoadSites,
-		ServiceMaterializations: svcMaterializations,
+		Header:                    h,
+		StatusCounts:              map[string]int{},
+		SeverityCounts:            map[string]int{},
+		TotalCVEs:                 len(sorted),
+		WarningMessages:           warnings,
+		ServiceRegistrations:      svcRegs,
+		ServiceLoadSites:          svcLoadSites,
+		ServiceMaterializations:   svcMaterializations,
+		CallbackRegistrationSites: callbackSites,
 	}
 
 	for _, r := range sorted {

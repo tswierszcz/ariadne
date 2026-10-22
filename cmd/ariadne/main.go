@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/cves"
 	"ariadne/internal/exploit"
@@ -227,6 +228,19 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 	}
 	log("ServiceLoader: %d load() call sites found, %d resolved to a service interface", len(svcLoadSites), resolvedLoadSites)
+
+	// ASYNC_CALLBACKS A0: an inventory of callback-registration call
+	// sites (Thread/Executor so far) — not yet a call-graph edge, and
+	// not yet resolving which concrete object the callback is (see
+	// callback.RegistrationSite's own doc comment).
+	callbackSites := callback.FindRegistrationSites(h)
+	unsupportedCallbackAPIs := 0
+	for _, s := range callbackSites {
+		if s.Outcome == callback.OutcomeUnsupportedAPI {
+			unsupportedCallbackAPIs++
+		}
+	}
+	log("callbacks: %d registration call sites found (%d a known API's uncataloged overload)", len(callbackSites), unsupportedCallbackAPIs)
 
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {
@@ -447,7 +461,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

@@ -644,6 +644,12 @@ report:
   repository interface, for instance, has *no bytecode implementation at
   all* — Spring generates it at run time — so a call to one can only be
   seen reaching the interface method itself.
+- **Callbacks and async execution** (`Thread`, `Executor`/
+  `ExecutorService`): every call site registering one is inventoried
+  (ASYNC_CALLBACKS A0 — see the report's own "Callback registration
+  call sites" section), but which concrete `Runnable`/`Callable` it
+  registers, and any resulting call-graph edge to that callback's own
+  method, are not modeled yet.
 - **Serialization gadgets and config-driven behavior** (XML wiring,
   `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the

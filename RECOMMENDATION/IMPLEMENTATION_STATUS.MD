@@ -19,7 +19,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
-| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Katalog API i powiązanie callbacka z właściwym obiektem. |
+| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0: DONE; A1–A4: UNASSESSED | A0 inwentaryzuje wywołania Thread/Executor (138/140 na petclinic/WebGoat), ale nie rozwiązuje jeszcze, czym konkretnie jest callback (A1) ani nie tworzy krawędzi (A2). |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Uporządkować istniejące lambda/method references przed szerszymi uchwytami. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
@@ -1026,6 +1026,91 @@ Przy dodawaniu kolejnego wpisu zapisz:
   Alternatywnie: `ASYNC_CALLBACKS:A0–A2`, teraz również odblokowane
   przez `DATA_FLOW:D0–D2`. Wymaga propozycji i zgody użytkownika przed
   startem.
+
+### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** B0–B3 (wspólne — rejestr modeli B3
+  nie istnieje jeszcze, nieodnotowane; zamiast czekać, A0 koduje
+  bezpośrednio mały, jawny katalog, bez budowania ogólnego rejestru,
+  ta sama decyzja co SERVICE_LOADING S1 dla `ServiceLoader`'s
+  przeciążeń), JVM G0–G2 (gotowe, zarchiwizowane), DATA_FLOW D0–D2
+  (gotowe wyżej — choć A0 samo jeszcze nie rozwiązuje żadnego
+  argumentu przez `internal/dataflow`; to jest A1's własny zakres).
+- **Zmienione pliki:** nowy pakiet `internal/callback`
+  (`catalog.go`: `RegistrationModel`/`ExecutionKind`/`DefaultCatalog` —
+  `Thread`'s konstruktory przyjmujące `Runnable` i
+  `Executor`/`ExecutorService#execute`/`#submit`, z `Lookup` po
+  dokładnym `(owner,name,desc)`; `LooksLikeUncatalogedRegistration` —
+  diagnostyka "znana nazwa API, nieskatalogowany wariant", sprawdzająca
+  też, czy deskryptor faktycznie wspomina `Runnable`/`Callable` jako
+  parametr, nie tylko właściciela+nazwę — bez tego każdy konstruktor
+  podklasy `Thread` (np. `super(String)`, zero związku z callbackiem)
+  dostałby fałszywie dodatnią diagnostykę, co faktycznie wystąpiło i
+  zostało złapane przed, nie po, zmierzonym przebiegu (34 fałszywych
+  trafień na petclinic przy pierwszej, naiwnej wersji
+  owner+name-only — poprawione, zmierzone ponownie: 2); `sites.go`:
+  `FindRegistrationSites`/`RegistrationSite`/`Outcome` — inwentaryzacja
+  po już wyekstrahowanych `hierarchy.Method.Calls`, bez ponownego
+  odczytu bytecode); `internal/report/report.go`/`report.md.tmpl`
+  (nowa sekcja "Callback registration call sites"); `cmd/ariadne/main.go`
+  (wywołanie `FindRegistrationSites` po S1's load-site'ach, log z
+  liczbą znalezionych/niejednoznacznych wywołań).
+- **Zachowanie dostępne użytkownikowi:** raport ma nową tabelę każdego
+  wywołania rejestrującego callback przez znane API, z interfejsem
+  callbacku i charakterem wykonania (`async-maybe`/`immediate-or-async`)
+  dla skatalogowanych przeciążeń, i jawną diagnostyką
+  `unsupported-api` dla realnych, ale nieskatalogowanych wariantów —
+  **bez żadnej krawędzi grafu wywołań i bez rozwiązywania, czym
+  faktycznie jest callback** (to A1/A2, jawnie odnotowane jako
+  nieukończone w tej samej fazie, nie przemilczane).
+- **Spełnione kryteria (z A0's "Gotowe", częściowo — patrz
+  "Niespełnione"):** "katalog ma dodatni i ujemny przykład każdego
+  pierwszego API" —
+  `TestFindRegistrationSites_threadConstructor`/`_executorSubmitCallable`
+  (dodatnie, dwa różne interfejsy callbacku) i
+  `_uncatalogedOverloadIsFlagged`/`_unrelatedCallIsIgnored`/
+  `_threadSubclassSuperCallIsNotFlagged` (ujemne — w tym realny,
+  złapany false-positive). "Diagnostyka nieobsługiwanego API" —
+  `unsupported-api` zaimplementowane i zweryfikowane na realnym
+  bytecode. "Diagnostyka brakującego celu i unknown receivera" —
+  **nie zaimplementowane w A0** — wymagają rozwiązanej tożsamości
+  callbacku (A1), więc nie są tej fazy własnym zakresem, zgodnie z
+  `RegistrationSite`'s/`Outcome`'s własnym komentarzem.
+- **Błąd złapany i naprawiony w trakcie pracy, nie przemilczany:**
+  pierwsza wersja diagnostyki (`IsKnownAPI(owner,name)`, ignorująca
+  deskryptor) oznaczała **34 fałszywe trafienia na petclinic** —
+  głównie podklasy `Thread` wołające `super(String)`/`super()`/
+  `super(ThreadGroup,String)`, zero związku z `Runnable`. Naprawione
+  przez `LooksLikeUncatalogedRegistration`, które dodatkowo sprawdza,
+  czy deskryptor wspomina `Runnable;`/`Callable;`; po naprawie: 2
+  prawdziwe, bliskie niedopasowania na petclinic (`ExecutorService#submit
+  (Runnable, Object)`, `TaskThread`'s 4-argumentowy konstruktor), 6 na
+  WebGoat — żadnego fałszywego trafienia w próbce sprawdzonej ręcznie.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/callback`:
+  `TestFindRegistrationSites_*` [5], `TestLookup_andLooksLikeUncatalogedRegistration`);
+  `go test -race ./...` dla całego projektu (zielone); `bin/ariadne
+  -offline` na petclinic (138 wywołań, 2 niejednoznaczne) i WebGoat
+  (140, 6) — **zero zmian w REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN**
+  na obu aplikacjach (ta faza nie dotyka grafu wywołań w ogóle);
+  dwa przebiegi petclinic dają bajt-identyczny `results.json` i
+  `report.md` (poza znacznikiem czasu).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "General
+  callbacks and asynchronous execution models": Not implemented →
+  Partial, z pełnym opisem zakresu i zmierzonymi dowodami).
+  `README.md` ("Known limitations" — nowy bullet o callbackach).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy):** A1
+  (tożsamość zadania — rozwiązanie konkretnego typu `Runnable`/`Callable`
+  przez `internal/dataflow` dla `new X()` przekazanego bezpośrednio;
+  lambdy/referencje metod zależą od DYNAMIC_LINKAGE L1, nieodnotowane),
+  A2 (realna krawędź grafu wywołań do `run`/`call`), A3 (CompletionStage,
+  listenery, reactive), A4 — nietknięte.
+- **Następny krok:** `ASYNC_CALLBACKS:A1` (tożsamość zadania — zacząć
+  od przypadku `new ConcreteRunnable()` przekazanego bezpośrednio do
+  skatalogowanego wywołania, z użyciem `internal/dataflow`'s już
+  istniejącego `Alloc`; świadomie odłożyć lambdy/referencje metod do
+  DYNAMIC_LINKAGE L1) albo dokończenie `SERVICE_LOADING:S3` (JPMS).
+  Wymaga propozycji i zgody użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
 

@@ -172,6 +172,27 @@ None found.
 {{end}}
 {{end}}
 
+## Callback registration call sites
+
+Every call site found matching, or nearly matching, a cataloged callback-registration
+API (`java.lang.Thread`'s Runnable-taking constructors, `Executor`/`ExecutorService`'s
+`execute`/`submit`; ASYNC_CALLBACKS A0). **Not a call-graph edge** — this says a method
+*registers* a callback with an API that will eventually invoke it, not what the
+callback actually is or that it ever runs (resolving the callback argument's concrete
+type is ASYNC_CALLBACKS A1; turning that into a call-graph edge is A2, neither
+implemented yet). "unsupported-api" means the call's owner and method name match a
+cataloged API and the call plausibly still passes a callback argument, but this exact
+overload isn't cataloged — a real registration ariadne doesn't model yet, not a false
+negative being hidden.
+{{if not .CallbackRegistrationSites}}
+None found.
+{{else}}
+| Caller | Callback interface | Outcome |
+|---|---|---|
+{{range .CallbackRegistrationSites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}) | {{if eq .Outcome "cataloged"}}`{{.Model.CallbackInterface}}#{{.Model.CallbackMethod}}` ({{.Model.Execution}}){{else}}—{{end}} | {{.Outcome}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
