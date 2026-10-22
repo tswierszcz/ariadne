@@ -4,6 +4,8 @@ Status wszystkich nowych obszarów: plan, bez implementacji w ramach przygotowan
 
 Punkt wyjścia: [oryginalne rekomendacje](MD). Wspólne zależności, zasady i kolejność: [ROADMAP.MD](ROADMAP.MD). Istniejący zakres rozpoznawania CVE pozostaje w osobnej parze dokumentów.
 
+`PLAN.md`'s Phase 9/12/13 (z sesji 2026-10-14, przed powstaniem tego folderu) zawierają wcześniejsze, lżejsze notatki o części tego samego zakresu — ServiceLoader, refleksja, proxy/frameworki, Go, RTA. Ten folder jest ich bardziej rygorystycznym rozwinięciem, nie konkurencyjnym planem; nowa praca nad tymi tematami powinna zaczynać się tutaj, nie w `PLAN.md`.
+
 Do realizacji w nowej sesji użyj [promptu startowego i skilla](START_IMPLEMENTATION.MD).
 Postęp zapisuje [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD), a faktycznie dostępne
 możliwości i ograniczenia opisuje [SUPPORT.MD](../docs/SUPPORT.MD).

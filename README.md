@@ -640,4 +640,8 @@ report:
   methods are a machine's suggestion (checked to exist, not to be the
   vulnerable ones); see step 6 above.
 
+See [docs/SUPPORT.MD](docs/SUPPORT.MD) for a mechanism-by-mechanism status table and
+[RECOMMENDATION](RECOMMENDATION/README.MD) for plans to extend beyond the limitations
+above — this list is not independently maintained from those two.
+
 

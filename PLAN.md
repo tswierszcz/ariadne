@@ -1136,7 +1136,21 @@ riskier of the two options this phase named, and the LLM-based check already ans
 same question (is this REACHABLE result plausibly attacker-reachable) without needing a
 live target. Left as a possible future addition, not a gap in this phase's own scope.
 
+**Note on Phases 9–13 below.** These are a lightweight backlog captured from a single
+discussion on 2026-10-14, before [RECOMMENDATION/](RECOMMENDATION/README.MD) existed.
+RECOMMENDATION (added 2026-10-15) is a far more rigorous, later plan for much of the same
+ground — ServiceLoader, reflection, proxies/frameworks, async callbacks, dynamic linkage,
+deserialization, RTA/points-to, data flow, runtime/native, and other ecosystems — with
+shared contracts and phase tracking across areas. **New work on those specific topics
+should start from RECOMMENDATION, not from the phases below** — see each phase's own note
+for which RECOMMENDATION document supersedes it. Phases 10 and 11 (`-cves-file`, Strix) are
+not covered by RECOMMENDATION and remain this file's own backlog.
+
 ### Phase 9 (optional, future) — Closing known blind spots
+**Superseded in detail by [RECOMMENDATION/SERVICE_LOADING.MD](RECOMMENDATION/SERVICE_LOADING.MD),
+[REFLECTION.MD](RECOMMENDATION/REFLECTION.MD) and [FRAMEWORKS.MD](RECOMMENDATION/FRAMEWORKS.MD)** —
+kept here for history; start new work in those documents instead.
+
 Section 3 point 8 lists several blind spots that are structural, not bugs: reflection,
 dynamic proxies beyond Spring Data, `invokedynamic` other than lambdas/method refs,
 serialization gadgets, config-driven behaviour, ServiceLoader, shaded/relocated
@@ -1224,6 +1238,9 @@ this should get an explicit design/confirmation pass before implementation start
 straight to code.
 
 ### Phase 12 (optional, future) — Go ecosystem support, as a separate command
+**Superseded in detail by [RECOMMENDATION/ECOSYSTEMS.MD](RECOMMENDATION/ECOSYSTEMS.MD)**
+(tracks E0–E4) — kept here for history; start new work in that document instead.
+
 Raised in discussion: extending ariadne beyond the JVM to cover Go. **Not just a change to
 graph building** — most of the bottom of the stack is JVM-specific and would need
 replacing, not extending:
@@ -1276,13 +1293,18 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
    instead of every subtype) — worth real measurement once a case shows CHA over-expansion
    actually matters in practice (the Phase 8 `-framework-check` run against petclinic
    already surfaced one concrete candidate: the `StandardHost`/`StandardPipeline`/
-   `LifecycleBase` CHA artifact).
+   `LifecycleBase` CHA artifact). **Superseded in detail by
+   [RECOMMENDATION/GRAPH_PRECISION.MD](RECOMMENDATION/GRAPH_PRECISION.MD)** (tracks P0–P4,
+   including the allocation-driven version of this same idea) — start new work there.
 5. **JDK-itself CVEs, not just Maven-dependency CVEs.** OSV's Maven ecosystem covers
    libraries resolved via GAV; it does not cover CVEs in the JDK's own classes
    (`java.*`/`javax.*` internals, security providers), which ariadne's call graph does
    reach and record calls into. Would need a separate CVE source for the JDK itself and
    matching by the target JDK/bytecode version rather than by GAV — a bigger, separate
-   piece of work, not a one-line addition like 1–3 above.
+   piece of work, not a one-line addition like 1–3 above. Related to
+   [RECOMMENDATION/CVE_IMPLEMENTATION_PLAN.MD](RECOMMENDATION/CVE_IMPLEMENTATION_PLAN.MD)'s
+   runtime-CVE track (F8), which also treats the target JDK as a CVE-relevant input rather
+   than just a bytecode-version number.
 
 **Status: not started.** No code written; captured as a backlog, not committed to in this
 order.

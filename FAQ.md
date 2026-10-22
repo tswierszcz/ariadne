@@ -306,6 +306,10 @@ target).
 only needed to build the application being analyzed — `ariadne` itself
 parses `.class` files with its own parser.
 
+See [docs/SUPPORT.MD](docs/SUPPORT.MD) for a mechanism-by-mechanism current-status table
+and [RECOMMENDATION](RECOMMENDATION/README.MD) for plans to extend what's still missing
+above — this section is a narrative companion to those, not a separately maintained list.
+
 ## How the pipeline works, step by step
 
 ### Step 1: `internal/input` — normalizing the input
