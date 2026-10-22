@@ -20,17 +20,19 @@ const readWorkers = 8
 // an error, since ariadne can still analyze the rest of the graph.
 func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, error) {
 	type job struct {
+		idx   int
 		path  string
 		gav   *input.GAV
 		isApp bool
 	}
 	jobs := make([]job, 0, len(depJars)+1)
-	jobs = append(jobs, job{path: appJarPath, isApp: true})
-	for _, dj := range depJars {
-		jobs = append(jobs, job{path: dj.Path, gav: dj.GAV})
+	jobs = append(jobs, job{idx: 0, path: appJarPath, isApp: true})
+	for i, dj := range depJars {
+		jobs = append(jobs, job{idx: i + 1, path: dj.Path, gav: dj.GAV})
 	}
 
 	type result struct {
+		idx     int
 		path    string
 		classes []*ClassInfo
 		err     error
@@ -45,7 +47,7 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 			defer wg.Done()
 			for j := range jobCh {
 				classes, err := readJarClasses(j.path, j.gav, j.isApp)
-				resCh <- result{path: j.path, classes: classes, err: err}
+				resCh <- result{idx: j.idx, path: j.path, classes: classes, err: err}
 			}
 		}()
 	}
@@ -60,28 +62,43 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 		close(resCh)
 	}()
 
-	classes := make(map[string]*ClassInfo)
-	var warnings []string
+	// Results are collected by job index, not in whatever order workers
+	// happen to finish: JVM_GRAPH G1's own correctness requirement is that
+	// which duplicate class "wins" depends only on the explicit input
+	// order (app, then dependency jars in the order the CLI/ResolveDepJars
+	// gave them) — never on worker scheduling, jar size, or disk speed,
+	// none of which are supposed to change the analysis's own answer.
+	results := make([]result, len(jobs))
 	var firstErr error
 	for r := range resCh {
-		if r.err != nil {
-			if firstErr == nil {
-				firstErr = fmt.Errorf("reading %s: %w", r.path, r.err)
-			}
-			continue
+		if r.err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("reading %s: %w", r.path, r.err)
 		}
-		for _, ci := range r.classes {
-			if existing, dup := classes[ci.FQCN]; dup {
-				warnings = append(warnings, fmt.Sprintf(
-					"class %s found in both %s and %s; keeping the first one seen",
-					ci.FQCN, existing.SourceJar, ci.SourceJar))
-				continue
-			}
-			classes[ci.FQCN] = ci
-		}
+		results[r.idx] = r
 	}
 	if firstErr != nil {
-		return nil, warnings, firstErr
+		return nil, nil, firstErr
+	}
+
+	classes := make(map[string]*ClassInfo)
+	var warnings []string
+	var duplicates []Duplicate
+	for _, r := range results {
+		for _, ci := range r.classes {
+			existing, dup := classes[ci.FQCN]
+			if !dup {
+				classes[ci.FQCN] = ci
+				continue
+			}
+			warnings = append(warnings, fmt.Sprintf(
+				"class %s found in both %s and %s; keeping the first one seen (explicit input order, not read order)",
+				ci.FQCN, existing.SourceJar, ci.SourceJar))
+			duplicates = append(duplicates, Duplicate{
+				FQCN:     ci.FQCN,
+				Kept:     sourceRefOf(existing),
+				Shadowed: sourceRefOf(ci),
+			})
+		}
 	}
 
 	sorted := make([]string, 0, len(classes))
@@ -95,6 +112,7 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 		direct:        buildDirectSubtypes(classes, sorted),
 		subtypesCache: make(map[string][]string),
 		sorted:        sorted,
+		duplicates:    duplicates,
 	}, warnings, nil
 }
 

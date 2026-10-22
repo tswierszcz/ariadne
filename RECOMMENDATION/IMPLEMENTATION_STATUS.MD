@@ -14,7 +14,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
-| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0: DONE (2026-10-22); G1–G5: UNASSESSED | G1 (deterministyczny wybór klas) jest następnym naturalnym krokiem — G0 już daje mu miejsce w modelu Edge (Basis), ale sam wybór klas po jawnej kolejności wejścia jeszcze nie istnieje. |
+| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1: DONE (2026-10-22); G2–G5: UNASSESSED | G2 (dokładne rozwiązywanie wywołań, współdzielone z CVE F4) jest następnym naturalnym krokiem. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
@@ -94,6 +94,72 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 - **Następny krok:** `JVM_GRAPH:G1` (deterministyczny wybór klas, jawna
   kolejność wejścia w `internal/hierarchy/build.go`) — wymaga zgody
   użytkownika przed startem, jak każda kolejna faza.
+
+### JVM_GRAPH:G1 — Pochodzenie i deterministyczny wybór klas — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** G0 (gotowe wyżej). Model komponentu
+  CVE F1 nie istnieje jeszcze — zamiast czekać na całą fazę F1 (poza
+  zakresem tego przyrostu), z jej opisu wzięto tylko wspólny element,
+  który G1 faktycznie potrzebuje: SHA-256 jako dowód tożsamości
+  zawartości pliku klasy. To nie jest realizacja F1; gdy F1 faktycznie
+  powstanie, ma użyć tego samego `hashClassEntry`, nie duplikować go.
+- **Zmienione pliki:** `internal/hierarchy/build.go` (merge wyników
+  czytania jarów odbywa się teraz po indeksie zadania w jawnej liście
+  wejściowej — `results := make([]result, len(jobs))` — a nie w
+  kolejności, w jakiej kanał `resCh` dostarczył wyniki, co wcześniej
+  zależało od tego, który worker skończył pierwszy); nowy
+  `internal/hierarchy/duplicates.go` (`SourceRef`, `Duplicate`,
+  `hashClassEntry` — leniwe liczenie SHA-256 tylko dla faktycznych
+  kolizji, nie dla każdej klasy, żeby nie dotykać gorącej ścieżki
+  odczytu 29–40 tysięcy klas); `internal/hierarchy/hierarchy.go`
+  (`Hierarchy.duplicates`/`Duplicates()`; poprawiony nieaktualny
+  komentarz przy `SourceJar`, który twierdził, że jest "" dla klas
+  aplikacji — kod zawsze ustawia rzeczywistą ścieżkę jara).
+- **Zachowanie dostępne użytkownikowi:** które wystąpienie zduplikowanej
+  klasy "wygrywa" zależy teraz wyłącznie od jawnej kolejności wejścia
+  (aplikacja, potem zależności w kolejności podanej przez
+  `ResolveDepJars`/CLI — `os.ReadDir` już sortuje alfabetycznie, co
+  samo w sobie już daje odtwarzalną kolejność classpath, więc ten
+  element zadania był już spełniony), nigdy od szybkości workera.
+  `Hierarchy.Duplicates()` daje też strukturalny dowód (ścieżka +
+  SHA-256) obok dotychczasowego ostrzeżenia tekstowego.
+- **Spełnione kryteria (z G1's "Gotowe"):**
+  - "permutacja czasu workerów nie zmienia grafu" — mechanizm wyklucza
+    to z definicji (merge po indeksie zadania ustalonym przed
+    uruchomieniem jakiegokolwiek workera), potwierdzone też testem pod
+    `-race`.
+  - "zmiana jawnej kolejności zmienia wybraną implementację w
+    przewidywalny sposób" — test
+    `TestBuild_duplicateWinnerFollowsExplicitOrderNotReadOrder`
+    (`internal/hierarchy/hierarchy_test.go`): dwie kopie tego samego
+    jara pod różnymi ścieżkami, zamiana ich kolejności w `depJars`
+    przewidywalnie zamienia, która ścieżka "wygrywa".
+  - Dowody nie są tylko konstrukcją testową: realny przebieg na
+    petclinic ujawnił **31 prawdziwych kolizji klas** (np.
+    `jakarta.activation-1.2.2.jar` vs
+    `jakarta.activation-api-1.2.2.jar`), a na WebGoat **242** — czyli to
+    wcześniej latentne niezdeterminowanie było realne, nie
+    teoretyczne, na obu rzeczywistych aplikacjach kontrolnych.
+- **Niespełnione/odłożone:** "oznaczać przyjętą kolejność jako
+  założenie" i "zachować konflikt w pokryciu dla nieobsługiwanej
+  izolacji loaderów" z G1's zadań nie dostały nowego, dedykowanego pola
+  — pokrywa je nadal istniejący mechanizm ostrzeżeń plus nowy
+  `Duplicates()`; pełny model izolacji loaderów to RUNTIME_NATIVE N1–N2,
+  nie ta faza (zgodnie z ROADMAP.MD B1's własną uwagą).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone); `go test -race ./internal/hierarchy/...`
+  (zielone); `bin/ariadne -offline` na petclinic (`-profile spring`:
+  3/59/29/51/6, identyczne jak przed zmianą, 273180 węzłów/1229725
+  krawędzi bez zmian) i WebGoat (40/43/21/56/0, 339786/2591563 bez
+  zmian) — brak regresji; dwa przebiegi petclinic dają bajt-identyczny
+  `results.json`.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Duplicate class
+  selection" rozszerzony o nowy zakres i dowody z realnych przebiegów).
+  `README.md`/`FAQ.md` nie opisywały wcześniej duplikatów klas jako
+  osobnego tematu, więc nie wymagały zmiany.
+- **Następny krok:** `JVM_GRAPH:G2` (dokładne rozwiązywanie wywołań —
+  lookup `fqcn+name+descriptor+rodzaj wywołania`, współdzielone z CVE
+  F4) — wymaga zgody użytkownika przed startem.
 
 Przy dodawaniu kolejnego wpisu zapisz:
 

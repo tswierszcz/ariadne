@@ -36,9 +36,11 @@ type ClassInfo struct {
 	MajorVersion uint16
 	Methods      []Method
 	Annotations  []string
-	// SourceJar is the jar this class was read from ("" for an app class
-	// read from a classes directory/app-classes.jar rather than a
-	// dependency jar).
+	// SourceJar is the path of the jar this class was read from — the app
+	// jar (or the in-memory jar PrepareAppInput packed from a classes
+	// directory) for an app class, or the dependency jar's own path
+	// otherwise. Never "" in practice: Build always passes a jar path for
+	// the app too.
 	SourceJar string
 	// GAV is the resolved Maven coordinate of SourceJar, or nil if it
 	// came from the app, or from a dependency jar ResolveDepJars could
@@ -100,6 +102,19 @@ type Hierarchy struct {
 	// per run and would otherwise make results.json's reported paths
 	// nondeterministic between two runs of the very same analysis.
 	sorted []string
+
+	// duplicates records every FQCN collision Build resolved (see
+	// Duplicate's own doc comment) — structured evidence behind the
+	// plain-string warnings Build also returns.
+	duplicates []Duplicate
+}
+
+// Duplicates returns every class-name collision Build resolved while
+// assembling this Hierarchy, in the order they were found (app, then
+// dependency jars in explicit input order). Empty when nothing
+// collided. The caller must not modify the returned slice.
+func (h *Hierarchy) Duplicates() []Duplicate {
+	return h.duplicates
 }
 
 // SortedFQCNs returns every class's FQCN, sorted, for callers that need a
