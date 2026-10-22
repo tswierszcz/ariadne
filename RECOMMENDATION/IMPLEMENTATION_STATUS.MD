@@ -15,8 +15,8 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1: DONE; D2–D5: UNASSESSED | D1 daje realny CFG (zweryfikowany na ~500k metod z petclinic+WebGoat), ale nic w CLI go jeszcze nie używa — brak lokalnej analizy wartości (D2) aż do kolejnej fazy. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 wciąż wymaga DATA_FLOW D1–D2 (D0 samo nie wystarcza — to tylko kontrakt) do rozwiązania argumentu `Class` przy `ServiceLoader.load(...)`. |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1, D2: DONE; D3–D5: UNASSESSED | D2 daje realną, zweryfikowaną na skalę lokalną analizę wartości (stałe tekstowe/klasowe przez zmienne i gałęzie, argumenty wywołań) i odblokowuje `SERVICE_LOADING:S1`, ale nic w CLI go jeszcze nie używa. |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 jest teraz odblokowane (DATA_FLOW D0–D2: DONE) — rozwiązanie argumentu `Class` przy `ServiceLoader.load(...)` przez `internal/dataflow.Analyze`'s `Facts.ArgumentAt`. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Katalog API i powiązanie callbacka z właściwym obiektem. |
@@ -736,6 +736,92 @@ Przy dodawaniu kolejnego wpisu zapisz:
   z prawdziwego bytecode, korzystając z `BuildCFG`) odblokowuje
   `SERVICE_LOADING:S1`. Wymaga propozycji i zgody użytkownika przed
   startem.
+
+### DATA_FLOW:D2 — Lokalne wartości i udostępnienie modelom — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** D1 (gotowe wyżej). D2's własny plan
+  odkładał symulację stosu do tej fazy — wykonana w pełni, łącznie z
+  całą rodziną `dup`/`dup2`/`pop`/`pop2`/`swap` świadomą kategorii
+  (JVMS 6.5), nie tylko uproszczonym modelem "jedna wartość = jedno
+  słowo" (co dałoby błędne przesunięcia głębokości stosu dla
+  `long`/`double`).
+- **Zmienione pliki:** nowy `internal/classfile/localops.go`
+  (`LocalOp`/`LocalOpKind`/`ConstKind`, `DecodeLocalOps` — dekoduje
+  *każdą* instrukcję na jej efekt stosu/lokalnych, rozwiązując
+  referencje do stałej tabeli tam, gdzie to potrzebne — `ldc`/`ldc_w`
+  stałych tekstowych/klasowych, `getfield`/`getstatic`, `invoke*`,
+  `new`/`anewarray`/`multianewarray`, `checkcast`/`instanceof` — bez
+  ujawniania `pool` poza pakietem, ta sama zasada co `ExtractCalls`;
+  obsługuje `wide` i cały zakres opkodów 0x00–0xc9); nowy
+  `internal/classfile/fortesting.go` (`PoolEntry`/`NewClassFileForTesting`
+  — jawny, eksportowany odpowiednik `hierarchy.NewForTesting` dla
+  `*ClassFile`, żeby testy w `internal/dataflow` mogły budować
+  realistyczną tablicę stałych bez pisania binarnego `.class` ręcznie);
+  nowy pakiet `internal/dataflow` (`analyze.go`: `Analyze` — worklist
+  o punkcie stałym nad blokami D1's CFG, z `valueflow.Merge` na złączeniach
+  i jawnym, nigdy zgadywanym, przerwaniem (`Aborted`) przy niezgodności
+  głębokości/szerokości stosu albo `jsr`/`ret`; `step.go` — efekt każdej
+  z ok. 40 kategorii instrukcji; `dup.go` — cztery formy `dup_x2`/`dup2_x1`/
+  `dup2_x2` dokładnie według JVMS 6.5; `facts.go` — `MethodFacts` jako
+  realna implementacja `valueflow.Facts`).
+- **Zachowanie dostępne użytkownikowi: żadne jeszcze** — `dataflow.Analyze`
+  istnieje i jest poprawny, ale `cmd/ariadne`/`internal/reach`/
+  `internal/serviceload` go jeszcze nie wywołują (sprawdzone wprost:
+  `bin/ariadne -offline` na petclinic/WebGoat po tej fazie nie wymagało
+  ponownej weryfikacji liczb, bo żaden plik na ścieżce CLI→raport się
+  nie zmienił).
+- **Spełnione kryteria (z D2's "Gotowe"):** "literał przez zmienną" —
+  `TestAnalyze_literalThroughVariable`: `String s = "a"; take(s);` daje
+  `Const("java.lang.String","a")` dokładnie w miejscu wywołania, nie
+  rozmyte przez przejście przez zmienną. "Dwa warianty gałęzi" —
+  `TestAnalyze_twoBranchVariantsJoin`: `if/else` przypisujący `"a"`/`"b"`
+  i wywołujący w punkcie złączenia daje `KindSet{"a","b"}`, nie jedną
+  wartość i nie fikcyjne `Unknown`. "Nieznany parametr" —
+  `TestAnalyze_unknownParameterStaysUnknown`: parametr `String p` przekazany
+  dalej daje `KindTyped("Ljava/lang/String;")`, nigdy zgadaną konkretną
+  wartość. "Pierwszy przyrost B2 można wydać bez D4" — prawda z
+  konstrukcji: `internal/taint` (D4) nie istnieje i nic z D2 go wymaga.
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  jednorazowy skrypt diagnostyczny (napisany w `cmd/diagtmp`, uruchomiony,
+  usunięty) wywołujący `dataflow.Analyze` na *każdej* metodzie z kodem w
+  realnym petclinic i WebGoat (łącznie z zależnościami) — **petclinic:
+  219077 metod, 0 błędów, 0 panik, 2 przerwane analizy** (te same dwie
+  metody z `jsr`/`ret`, które D1's `CFG.Unsupported` już wcześniej
+  znalazło); **WebGoat: 280172 metody, 0 błędów, 0 panik, 96 przerwanych
+  analiz** — dokładnie 96, identyczna liczba jak D1's własny pomiar
+  `jsr`/`ret` na WebGoat, potwierdzająca że jedyny powód przerwania to
+  rzeczywiście ta sama, już znana, odnotowana granica, nie nowy błąd.
+- **Świadoma decyzja o zakresie:** wynik arytmetyki/konwersji/porównań
+  nie jest śledzony (`KindUnknown` z powodem) — D2's własny zapis
+  "stałe napisowe/klasowe" ogranicza zakres do stałych tekstowych i
+  klasowych, nie liczbowych; `iinc` i każdy binarny/unarny operator
+  liczbowy wciąż poprawnie zachowuje kształt stosu (szerokość 1 albo 2
+  słowa), tylko nie podaje konkretnej wartości. Wynik wywołania
+  (`invoke*`) też zawsze `KindUnknown` — streszczenia międzymetodowe to
+  D3, nie D2.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/classfile`:
+  `TestDecodeLocalOps_*` [7, w tym cała rodzina dup/pop/swap, `wide`,
+  szerokości arytmetyki]; `internal/dataflow`: `TestAnalyze_*` [6]);
+  `go test -race ./internal/classfile/... ./internal/dataflow/...` i
+  `go test -race ./...` dla całego projektu (zielone); jednorazowy
+  skrypt diagnostyczny opisany wyżej (napisany, uruchomiony, usunięty —
+  `cmd/diagtmp` nie istnieje w repozytorium); `go build -o bin/ariadne
+  ./cmd/ariadne` (zielone, bez zmiany zachowania).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Data flow and
+  taint" rozszerzony o D2's pełny zakres, ograniczenia i zmierzony
+  dowód na petclinic/WebGoat).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy):** D3
+  (streszczenia międzymetodowe), D4 (taint), D5 (pomiar/wydanie) —
+  nietknięte. Żaden konsument (`SERVICE_LOADING:S1`, REFLECTION,
+  ASYNC_CALLBACKS) jeszcze nie wywołuje `dataflow.Analyze`.
+- **Następny krok:** `SERVICE_LOADING:S1` jest teraz odblokowane
+  (DATA_FLOW D0–D2: DONE) — rozwiązanie argumentu `Class` przy
+  `ServiceLoader.load(...)` przez `Facts.ArgumentAt`, budujące
+  `ServiceLoadSite`/pierwszą realną krawędź "może być wywołany przez
+  ServiceLoader" (dowody, nie fikcyjna krawędź grafu wywołań, zgodnie z
+  S0's własnym zastrzeżeniem). Wymaga propozycji i zgody użytkownika
+  przed startem.
 
 ## Punkt startowy następnej sesji
 
