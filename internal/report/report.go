@@ -16,21 +16,28 @@ import (
 
 // Header carries everything section 6's report header asks for.
 type Header struct {
-	App             string
-	GeneratedAt     time.Time
-	AriadneVersion  string
-	Profile         string
-	MaxBytecodeVer  int
-	GraphNodes      int
-	GraphEdges      int
-	PreCHAEdges     int
-	CHAEdges        int
-	InitEdges       int
-	UnresolvedDyn   int
-	UnresolvedOwner int
-	DepsTotal       int
-	DepsIdentified  int
-	UnidentifiedJar []string
+	App            string
+	GeneratedAt    time.Time
+	AriadneVersion string
+	Profile        string
+	// FrameworksDetected is FRAMEWORKS F0's own separated fact: a
+	// space-joined list of every profile whose own marker classes were
+	// found, independent of which one(s) Profile above actually merges
+	// (Select may combine several — before F0 there was no way to see
+	// the individual detections that produced a merged name like
+	// "spring+jakarta").
+	FrameworksDetected string
+	MaxBytecodeVer     int
+	GraphNodes         int
+	GraphEdges         int
+	PreCHAEdges        int
+	CHAEdges           int
+	InitEdges          int
+	UnresolvedDyn      int
+	UnresolvedOwner    int
+	DepsTotal          int
+	DepsIdentified     int
+	UnidentifiedJar    []string
 
 	// LLM* are set only when -llm was used.
 	LLMModel   string

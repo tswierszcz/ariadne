@@ -4,6 +4,7 @@
 - **Generated:** {{.GeneratedAt.Format "2006-01-02 15:04:05 MST"}}
 - **ariadne version:** {{.AriadneVersion}}
 - **Profile:** {{.Profile}}
+- **Frameworks detected:** {{.FrameworksDetected}} — FRAMEWORKS F0: which profiles' own marker classes were actually found, independent of which one(s) got merged into the active Profile above (e.g. both `spring` and `jakarta` can be detected while only `spring` ends up selected by `-profile`)
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}
 - **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init)
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}

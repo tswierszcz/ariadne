@@ -18,7 +18,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1, D2: DONE; D3–D5: UNASSESSED | D2 daje realną, zweryfikowaną na skalę lokalną analizę wartości (stałe tekstowe/klasowe przez zmienne i gałęzie, argumenty wywołań) i odblokowuje `SERVICE_LOADING:S1`, ale nic w CLI go jeszcze nie używa. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
-| FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
+| FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | F0: DONE; F1–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu (`profile.DetectAll`) i ustala (bez wdrożenia) kontrakt `Condition`/`FrameworkScenario`/`BeanDefinition`/`ConditionalBinding`/`ExternalEntry`. Rejestr B3 wciąż nieodnotowany. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method case): DONE; L1 (SAM-call materialization), L2 (cross-method tracking), L3–L4: UNASSESSED | L2 łączy `invoke()`/`invokeExact()` z `Lookup.find*`'s uchwytem i daje realną krawędź grafu (`Facts` rozszerzone o `ReceiverAt`), ale tylko w ramach jednej metody — na petclinic/WebGoat 0/0 z 10/46 realnych wywołań miało tak płytki zasięg (dominujący wzorzec to pole statyczne, poza zakresem bez D3). |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
@@ -1574,6 +1574,80 @@ Przy dodawaniu kolejnego wpisu zapisz:
   poprawiłby precyzję całego projektu. Alternatywnie `SERVICE_LOADING:S3`
   (JPMS) albo `REFLECTION:R0`. Wymaga propozycji i zgody użytkownika
   przed startem.
+
+### FRAMEWORKS:F0 — Model frameworka i scenariusza — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** B0–B1 (wspólne, gotowe wcześniej),
+  JVM G0–G2 (gotowe, zarchiwizowane). Rejestr modeli B3 (ogólny
+  mechanizm dla wielu torów) nie istnieje jeszcze (nieodnotowane) —
+  F0 celowo **nie** budował rejestru; zamiast tego rozszerzył
+  bezpośrednio `internal/profile` i zapisał proponowane typy kontraktu
+  jako gotowe DO UŻYCIA przez F1/F2, nie jako działający rejestr —
+  ta sama decyzja co poprzednie fazy kontraktowe (D0, A0, S0, L0).
+- **Zmienione pliki:** nowy `internal/profile/scenario.go`
+  (`Condition` — trójstanowy fakt true/false/unknown, zgodnie z F0's
+  własnym wymogiem; `Detection`/`DetectAll` — **jedyna część tej fazy
+  faktycznie podłączona do pipeline'u**: dla każdego profilu w
+  katalogu (poza `generic`) osobno sprawdza, czy jego własne markery
+  `detect` są obecne, niezależnie od tego, które profile `Select`
+  faktycznie scaliło w aktywny; `FrameworkScenario`/`BeanDefinition`/
+  `ConditionalBinding`/`ExternalEntry` — proponowane kontrakty dla
+  F1/F2, jawnie nieskonstruowane w tej fazie, z komentarzem
+  wyjaśniającym dlaczego); `cmd/ariadne/main.go` (wywołanie
+  `DetectAll` przed `Select`, log z listą wykrytych frameworków,
+  `header.FrameworksDetected`); `internal/report/report.go`
+  (`Header.FrameworksDetected string`); `internal/report/templates/report.md.tmpl`
+  (nowa linia nagłówka "Frameworks detected" obok istniejącego
+  "Profile").
+- **Zachowanie dostępne użytkownikowi:** raport pokazuje teraz
+  **dwie** osobne informacje tam, gdzie wcześniej była jedna: "Profile"
+  (aktywny, ewentualnie scalony profil) i "Frameworks detected"
+  (każdy profil, którego markery faktycznie znaleziono, niezależnie
+  od `-profile`). To znaczy: `-profile spring` na petclinic/WebGoat
+  teraz jawnie pokazuje "Frameworks detected: spring, servlet" — fakt
+  wcześniej niewidoczny, bo wybór `-profile spring` *wymuszał* dokładnie
+  jeden aktywny profil, chowając wykrycie `servlet`. Zero zmiany
+  zachowania analizy samej (reachability, graf) — F0's własny wymóg
+  "obecny profil zachowuje działanie" potwierdzony wprost.
+- **Spełnione kryteria (z F0's "Gotowe"):** "obecny profil zachowuje
+  działanie" — `go test ./...` bez regresji, `bin/ariadne -offline`
+  na petclinic daje identyczne REACHABLE/FRAMEWORK/NOT_REACHABLE/
+  UNKNOWN przed/po (3/62/26/51/6), bajt-identyczny `results.json`
+  między dwoma przebiegami. "Dostępność biblioteki i aktywna
+  konfiguracja są osobnymi informacjami" —
+  `TestDetectAll_separatesPresenceFromActiveSelection` (dwa profile
+  wykryte i scalone w "a+b" przez `Select`, ale `DetectAll` zwraca
+  obie jako niezależne fakty, plus trzeci, nieobecny profil jako
+  `Present: false`, nie pominięty); potwierdzone na realnym
+  petclinic/WebGoat: `-profile spring` (wymuszony) i `-profile auto`
+  (scalający `spring+servlet`) dają **identyczną** listę wykrytych
+  frameworków ("spring, servlet"), potwierdzając że wykrycie jest
+  rzeczywiście niezależne od wyboru aktywnego profilu.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/profile`:
+  `TestDetectAll_separatesPresenceFromActiveSelection`,
+  `TestDetectAll_excludesGeneric`); `go test -race ./...` dla całego
+  projektu (zielone); `bin/ariadne -offline` na petclinic (dwa
+  przebiegi, plus trzeci z `-profile auto` dla porównania) i WebGoat.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Profiles and
+  selected roots" rozszerzony o F0's zakres i zmierzony dowód).
+  `README.md` (nowy akapit w sekcji o profilach, wyjaślniający
+  rozdzielenie detekcji od aktywacji).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** `FrameworkScenario`/`BeanDefinition`/
+  `ConditionalBinding`/`ExternalEntry` są zdefiniowane, ale **nigdy
+  konstruowane** — to F1 (adnotacje/zasoby/jawna konfiguracja) i F2
+  (DI/zewnętrzne wejścia), które same zależą od DATA_FLOW D0–D2
+  (gotowe) i rejestru B3 (nieodnotowany) odpowiednio. Migracja
+  istniejących profili YAML/syntetycznych Spring Data edges do
+  nowego kontraktu — nietknięta, YAML-owe profile nadal są
+  jedynym mechanizmem niosącym realne zachowanie.
+- **Następny krok:** `FRAMEWORKS:F1` (adnotacje z wartościami, zasoby,
+  ograniczony odczyt `web.xml`/XML bean definitions) albo
+  `DATA_FLOW:D3` (streszczenia międzymetodowe — odblokowałoby
+  jednocześnie `DYNAMIC_LINKAGE:L2`'s dominujący wzorzec MethodHandle
+  i `FRAMEWORKS:F2`'s własną zależność). Wymaga propozycji i zgody
+  użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
 

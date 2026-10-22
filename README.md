@@ -340,6 +340,14 @@ is `REACHABLE`/`NOT_REACHABLE`/`UNKNOWN`/`NOT_APPLICABLE` only, never
 explicitly; `-profile-file path.yaml` loads a custom profile (same YAML
 shape) and adds it to the catalog, or replaces one of the same name.
 
+FRAMEWORKS F0 separates *detection* from *activation*: `-profile spring`
+forces `spring` active even when `servlet` is also detected, and before
+F0 that detection fact was invisible once a specific `-profile` name was
+passed (only `-profile auto`'s own merge showed it, as part of the
+merged name). The report header's "Frameworks detected" line now always
+shows every profile whose markers were actually found, independent of
+`-profile`'s own choice.
+
 `spring`'s own list is section 4's original seed plus
 `org.springframework:spring-beans`/`spring-core`/`spring-expression`/
 `spring-aop` — added after a real petclinic run showed several

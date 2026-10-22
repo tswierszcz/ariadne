@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"ariadne/internal/callback"
@@ -266,6 +267,20 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			return fmt.Errorf("loading -profile-file %s: %w", cfg.profileFile, err)
 		}
 	}
+	// FRAMEWORKS F0: which frameworks' own marker classes are present —
+	// a fact about the dependency closure, kept separate from which
+	// profile ends up active below (Select may merge several; before
+	// F0 there was no way to see the individual matches that produced
+	// a merged name like "spring+jakarta").
+	detections := profile.DetectAll(catalog, h)
+	var detected []string
+	for _, d := range detections {
+		if d.Present {
+			detected = append(detected, d.Name)
+		}
+	}
+	log("frameworks detected: %s", strings.Join(detected, ", "))
+
 	prof, err := profile.Select(catalog, cfg.profile, h)
 	if err != nil {
 		return fmt.Errorf("selecting profile: %w", err)
@@ -481,21 +496,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		profileLabel += " (roots: profile)"
 	}
 	header := report.Header{
-		App:             cfg.app,
-		GeneratedAt:     time.Now(),
-		AriadneVersion:  version(),
-		Profile:         profileLabel,
-		MaxBytecodeVer:  maxBytecode,
-		GraphNodes:      g.NodeCount(),
-		GraphEdges:      g.EdgeCount(),
-		PreCHAEdges:     g.PreCHAEdgeCount(),
-		CHAEdges:        g.CHAEdgeCount(),
-		InitEdges:       g.InitEdgeCount(),
-		UnresolvedDyn:   g.UnresolvedDynamicCount(),
-		UnresolvedOwner: g.UnresolvedOwnerCount(),
-		DepsTotal:       len(depJars),
-		DepsIdentified:  identified,
-		UnidentifiedJar: unidentified,
+		App:                cfg.app,
+		GeneratedAt:        time.Now(),
+		AriadneVersion:     version(),
+		Profile:            profileLabel,
+		FrameworksDetected: strings.Join(detected, ", "),
+		MaxBytecodeVer:     maxBytecode,
+		GraphNodes:         g.NodeCount(),
+		GraphEdges:         g.EdgeCount(),
+		PreCHAEdges:        g.PreCHAEdgeCount(),
+		CHAEdges:           g.CHAEdgeCount(),
+		InitEdges:          g.InitEdgeCount(),
+		UnresolvedDyn:      g.UnresolvedDynamicCount(),
+		UnresolvedOwner:    g.UnresolvedOwnerCount(),
+		DepsTotal:          len(depJars),
+		DepsIdentified:     identified,
+		UnidentifiedJar:    unidentified,
 	}
 	if llmSrc != nil {
 		st := llmSrc.Stats()
