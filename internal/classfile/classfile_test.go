@@ -56,9 +56,14 @@ func methodByName(cf *ClassFile, name string) *Method {
 	return nil
 }
 
+// callCounts counts calls by target identity (kind/owner/name/desc), the
+// same thing it counted before Call gained a PC field: two calls to the
+// same target from different bytecode offsets are still "the same call,
+// twice" for these tests, not two distinct keys.
 func callCounts(calls []Call) map[Call]int {
 	m := make(map[Call]int)
 	for _, c := range calls {
+		c.PC = 0
 		m[c]++
 	}
 	return m
@@ -92,11 +97,11 @@ func callCounts(calls []Call) map[Call]int {
 func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 	const greetWithDesc = "(Ljava/lang/String;Ljava/util/function/Function;)Ljava/lang/String;"
 	common := map[Call]int{
-		{CallSpecial, "fixture.FormalGreeter", "<init>", "()V"}:                                   1,
-		{CallSpecial, "fixture.CasualGreeter", "<init>", "()V"}:                                   1,
-		{CallInterface, "fixture.Greeter", "greet", "(Ljava/lang/String;)Ljava/lang/String;"}:     2,
-		{CallDynamic, "fixture.App", "lambda$handle$0", "(Ljava/lang/String;)Ljava/lang/String;"}: 1,
-		{CallDynamic, "fixture.Util", "shout", "(Ljava/lang/String;)Ljava/lang/String;"}:          1,
+		{Kind: CallSpecial, Owner: "fixture.FormalGreeter", Name: "<init>", Desc: "()V"}:                                                     1,
+		{Kind: CallSpecial, Owner: "fixture.CasualGreeter", Name: "<init>", Desc: "()V"}:                                                     1,
+		{Kind: CallInterface, Owner: "fixture.Greeter", Name: "greet", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                       2,
+		{Kind: CallDynamic, Owner: "fixture.App", Name: "lambda$handle$0", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                   1,
+		{Kind: CallDynamic, Owner: "fixture.Util", Name: "shout", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                            1,
 	}
 
 	cases := []struct {
@@ -107,17 +112,17 @@ func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 		{
 			release: 8,
 			extra: map[Call]int{
-				{CallSpecial, "fixture.App", "greetWith", greetWithDesc}:                                            2,
-				{CallSpecial, "java.lang.StringBuilder", "<init>", "()V"}:                                           1,
-				{CallVirtual, "java.lang.StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;"}: 4,
-				{CallVirtual, "java.lang.StringBuilder", "toString", "()Ljava/lang/String;"}:                        1,
+				{Kind: CallSpecial, Owner: "fixture.App", Name: "greetWith", Desc: greetWithDesc}:                                                          2,
+				{Kind: CallSpecial, Owner: "java.lang.StringBuilder", Name: "<init>", Desc: "()V"}:                                                         1,
+				{Kind: CallVirtual, Owner: "java.lang.StringBuilder", Name: "append", Desc: "(Ljava/lang/String;)Ljava/lang/StringBuilder;"}:               4,
+				{Kind: CallVirtual, Owner: "java.lang.StringBuilder", Name: "toString", Desc: "()Ljava/lang/String;"}:                                      1,
 			},
 			wantUnresolved: 0,
 		},
 		{
 			release: 21,
 			extra: map[Call]int{
-				{CallVirtual, "fixture.App", "greetWith", greetWithDesc}: 2,
+				{Kind: CallVirtual, Owner: "fixture.App", Name: "greetWith", Desc: greetWithDesc}: 2,
 			},
 			// StringConcatFactory#makeConcatWithConstants: not
 			// LambdaMetafactory, so it must be reported as unresolved
@@ -211,7 +216,7 @@ func TestParseAndExtractCalls_greetWithIsInvokeinterfaceOnFunction(t *testing.T)
 	if err != nil {
 		t.Fatalf("ExtractCalls: %v", err)
 	}
-	want := Call{CallInterface, "java.util.function.Function", "apply", "(Ljava/lang/Object;)Ljava/lang/Object;"}
+	want := Call{Kind: CallInterface, Owner: "java.util.function.Function", Name: "apply", Desc: "(Ljava/lang/Object;)Ljava/lang/Object;"}
 	if callCounts(calls)[want] != 1 {
 		t.Errorf("calls = %+v, want exactly one %+v", calls, want)
 	}
@@ -264,11 +269,11 @@ func TestMainMethodCallsHandle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExtractCalls: %v", err)
 	}
-	want := Call{CallVirtual, "fixture.App", "handle", "(Ljava/lang/String;)Ljava/lang/String;"}
+	want := Call{Kind: CallVirtual, Owner: "fixture.App", Name: "handle", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}
 	if callCounts(calls)[want] != 1 {
 		t.Errorf("calls = %+v, want exactly one %+v", calls, want)
 	}
-	ctor := Call{CallSpecial, "fixture.App", "<init>", "()V"}
+	ctor := Call{Kind: CallSpecial, Owner: "fixture.App", Name: "<init>", Desc: "()V"}
 	if callCounts(calls)[ctor] != 1 {
 		t.Errorf("calls = %+v, want exactly one %+v", calls, ctor)
 	}

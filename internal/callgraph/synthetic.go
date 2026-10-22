@@ -49,11 +49,10 @@ func ApplySyntheticEdges(g *Graph, h *hierarchy.Hierarchy, edges []SyntheticEdge
 					if !ok {
 						continue
 					}
-					e := Edge{To: toID, Kind: classfile.CallSynthetic}
-					if hasEdge(g, fromID, e) {
+					if hasEdge(g, fromID, toID, classfile.CallSynthetic, BasisSynthetic) {
 						continue
 					}
-					g.addEdge(fromID, toID, classfile.CallSynthetic)
+					g.addEdge(fromID, toID, classfile.CallSynthetic, BasisSynthetic, nil)
 					added++
 				}
 			}
@@ -62,9 +61,9 @@ func ApplySyntheticEdges(g *Graph, h *hierarchy.Hierarchy, edges []SyntheticEdge
 	return added
 }
 
-func hasEdge(g *Graph, from uint32, e Edge) bool {
+func hasEdge(g *Graph, from, to uint32, kind classfile.CallKind, basis EdgeBasis) bool {
 	for _, existing := range g.adjacency[from] {
-		if existing == e {
+		if existing.To == to && existing.Kind == kind && existing.Basis == basis {
 			return true
 		}
 	}

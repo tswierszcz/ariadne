@@ -68,7 +68,7 @@ None.
 {{range $i, $node := .Path}}{{if $i}} → {{end}}{{$node}}
 {{end}}```
 {{if .Entry}}
-**Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}`
+**Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}` ({{.Entry.Kind}} call, resolution: {{.Entry.Basis}}{{if .Entry.PCString}}, {{.Entry.PCString}}{{end}})
 {{end}}
 {{if .Exploitability}}
 **Exploitability ({{.ExploitModel}}):** {{.Exploitability}} — {{.ExploitReason}}
@@ -94,7 +94,7 @@ None.
 {{range $i, $node := .Path}}{{if $i}} → {{end}}{{$node}}
 {{end}}```
 {{if .Entry}}
-**Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}`
+**Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}` ({{.Entry.Kind}} call, resolution: {{.Entry.Basis}}{{if .Entry.PCString}}, {{.Entry.PCString}}{{end}})
 {{end}}
 {{if .PathPlausibility}}
 **Path plausibility ({{.PathPlausibilityModel}}):** {{.PathPlausibility}} — {{.PathPlausibilityReason}}

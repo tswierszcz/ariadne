@@ -31,10 +31,29 @@ const (
 // EntryEdge is the first app -> dependency edge on a REACHABLE/FRAMEWORK
 // path: the one call where execution actually leaves the application's
 // own code, which is usually the most useful single line for a human
-// reviewing the result to look at.
+// reviewing the result to look at. Kind/Basis/PC are JVM_GRAPH G0's
+// "resolution rule" and "concrete call site" for that one edge: Basis
+// says whether this is a direct call or one CHA fabricated to a subtype
+// (a reader should trust a "direct" entry a lot more than a "cha" one),
+// and PC is the bytecode offset of the call site that produced it (the
+// first one, if several call sites collapsed into this edge) — enough to
+// find the exact instruction with `javap -c -p`.
 type EntryEdge struct {
-	From string `json:"from"` // app method key, "fqcn#name(desc)"
-	To   string `json:"to"`   // dependency method key it calls
+	From  string `json:"from"` // app method key, "fqcn#name(desc)"
+	To    string `json:"to"`   // dependency method key it calls
+	Kind  string `json:"kind,omitempty"`  // classfile.CallKind: virtual, interface, static, special, dynamic, synthetic
+	Basis string `json:"basis,omitempty"` // callgraph.EdgeBasis: direct, cha, synthetic
+	PC    *int   `json:"pc,omitempty"`    // bytecode offset of the call site, nil for a synthetic edge with none
+}
+
+// PCString renders PC for the report template, which can't cleanly
+// dereference a *int itself: "" when there is no call site (a synthetic
+// edge), otherwise "pc=<offset>".
+func (e EntryEdge) PCString() string {
+	if e.PC == nil {
+		return ""
+	}
+	return fmt.Sprintf("pc=%d", *e.PC)
 }
 
 // Result is one CVE's reachability verdict.
@@ -279,7 +298,16 @@ func renderPath(g *callgraph.Graph, path []uint32) []string {
 func (e *Engine) entryEdge(path []uint32) *EntryEdge {
 	for i := 0; i+1 < len(path); i++ {
 		if e.isAppNode(path[i]) && !e.isAppNode(path[i+1]) {
-			return &EntryEdge{From: e.g.Key(path[i]), To: e.g.Key(path[i+1])}
+			entry := &EntryEdge{From: e.g.Key(path[i]), To: e.g.Key(path[i+1])}
+			if edge, ok := e.g.EdgeBetween(path[i], path[i+1]); ok {
+				entry.Kind = string(edge.Kind)
+				entry.Basis = string(edge.Basis)
+				if len(edge.Sites) > 0 {
+					pc := edge.Sites[0].PC
+					entry.PC = &pc
+				}
+			}
+			return entry
 		}
 	}
 	return nil

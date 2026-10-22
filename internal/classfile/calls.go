@@ -25,12 +25,20 @@ const (
 
 // Call is one call-site edge out of a method: owner/name/desc identify
 // the target method exactly as the bytecode (or, for a dynamic call, the
-// resolved LambdaMetafactory implementation) names it.
+// resolved LambdaMetafactory implementation) names it. PC is the byte
+// offset of the invoke* instruction within the method's Code array —
+// evidence for *which* call site produced this edge, kept so
+// internal/callgraph/internal/reach can point a report at a specific
+// line of bytecode instead of just naming the target method (RECOMMENDATION
+// ROADMAP.MD B1/JVM_GRAPH G0: "miejsce wywołania: stabilna metoda + offset
+// bytecode + rodzaj operacji"). It is 0 for a call synthesized outside any
+// real bytecode (a profile's synthetic_edges, CallSynthetic).
 type Call struct {
 	Kind  CallKind
 	Owner string // FQCN
 	Name  string
 	Desc  string
+	PC    int
 }
 
 // ExtractCalls decodes a method's bytecode and returns every call-site
@@ -57,7 +65,7 @@ func (c *ClassFile) ExtractCalls(code []byte) ([]Call, int, error) {
 			if err != nil {
 				return nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
 			}
-			calls = append(calls, Call{Kind: kindFor(in.opcode), Owner: owner, Name: name, Desc: desc})
+			calls = append(calls, Call{Kind: kindFor(in.opcode), Owner: owner, Name: name, Desc: desc, PC: in.pc})
 
 		case opInvokeInterface:
 			idx := u16(in.operand) // operand: indexbyte1,2, count, 0
@@ -65,11 +73,11 @@ func (c *ClassFile) ExtractCalls(code []byte) ([]Call, int, error) {
 			if err != nil {
 				return nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
 			}
-			calls = append(calls, Call{Kind: CallInterface, Owner: owner, Name: name, Desc: desc})
+			calls = append(calls, Call{Kind: CallInterface, Owner: owner, Name: name, Desc: desc, PC: in.pc})
 
 		case opInvokeDynamic:
 			idx := u16(in.operand) // operand: indexbyte1,2, 0, 0
-			call, ok, err := c.resolveInvokeDynamic(idx)
+			call, ok, err := c.resolveInvokeDynamic(idx, in.pc)
 			if err != nil {
 				return nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
 			}
@@ -100,7 +108,7 @@ func kindFor(opcode byte) CallKind {
 // finds its bootstrap method, and — only when that bootstrap is
 // LambdaMetafactory — resolves to the real implementation method a call
 // through the resulting lambda/method reference will dispatch to.
-func (c *ClassFile) resolveInvokeDynamic(idx uint16) (Call, bool, error) {
+func (c *ClassFile) resolveInvokeDynamic(idx uint16, pc int) (Call, bool, error) {
 	e, err := c.pool.get(idx)
 	if err != nil {
 		return Call{}, false, err
@@ -116,5 +124,5 @@ func (c *ClassFile) resolveInvokeDynamic(idx uint16) (Call, bool, error) {
 	if !ok {
 		return Call{}, false, nil
 	}
-	return Call{Kind: CallDynamic, Owner: impl.Owner, Name: impl.Name, Desc: impl.Desc}, true, nil
+	return Call{Kind: CallDynamic, Owner: impl.Owner, Name: impl.Name, Desc: impl.Desc, PC: pc}, true, nil
 }

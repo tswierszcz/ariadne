@@ -11,12 +11,50 @@ import (
 	"ariadne/internal/classfile"
 )
 
-// Edge is one call-site edge, naming both its target and how the call
-// was made (kept mainly for the report; reachability itself only needs
-// the target).
+// EdgeBasis says why an edge exists, independent of Kind (which names the
+// bytecode call/dispatch mechanism — virtual, interface, static, ...).
+// Kept as its own field (RECOMMENDATION JVM_GRAPH G0) so a future
+// "initializes" edge (G3, a <clinit> edge from new/getstatic/putstatic/
+// invokestatic) doesn't have to overload Kind's meaning — it adds a new
+// EdgeBasis value instead, next to BasisCalls here.
+type EdgeBasis string
+
+const (
+	// BasisDirect is a direct edge to exactly the call site's own symbolic
+	// target, found straight in the caller's bytecode.
+	BasisDirect EdgeBasis = "direct"
+	// BasisCHA is an edge class-hierarchy-analysis expansion added to a
+	// subtype of the call's declared receiver (section 3.5 of PLAN.md) —
+	// the resolution rule a reader needs to know this edge is an
+	// over-approximation, not a direct call.
+	BasisCHA EdgeBasis = "cha"
+	// BasisSynthetic is an edge from a profile's synthetic_edges (PLAN.md
+	// section 4), standing in for a runtime-generated proxy with no
+	// bytecode implementation at all (e.g. Spring Data).
+	BasisSynthetic EdgeBasis = "synthetic"
+)
+
+// CallSite is one piece of evidence for why an edge exists: the bytecode
+// offset of the invoke instruction that produced it (or, for a
+// BasisCHA edge, of the original call whose declared receiver triggered
+// the CHA expansion to this edge's actual target).
+type CallSite struct {
+	PC int
+}
+
+// Edge is one call-site edge, naming its target, how the call was made
+// (Kind), and why the edge exists (Basis). Sites records every bytecode
+// offset that produced this exact (To, Kind, Basis) edge — several call
+// sites in one method that happen to call the same target the same way
+// collapse into one Edge (reachability itself only needs the target), but
+// their evidence is kept, not discarded, so a report can still point at a
+// specific line of bytecode. Sites is empty for a BasisSynthetic edge,
+// which has no real call site at all.
 type Edge struct {
-	To   uint32
-	Kind classfile.CallKind
+	To    uint32
+	Kind  classfile.CallKind
+	Basis EdgeBasis
+	Sites []CallSite
 }
 
 // Graph is the whole interned call graph: every method ariadne read is a
@@ -102,6 +140,25 @@ func (g *Graph) Edges(id uint32) []Edge {
 	return g.adjacency[id]
 }
 
+// EdgeBetween returns the edge from -> to, if any — used to attach
+// resolution-rule/call-site evidence to one step of an already-
+// reconstructed path (internal/reach) without the BFS itself having to
+// carry that evidence through every hop. When CHA added more than one
+// edge between the same pair (different Kind, e.g. both a virtual and
+// an interface call site happened to exist), the first one found is
+// returned; this is report evidence, not a correctness-critical lookup.
+func (g *Graph) EdgeBetween(from, to uint32) (Edge, bool) {
+	if int(from) >= len(g.adjacency) {
+		return Edge{}, false
+	}
+	for _, e := range g.adjacency[from] {
+		if e.To == to {
+			return e, true
+		}
+	}
+	return Edge{}, false
+}
+
 func methodKey(fqcn, name, desc string) string {
 	return fqcn + "#" + name + desc
 }
@@ -128,6 +185,13 @@ func (g *Graph) intern(fqcn, name, desc string) uint32 {
 	return id
 }
 
-func (g *Graph) addEdge(from uint32, to uint32, kind classfile.CallKind) {
-	g.adjacency[from] = append(g.adjacency[from], Edge{To: to, Kind: kind})
+// addEdge always appends a new Edge; callers that want to merge evidence
+// into an existing (to, kind, basis) edge instead (build.go's addOrMerge)
+// must check for that themselves first.
+func (g *Graph) addEdge(from uint32, to uint32, kind classfile.CallKind, basis EdgeBasis, site *CallSite) {
+	var sites []CallSite
+	if site != nil {
+		sites = []CallSite{*site}
+	}
+	g.adjacency[from] = append(g.adjacency[from], Edge{To: to, Kind: kind, Basis: basis, Sites: sites})
 }

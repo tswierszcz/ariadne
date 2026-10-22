@@ -42,11 +42,14 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 		}
 	}
 
-	// Pass 2: add edges. A per-method "seen" set dedupes the common case
-	// of the same target called from several call sites in one method
-	// (or a direct call and a CHA-expanded edge landing on the same
-	// node), without the cost of deduping across the whole graph.
-	seen := make(map[Edge]bool)
+	// Pass 2: add edges. A per-method "seen" index dedupes the common case
+	// of the same target called the same way from several call sites in
+	// one method (or a direct call and a CHA-expanded edge landing on the
+	// same node), without the cost of deduping across the whole graph —
+	// but unlike a plain seen-set, a repeat still gets its call site
+	// appended as evidence onto the one Edge that survives (JVM_GRAPH G0:
+	// "deduplikacja nie usuwa alternatywnych dowodów").
+	seen := make(map[edgeKey]int)
 	for _, fqcn := range fqcns {
 		ci := classes[fqcn]
 		for _, m := range ci.Methods {
@@ -59,7 +62,7 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 
 			for _, call := range m.Calls {
 				toID := g.intern(call.Owner, call.Name, call.Desc)
-				if addOnce(g, seen, callerID, toID, call.Kind) {
+				if addOrMerge(g, seen, callerID, toID, call.Kind, BasisDirect, call.PC) {
 					g.preCHAEdges++
 				}
 
@@ -79,7 +82,7 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 					}
 					for _, subMethod := range subInfo.MethodsByName(call.Name) {
 						subID := g.intern(sub, subMethod.Name, subMethod.Descriptor)
-						addOnce(g, seen, callerID, subID, call.Kind)
+						addOrMerge(g, seen, callerID, subID, call.Kind, BasisCHA, call.PC)
 					}
 				}
 			}
@@ -94,14 +97,28 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 	return g
 }
 
-// addOnce adds the edge if seen doesn't already have it, and reports
-// whether it actually added a new edge.
-func addOnce(g *Graph, seen map[Edge]bool, from, to uint32, kind classfile.CallKind) bool {
-	e := Edge{To: to, Kind: kind}
-	if seen[e] {
+// edgeKey identifies an edge for seen-set dedup purposes, deliberately
+// excluding Sites (which accumulates evidence rather than identifying
+// the edge).
+type edgeKey struct {
+	to    uint32
+	kind  classfile.CallKind
+	basis EdgeBasis
+}
+
+// addOrMerge adds a new (to, kind, basis) edge from `from` the first time
+// it's seen, or appends pc as another piece of evidence onto the existing
+// edge on every repeat. Reports whether it actually created a new edge
+// (used for the preCHAEdges/chaEdges bookkeeping).
+func addOrMerge(g *Graph, seen map[edgeKey]int, from, to uint32, kind classfile.CallKind, basis EdgeBasis, pc int) bool {
+	k := edgeKey{to: to, kind: kind, basis: basis}
+	if idx, ok := seen[k]; ok {
+		adj := g.adjacency[from]
+		adj[idx].Sites = append(adj[idx].Sites, CallSite{PC: pc})
 		return false
 	}
-	seen[e] = true
-	g.addEdge(from, to, kind)
+	idx := len(g.adjacency[from])
+	g.addEdge(from, to, kind, basis, &CallSite{PC: pc})
+	seen[k] = idx
 	return true
 }

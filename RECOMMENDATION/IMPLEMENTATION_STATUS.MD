@@ -14,7 +14,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
-| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Po minimalnym B0–B1 dobrać pierwszy wykonalny przyrost; sprawdzić istniejący graf. |
+| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0: DONE (2026-10-22); G1–G5: UNASSESSED | G1 (deterministyczny wybór klas) jest następnym naturalnym krokiem — G0 już daje mu miejsce w modelu Edge (Basis), ale sam wybór klas po jawnej kolejności wejścia jeszcze nie istnieje. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
@@ -30,7 +30,72 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
-Na razie nie zakwalifikowano żadnej nowej fazy jako DONE. Przy dodawaniu wpisu zapisz:
+### JVM_GRAPH:G0 — Kontrakt miejsc i krawędzi — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** minimalne B0–B1 potrzebne do G0 (format
+  dowodu krawędzi); żadna inna faza nie była wymagana wcześniej.
+- **Zmienione pliki:** `internal/classfile/calls.go` (`Call` zyskuje `PC int`
+  — offset bytecode instrukcji invoke*, wypełniany w `ExtractCalls` i
+  `resolveInvokeDynamic`); `internal/callgraph/graph.go` (nowy `EdgeBasis`
+  z wartościami `BasisDirect`/`BasisCHA`/`BasisSynthetic` — miejsce
+  zarezerwowane też na przyszłe `BasisInit` z G3 — oraz `CallSite`/`Sites
+  []CallSite` na `Edge`, plus `EdgeBetween` do odczytu konkretnej
+  krawędzi); `internal/callgraph/build.go` (`seen` zmienia typ z
+  `map[Edge]bool` na `map[edgeKey]int`, żeby duplikat tego samego
+  `(to,kind,basis)` z innego call site dopisywał dowód do istniejącej
+  krawędzi, a nie go gubił); `internal/callgraph/synthetic.go`
+  (`hasEdge`/`addEdge` zaktualizowane do nowej sygnatury);
+  `internal/reach/reach.go` (`EntryEdge` zyskuje `Kind`/`Basis`/`PC` i
+  metodę `PCString()`); `internal/report/templates/report.md.tmpl`
+  (linia "Entry call" renderuje teraz rodzaj wywołania, regułę
+  rozwiązania i offset bytecode).
+- **Zachowanie dostępne użytkownikowi:** raport (`report.md` i
+  `results.json`'s `entry.kind`/`entry.basis`/`entry.pc`) pokazuje dla
+  wejściowej krawędzi REACHABLE/FRAMEWORK, czy to wywołanie bezpośrednie
+  czy rozwinięte przez CHA (a więc mniej wiarygodne), jaki to rodzaj
+  wywołania (virtual/interface/static/special/dynamic/synthetic), i
+  konkretny offset bytecode (`pc=N`) — zamiast tylko dwóch nazw metod.
+- **Spełnione kryteria (z G0's "Gotowe"):**
+  - "krok raportu odsyła do konkretnego miejsca wywołania i reguły
+    rozwiązania" — potwierdzone na realnym przebiegu petclinic
+    (`OwnerController#setAllowedFields → WebDataBinder#setDisallowedFields`,
+    `virtual call, resolution: direct, pc=10`) i WebGoat
+    (`VulnerableComponentsLesson#completed → XStream#fromXML`, `virtual
+    call, resolution: direct, pc=77`).
+  - "deduplikacja nie usuwa alternatywnych dowodów" — test
+    `TestEvidenceIsPreservedAcrossDuplicateCallSites`
+    (`internal/callgraph/build_test.go`): cztery wywołania
+    `StringBuilder#append` z czterech różnych offsetów w jednej metodzie
+    kolapsują do jednej krawędzi, ale wszystkie cztery offsety
+    przechowane jako `Sites`.
+  - "kolejność wyników jest stabilna" — niezmienione (nie dotyczy tej
+    fazy bezpośrednio, ale sprawdzone ponownie: dwa przebiegi offline na
+    petclinic dają bajt-identyczny `results.json`, włącznie z nowymi
+    polami `entry.*`).
+- **Niespełnione/odłożone:** `EdgeBetween` bierze pierwszą krawędź
+  między parą węzłów, jeśli istnieje więcej niż jedna (różny `Kind`) —
+  wystarczające dla raportu, nie dla pełnej precyzji; to G1–G2's własny
+  zakres (deterministyczny wybór klas, dokładne rozwiązywanie wywołań z
+  deskryptorem) nie został tu dotknięty — overload-insensitive
+  dopasowanie w `internal/reach/match.go` działa jak wcześniej.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (wszystkie pakiety, zielone); `bin/ariadne` dwa pełne
+  przebiegi `-offline` na petclinic (`-profile spring`:
+  REACHABLE=3/FRAMEWORK=59/NOT_REACHABLE=29/UNKNOWN=51/NOT_APPLICABLE=6,
+  identyczne z istniejącą bazową wartością) i jeden na WebGoat
+  (REACHABLE=40/FRAMEWORK=43/NOT_REACHABLE=21/UNKNOWN=56/NOT_APPLICABLE=0,
+  również identyczne) — potwierdzające brak regresji liczb przy tym
+  refaktorze; `diff` dwóch przebiegów petclinic na bajt identyczny
+  `results.json`.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Direct calls, CHA
+  and inheritance" i "Markdown and JSON reports" rozszerzone o nowy
+  zakres); `README.md` (sekcja "8. The report" opisuje nową linię "Entry
+  call").
+- **Następny krok:** `JVM_GRAPH:G1` (deterministyczny wybór klas, jawna
+  kolejność wejścia w `internal/hierarchy/build.go`) — wymaga zgody
+  użytkownika przed startem, jak każda kolejna faza.
+
+Przy dodawaniu kolejnego wpisu zapisz:
 
 - Pełny identyfikator fazy i stan.
 - Zakres zlecenia i niezbędne wspólne zależności, które faktycznie wykonano.

@@ -398,11 +398,26 @@ its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
 review, the list of unidentified dependency jars, and a fixed Limitations
 section (see below).
 
+The entry call line also names the call kind, the resolution rule
+(`direct`: the edge is exactly the call site's own symbolic target; `cha`:
+class-hierarchy-analysis expanded it to a subtype, so trust it less;
+`synthetic`: a profile's `synthetic_edges`, with no real call site at
+all) and, when there is one, the bytecode offset of the actual invoke
+instruction — e.g. `(virtual call, resolution: direct, pc=77)` — so a
+reader can jump straight to `javap -c -p` output instead of trusting the
+method names alone (`internal/reach.EntryEdge`, `internal/callgraph.Edge`;
+RECOMMENDATION's [JVM_GRAPH:G0](RECOMMENDATION/JVM_GRAPH_IMPLEMENTATION_PLAN.MD)).
+The underlying call graph also keeps every call site that produced an
+edge (not just the first one that happened to be seen) as evidence,
+even when several calls to the same target collapse into one edge.
+
 `results.json` is the same analysis as structured data — sorted by CVE
 id, with each result's own method list sorted — so that two runs against
 the same cached inputs produce **byte-for-byte identical output**
 (verified: see [PLAN.md](PLAN.md)'s Phase 6 notes for a real
-non-determinism bug this guarantee caught and how it was fixed).
+non-determinism bug this guarantee caught and how it was fixed; the new
+`entry.kind`/`entry.basis`/`entry.pc` fields were checked for the same
+byte-identical-rerun property against real petclinic/WebGoat runs).
 
 ## Usage
 

@@ -64,6 +64,20 @@ func TestAnalyze_reachableDirectDependencyCall(t *testing.T) {
 	if r.Entry == nil || r.Entry.From != want[0] || r.Entry.To != want[1] {
 		t.Errorf("Entry = %+v, want From=%q To=%q", r.Entry, want[0], want[1])
 	}
+	// JVM_GRAPH G0: the report-facing entry edge must carry the resolution
+	// rule (a direct call, not a CHA-fabricated one) and a concrete
+	// bytecode offset, not just the two method names.
+	if r.Entry != nil {
+		if r.Entry.Basis != "direct" {
+			t.Errorf("Entry.Basis = %q, want %q", r.Entry.Basis, "direct")
+		}
+		if r.Entry.Kind == "" {
+			t.Errorf("Entry.Kind is empty, want a classfile.CallKind")
+		}
+		if r.Entry.PC == nil {
+			t.Errorf("Entry.PC is nil, want a concrete bytecode offset for a direct call")
+		}
+	}
 }
 
 func TestAnalyze_reachableDirectCallIntoFrameworkPackage(t *testing.T) {

@@ -122,6 +122,88 @@ func TestDirectCallsAreNotDuplicated(t *testing.T) {
 	}
 }
 
+// TestCHA_edgeBasisDistinguishesDirectFromExpanded is JVM_GRAPH G0's own
+// "resolution rule" requirement: a reader (or report) must be able to
+// tell a direct edge to the call's own symbolic target apart from an
+// edge CHA fabricated to a subtype, not just infer it from whether the
+// target happens to be an interface.
+func TestCHA_edgeBasisDistinguishesDirectFromExpanded(t *testing.T) {
+	g := buildFixtureGraph(t)
+
+	handleID, ok := g.ID("fixture.App", "handle", "(Ljava/lang/String;)Ljava/lang/String;")
+	if !ok {
+		t.Fatalf("fixture.App#handle not found in graph")
+	}
+	greetID, ok := g.ID("fixture.Greeter", "greet", "(Ljava/lang/String;)Ljava/lang/String;")
+	if !ok {
+		t.Fatalf("fixture.Greeter#greet not found in graph")
+	}
+	formalID, ok := g.ID("fixture.FormalGreeter", "greet", "(Ljava/lang/String;)Ljava/lang/String;")
+	if !ok {
+		t.Fatalf("fixture.FormalGreeter#greet not found in graph")
+	}
+
+	byTo := make(map[uint32]Edge)
+	for _, e := range g.Edges(handleID) {
+		byTo[e.To] = e
+	}
+
+	direct, ok := byTo[greetID]
+	if !ok {
+		t.Fatalf("handle() has no edge to Greeter#greet itself")
+	}
+	if direct.Basis != BasisDirect {
+		t.Errorf("edge to the call's own declared receiver: Basis = %q, want %q", direct.Basis, BasisDirect)
+	}
+	if len(direct.Sites) == 0 {
+		t.Errorf("direct edge has no Sites evidence at all")
+	}
+
+	expanded, ok := byTo[formalID]
+	if !ok {
+		t.Fatalf("handle() has no CHA-expanded edge to FormalGreeter#greet")
+	}
+	if expanded.Basis != BasisCHA {
+		t.Errorf("edge CHA added to a subtype: Basis = %q, want %q", expanded.Basis, BasisCHA)
+	}
+}
+
+// TestEvidenceIsPreservedAcrossDuplicateCallSites is the other half of
+// G0's "deduplikacja nie usuwa alternatywnych dowodów": handle() (Java 8
+// build) calls StringBuilder#append four times from four different
+// bytecode offsets; they must still collapse into one Edge (reachability
+// doesn't need four copies of the same target), but every offset must
+// survive as separate Sites evidence, not just the first/last one.
+func TestEvidenceIsPreservedAcrossDuplicateCallSites(t *testing.T) {
+	g := buildFixtureGraph(t)
+
+	handleID, ok := g.ID("fixture.App", "handle", "(Ljava/lang/String;)Ljava/lang/String;")
+	if !ok {
+		t.Fatalf("fixture.App#handle not found in graph")
+	}
+
+	var appendEdge *Edge
+	for i, e := range g.Edges(handleID) {
+		if g.Key(e.To) == "java.lang.StringBuilder#append(Ljava/lang/String;)Ljava/lang/StringBuilder;" {
+			appendEdge = &g.Edges(handleID)[i]
+			break
+		}
+	}
+	if appendEdge == nil {
+		t.Fatalf("handle() has no edge to StringBuilder#append")
+	}
+	if len(appendEdge.Sites) != 4 {
+		t.Fatalf("StringBuilder#append edge has %d Sites, want 4 (one per call site, none dropped by dedup)", len(appendEdge.Sites))
+	}
+	seenPCs := make(map[int]bool)
+	for _, s := range appendEdge.Sites {
+		if seenPCs[s.PC] {
+			t.Errorf("duplicate PC %d across Sites: %v", s.PC, appendEdge.Sites)
+		}
+		seenPCs[s.PC] = true
+	}
+}
+
 func TestEdgeAndNodeCountsAreConsistent(t *testing.T) {
 	g := buildFixtureGraph(t)
 	if g.NodeCount() == 0 {
