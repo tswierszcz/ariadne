@@ -15,8 +15,8 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 wymaga DATA_FLOW D0–D2 (nieodnotowane) — rozwiązania argumentu `Class` przy `ServiceLoader.load(...)`. |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0: DONE (kontrakt, bez CFG/analizy); D1–D5: UNASSESSED | D0 to tylko kontrakt — nie zakładać istnienia CFG (D1) ani lokalnej analizy wartości (D2); nic w pipeline nie produkuje jeszcze realnej wartości. |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 wciąż wymaga DATA_FLOW D1–D2 (D0 samo nie wystarcza — to tylko kontrakt) do rozwiązania argumentu `Class` przy `ServiceLoader.load(...)`. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Katalog API i powiązanie callbacka z właściwym obiektem. |
@@ -588,6 +588,77 @@ Przy dodawaniu kolejnego wpisu zapisz:
   S1 i resztę R1, albo pozostać przy mechanicznych, niezależnych
   krokach w innych obszarach, jeśli takie się znajdą. Wymaga propozycji
   i zgody użytkownika przed startem.
+
+### DATA_FLOW:D0 — Kontrakt IR, wartości i zakresów — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** B0–B1 (wspólne), `JVM_GRAPH:G0–G2`
+  (gotowe, zarchiwizowane). To wyłącznie faza kontraktowa — **żaden
+  realny CFG czy analiza wartości nie istnieje po tej fazie**; D1
+  (CFG) i D2 (lokalne wartości) są osobnymi, nienaruszonymi fazami.
+- **Zmienione pliki (wyłącznie nowe pakiety, zero zmian w istniejącym
+  kodzie produkcyjnym — D0 niczego jeszcze nie konsumuje):**
+  `internal/bytecodeir/site.go` (`Site`, `OpKind` — tożsamość jednej
+  instrukcji bytecode: metoda, deskryptor, offset, rodzaj operacji;
+  mirror filozofii dowodowej z `JVM_GRAPH:G0`'s `Call.PC`/`Edge.Basis`,
+  jeden poziom niżej — na poziomie instrukcji, nie krawędzi grafu
+  wywołań); `internal/valueflow/value.go` (`Value`/`Kind`: `KindConst`
+  — dokładnie znana stała, rozdzielona od `KindTyped` — tylko górne
+  ograniczenie typu, bez znanej wartości — zgodnie z explicit
+  wymogiem planu "rozdzielić dokładnie znaną stałą od jedynie górnego
+  ograniczenia typu"; plus `KindAlloc`, `KindNull`, `KindSet`,
+  `KindUnknown` z obowiązkowym `Reason`); `internal/valueflow/merge.go`
+  (`Merge`/`MergeWithBudget`, `DefaultBudget=4` — kolejność
+  poszerzania: identyczne wartości kolapsują do jednej, różne łączą się
+  w `KindSet` do budżetu, przekroczenie budżetu **zawsze** poszerza do
+  `KindUnknown` z powodem, nigdy nie przycina `Candidates` tak, żeby
+  wyglądało na kompletne); `internal/valueflow/facts.go` (`Facts` —
+  API faktów dla modeli B3, niezależne od CVE i konkretnego frameworka,
+  zgodnie z wymogiem planu).
+- **Zachowanie dostępne użytkownikowi: żadne jeszcze.** To jest
+  świadomie kontrakt bez implementacji — `cmd/ariadne` nic z tego nie
+  wywołuje, `go build -o bin/ariadne` i pełne przebiegi na
+  petclinic/WebGoat są **niezmienione i nie wymagały ponownej
+  weryfikacji** (sprawdzone: brak zmian w plikach, które wpływałyby na
+  pipeline).
+- **Spełnione kryteria (z D0's "Gotowe"):** "kontrakt ma przykłady
+  gałęzi, pętli, wywołania i nieobsługiwanej operacji" —
+  `internal/valueflow/merge_test.go`'s `TestExample_branch` (dwie
+  różne stałe z dwóch gałęzi `if` łączą się w `KindSet`),
+  `TestExample_loop` (pięć kolejnych scaleń w pętli przekracza budżet
+  4 i poszerza się do `KindUnknown` z powodem), `TestExample_call`
+  (wynik wywołania zewnętrznego — `KindUnknown`, bo streszczenia
+  międzymetodowe to D3, nie D0), `TestExample_unsupportedOperation`
+  (`jsr`/`ret`, przykład nazwany explicite w planie, jako
+  `bytecodeir.OpUnsupported` + `KindUnknown`). "Nie wymaga ukończenia
+  taint" — prawda z konstrukcji: `internal/taint` (D4) nie istnieje i
+  nic z D0 go wymaga.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/valueflow`:
+  `TestExample_*` [4], `TestMerge_*` [4], `TestUnknown_requiresAReason`,
+  `TestFacts_contractIsImplementable`; `internal/bytecodeir` ma zero
+  testów — czysty typ/enum bez logiki, D1 doda testy, gdy zacznie
+  faktycznie dekodować bytecode do `Site`); `go test -race ./...` dla
+  całego projektu (zielone). **Brak przebiegu `bin/ariadne` na
+  petclinic/WebGoat — zamierzone, nie przeoczone**: ta faza nie dotyka
+  żadnego pliku na drodze CLI→raport, więc taki przebieg
+  potwierdziłby tylko to, co `go test ./...` już potwierdza (brak
+  regresji), bez żadnego nowego sygnału.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Data flow and
+  taint" — **status pozostaje `Not implemented`**, nie podniesiony do
+  `Partial`: żaden realny mechanizm pipeline'u się nie zmienił, tylko
+  dodano opis istniejących teraz pakietów kontraktowych w kolumnie
+  "Available scope" — świadoma decyzja, żeby nie przeszacować zakresu,
+  zgodnie z ostrzeżeniem `JVM_GRAPH:G5`).
+- **Niespełnione/odłożone:** cała resztę D1–D5 (CFG, lokalne wartości,
+  streszczenia międzymetodowe, taint, pomiar/wydanie) — to osobne fazy
+  z własnymi zależnościami, nie przeoczenia tej.
+- **Następny krok:** `DATA_FLOW:D1` (CFG i semantyka kodu metody —
+  rozszerzenie `internal/classfile/code.go` o tabelę wyjątków,
+  podstawowe bloki, normalne/wyjątkowe krawędzie) jest naturalnym
+  kolejnym krokiem — to pierwsza faza, która faktycznie dotyka
+  istniejącego kodu bytecode'owego i dekoduje prawdziwe instrukcje do
+  `bytecodeir.Site`. Wymaga propozycji i zgody użytkownika przed
+  startem.
 
 ## Punkt startowy następnej sesji
 
