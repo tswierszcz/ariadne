@@ -19,7 +19,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
-| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0, A1: DONE; A2–A4: UNASSESSED | A1 rozwiązuje konkretną klasę przekazaną jako callback dla bezpośredniej alokacji (53/35 z 135/134 na petclinic/WebGoat), ale żadna krawędź grafu wywołań do `run`/`call` jeszcze nie powstaje (A2); lambdy odłożone do DYNAMIC_LINKAGE L1. |
+| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` (51/33 z 53/35 na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum). A0–A2 domykają zadeklarowane MVP tego obszaru; lambdy/referencje metod (DYNAMIC_LINKAGE L1), continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Uporządkować istniejące lambda/method references przed szerszymi uchwytami. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
@@ -1207,6 +1207,85 @@ Przy dodawaniu kolejnego wpisu zapisz:
   inicjalizacji, tym samym wzorcem co `SERVICE_LOADING:S2`) albo
   dokończenie `SERVICE_LOADING:S3` (JPMS). Wymaga propozycji i zgody
   użytkownika przed startem.
+
+### ASYNC_CALLBACKS:A2 — Podstawowe wykonanie i ścieżki — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** A1 (gotowe wyżej). Ten sam wzorzec
+  co `SERVICE_LOADING:S2` (realna krawędź "może zostać wywołane", bez
+  prywatnej listy instancji, z jawną luką przy nieudanym rozwiązaniu
+  celu) — zastosowany tu do pary (rejestracja callbacku, metoda
+  `run`/`call`) zamiast (wywołanie `ServiceLoader.load`, konstruktor
+  providera).
+- **Zmienione pliki:** nowy `internal/callback/edges.go`
+  (`FindCallbackEdges` — dla każdego `ResolvedCallback` (A1) z
+  rozwiązanym `TargetFQCN` woła `hierarchy.ResolveExact` (zwykłe
+  rozwiązywanie metod JVM po łańcuchu nadklas — klasa docelowa może
+  tylko *dziedziczyć* `run`, nie nadpisywać go wprost), z jawną `Gap`
+  przy niepowodzeniu; `EdgeTargets` — para (caller, deklarująca
+  klasa#metoda) gotowa dla `internal/callgraph`); `internal/callgraph/graph.go`
+  (nowa `BasisCallback`, odrębna od S2's własnej `BasisServiceLoader` —
+  opisana explicite jako "może, nie na pewno" wykonanie, żeby nigdy nie
+  sugerować wymyślonej tożsamości wątku); nowy
+  `internal/callgraph/callback_edges.go` (`ApplyCallbackEdges`,
+  ta sama struktura co `ApplyServiceLoaderEdges`); `cmd/ariadne/main.go`
+  (wywołanie `FindCallbackEdges`/`EdgeTargets`/`ApplyCallbackEdges` po
+  S2's `ApplyServiceLoaderEdges`); `internal/report/report.go`/
+  `report.md.tmpl` (nowa sekcja "Callback call-graph edges").
+- **Zachowanie dostępne użytkownikowi:** graf wywołań ma teraz realną
+  krawędź od miejsca rejestracji callbacku do konkretnej metody
+  `run`/`call`, którą reachability BFS (`internal/reach`) przechodzi
+  jak każdą inną — bez wymyślania identyczności wątku (A2's własny
+  wymóg "raport nie wymyśla thread identity"), bo krawędź po prostu
+  łączy dwie metody, nie niesie żadnej informacji o konkretnym
+  wykonaniu w czasie. Raport ma nową tabelę z jawną luką tam, gdzie
+  rozwiązana klasa nie implementuje metody callbacku nigdzie w
+  analizowanej hierarchii.
+- **Spełnione kryteria (z A2's "Gotowe"):** "ścieżka do wywołania w
+  run/call" — `TestApplyCallbackEdges` (realna krawędź w grafie,
+  potwierdzona `g.EdgeBetween`, poprawny `Kind`/`Basis`/`Sites` z
+  prawdziwym PC) i `TestFindCallbackEdges_resolvesDeclaringClass`
+  (dziedziczona, nie nadpisana metoda `run` poprawnie rozwiązana do
+  rzeczywistej deklarującej klasy, nie do klasy docelowej samej).
+  "Rejestracja bez wykonania" — pokryte już przez A1's własny filtr
+  (tylko rozwiązane `TargetFQCN` trafiają do A2 w ogóle). "Nieznany
+  target" — `TestFindCallbackEdges_unresolvedIdentityContributesNothing`
+  i `_unresolvableTargetIsAGap` (jawna luka, nie fikcyjna krawędź).
+  Ponowne zastosowanie tych samych krawędzi nie dubluje ich
+  (`TestApplyCallbackEdges`'s ostatni krok).
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  `bin/ariadne -offline` na petclinic: **51 z 53 rozwiązanych
+  tożsamości zamodelowanych jako krawędzie (47 krawędzi — część
+  callerów ma po kilka miejsc do tego samego celu, kolapsujące),
+  2 szczere luki**: `org.springframework.util.concurrent.ListenableFutureTask`
+  dziedziczy `run()` po `java.util.concurrent.FutureTask` — klasie
+  JDK, którą ariadne z zasady nie czyta (poza analizowanym
+  uniwersum), nie po błędzie analizy. WebGoat: **33 z 35, 32 krawędzie,
+  0 luk.** **Zero zmian w REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN**
+  na obu aplikacjach — nowe krawędzie "może wykonać" nie prowadzą na
+  tej bazie do żadnej metody podatnej na obecnie mapowane CVE. Dwa
+  przebiegi petclinic dają bajt-identyczny `results.json` i
+  `report.md` (poza znacznikiem czasu).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/callback`:
+  `TestFindCallbackEdges_*` [3]; `internal/callgraph`:
+  `TestApplyCallbackEdges`); `go test -race ./...` dla całego
+  projektu (zielone); `bin/ariadne -offline` na petclinic (dwa
+  przebiegi) i WebGoat (opisane wyżej).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "General
+  callbacks and asynchronous execution models" rozszerzony o A2's
+  zakres i zmierzone dowody, w tym realny przypadek luki).
+  `README.md` ("Known limitations" i opis `resolution rule` przy entry
+  call rozszerzone o `callback`).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy):** A0–A2
+  to zadeklarowane MVP tego obszaru — **domknięte**. Lambdy/referencje
+  metod (DYNAMIC_LINKAGE L1), wzorzec "podklasa Thread z własnym
+  override `run()`" (A0's katalog go nie wykrywa), A3 (CompletionStage,
+  listenery, reactive), A4 — nietknięte, osobne, nieuzgodnione fazy.
+- **Następny krok:** `ASYNC_CALLBACKS:A3` (kontynuacje, listenery,
+  reactive — zależne od DATA_FLOW D3 i FRAMEWORK F2/F4, obie
+  nieodnotowane) albo `SERVICE_LOADING:S3` (JPMS) albo inny obszar
+  R1/R2 z ROADMAP.MD. Wymaga propozycji i zgody użytkownika przed
+  startem.
 
 ## Punkt startowy następnej sesji
 

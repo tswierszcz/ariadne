@@ -52,6 +52,18 @@ const (
 	// resolved ServiceLoader registration — different evidence, different
 	// confidence.
 	BasisServiceLoader EdgeBasis = "serviceloader"
+	// BasisCallback is an ASYNC_CALLBACKS A2 edge: a call site that
+	// registers a callback (Thread's Runnable-taking constructors,
+	// Executor/ExecutorService#execute/#submit) whose argument A1
+	// resolved to a concrete class, connected to that class's own
+	// run/call method (the class actually declaring it, which may be a
+	// superclass — JVM method resolution). Possible, not certain: the
+	// registration call running does not guarantee the callback itself
+	// ever executes (the thread may never be started, the task may be
+	// rejected/cancelled) — this basis says "may run", the same
+	// "don't invent certainty" reasoning BasisCHA already applies to
+	// virtual dispatch.
+	BasisCallback EdgeBasis = "callback"
 )
 
 // CallSite is one piece of evidence for why an edge exists: the bytecode

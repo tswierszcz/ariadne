@@ -422,8 +422,10 @@ The entry call line also names the call kind, the resolution rule
 class-hierarchy-analysis expanded it to a subtype, so trust it less;
 `synthetic`: a profile's `synthetic_edges`, with no real call site at
 all; `serviceloader`: a resolved `ServiceLoader.load(...)` call site
-connected to a registered provider's constructor, SERVICE_LOADING S2)
-and, when there is one, the bytecode offset of the actual invoke
+connected to a registered provider's constructor, SERVICE_LOADING S2;
+`callback`: a resolved `Thread`/`Executor` registration connected to the
+callback's own `run`/`call` method, ASYNC_CALLBACKS A2) and, when there
+is one, the bytecode offset of the actual invoke
 instruction — e.g. `(virtual call, resolution: direct, pc=77)` — so a
 reader can jump straight to `javap -c -p` output instead of trusting the
 method names alone (`internal/reach.EntryEdge`, `internal/callgraph.Edge`;
@@ -647,11 +649,14 @@ report:
 - **Callbacks and async execution** (`Thread`, `Executor`/
   `ExecutorService`): every call site registering one is inventoried
   (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),
-  and the concrete `Runnable`/`Callable` class passed directly is
-  resolved where possible (ASYNC_CALLBACKS A1 — "Callback identities
-  resolved" section), but no call-graph edge to that class's own
-  `run`/`call` method exists yet, and a lambda/method reference is left
-  unresolved rather than guessed at.
+  the concrete `Runnable`/`Callable` class passed directly is resolved
+  where possible (ASYNC_CALLBACKS A1 — "Callback identities resolved"
+  section), and a real call-graph edge connects the registration site to
+  that class's own `run`/`call` method (ASYNC_CALLBACKS A2 — "Callback
+  call-graph edges" section). A lambda/method reference is left
+  unresolved rather than guessed at (needs DYNAMIC_LINKAGE L1), and
+  nothing beyond the registration→callback edge itself is modeled
+  (`CompletionStage`, listeners, reactive operators).
 - **Serialization gadgets and config-driven behavior** (XML wiring,
   `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the

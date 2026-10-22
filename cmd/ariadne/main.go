@@ -301,6 +301,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	svcEdgesAdded := callgraph.ApplyServiceLoaderEdges(g, svcGraphEdges)
 	log("ServiceLoader: %d provider constructors modeled as call-graph targets (%d edges added)", len(svcEdgeTargets), svcEdgesAdded)
 
+	// ASYNC_CALLBACKS A2: connect each resolved callback identity (A1)
+	// to the class that actually declares its run()/call() method — a
+	// "may run" edge (BasisCallback), never claiming the thread/task
+	// actually executes.
+	callbackEdgeResults := callback.FindCallbackEdges(h, resolvedCallbacks)
+	callbackEdgeTargets := callback.EdgeTargets(callbackEdgeResults)
+	var callbackGraphEdges []callgraph.CallbackEdge
+	for _, e := range callbackEdgeTargets {
+		callbackGraphEdges = append(callbackGraphEdges, callgraph.CallbackEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetMethod: e.TargetMethod, TargetMethodDesc: e.TargetMethodDesc,
+		})
+	}
+	callbackEdgesAdded := callgraph.ApplyCallbackEdges(g, callbackGraphEdges)
+	log("callbacks: %d resolved identities modeled as call-graph targets (%d edges added)", len(callbackEdgeTargets), callbackEdgesAdded)
+
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
@@ -474,7 +490,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

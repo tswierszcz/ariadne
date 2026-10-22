@@ -209,6 +209,26 @@ None found.
 {{end}}
 {{end}}
 
+## Callback call-graph edges
+
+For every callback identity resolved above, a real call-graph edge (ASYNC_CALLBACKS
+A2) from the registration call site to the class that actually declares the callback
+method (may be a superclass — ordinary JVM method resolution). This is a "may run"
+edge, like a profile's synthetic edge or CHA's own dispatch expansion: it does not
+claim the registration call itself guarantees execution (the thread may never start,
+the task may be rejected or cancelled), and it never invents a thread identity. "Gap"
+means the resolved class doesn't resolve the callback method anywhere in the analyzed
+hierarchy (normally only when a class on that chain is missing from the input, not
+evidence the callback itself is unreachable).
+{{if not .CallbackEdges}}
+None found.
+{{else}}
+| Caller | Target | Edge |
+|---|---|---|
+{{range .CallbackEdges}}| `{{.ResolvedCallback.Site.CallerFQCN}}#{{.ResolvedCallback.Site.CallerName}}{{.ResolvedCallback.Site.CallerDesc}}` (pc={{.ResolvedCallback.Site.PC}}) | `{{.ResolvedCallback.TargetFQCN}}` | {{if .DeclaringFQCN}}`{{.DeclaringFQCN}}#{{.ResolvedCallback.Site.Model.CallbackMethod}}` ({{.ResolvedCallback.Site.Model.Execution}}){{else}}**gap:** {{.Gap}}{{end}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
