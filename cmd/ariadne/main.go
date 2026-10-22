@@ -42,6 +42,7 @@ type config struct {
 	profile     string
 	profileFile string
 	roots       string
+	targetJava  int
 
 	llm        bool
 	llmModel   string
@@ -64,6 +65,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.profile, "profile", "auto", "which profile's framework knowledge to use: auto, generic, spring, or a name from -profile-file")
 	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
 	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default) or "profile" (only the active profile's entry points: annotated methods/classes, main)`)
+	fs.IntVar(&cfg.targetJava, "target-java", 0, "Java feature version (e.g. 11, 17) to resolve multi-release JAR variants against; unset falls back to every jar's base classes, not the highest bytecode version seen (JVM_GRAPH G4)")
 	fs.StringVar(&cfg.out, "out", "", "report.md output path (required)")
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
@@ -124,6 +126,9 @@ func validate(cfg config) error {
 	if cfg.roots != "all" && cfg.roots != "profile" {
 		return fmt.Errorf("-roots must be %q or %q, got %q", "all", "profile", cfg.roots)
 	}
+	if cfg.targetJava < 0 {
+		return fmt.Errorf("-target-java must be a positive Java feature version, got %d", cfg.targetJava)
+	}
 	return nil
 }
 
@@ -174,17 +179,26 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("resolved %d/%d dependency jars to Maven coordinates", identified, len(depJars))
 
 	log("building class hierarchy")
-	h, warnings, err := hierarchy.Build(prepared.AppClassesJar, depJars)
+	h, warnings, err := hierarchy.BuildWithTarget(prepared.AppClassesJar, depJars, cfg.targetJava)
 	if err != nil {
 		return fmt.Errorf("building hierarchy: %w", err)
 	}
 	maxBytecode := 0
+	mrVariants := 0
 	for _, ci := range h.All() {
 		if int(ci.MajorVersion) > maxBytecode {
 			maxBytecode = int(ci.MajorVersion)
 		}
+		if ci.VariantVersion > 0 {
+			mrVariants++
+		}
 	}
-	log("hierarchy: %d classes (max bytecode version %d)", h.Len(), maxBytecode)
+	if cfg.targetJava > 0 {
+		log("hierarchy: %d classes (max bytecode version %d, target Java %d, %d multi-release variants selected)",
+			h.Len(), maxBytecode, cfg.targetJava, mrVariants)
+	} else {
+		log("hierarchy: %d classes (max bytecode version %d)", h.Len(), maxBytecode)
+	}
 
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {

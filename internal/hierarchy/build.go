@@ -10,15 +10,26 @@ import (
 
 const readWorkers = 8
 
-// Build reads every class from the application (appJarPath: a plain jar
-// or a jar packed from a classes directory, per Phase 1) and from every
-// dependency jar, in parallel, and assembles the resulting Hierarchy.
+// Build is BuildWithTarget with no -target-java given: multi-release JAR
+// variants are never activated (JVM_GRAPH G4's documented fallback —
+// every jar's base classes, regardless of any META-INF/versions/ it
+// has), exactly as ariadne behaved before that phase.
+func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, error) {
+	return BuildWithTarget(appJarPath, depJars, 0)
+}
+
+// BuildWithTarget reads every class from the application (appJarPath: a
+// plain jar or a jar packed from a classes directory, per Phase 1) and
+// from every dependency jar, in parallel, and assembles the resulting
+// Hierarchy. targetJava is the Java feature version multi-release JAR
+// variants (JVM_GRAPH G4) are resolved against; 0 means "unset" and
+// always selects base classes (see selectClassEntries).
 //
 // A class that's defined in more than one jar (a duplicate on the
 // classpath — not unusual with overlapping shaded dependencies) is kept
 // from whichever jar was read first and reported as a warning rather than
 // an error, since ariadne can still analyze the rest of the graph.
-func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, error) {
+func BuildWithTarget(appJarPath string, depJars []input.DepJar, targetJava int) (*Hierarchy, []string, error) {
 	type job struct {
 		idx   int
 		path  string
@@ -32,10 +43,11 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 	}
 
 	type result struct {
-		idx     int
-		path    string
-		classes []*ClassInfo
-		err     error
+		idx      int
+		path     string
+		classes  []*ClassInfo
+		warnings []string
+		err      error
 	}
 	jobCh := make(chan job)
 	resCh := make(chan result)
@@ -46,8 +58,8 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 		go func() {
 			defer wg.Done()
 			for j := range jobCh {
-				classes, err := readJarClasses(j.path, j.gav, j.isApp)
-				resCh <- result{idx: j.idx, path: j.path, classes: classes, err: err}
+				classes, warnings, err := readJarClasses(j.path, j.gav, j.isApp, targetJava)
+				resCh <- result{idx: j.idx, path: j.path, classes: classes, warnings: warnings, err: err}
 			}
 		}()
 	}
@@ -84,6 +96,7 @@ func Build(appJarPath string, depJars []input.DepJar) (*Hierarchy, []string, err
 	var warnings []string
 	var duplicates []Duplicate
 	for _, r := range results {
+		warnings = append(warnings, r.warnings...)
 		for _, ci := range r.classes {
 			existing, dup := classes[ci.FQCN]
 			if !dup {

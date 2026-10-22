@@ -14,7 +14,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
-| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1, G3: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here); G4–G5: UNASSESSED | G4 (target Java/multi-release JAR) jest następnym naturalnym krokiem; G5 (integracja/kwalifikacja całego zakresu) zostaje na koniec. |
+| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1, G3, G4: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here); G5: UNASSESSED | G5 (integracja/kwalifikacja całego zakresu G0–G4) jest ostatnim krokiem tego obszaru w R0. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
@@ -338,6 +338,94 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   wymaga zgody użytkownika przed startem. Alternatywnie: dokończyć G2's
   odłożoną weryfikację bridge/default methods, jeśli w przyszłej sesji
   będzie dostępny JDK.
+
+### JVM_GRAPH:G4 — Target Java i multi-release JAR — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** G1 (gotowe wyżej). Wspólny opis
+  targetu z CVE F8a nie istnieje (F8 nieodnotowane) — zgodnie z G4's
+  własnym zapisem "pełny adapter podatności JDK nie jest wymagany",
+  zaimplementowano tylko to, co G4 faktycznie potrzebuje (flaga
+  `-target-java` + wybór wariantu), bez czekania na F8a.
+- **Zmienione pliki:** `internal/hierarchy/jarread.go` (przebudowane:
+  `selectClassEntries`/`isMultiReleaseJar`/`parseVersionDir` — logika
+  wyboru wariantu; `readJarClasses` zyskuje `targetJava int` i drugą
+  wartość zwraną `[]string` ostrzeżeń); `internal/hierarchy/hierarchy.go`
+  (`ClassInfo.SourceEntry`/`VariantVersion`); `internal/hierarchy/build.go`
+  (`Build` zostaje niezmienione jako wrapper; nowe `BuildWithTarget` z
+  parametrem `targetJava` — **żadny z 11 istniejących wywołań `Build`
+  nie wymagał zmiany**, dzięki temu podziałowi); `cmd/ariadne/main.go`
+  (`-target-java` flaga + walidacja + log z liczbą wybranych wariantów).
+- **Zachowanie dostępne użytkownikowi:** `-target-java 17` wybiera, dla
+  jara z `Multi-Release: true` w manifeście, najwyższy
+  `META-INF/versions/<V>/...` z `V <= 17` per klasa, z fallbackiem do
+  wpisu bazowego. Bez flagi — zawsze wpis bazowy, **nigdy zgadywanie z
+  najwyższej widzianej wersji bytecode** (to był jawny wymóg G4's
+  "Gotowe"). `ClassInfo.SourceEntry`/`VariantVersion` zachowują
+  faktyczną wybraną ścieżkę i wersję.
+- **Spełnione kryteria (z G4's "Gotowe"):**
+  - "targety bazowy/11/17 wybierają oczekiwane klasy" —
+    `TestSelectClassEntries_picksHighestQualifyingVariant` (7 celów:
+    8/9/10/11/16/17/21 — potwierdza też, że cel 21 wybiera wariant 17,
+    nie zgaduje wariantu 21, którego nie ma).
+  - "brak flagi" — `TestSelectClassEntries_unsetTargetFallsBackToBase`.
+  - "brak wariantu" — pokryte przez przypadek target=8 w teście powyżej
+    (żaden wariant nie kwalifikuje się, wpis bazowy wygrywa).
+  - "sprzeczne wejście" — nie istnieje drugie źródło metadanych runtime'u
+    do konfliktu z (F8a nieodnotowane), więc walidacja ograniczona do
+    samej flagi (`-target-java` musi być dodatnie); odnotowane jako
+    świadome ograniczenie, nie przemilczane.
+  - "nie traktować każdego META-INF/versions/ jako aktywnego wariantu" —
+    `TestSelectClassEntries_notMultiReleaseIgnoresVersionsDir` (jar bez
+    `Multi-Release: true` w manifeście nigdy nie aktywuje wariantów,
+    nawet z podanym celem).
+  - "raportować niezgodne wejścia" —
+    `TestSelectClassEntries_malformedVersionDirWarnsAndFallsBackToBase`
+    (nienumeryczny katalog wersji i wersja <9 — oba dają ostrzeżenie,
+    nie błąd).
+  - "Snapshot zachowuje wybór" — `results.json` bajt-identyczny między
+    dwoma przebiegami petclinic z `-target-java 17` (patrz dowody
+    poniżej).
+- **Dowód na realnym bytecode, nie tylko metadanych:**
+  `TestBuildWithTarget_selectsRealVariantBytecode` — syntetyczny
+  multi-release jar, którego wpis bazowy to prawdziwe, skompilowane
+  bytecode `fixture.Greeter`, a wariant wersji 17 to prawdziwe
+  `fixture.FormalGreeter` (dwie różne, rzeczywiste klasy jako
+  rozróżnialna "treść wariantu" — bez JDK nie można było skompilować
+  jednej klasy w dwóch wersjach celowo różniących się czymś
+  obserwowalnym). Potwierdza, że `readJarClasses` faktycznie parsuje
+  wybrane bajty, nie tylko że `selectClassEntries` nazwał właściwy
+  `zip.File`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone); `go test -race ./internal/hierarchy/...`
+  (zielone); `bin/ariadne -offline` na petclinic i WebGoat, z i bez
+  `-target-java 17`:
+  - **petclinic ma 8 realnych zależności multi-release**
+    (`log4j-api-2.13.3`, `byte-buddy-1.10.22`, `classgraph-4.8.69`,
+    `h2-1.4.200`, `HikariCP-3.4.5`, `istack-commons-runtime-3.0.12`,
+    `jakarta.xml.bind-api-2.3.3`, `jaxb-runtime-2.3.4`) — potwierdzone
+    bezpośrednim sprawdzeniem manifestów, nie założone. `-target-java 17`
+    aktywuje **15 wariantów** (log: "29125 classes ... target Java 17,
+    15 multi-release variants selected").
+  - **WebGoat: 21 aktywowanych wariantów.**
+  - **Zero zmian statusu CVE w obu aplikacjach** (porównanie `results.json`
+    bez/z `-target-java 17`, zero różnic) — szczery wynik: funkcja
+    realna i aktywowana na prawdziwych danych, ale na tej bazie nie
+    odkrywa nowych ścieżek.
+  - Dwa przebiegi petclinic z `-target-java 17` dają bajt-identyczny
+    `results.json`.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Multi-release
+  target selection": Not implemented → Partial, z pełnym opisem i
+  dowodami z realnych przebiegów); `README.md` (nowy wiersz `-target-java`
+  w tabeli flag).
+- **Niespełnione/odłożone:** "uzgodnić z metadanymi runtime'u, jeśli
+  podano oba wejścia" — nie zaimplementowane, bo drugie źródło metadanych
+  nie istnieje jeszcze (CVE F8a); nic do uzgadniania na razie. Pełny
+  adapter podatności JDK (reszta F8) — poza zakresem tej fazy z
+  definicji.
+- **Następny krok:** `JVM_GRAPH:G5` (integracja i kwalifikacja całego
+  G0–G4 — fixtures do `testdata`, porównanie grafu przed/po, aktualizacja
+  README/raportu/ograniczeń) — to domyka R0's JVM_GRAPH w całości.
+  Wymaga zgody użytkownika przed startem.
 
 Przy dodawaniu kolejnego wpisu zapisz:
 

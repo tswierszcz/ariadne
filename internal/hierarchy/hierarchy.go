@@ -52,6 +52,16 @@ type ClassInfo struct {
 	// otherwise. Never "" in practice: Build always passes a jar path for
 	// the app too.
 	SourceJar string
+	// SourceEntry is the exact zip entry path this class was read from
+	// inside SourceJar (JVM_GRAPH G4) — ordinarily the same as the class's
+	// own path (e.g. "com/example/Foo.class"), but
+	// "META-INF/versions/N/com/example/Foo.class" when a multi-release
+	// variant was selected for the active -target-java.
+	SourceEntry string
+	// VariantVersion is 0 for an ordinary base entry, or the
+	// multi-release version N SourceEntry was selected from (JVM_GRAPH
+	// G4).
+	VariantVersion int
 	// GAV is the resolved Maven coordinate of SourceJar, or nil if it
 	// came from the app, or from a dependency jar ResolveDepJars could
 	// not identify.

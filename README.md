@@ -446,6 +446,7 @@ Flags:
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
+| `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
