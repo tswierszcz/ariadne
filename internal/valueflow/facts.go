@@ -25,4 +25,16 @@ type Facts interface {
 	// so a bug in the caller doesn't read as "the analysis genuinely
 	// doesn't know".
 	ArgumentAt(at bytecodeir.Site, i int) Value
+
+	// ReceiverAt returns the Value of an instance call's own receiver
+	// (the object the call is made on — `this` inside the invoked
+	// method), as known at the call site identified by at. DYNAMIC_LINKAGE
+	// L2's own first consumer: `handle.invoke(...)`/`invokeExact(...)`
+	// needs the receiver — the MethodHandle itself — not an argument, to
+	// connect back to the HandleValue a `Lookup.find*` call produced
+	// earlier. A Site whose Op is not bytecodeir.OpCall, or one with no
+	// receiver at all (a static call), is a caller error — an
+	// implementation may panic rather than return a disguised Unknown,
+	// same discipline as ArgumentAt.
+	ReceiverAt(at bytecodeir.Site) Value
 }

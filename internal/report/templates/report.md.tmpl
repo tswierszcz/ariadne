@@ -235,6 +235,41 @@ None found.
 {{end}}
 {{end}}
 
+## MethodHandle invoke call sites
+
+Every `MethodHandle#invoke`/`invokeExact` call site found, with its receiver resolved
+back to the `MethodHandles.Lookup#findStatic/findVirtual/findSpecial/findConstructor`
+call that produced it, where possible (DYNAMIC_LINKAGE L2). A receiver that was a
+parameter, a field read, or an unresolved lookup is correctly left unresolved, not
+guessed at.
+{{if not .HandleInvokeSites}}
+None found.
+{{else}}
+| Caller | Exact | Handle |
+|---|---|---|
+{{range .HandleInvokeSites}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}{{.Site.CallerDesc}}` (pc={{.Site.PC}}) | {{.Site.Exact}} | {{if .RequestedOwner}}`{{.RequestedOwner}}#{{.Method}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{end}}
+{{end}}
+
+## MethodHandle call-graph edges
+
+For every resolved handle above, a real call-graph edge (DYNAMIC_LINKAGE L2) from the
+`invoke`/`invokeExact` call site to the target method name's actual declaring class —
+overload-insensitive by name alone (no find* call carries a fixed descriptor to
+narrow it), connected to *every* overload on that class. A "may run" edge, same
+reasoning as a profile's synthetic edge or ASYNC_CALLBACKS's own `BasisCallback`.
+"Gap" means the requested owner doesn't resolve a method with that name anywhere in
+its hierarchy — rare on real bytecode (the lookup itself would have failed at
+runtime), not evidence the call is unreachable.
+{{if not .HandleEdges}}
+None found.
+{{else}}
+| Caller | Target |
+|---|---|
+{{range .HandleEdges}}| `{{.ResolvedInvoke.Site.CallerFQCN}}#{{.ResolvedInvoke.Site.CallerName}}{{.ResolvedInvoke.Site.CallerDesc}}` (pc={{.ResolvedInvoke.Site.PC}}) | {{if .DeclaringFQCN}}`{{.DeclaringFQCN}}#{{.ResolvedInvoke.Method}}`{{else}}**gap:** {{.Gap}}{{end}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

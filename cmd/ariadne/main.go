@@ -19,6 +19,7 @@ import (
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
+	"ariadne/internal/methodhandle"
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
 	"ariadne/internal/report"
@@ -318,6 +319,27 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	callbackEdgesAdded := callgraph.ApplyCallbackEdges(g, callbackGraphEdges)
 	log("callbacks: %d resolved identities modeled as call-graph targets (%d edges added)", len(callbackEdgeTargets), callbackEdgesAdded)
 
+	// DYNAMIC_LINKAGE L2: find every MethodHandle#invoke/invokeExact
+	// call site, read its receiver back via DATA_FLOW D2's
+	// Facts.ReceiverAt, and connect it to every overload of the
+	// resolved target method name — a "may run" edge, like
+	// ASYNC_CALLBACKS A2's own BasisCallback.
+	handleInvokeSites := methodhandle.FindInvokeSites(h)
+	resolvedHandles, handleResolveWarnings := methodhandle.ResolveInvokes(h, handleInvokeSites)
+	warnings = append(warnings, handleResolveWarnings...)
+	handleEdgeResults := methodhandle.FindHandleEdges(h, resolvedHandles)
+	handleEdgeTargets := methodhandle.EdgeTargets(handleEdgeResults)
+	var handleGraphEdges []callgraph.HandleEdge
+	for _, e := range handleEdgeTargets {
+		handleGraphEdges = append(handleGraphEdges, callgraph.HandleEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetMethod: e.TargetMethod,
+		})
+	}
+	handleEdgesAdded := callgraph.ApplyMethodHandleEdges(g, handleGraphEdges)
+	log("method handles: %d invoke/invokeExact call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
+		len(handleInvokeSites), len(handleEdgeTargets), handleEdgesAdded)
+
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
@@ -491,7 +513,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

@@ -273,6 +273,9 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		args[i] = e.v
 	}
 	it.facts.calls[it.site(op.PC, bytecodeir.OpCall)] = args
+	if op.CallHasReceiver {
+		it.facts.receivers[it.site(op.PC, bytecodeir.OpCall)] = entries[0].v
+	}
 
 	if op.CallKind == classfile.CallDynamic && op.CallOwner != "" {
 		// DYNAMIC_LINKAGE L0/L1: a resolved LambdaMetafactory creation

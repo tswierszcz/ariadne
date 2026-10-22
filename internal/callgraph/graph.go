@@ -64,6 +64,14 @@ const (
 	// "don't invent certainty" reasoning BasisCHA already applies to
 	// virtual dispatch.
 	BasisCallback EdgeBasis = "callback"
+	// BasisMethodHandle is a DYNAMIC_LINKAGE L2 edge: a
+	// MethodHandle#invoke/invokeExact call site whose receiver DATA_FLOW
+	// D2 resolved back to a MethodHandles.Lookup find* call, connected
+	// to every overload of the found method name on its resolved
+	// declaring class (never an exact descriptor — a find* call carries
+	// no fixed overload to begin with, same reasoning the rest of
+	// ariadne already applies to CVE-vulnerable-method matching).
+	BasisMethodHandle EdgeBasis = "methodhandle"
 )
 
 // CallSite is one piece of evidence for why an edge exists: the bytecode

@@ -20,6 +20,10 @@ func (f fakeFacts) ArgumentAt(_ bytecodeir.Site, i int) Value {
 	return Unknown("fakeFacts has no value for this argument index")
 }
 
+func (f fakeFacts) ReceiverAt(_ bytecodeir.Site) Value {
+	return Unknown("fakeFacts has no receiver")
+}
+
 func TestFacts_contractIsImplementable(t *testing.T) {
 	var f Facts = fakeFacts{args: map[int]Value{
 		0: Const("java.lang.Class", "java.sql.Driver"),

@@ -20,7 +20,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
-| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (wartość uchwytu): DONE; L1 (SAM-call materialization), L2 (invoke/invokeExact → krawędź), L3–L4: UNASSESSED | L2 daje realną `valueflow.KindHandle` dla `Lookup.findStatic/findVirtual/findSpecial/findConstructor` (realne użycie na petclinic/WebGoat potwierdzone), ale **bez konsumenta** — połączenie `invoke()`/`invokeExact()` z uchwytem jako krawędź grafu wymaga rozszerzenia `Facts` o dostęp do receivera wywołania, odłożone do wyraźnej decyzji. |
+| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method case): DONE; L1 (SAM-call materialization), L2 (cross-method tracking), L3–L4: UNASSESSED | L2 łączy `invoke()`/`invokeExact()` z `Lookup.find*`'s uchwytem i daje realną krawędź grafu (`Facts` rozszerzone o `ReceiverAt`), ale tylko w ramach jednej metody — na petclinic/WebGoat 0/0 z 10/46 realnych wywołań miało tak płytki zasięg (dominujący wzorzec to pole statyczne, poza zakresem bez D3). |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
@@ -1481,6 +1481,99 @@ Przy dodawaniu kolejnego wpisu zapisz:
   `invoke`/`invokeExact` z grafem), albo przejść do innego obszaru
   (`ASYNC_CALLBACKS:A3`, `SERVICE_LOADING:S3`). Wymaga propozycji i
   zgody użytkownika przed startem.
+
+### DYNAMIC_LINKAGE:L2 — invoke/invokeExact → krawędź grafu (zasięg jednej metody) — DONE, z uzgodnionym rozszerzeniem kontraktu Facts (2026-10-22)
+
+- **Zakres zlecenia i zależności:** L2's własna wartość `HandleValue`
+  (gotowa wyżej). Ta faza wymagała **jawnej decyzji użytkownika**
+  przed startem — rozszerzenie `valueflow.Facts` (kontrakt DATA_FLOW
+  D0) o nową metodę, pierwszej od samego D0 — zgoda uzyskana przed
+  implementacją, zgodnie z ustalonym wzorcem sesji.
+- **Zmienione pliki:** `internal/valueflow/facts.go` (`Facts` zyskuje
+  `ReceiverAt(at bytecodeir.Site) Value` — receiver wywołania
+  instancyjnego, ten sam reżim panik/`Aborted` co `ArgumentAt`;
+  `facts_test.go`'s `fakeFacts` zaktualizowane, żeby demonstrować
+  implementowalność rozszerzonego kontraktu);
+  `internal/dataflow/facts.go`/`analyze.go`/`step.go`
+  (`MethodFacts.receivers` — nowa mapa, wypełniana w preregistration
+  (`Unknown("receiver not yet analyzed")` dla każdego wywołania z
+  receiverem) i w `stepCall` (prawdziwa wartość ze stosu, ta sama
+  `entries[0]` która wcześniej była odrzucana)); nowy pakiet
+  `internal/methodhandle` (`FindInvokeSites` — skan po już
+  wyekstrahowanych `Calls` dla `MethodHandle#invoke`/`invokeExact`,
+  dopasowanie tylko po owner+name, bo to metody polimorficzne
+  sygnaturowo, bez ustalonego deskryptora; `ResolveInvokes` — ponowny
+  odczyt klasy przez `classfile.JarClassReader`, `dataflow.Analyze`,
+  `Facts.ReceiverAt`; `FindHandleEdges`/`EdgeTargets` — rozwiązanie
+  deklarującej klasy przez `hierarchy.ResolveMethod` [po samej nazwie,
+  bez deskryptora — ten sam poziom precyzji co CVE's własne
+  dopasowanie podatnych metod w całym projekcie]); `internal/callgraph/graph.go`
+  (`BasisMethodHandle`); nowy `internal/callgraph/methodhandle_edges.go`
+  (`ApplyMethodHandleEdges` — łączy się z **każdym** przeciążeniem
+  nazwy celu przez `g.IDsByName`, bo `find*` nigdy nie ustala
+  dokładnego deskryptora); `cmd/ariadne/main.go` (wywołanie całego
+  łańcucha po `ApplyCallbackEdges`); `internal/report/report.go`/
+  `report.md.tmpl` (dwie nowe sekcje: "MethodHandle invoke call sites"
+  / "MethodHandle call-graph edges").
+- **Zachowanie dostępne użytkownikowi:** raport ma teraz tabelę
+  każdego `invoke`/`invokeExact` z rozwiązanym (lub nie, z jawnym
+  powodem) uchwytem, i drugą tabelę z realną krawędzią grafu tam,
+  gdzie się udało. Krawędź jest oznaczona `methodhandle`
+  (`BasisMethodHandle`) w linii "Entry call", odróżniona od
+  `callback`/`serviceloader`.
+- **Spełnione kryteria (z L2's "Gotowe", w zakresie jednej metody):**
+  "różnica posiadanie/invocation" — `HandleValue` sam nie tworzy
+  krawędzi (L1-owa faza), krawędź powstaje tylko przy faktycznym
+  `invoke`/`invokeExact` (ta faza) —
+  `TestAnalyze_receiverAtReadsBackHandleValue`,
+  `TestResolveOne_handleReceiverResolves`,
+  `TestApplyMethodHandleEdges` (w tym: dwa przeciążenia tej samej
+  nazwy obie dostają krawędź, ponowne zastosowanie nie duplikuje).
+  "Nieznany lookup" — pokryte już przez L1-ową `HandleValue`'s
+  własny `Unknown`, teraz widoczne też na poziomie receivera
+  (`TestFindHandleEdges_unresolvedInvokeContributesNothing`).
+  "Niezgodny typ" — **nie zaimplementowane w tym przyroście** (patrz
+  "Niespełnione").
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  `bin/ariadne -offline` na petclinic: **10 realnych wywołań
+  `invoke`/`invokeExact` znalezionych, 0 rozwiązanych do krawędzi** —
+  **szczery, zmierzony wynik, nie błąd**: każde z 10 miejsc ładuje
+  swój receiver (uchwyt) z pola (`getfield`/`getstatic`, dające
+  `KindTyped`, nie `KindHandle`) — dominujący, realny idiom "znajdź
+  uchwyt raz, trzymaj go w polu, wywołuj później z innej metody",
+  który jest poza zasięgiem analizy ograniczonej do jednej metody
+  (potrzebuje DATA_FLOW D3). WebGoat: **46 wywołań, też 0 krawędzi**,
+  identyczny wzorzec. **Zero zmian w REACHABLE/FRAMEWORK/
+  NOT_REACHABLE/UNKNOWN** na obu aplikacjach. Dwa przebiegi petclinic
+  dają bajt-identyczny `results.json`/`report.md`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/dataflow`:
+  `TestAnalyze_receiverAtReadsBackHandleValue`; `internal/methodhandle`
+  [nowy pakiet]: `TestFindInvokeSites`, `TestFindHandleEdges_*` [3],
+  `TestResolveOne_handleReceiverResolves`; `internal/callgraph`:
+  `TestApplyMethodHandleEdges`); `go test -race ./...` dla całego
+  projektu (zielone); `bin/ariadne -offline` na petclinic (dwa
+  przebiegi) i WebGoat (opisane wyżej).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "General
+  reflection, MethodHandle invocation and custom bootstrap models"
+  rozszerzony o L2's pełny, szczery zakres i zmierzony "zero krawędzi,
+  ale dlaczego"). `README.md` ("Known limitations" i opis
+  `resolution rule` rozszerzone o `methodhandle`).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** śledzenie uchwytu między metodami (przez pole
+  statyczne/instancyjne) — wymaga DATA_FLOW D3 (streszczenia
+  międzymetodowe/pól), nieodnotowane; to jest **dominujący** realny
+  wzorzec, więc realny efekt tej fazy na dwóch aplikacjach kontrolnych
+  jest zerowy, odnotowane szczerze, nie przemilczane. "Niezgodny typ"
+  dla `invokeExact` (wymaga rozwiązania `MethodType.methodType(...)`,
+  nietknięte). L3 (`bindTo`/`asType`, `StringConcatFactory`,
+  `CONSTANT_Dynamic`), L4 (fixtures wymagające JDK) — nietknięte.
+- **Następny krok:** `DATA_FLOW:D3` (streszczenia międzymetodowe) —
+  jeden przyrost odblokowałby jednocześnie ten dominujący wzorzec
+  MethodHandle, ASYNC_CALLBACKS A3's własną zależność, i ogólnie
+  poprawiłby precyzję całego projektu. Alternatywnie `SERVICE_LOADING:S3`
+  (JPMS) albo `REFLECTION:R0`. Wymaga propozycji i zgody użytkownika
+  przed startem.
 
 ## Punkt startowy następnej sesji
 

@@ -132,3 +132,67 @@ func TestAnalyze_lookupFindVirtualWithUnknownNameStaysUnknown(t *testing.T) {
 		t.Fatalf("ArgumentAt = %+v, want KindUnknown", val)
 	}
 }
+
+// TestAnalyze_receiverAtReadsBackHandleValue confirms Facts.ReceiverAt
+// surfaces the real receiver — here, a HandleValue flowing from a
+// `findStatic` call straight into `invokeExact`'s own receiver slot —
+// DYNAMIC_LINKAGE L2's own prerequisite for connecting invoke/
+// invokeExact to the handle it was called on.
+//
+// Bytecode (static void m(Lookup lookup, MethodType mt)):
+//
+//	pc0:  aload_0           (lookup)
+//	pc1:  ldc #8            (test.Foo.class)
+//	pc3:  ldc #10           ("bar")
+//	pc5:  aload_1           (mt)
+//	pc6:  invokevirtual #16 (Lookup#findStatic(Class,String,MethodType)MethodHandle)
+//	pc9:  invokevirtual #19 (MethodHandle#invokeExact([Ljava/lang/Object;)V, varargs-free for this test)
+//	pc12: return
+func TestAnalyze_receiverAtReadsBackHandleValue(t *testing.T) {
+	pool := sinkPool(
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "test/Foo"},                                                                                          // 7
+		classfile.PoolEntry{Tag: classfile.TagClass, NameIndex: 7},                                                                                            // 8
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "bar"},                                                                                               // 9
+		classfile.PoolEntry{Tag: classfile.TagString, NameIndex: 9},                                                                                           // 10
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "java/lang/invoke/MethodHandles$Lookup"},                                                             // 11
+		classfile.PoolEntry{Tag: classfile.TagClass, NameIndex: 11},                                                                                           // 12
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "findStatic"},                                                                                        // 13
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"}, // 14
+		classfile.PoolEntry{Tag: classfile.TagNameAndType, NameIndex: 13, DescriptorIndex: 14},                                                                // 15
+		classfile.PoolEntry{Tag: classfile.TagMethodref, ClassIndex: 12, NameAndTypeIndex: 15},                                                                // 16: Lookup#findStatic
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "java/lang/invoke/MethodHandle"},                                                                     // 17
+		classfile.PoolEntry{Tag: classfile.TagClass, NameIndex: 17},                                                                                           // 18
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "invokeExact"},                                                                                       // 19
+		classfile.PoolEntry{Tag: classfile.TagUtf8, Str: "()V"},                                                                                               // 20
+		classfile.PoolEntry{Tag: classfile.TagNameAndType, NameIndex: 19, DescriptorIndex: 20},                                                                // 21
+		classfile.PoolEntry{Tag: classfile.TagMethodref, ClassIndex: 18, NameAndTypeIndex: 21},                                                                // 22: MethodHandle#invokeExact()V
+	)
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	code := []byte{
+		0x2a,       // pc0 aload_0 (lookup)
+		0x12, 0x08, // pc1 ldc #8 (test.Foo.class)
+		0x12, 0x0a, // pc3 ldc #10 ("bar")
+		0x2b,             // pc5 aload_1 (mt)
+		0xb6, 0x00, 0x10, // pc6 invokevirtual #16 (findStatic)
+		0xb6, 0x00, 0x16, // pc9 invokevirtual #22 (invokeExact)
+		0xb1, // pc12 return
+	}
+	desc := "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/invoke/MethodType;)V"
+	m := classfile.Method{Name: "m", Descriptor: desc, AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 2}
+
+	facts, err := Analyze(cf, "test.Caller", m)
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if aborted, reason := facts.Aborted(); aborted {
+		t.Fatalf("Analyze aborted: %s", reason)
+	}
+
+	receiver := facts.ReceiverAt(bytecodeir.Site{Method: "test.Caller#m", Descriptor: desc, PC: 9, Op: bytecodeir.OpCall})
+	if receiver.Kind != valueflow.KindHandle {
+		t.Fatalf("ReceiverAt = %+v, want KindHandle", receiver)
+	}
+	if receiver.Handle.RequestedOwner != "test.Foo" || receiver.Handle.Name != "bar" {
+		t.Errorf("Handle = %s#%s, want test.Foo#bar", receiver.Handle.RequestedOwner, receiver.Handle.Name)
+	}
+}

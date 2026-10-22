@@ -424,7 +424,9 @@ class-hierarchy-analysis expanded it to a subtype, so trust it less;
 all; `serviceloader`: a resolved `ServiceLoader.load(...)` call site
 connected to a registered provider's constructor, SERVICE_LOADING S2;
 `callback`: a resolved `Thread`/`Executor` registration connected to the
-callback's own `run`/`call` method, ASYNC_CALLBACKS A2) and, when there
+callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
+a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,
+DYNAMIC_LINKAGE L2) and, when there
 is one, the bytecode offset of the actual invoke
 instruction — e.g. `(virtual call, resolution: direct, pc=77)` — so a
 reader can jump straight to `javap -c -p` output instead of trusting the
@@ -646,6 +648,13 @@ report:
   repository interface, for instance, has *no bytecode implementation at
   all* — Spring generates it at run time — so a call to one can only be
   seen reaching the interface method itself.
+- **`MethodHandle`**: a `MethodHandles.Lookup#findStatic/findVirtual/
+  findSpecial/findConstructor` call with a literal target, and an
+  `invoke()`/`invokeExact()` call whose receiver is that same handle
+  found *earlier in the same method*, gets a real call-graph edge
+  (DYNAMIC_LINKAGE L2 — "MethodHandle call-graph edges" section). The
+  far more common real-world pattern — finding a handle once and
+  caching it in a field for later use — is not modeled yet.
 - **Callbacks and async execution** (`Thread`, `Executor`/
   `ExecutorService`): every call site registering one is inventoried
   (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),

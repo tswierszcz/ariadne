@@ -9,6 +9,7 @@ import (
 
 	"ariadne/internal/callback"
 	"ariadne/internal/cves"
+	"ariadne/internal/methodhandle"
 	"ariadne/internal/reach"
 	"ariadne/internal/serviceload"
 )
@@ -111,13 +112,20 @@ type Data struct {
 	// its run/call method, as a real call-graph edge — or a Gap
 	// explaining why not.
 	CallbackEdges []callback.CallbackEdgeResult
+
+	// HandleInvokeSites/HandleEdges are DYNAMIC_LINKAGE L2's own
+	// result: every MethodHandle#invoke/invokeExact call site found,
+	// and each one's resolved receiver connected to its target method
+	// as a real call-graph edge (or a Gap explaining why not).
+	HandleInvokeSites []methodhandle.ResolvedInvoke
+	HandleEdges       []methodhandle.HandleEdgeResult
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -141,6 +149,8 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		CallbackRegistrationSites: callbackSites,
 		ResolvedCallbacks:         resolvedCallbacks,
 		CallbackEdges:             callbackEdges,
+		HandleInvokeSites:         handleInvokeSites,
+		HandleEdges:               handleEdges,
 	}
 
 	for _, r := range sorted {
