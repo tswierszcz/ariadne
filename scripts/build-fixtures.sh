@@ -3,6 +3,16 @@
 # each into a jar under testdata/fixture/. The resulting .class/.jar files are
 # committed to the repo so that `go test` never needs a JDK.
 #
+# As of JVM_GRAPH G5, testdata/fixture/src/fixture/ also has Box.java,
+# StringBox.java and BridgeDemo.java (a generic interface forcing a
+# synthetic bridge method) and a default method on Greeter.java — added
+# to exercise JVM_GRAPH G2's bridge-method/default-method resolution
+# against real compiled bytecode, but not yet compiled into the
+# committed fixture-8.jar/fixture-21.jar: this repo's own working
+# environment has no javac. Run this script (with a real javac8/javac21)
+# to pick them up, then see BridgeDemo.java's own doc comment for the
+# cross-check this should let a future session add.
+#
 # Usage: scripts/build-fixtures.sh [javac8] [javac21]
 set -euo pipefail
 

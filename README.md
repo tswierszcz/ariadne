@@ -184,9 +184,13 @@ two passes:
 2. **Add edges.** Every call-site edge found by `classfile` becomes a
    direct graph edge. For a `virtual` or `interface` call to `T#m`, an
    extra edge is added to `S#m` for **every transitive subtype `S` of `T`
-   that itself declares `m`** — this is class-hierarchy analysis (CHA):
-   the call graph can't know which subtype a given object actually is at
-   run time, so it conservatively assumes it could be any of them.
+   that itself declares `m` with the exact same descriptor** — this is
+   class-hierarchy analysis (CHA): the call graph can't know which
+   subtype a given object actually is at run time, so it conservatively
+   assumes it could be any of them. Matching the exact descriptor
+   (JVM_GRAPH G2), not just the name, matters in practice: on real
+   petclinic, the CHA-added edge count roughly halved once two unrelated
+   overloads of the same name stopped getting wired together.
 
 **CHA is deliberately not applied to JDK types.** A call declared on
 `java.*`/`javax.*`/`jdk.*`/`sun.*` (`Object#toString`, `Runnable#run`,
@@ -199,11 +203,23 @@ with the guard vs. 11.4M without it (9.3×), built in 1.9s vs. 2m43s
 every CVE in every dependency would show up as "reachable", which is not
 useful.
 
-A call to a subtype's inherited (not overridden) method still resolves
-correctly: `classfile.ExtractCalls` reports a Methodref's owner exactly
-as the bytecode names it, which for a call through a subclass reference
-is the subclass — even when that subclass never declares the method
-itself. `internal/reach`'s method matching (see below) accounts for this.
+A call to a subtype's inherited (not overridden) method resolves to the
+class that actually supplies the body, not a dead-end node under the
+subclass's own name: `classfile.ExtractCalls` reports a Methodref's
+owner exactly as the bytecode names it (for a call through a subclass
+reference, the subclass — even when it never declares the method
+itself), but `internal/callgraph.Build` (JVM_GRAPH G2) resolves that
+against the actual declaring class first, the same superclass-then-
+interface order the JVM itself uses. `internal/reach`'s method matching
+(see below) keeps its own inheritance check too, as a second line of
+defense for a declaring class the input doesn't actually include.
+
+**Class initialization edges** (JVM_GRAPH G3): a `new`, `getstatic`,
+`putstatic` or `invokestatic` adds an edge to the target class's own
+`<clinit>`, if it has one, since the JVM runs it first (JVMS 5.5); a
+class with its own `<clinit>` also gets an edge to its superclass's
+`<clinit>`. These show up in the report as a third edge category next
+to "direct" and "added by CHA".
 
 **Synthetic edges** (`internal/callgraph.ApplySyntheticEdges`, applied by
 the CLI right after `Build`) cover the one case CHA alone cannot: a proxy
@@ -628,9 +644,11 @@ report:
   under a different package than its own Maven coordinates declare is
   not detected as such.
 - **CHA over-approximates**: a virtual/interface call is treated as
-  reaching every subtype that declares the same-named method, whether or
-  not that specific override is ever invoked for that call site at run
-  time. This can only produce false positives.
+  reaching every subtype that overrides it (as of JVM_GRAPH G2, matched
+  by exact descriptor, not just name — so two unrelated overloads of
+  the same name no longer get conflated), whether or not that specific
+  override is ever invoked for that call site at run time. This can
+  only produce false positives.
 - **Reflection under-approximates**: anything invoked purely via
   `java.lang.reflect`, a `MethodHandle` lookup outside a recognized
   `LambdaMetafactory` call, or dependency injection wiring beans by

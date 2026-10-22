@@ -14,7 +14,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
-| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1, G3, G4: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here); G5: UNASSESSED | G5 (integracja/kwalifikacja całego zakresu G0–G4) jest ostatnim krokiem tego obszaru w R0. |
+| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
@@ -426,6 +426,90 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   G0–G4 — fixtures do `testdata`, porównanie grafu przed/po, aktualizacja
   README/raportu/ograniczeń) — to domyka R0's JVM_GRAPH w całości.
   Wymaga zgody użytkownika przed startem.
+
+### JVM_GRAPH:G5 — Integracja i kwalifikacja — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** G0–G4 (gotowe wyżej, z jednym
+  odnotowanym ograniczeniem w G2). To faza integracyjna, nie nowa
+  funkcja — zgodnie z jej własnym zapisem "nie ogłaszać, że rozwiązano
+  refleksję, callbacki i JNI przez samo poprawienie dispatch", poniższe
+  nie zmienia żadnego z tych trzech obszarów (wciąż `Not implemented` w
+  `docs/SUPPORT.MD`, sprawdzone wprost poniżej).
+- **Fixtures do testdata, ze źródłami i instrukcją regeneracji:**
+  `testdata/fixture/src/fixture/Box.java` (generyczny interfejs),
+  `StringBox.java` (implementacja `Box<String>` — wymusza syntetyczną
+  metodę bridge), `BridgeDemo.java` (wywołuje obie nowe sceny: bridge i
+  odziedziczoną metodę domyślną), oraz dodana metoda domyślna
+  `Greeter#defaultGreeting`. **Status: źródła dodane, nieskompilowane**
+  — to środowisko nie ma `javac` (sprawdzone wprost w G2/G3), więc
+  `fixture-8.jar`/`fixture-21.jar` nie zawierają jeszcze tych klas.
+  `scripts/build-fixtures.sh` dostał komentarz z instrukcją: uruchomić z
+  prawdziwym javac, potem dodać cross-check opisany w `BridgeDemo.java`'s
+  własnym komentarzu. Nie dodano analogicznej sztuki dla G4 (multi-release
+  fixture wymagający dwóch kompilacji) — G4 ma już **realny dowód
+  bytecode** inną metodą (patrz jego własny wpis: dwie prawdziwe klasy z
+  istniejącego fixture użyte jako rozróżnialna "treść wariantu"), więc
+  dodatkowy, niedostarczalny teraz fixture miałby niską wartość
+  krańcową względem G2's rzeczywistej dziury.
+- **Porównanie grafu przed/po (petclinic, `-profile spring -offline`,
+  ten sam cache przez cały ciąg G0→G4):**
+
+  | Etap | Status (R/F/NR/U/NA) | Węzły | Krawędzie (direct+CHA+init) |
+  |---|---|---|---|
+  | Przed G0 (Phase 7 baseline) | 3/59/29/51/6 | 273180 | 1229725 (598909+630816+0) |
+  | Po G0 (dowody krawędzi, bez zmiany logiki) | 3/59/29/51/6 | 273180 | 1229725 (598909+630816+0) |
+  | Po G1 (deterministyczny wybór duplikatów) | 3/59/29/51/6 | 273180 | 1229725 (598909+630816+0) |
+  | Po G2 (dokładne rozwiązywanie — **realna poprawka**) | 3/62/26/51/6 | 257640 | 908326 (597908+310418+0) |
+  | Po G3 (krawędzie inicjalizacji) | 3/62/26/51/6 | 257640 | 974817 (597908+310418+66491) |
+  | Po G4 (`-target-java 17`) | 3/62/26/51/6 | 257688 | 974788 (597848+310414+66526) |
+
+  **Uzasadnienie zmienionych ścieżek:** jedyna zmiana statusu CVE w
+  całym ciągu G0–G4 nastąpiła przy G2 i ma w pełni zrozumiane przyczyny
+  (zapisane w G2's własnym wpisie): 6 CVE NOT_REACHABLE→FRAMEWORK (CHA
+  bez konfliktu przeciążeń odkrywa więcej prawdziwych połączeń) i
+  dokładnie 1 FRAMEWORK→NOT_REACHABLE (`CVE-2021-22118` — potwierdzony,
+  rzeczywisty artefakt CHA przez reaktywny WebFlux, którego petclinic
+  nie używa). G3/G4 nie zmieniły żadnego statusu na tej bazie — spadek
+  liczby węzłów po G2 (273180→257640) to martwe węzły-ślepe-uliczki,
+  które przestały być tworzone po naprawie dziedziczenia, nie utracone
+  informacje.
+- **Koszt pamięci przechowywania dowodów (G0's `Edge.Sites`), zmierzony
+  wprost na petclinic, nie oszacowany:** jednorazowy instrumentowany
+  przebieg (`runtime.MemStats`, usunięty po pomiarze) na grafie po G4:
+  974817 krawędzi, z czego 974289 ma niepuste `Sites` (łącznie 1359423
+  wpisów `CallSite`). Szacowana pamięć samych dowodów: **~32.7 MiB**
+  (1359423×8B danych + 974289×24B nagłówków slice'ów) z **~177 MiB**
+  całkowitego RSS Go po zbudowaniu grafu — czyli **dowody krawędzi to
+  ok. 18% pamięci grafu**, realny, ale nie dominujący koszt. Nie
+  zmierzono analogicznie dla WebGoat (większy graf, oczekiwany
+  proporcjonalnie podobny udział — nieprzetestowane, nie założone).
+- **Sprawdzone pakiety i kontrole według ROADMAP.MD B4:** `go build
+  ./...`, `go vet ./...`, `go test ./...` **i `go test -race ./...`
+  dla całego projektu** (nie tylko dotknięte pakiety) — wszystko
+  zielone. Testy LLM/live pozostają osobne i opt-in (`-llm`/`ARIADNE_LLM_E2E`),
+  nieuruchamiane tutaj.
+- **Sprawdzone: brak nadinterpretacji zakresu.** `docs/SUPPORT.MD`
+  bezpośrednio sprawdzone: "General reflection, MethodHandle invocation
+  and custom bootstrap models" i "General callbacks and asynchronous
+  execution models" wciąż `Not implemented` — żadna z poprawek G0–G4 nie
+  zmieniła tych wierszy, zgodnie z G5's własnym ostrzeżeniem.
+- **Zmiany w dokumentacji:** `README.md` — dwa realnie nieaktualne akapity
+  poprawione (nie tylko dopisane): sekcja "4. The call graph and CHA
+  expansion" opisywała dawne zachowanie ("Methodref owner exactly as the
+  bytecode names it... internal/reach's method matching accounts for
+  this") jako wciąż aktualne, mimo że G2 to naprawiło u źródła; podobnie
+  punkt "CHA over-approximates" w "Known limitations" nie wspominał
+  dokładności deskryptora. Oba poprawione, plus nowy akapit o
+  krawędziach inicjalizacji (G3). `scripts/build-fixtures.sh` — komentarz
+  z instrukcją regeneracji dla nowych klas fixture.
+- **Niespełnione/odłożone:** G2's bridge/default-method weryfikacja na
+  realnym bytecode wciąż czeka na JDK w środowisku — źródła są już
+  gotowe (ten wpis), tylko kompilacja i cross-check pozostają.
+- **Następny krok:** JVM_GRAPH's R0-owy zakres jest zamknięty. Zgodnie z
+  ROADMAP.MD, R1 (DATA_FLOW D0–D2, SERVICE S0–S2, ASYNC A0–A2) jest
+  teraz odblokowane — albo najpierw wspólne B0–B1 z innych obszarów R0
+  (CVE F0–F1 współdzielone części), jeśli jeszcze nieuzgodnione. Wymaga
+  propozycji i zgody użytkownika przed startem, jak każda kolejna faza.
 
 Przy dodawaniu kolejnego wpisu zapisz:
 
