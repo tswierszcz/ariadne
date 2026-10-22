@@ -7,7 +7,20 @@ import "fmt"
 // walked correctly (see operandLen) so the walker never desyncs on an
 // instruction it doesn't care about.
 const (
-	opLdc             = 0x12
+	opLdc = 0x12
+	// ifeq..if_acmpne (0x99-0xa6): all 2-byte signed branch offsets,
+	// relative to the instruction's own pc (JVMS 6.5). DATA_FLOW D1 only
+	// needs this whole range treated uniformly as "a conditional branch
+	// with one target plus a fall-through", never which comparison it is.
+	opIfeqFirst       = 0x99
+	opIfAcmpneLast    = 0xa6
+	opGoto            = 0xa7
+	opJsr             = 0xa8
+	opRet             = 0xa9
+	opTableSwitch     = 0xaa
+	opLookupSwitch    = 0xab
+	opIreturn         = 0xac
+	opReturnLast      = 0xb1 // ireturn..return (0xac-0xb1)
 	opGetStatic       = 0xb2
 	opPutStatic       = 0xb3
 	opInvokeVirtual   = 0xb6
@@ -16,9 +29,12 @@ const (
 	opInvokeInterface = 0xb9
 	opInvokeDynamic   = 0xba
 	opNew             = 0xbb
+	opAthrow          = 0xbf
+	opIfnull          = 0xc6
+	opIfnonnull       = 0xc7
+	opGotoW           = 0xc8
+	opJsrW            = 0xc9
 	opWide            = 0xc4
-	opTableSwitch     = 0xaa
-	opLookupSwitch    = 0xab
 	opWideIinc        = 0x84 // the opcode byte that follows a `wide` prefix for iinc
 )
 

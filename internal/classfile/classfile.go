@@ -38,6 +38,17 @@ type Method struct {
 	// Code is the raw bytecode from this method's Code attribute, or nil
 	// for an abstract/native method.
 	Code []byte
+	// MaxStack/MaxLocals are the Code attribute's own declared bounds
+	// (JVM spec 4.7.3), kept for DATA_FLOW D1's stack-category
+	// bookkeeping; both are 0 for an abstract/native method.
+	MaxStack  int
+	MaxLocals int
+	// ExceptionTable is this method's exception table (nil for an
+	// abstract/native method, or one with no try/catch/finally at all).
+	ExceptionTable []ExceptionHandler
+	// LineNumbers is the optional LineNumberTable attribute, nil if
+	// absent (no debug info) — DATA_FLOW D1 presentation data only.
+	LineNumbers []LineNumberEntry
 }
 
 func (m Method) IsStatic() bool   { return m.AccessFlags&AccStatic != 0 }
@@ -270,7 +281,7 @@ func readMethod(rd *reader, p pool) (Method, error) {
 
 	var annotations []string
 	var paramAnnotations [][]string
-	var code []byte
+	var code CodeAttr
 	for i := uint16(0); i < attrCount && rd.err == nil; i++ {
 		name, data, err := readAttribute(rd, p)
 		if err != nil {
@@ -288,7 +299,7 @@ func readMethod(rd *reader, p pool) (Method, error) {
 				return Method{}, fmt.Errorf("RuntimeVisibleParameterAnnotations: %w", err)
 			}
 		case "Code":
-			code, err = parseCodeAttribute(data)
+			code, err = parseCodeAttribute(data, p)
 			if err != nil {
 				return Method{}, fmt.Errorf("Code: %w", err)
 			}
@@ -312,7 +323,11 @@ func readMethod(rd *reader, p pool) (Method, error) {
 		Descriptor:           desc,
 		Annotations:          annotations,
 		ParameterAnnotations: paramAnnotations,
-		Code:                 code,
+		Code:                 code.Code,
+		MaxStack:             code.MaxStack,
+		MaxLocals:            code.MaxLocals,
+		ExceptionTable:       code.ExceptionTable,
+		LineNumbers:          code.LineNumbers,
 	}, nil
 }
 

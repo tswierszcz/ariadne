@@ -15,7 +15,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0: DONE (kontrakt, bez CFG/analizy); D1–D5: UNASSESSED | D0 to tylko kontrakt — nie zakładać istnienia CFG (D1) ani lokalnej analizy wartości (D2); nic w pipeline nie produkuje jeszcze realnej wartości. |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1: DONE; D2–D5: UNASSESSED | D1 daje realny CFG (zweryfikowany na ~500k metod z petclinic+WebGoat), ale nic w CLI go jeszcze nie używa — brak lokalnej analizy wartości (D2) aż do kolejnej fazy. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 wciąż wymaga DATA_FLOW D1–D2 (D0 samo nie wystarcza — to tylko kontrakt) do rozwiązania argumentu `Class` przy `ServiceLoader.load(...)`. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
@@ -658,6 +658,83 @@ Przy dodawaniu kolejnego wpisu zapisz:
   kolejnym krokiem — to pierwsza faza, która faktycznie dotyka
   istniejącego kodu bytecode'owego i dekoduje prawdziwe instrukcje do
   `bytecodeir.Site`. Wymaga propozycji i zgody użytkownika przed
+  startem.
+
+### DATA_FLOW:D1 — CFG i semantyka kodu metody — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** D0 (gotowe wyżej). Nie wdrożono
+  pełnej symulacji stosu (dup/dup2/swap, obiekty niezainicjalizowane) —
+  **odłożone do D2 z jasnym uzasadnieniem**: D1's własny CFG (bloki,
+  krawędzie) nie wymaga znajomości zawartości stosu, tylko miejsc
+  skoków; D2 ("lokalne wartości") jest fazą, która faktycznie potrzebuje
+  symulować stos, żeby wiedzieć co dana instrukcja czyta/zapisuje.
+  Uzgodnienie współdzielenia z `JVM_GRAPH:G3` sprawdzone wprost: G3
+  nigdy nie dotknęło tabeli wyjątków, więc nie ma nic do współdzielenia
+  poza samym faktem, że obie fazy czytają ten sam Code attribute.
+- **Zmienione pliki:** `internal/classfile/code.go` (przepisane:
+  `parseCodeAttribute` zyskuje drugi parametr `pool` i zwraca strukturalny
+  `CodeAttr` — `MaxStack`/`MaxLocals`/`ExceptionTable`/`LineNumbers` —
+  zamiast tylko `[]byte`; nowy `parseLineNumberTable`);
+  `internal/classfile/classfile.go` (`Method` zyskuje
+  `MaxStack`/`MaxLocals`/`ExceptionTable`/`LineNumbers`; `readMethod`
+  przekazuje `p` do `parseCodeAttribute`); `internal/classfile/opcodes.go`
+  (nowe stałe opcode'ów dla całej rodziny branch/return: `if*`,
+  `goto`/`goto_w`, `jsr`/`jsr_w`/`ret`, `*return`, `athrow`,
+  `ifnull`/`ifnonnull`); nowy `internal/classfile/cfg.go`
+  (`BasicBlock`/`EdgeKind`/`CFGEdge`/`CFG`/`BuildCFG` — prawdziwy
+  budowniczy CFG: rozwiązywanie celów skoków dla całej rodziny
+  if*/goto/goto_w/tableswitch/lookupswitch zgodnie z JVMS 6.5, z
+  poprawnym wyliczeniem paddingu tableswitch/lookupswitch; `jsr`/`ret`
+  jawnie oznaczone jako `Unsupported`, nigdy modelowane); nowy
+  `internal/classfile/locals.go` (`ArgumentSlots`/`Argument` —
+  szerokość slotu zmiennej lokalnej z deskryptora, `long`/`double` = 2
+  sloty, zgodnie z explicit wymogiem D1).
+- **Zachowanie dostępne użytkownikowi: żadne jeszcze** — `BuildCFG`
+  istnieje i jest poprawny, ale nic w `cmd/ariadne`/`internal/reach` go
+  nie wywołuje. Potwierdzone bezpośrednio: pełny przebieg `bin/ariadne
+  -offline` na petclinic po tej fazie daje **identyczne** liczby
+  REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN (3/62/26/51/6) jak przed D1
+  — żadnej regresji, bo żadnego nowego zachowania w pipeline.
+- **Spełnione kryteria (z D1's "Gotowe"):** "CFG i stany poprawne dla
+  gałęzi, pętli, wyjątków i szerokich typów" — cztery dedykowane testy
+  (`cfg_test.go`: `TestBuildCFG_branch`, `TestBuildCFG_loop`,
+  `TestBuildCFG_exception`; `locals_test.go`:
+  `TestArgumentSlots_wideTypes`) na ręcznie zmontowanym bytecode (brak
+  JDK, jak w poprzednich fazach tej sesji). "Nie mylić rzuconego
+  wyjątku z normalnym wynikiem metody" — `TestBuildCFG_exception`
+  explicite sprawdza, że blok kończący się `return` ma *wyłącznie*
+  krawędź wyjątkową do handlera, zero krawędzi normalnego przepływu.
+  "Stare jsr/ret... oznaczać jako nieobsługiwane" —
+  `TestBuildCFG_jsrRetIsUnsupportedNotCrashing`. "Niepoprawne wejścia
+  nie powodują paniki ani fikcyjnego braku przepływu" —
+  `TestBuildCFG_invalidOpcodeErrorsNotPanics` (błąd, nie panika) +
+  **realny test na skalę**: `BuildCFG` uruchomione na **wszystkich
+  metodach z kodem w petclinic (217965) i WebGoat (278394)** — **0
+  błędów w obu**, w tym poprawnie wykryte 2 (petclinic) i 96 (WebGoat)
+  prawdziwych metod z `jsr`/`ret` (stary styl kompilacji `finally`).
+  "Zachować opcjonalne numery linii... brak debug data nie zatrzymuje
+  analizy" — `TestParseCodeAttribute_noLineNumberTableIsNilNotError`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone — w tym nowe testy w `internal/classfile`:
+  `TestParseCodeAttribute_*`, `TestBuildCFG_*` [7], `TestArgumentSlots_*`
+  [5]); `go test -race ./internal/classfile/...` (zielone); **jednorazowy
+  skrypt diagnostyczny** (napisany, uruchomiony, usunięty) wołający
+  `BuildCFG` na każdej metodzie z kodem w realnym petclinic i WebGoat —
+  wynik: 0 błędów na ~496k metod łącznie, maks. 451/1210 bloków i
+  823/1612 krawędzi w jednej metodzie (odpowiednio); `bin/ariadne
+  -offline` na petclinic — identyczne liczby jak przed fazą (różni się
+  tylko wersja w nagłówku raportu, bo to inny commit).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Data flow and
+  taint": Not implemented → **Partial** — tym razem uzasadnione, bo D1
+  dostarcza realny, przetestowany na dużą skalę mechanizm, nie tylko
+  kontrakt jak D0; jasno odnotowane, że nic w CLI go jeszcze nie używa).
+- **Niespełnione/odłożone:** symulacja stosu (dup/dup2/swap, obiekty
+  niezainicjalizowane) — odłożone do D2 z uzasadnieniem wyżej; D2–D5
+  nietknięte.
+- **Następny krok:** `DATA_FLOW:D2` (lokalne wartości i udostępnienie
+  modelom — pierwsza faza, która faktycznie produkuje `valueflow.Value`
+  z prawdziwego bytecode, korzystając z `BuildCFG`) odblokowuje
+  `SERVICE_LOADING:S1`. Wymaga propozycji i zgody użytkownika przed
   startem.
 
 ## Punkt startowy następnej sesji
