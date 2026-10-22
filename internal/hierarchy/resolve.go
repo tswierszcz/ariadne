@@ -86,6 +86,41 @@ func (h *Hierarchy) ResolveExact(fqcn, name, desc string) (declaringClass string
 	})
 }
 
+// ResolveField finds which class/interface actually declares a field
+// with this exact name and descriptor, following the JVM's own field
+// resolution order (JVMS 5.4.3.2) — deliberately *not* the same order as
+// ResolveMethod/ResolveExact: a field checks fqcn itself, then every
+// superinterface (recursively) *before* the superclass, the reverse of
+// a method's superclass-first order. Used by JVM_GRAPH G3 to find the
+// class whose <clinit> a getstatic/putstatic should trigger an edge to.
+func (h *Hierarchy) ResolveField(fqcn, name, desc string) (declaringClass string, found bool) {
+	return h.resolveField(fqcn, name, desc, make(map[string]bool))
+}
+
+func (h *Hierarchy) resolveField(fqcn, name, desc string, seen map[string]bool) (declaringClass string, found bool) {
+	if seen[fqcn] {
+		return "", false // malformed/cyclic hierarchy; don't recurse forever
+	}
+	seen[fqcn] = true
+
+	ci, ok := h.classes[fqcn]
+	if !ok {
+		return "", false
+	}
+	if _, ok := ci.FieldByNameAndDesc(name, desc); ok {
+		return fqcn, true
+	}
+	for _, iface := range ci.Interfaces {
+		if d, ok := h.resolveField(iface, name, desc, seen); ok {
+			return d, true
+		}
+	}
+	if ci.SuperClass != "" {
+		return h.resolveField(ci.SuperClass, name, desc, seen)
+	}
+	return "", false
+}
+
 // superclassChain returns fqcn and every superclass above it, in order,
 // stopping at java.lang.Object or at the first class ariadne never read
 // (a JDK type outside the app+dependency universe).

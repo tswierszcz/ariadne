@@ -32,6 +32,16 @@ const (
 	// section 4), standing in for a runtime-generated proxy with no
 	// bytecode implementation at all (e.g. Spring Data).
 	BasisSynthetic EdgeBasis = "synthetic"
+	// BasisInit is a class-initialization edge (JVM_GRAPH G3): the caller
+	// contains a new/getstatic/putstatic/invokestatic that, per JVMS 5.5,
+	// requires some class's <clinit> to run first, or the edge from a
+	// class's own <clinit> to its superclass's <clinit> (JVMS 5.5's own
+	// "superclass must be initialized first" rule). Distinct from "calls"
+	// edges even where the target really is a <clinit> method: this edge
+	// does not correspond to any single instruction invoking <clinit>
+	// directly (the JVM runs it implicitly), which is also why Kind is
+	// CallInit rather than one of the ordinary invoke kinds.
+	BasisInit EdgeBasis = "init"
 )
 
 // CallSite is one piece of evidence for why an edge exists: the bytecode
@@ -79,6 +89,7 @@ type Graph struct {
 	// resolved to an edge at all).
 	preCHAEdges       int
 	chaEdges          int
+	initEdges         int
 	unresolvedDynamic int
 	// unresolvedOwner counts direct calls whose declared receiver type is
 	// itself part of the analyzed universe, but whose method could not
@@ -112,7 +123,16 @@ func (g *Graph) PreCHAEdgeCount() int { return g.preCHAEdges }
 
 // CHAEdgeCount is how many of EdgeCount's edges were added by CHA
 // expansion rather than found directly by classfile.ExtractCalls.
+// Excludes InitEdgeCount's edges (JVM_GRAPH G3): those are neither a
+// direct call nor a CHA expansion, and counting them as "added by CHA"
+// would misattribute them.
 func (g *Graph) CHAEdgeCount() int { return g.chaEdges }
+
+// InitEdgeCount is how many of EdgeCount's edges are class-initialization
+// edges (JVM_GRAPH G3, BasisInit): a new/getstatic/putstatic/invokestatic
+// requiring some class's <clinit> to run first, or a class's own
+// <clinit> requiring its superclass's <clinit> first.
+func (g *Graph) InitEdgeCount() int { return g.initEdges }
 
 // UnresolvedDynamicCount is how many invokedynamic call sites across the
 // whole graph had a bootstrap method ariadne couldn't resolve to a real

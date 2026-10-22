@@ -153,7 +153,7 @@ func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 				t.Errorf("handle annotations = %v, want [fixture.Entry]", handle.Annotations)
 			}
 
-			calls, unresolved, err := cf.ExtractCalls(handle.Code)
+			calls, _, unresolved, err := cf.ExtractCalls(handle.Code)
 			if err != nil {
 				t.Fatalf("ExtractCalls: %v", err)
 			}
@@ -212,7 +212,7 @@ func TestParseAndExtractCalls_greetWithIsInvokeinterfaceOnFunction(t *testing.T)
 	if m == nil {
 		t.Fatalf("no greetWith method found")
 	}
-	calls, _, err := cf.ExtractCalls(m.Code)
+	calls, _, _, err := cf.ExtractCalls(m.Code)
 	if err != nil {
 		t.Fatalf("ExtractCalls: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestMainMethodCallsHandle(t *testing.T) {
 	if !m.IsStatic() {
 		t.Errorf("main is not static")
 	}
-	calls, _, err := cf.ExtractCalls(m.Code)
+	calls, _, _, err := cf.ExtractCalls(m.Code)
 	if err != nil {
 		t.Fatalf("ExtractCalls: %v", err)
 	}

@@ -53,7 +53,7 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 	for _, fqcn := range fqcns {
 		ci := classes[fqcn]
 		for _, m := range ci.Methods {
-			if len(m.Calls) == 0 {
+			if len(m.Calls) == 0 && len(m.InitRefs) == 0 {
 				g.unresolvedDynamic += m.UnresolvedDynamic
 				continue
 			}
@@ -78,6 +78,13 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 				toID := g.intern(toOwner, call.Name, call.Desc)
 				if addOrMerge(g, seen, callerID, toID, call.Kind, BasisDirect, call.PC) {
 					g.preCHAEdges++
+				}
+
+				// JVM_GRAPH G3: invokestatic also requires the resolved
+				// declaring class to be initialized first (JVMS 5.5) —
+				// reusing toOwner above instead of resolving a second time.
+				if call.Kind == classfile.CallStatic {
+					addInitEdge(g, seen, callerID, toOwner, call.PC)
 				}
 
 				if call.Kind != classfile.CallVirtual && call.Kind != classfile.CallInterface {
@@ -118,15 +125,88 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 					addOrMerge(g, seen, callerID, subID, call.Kind, BasisCHA, call.PC)
 				}
 			}
+
+			// JVM_GRAPH G3: new/getstatic/putstatic each require some
+			// class to be initialized first (JVMS 5.5). invokestatic is
+			// handled above, inside the Calls loop, to reuse its already-
+			// resolved declaring class instead of resolving twice.
+			for _, ref := range m.InitRefs {
+				switch ref.Kind {
+				case classfile.InitNew:
+					// `new` always initializes exactly the class it
+					// names — no resolution walk needed, unlike a field
+					// or method reference.
+					addInitEdge(g, seen, callerID, ref.Owner, ref.PC)
+				case classfile.InitGetStatic, classfile.InitPutStatic:
+					if declaring, found := h.ResolveField(ref.Owner, ref.Name, ref.Desc); found {
+						addInitEdge(g, seen, callerID, declaring, ref.PC)
+					}
+					// Not found: the field belongs to a class outside the
+					// analyzed universe (almost always the JDK) — nothing
+					// more precise to resolve to, and no <clinit> of ours
+					// to point at either.
+				}
+			}
+
 			g.unresolvedDynamic += m.UnresolvedDynamic
 		}
 	}
-	// The report wants "how many edges did CHA add", which is just the
-	// difference between the final edge count and the direct-call-only
-	// count accumulated above.
-	g.chaEdges = g.EdgeCount() - g.preCHAEdges
+
+	// Pass 3: a class with its own <clinit> requires its superclass to be
+	// initialized first (JVMS 5.5) — a structural requirement of having a
+	// <clinit> at all, independent of anything that <clinit>'s own body
+	// calls, so it's a separate pass rather than part of Pass 2's
+	// per-call processing. At most one such edge per class, so a plain
+	// addEdge (not addOrMerge) is enough — nothing to merge evidence into.
+	for _, fqcn := range fqcns {
+		ci := classes[fqcn]
+		if ci.SuperClass == "" {
+			continue
+		}
+		if _, hasInit := ci.MethodByNameAndDesc(clinitName, clinitDesc); !hasInit {
+			continue
+		}
+		superInfo, ok := h.Lookup(ci.SuperClass)
+		if !ok {
+			continue
+		}
+		if _, superHasInit := superInfo.MethodByNameAndDesc(clinitName, clinitDesc); !superHasInit {
+			continue
+		}
+		fromID, _ := g.ID(fqcn, clinitName, clinitDesc)
+		toID, _ := g.ID(ci.SuperClass, clinitName, clinitDesc)
+		g.addEdge(fromID, toID, classfile.CallInit, BasisInit, nil)
+		g.initEdges++
+	}
+
+	// The report wants "how many edges did CHA add", which is the
+	// difference between the final edge count and both the direct-call
+	// and the init-edge counts — init edges (JVM_GRAPH G3) are neither,
+	// and must not inflate the CHA figure.
+	g.chaEdges = g.EdgeCount() - g.preCHAEdges - g.initEdges
 
 	return g
+}
+
+const (
+	clinitName = "<clinit>"
+	clinitDesc = "()V"
+)
+
+// addInitEdge adds a class-initialization edge (JVM_GRAPH G3) from a
+// caller to targetClass's own <clinit>, if targetClass has one in the
+// analyzed universe — a no-op otherwise (most classes have no <clinit>
+// at all, and a class outside the universe has none we could point at
+// anyway). Keeps Graph.InitEdgeCount() accurate by only counting an
+// actually-new edge, not a repeat merged into an existing one.
+func addInitEdge(g *Graph, seen map[edgeKey]int, from uint32, targetClass string, pc int) {
+	clinitID, ok := g.ID(targetClass, clinitName, clinitDesc)
+	if !ok {
+		return
+	}
+	if addOrMerge(g, seen, from, clinitID, classfile.CallInit, BasisInit, pc) {
+		g.initEdges++
+	}
 }
 
 // resolveTarget finds the class that actually declares name+desc,

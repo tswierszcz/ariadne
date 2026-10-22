@@ -203,8 +203,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	log("building call graph")
 	g := callgraph.Build(h, nil)
-	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
-		g.NodeCount(), g.EdgeCount(), g.PreCHAEdgeCount(), g.CHAEdgeCount(), g.UnresolvedDynamicCount(), g.UnresolvedOwnerCount())
+	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA, %d class-init), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
+		g.NodeCount(), g.EdgeCount(), g.PreCHAEdgeCount(), g.CHAEdgeCount(), g.InitEdgeCount(), g.UnresolvedDynamicCount(), g.UnresolvedOwnerCount())
 
 	if len(prof.SyntheticEdges) > 0 {
 		var synthetic []callgraph.SyntheticEdge
@@ -365,6 +365,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		GraphEdges:      g.EdgeCount(),
 		PreCHAEdges:     g.PreCHAEdgeCount(),
 		CHAEdges:        g.CHAEdgeCount(),
+		InitEdges:       g.InitEdgeCount(),
 		UnresolvedDyn:   g.UnresolvedDynamicCount(),
 		UnresolvedOwner: g.UnresolvedOwnerCount(),
 		DepsTotal:       len(depJars),

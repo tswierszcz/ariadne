@@ -364,6 +364,18 @@ func (p Profile) AppRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
 			if id, ok := g.ID(fqcn, m.Name, m.Descriptor); ok {
 				roots = append(roots, id)
 			}
+			// JVM_GRAPH G3: the JVM runs the entry class's own <clinit>
+			// before calling main — not because main's bytecode calls it
+			// (it doesn't; the JVM does this implicitly, JVMS 5.5's rule
+			// for "the class that is to be executed") — so --roots
+			// profile must add it as a root directly. --roots all
+			// already gets this for free: every application method,
+			// <clinit> included, is already a root there.
+			if p.Roots.Main && isMainMethod(m) {
+				if clinitID, ok := g.ID(fqcn, "<clinit>", "()V"); ok {
+					roots = append(roots, clinitID)
+				}
+			}
 		}
 	}
 	roots = append(roots, p.overrideRoots(g, h)...)

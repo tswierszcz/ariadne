@@ -22,6 +22,7 @@ type Header struct {
 	GraphEdges      int
 	PreCHAEdges     int
 	CHAEdges        int
+	InitEdges       int
 	UnresolvedDyn   int
 	UnresolvedOwner int
 	DepsTotal       int

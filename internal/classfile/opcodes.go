@@ -8,11 +8,14 @@ import "fmt"
 // instruction it doesn't care about.
 const (
 	opLdc             = 0x12
+	opGetStatic       = 0xb2
+	opPutStatic       = 0xb3
 	opInvokeVirtual   = 0xb6
 	opInvokeSpecial   = 0xb7
 	opInvokeStatic    = 0xb8
 	opInvokeInterface = 0xb9
 	opInvokeDynamic   = 0xba
+	opNew             = 0xbb
 	opWide            = 0xc4
 	opTableSwitch     = 0xaa
 	opLookupSwitch    = 0xab

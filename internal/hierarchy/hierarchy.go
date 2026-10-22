@@ -20,6 +20,10 @@ type Method struct {
 	// Calls is nil for an abstract/native method (no Code), and otherwise
 	// every call-site edge ExtractCalls found.
 	Calls []classfile.Call
+	// InitRefs is every new/getstatic/putstatic reference found alongside
+	// Calls (JVM_GRAPH G3) — each one requires some class's <clinit> to
+	// run before this instruction executes.
+	InitRefs []classfile.InitRef
 	// UnresolvedDynamic counts this method's invokedynamic sites whose
 	// bootstrap wasn't LambdaMetafactory/altMetafactory (e.g. a
 	// StringConcatFactory string concatenation), and so produced no edge.
@@ -37,6 +41,10 @@ type ClassInfo struct {
 	// across the whole run.
 	MajorVersion uint16
 	Methods      []Method
+	// Fields are this class's own declared fields (JVM_GRAPH G3 needs
+	// these to resolve which class actually declares a field a
+	// getstatic/putstatic refers to — the field equivalent of Methods).
+	Fields       []classfile.Field
 	Annotations  []string
 	// SourceJar is the path of the jar this class was read from — the app
 	// jar (or the in-memory jar PrepareAppInput packed from a classes
@@ -65,6 +73,18 @@ func (c *ClassInfo) MethodByName(name string) (Method, bool) {
 		}
 	}
 	return Method{}, false
+}
+
+// FieldByNameAndDesc returns the field declared directly on this class
+// matching both name and descriptor exactly (JVMS 5.4.3.2 field
+// resolution matches by name+descriptor, same as a method).
+func (c *ClassInfo) FieldByNameAndDesc(name, desc string) (classfile.Field, bool) {
+	for _, f := range c.Fields {
+		if f.Name == name && f.Descriptor == desc {
+			return f, true
+		}
+	}
+	return classfile.Field{}, false
 }
 
 // MethodByNameAndDesc returns the method declared directly on this class

@@ -165,6 +165,28 @@ func (p pool) methodref(idx uint16) (owner, name, desc string, isInterface bool,
 	return owner, name, desc, e.tag == tagInterfaceMethodref, nil
 }
 
+// fieldref resolves a Fieldref constant to its owning class (FQCN), name
+// and descriptor — JVM_GRAPH G3's new/getstatic/putstatic init-trigger
+// extraction needs this the same way methodref already serves ExtractCalls.
+func (p pool) fieldref(idx uint16) (owner, name, desc string, err error) {
+	e, err := p.get(idx)
+	if err != nil {
+		return "", "", "", err
+	}
+	if e.tag != tagFieldref {
+		return "", "", "", fmt.Errorf("constant pool index %d is tag %d, want Fieldref", idx, e.tag)
+	}
+	owner, err = p.className(e.classIndex)
+	if err != nil {
+		return "", "", "", err
+	}
+	name, desc, err = p.nameAndType(e.nameAndTypeIndex)
+	if err != nil {
+		return "", "", "", err
+	}
+	return owner, name, desc, nil
+}
+
 // methodHandle resolves a MethodHandle constant: its reference kind, and
 // (for the kinds we care about, all of which point at a
 // Methodref/InterfaceMethodref) the target method.

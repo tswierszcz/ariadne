@@ -51,11 +51,12 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool) ([]*ClassInfo, e
 			if m.Code == nil {
 				continue
 			}
-			calls, unresolved, err := cf.ExtractCalls(m.Code)
+			calls, initRefs, unresolved, err := cf.ExtractCalls(m.Code)
 			if err != nil {
 				return nil, fmt.Errorf("extracting calls from %s %s#%s%s: %w", jarPath, cf.ThisClass, m.Name, m.Descriptor, err)
 			}
 			methods[i].Calls = calls
+			methods[i].InitRefs = initRefs
 			methods[i].UnresolvedDynamic = unresolved
 		}
 
@@ -66,6 +67,7 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool) ([]*ClassInfo, e
 			AccessFlags:  cf.AccessFlags,
 			MajorVersion: cf.MajorVersion,
 			Methods:      methods,
+			Fields:       cf.Fields,
 			Annotations:  cf.Annotations,
 			SourceJar:    jarPath,
 			GAV:          gav,

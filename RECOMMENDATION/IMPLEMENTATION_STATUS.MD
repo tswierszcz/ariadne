@@ -14,7 +14,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
-| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here); G3–G5: UNASSESSED | G3 (relacje inicjalizacji, `<clinit>`) jest następnym naturalnym krokiem. |
+| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1, G3: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here); G4–G5: UNASSESSED | G4 (target Java/multi-release JAR) jest następnym naturalnym krokiem; G5 (integracja/kwalifikacja całego zakresu) zostaje na koniec. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
@@ -261,6 +261,83 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 - **Następny krok:** `JVM_GRAPH:G3` (relacje inicjalizacji — krawędzie do
   `<clinit>` przy `new`/`getstatic`/`putstatic`/`invokestatic`) — wymaga
   zgody użytkownika przed startem.
+
+### JVM_GRAPH:G3 — Relacje inicjalizacji — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** G2 (gotowe wyżej, częściowo —
+  overloads/inheritance). Część metadanych współdzielona z DATA_FLOW D1
+  nie została naruszona (D1 nieodnotowane) — `classfile.ExtractCalls`
+  już wcześniej zachowywał tabelę wyjątków; G3 nie musiało tego dotykać.
+- **Zmienione pliki:** `internal/classfile/opcodes.go` (`opNew`,
+  `opGetStatic`, `opPutStatic`); `internal/classfile/pool.go`
+  (`fieldref` — odpowiednik `methodref` dla Fieldref); `internal/classfile/calls.go`
+  (`InitKind`/`InitRef`; `ExtractCalls` zyskuje drugą wartość zwracaną —
+  zmiana sygnatury, zaktualizowano 4 miejsca wywołania);
+  `internal/hierarchy/hierarchy.go` (`ClassInfo.Fields`,
+  `FieldByNameAndDesc`, `Method.InitRefs`); `internal/hierarchy/jarread.go`
+  (przekazuje `cf.Fields`/`InitRefs` dalej); `internal/hierarchy/resolve.go`
+  (`ResolveField` — **inny porządek przeszukiwania niż `ResolveExact`**:
+  JVMS 5.4.3.2 sprawdza superinterfejsy przed nadklasą, odwrotnie niż
+  rozwiązywanie metod; z ochroną przed cyklem przez `seen` map);
+  `internal/callgraph/graph.go` (`BasisInit`, `CallInit`, `InitEdgeCount`);
+  `internal/callgraph/build.go` (`addInitEdge`; Pass 3 — krawędzie
+  `<clinit>` → nadklasy `<clinit>`; poprawka liczenia `chaEdges`, żeby
+  krawędzie inicjalizacyjne nie zawyżały liczby "added by CHA" — błąd
+  złapany i naprawiony w trakcie, nie przed weryfikacją);
+  `internal/profile/profile.go` (`roots.main` dodaje też `<clinit>` klasy
+  wejściowej jako root); `cmd/ariadne/main.go`, `internal/report/report.go`,
+  `internal/report/templates/report.md.tmpl` (nowa pozycja "class-init").
+- **Ograniczenie środowiska (to samo co w G2):** brak JDK — scenariusze
+  testowane przez (1) ręcznie zmontowany bytecode na poziomie
+  `classfile.ExtractCalls` (`internal/classfile/initrefs_test.go`:
+  `new`/`getstatic`/`putstatic`/`ldc` jako gotowe bajty, nie skompilowany
+  plik — dla tej warstwy to nawet precyzyjniejszy test niż jedna
+  konkretna wersja javac), i (2) ręcznie zbudowana hierarchia
+  (`hierarchy.NewForTesting`) na poziomie `internal/callgraph`.
+- **Spełnione kryteria (z G3's "Gotowe"):**
+  - "ścieżka do wywołania w zależnościowym `<clinit>` istnieje tam, gdzie
+    jest uzasadniona" — potwierdzone na realnych petclinic/WebGoat:
+    66491/89483 nowych krawędzi `class-init`.
+  - "testy obejmują odziedziczone pole statyczne" —
+    `TestInit_inheritedStaticField`.
+  - "brak `<clinit>`" — `TestInit_noClinitProducesNoEdge`.
+  - "cykl" — `TestInit_cycleDoesNotHang`.
+  - "przypadki bez inicjalizacji" — `TestExtractCalls_initRefs` (ldc
+    `Foo.class` nie tworzy `InitRef`).
+  - "Graf nie obiecuje dokładnej kolejności runtime'u" — prawda z
+    konstrukcji: to pojedyncze krawędzie, nie model kolejności/czasu.
+- **Błąd złapany i naprawiony w trakcie pracy, nie przemilczany:**
+  pierwsza wersja liczyła nowe krawędzie inicjalizacyjne jako "added by
+  CHA" (bo `chaEdges` liczyło się jako `EdgeCount()-PreCHAEdges` bez
+  odjęcia nowej kategorii) — realny przebieg na petclinic pokazał CHA
+  skaczące z 310418 (koniec G2) na 376381 mimo że logika CHA się nie
+  zmieniła, co było sygnałem błędu w księgowaniu, nie w samej analizie.
+  Naprawione dodaniem `Graph.initEdges`/`InitEdgeCount()` i odjęciem go
+  od `chaEdges`; po naprawie CHA wróciło do identycznych 310418/556769
+  jak w G2, a nowa kategoria "class-init" (66491/89483) jest liczona
+  osobno.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone); `go test -race
+  ./internal/callgraph/... ./internal/classfile/... ./internal/hierarchy/...
+  ./internal/profile/... ./internal/reach/...` (zielone); `bin/ariadne
+  -offline` na petclinic i WebGoat — węzły i direct/CHA bez zmian
+  względem G2, 66491/89483 nowych krawędzi class-init, **żadna z CVE nie
+  zmieniła statusu w żadnej z dwóch aplikacji** (porównanie `results.json`
+  G2 vs G3, zero różnic) — szczery, zmierzony wynik: funkcja jest realna
+  i przetestowana, ale na obecnej bazowej analizie petclinic/WebGoat
+  jeszcze nie odkrywa nowych REACHABLE/FRAMEWORK ścieżek; dwa przebiegi
+  petclinic dają bajt-identyczny `results.json`.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Implicit class
+  initialization": Not implemented → Partial, z pełnym opisem zakresu,
+  ograniczeń i zmierzonego efektu).
+- **Niespełnione/odłożone:** domyślne metody i eager-init superinterfejsu
+  je deklarującego (JVMS 5.5's węższa reguła) — nie zaimplementowane,
+  rzadki przypadek; inicjalizacja przez refleksję (`Class.forName`) —
+  poza zakresem tej fazy, należy do REFLECTION.
+- **Następny krok:** `JVM_GRAPH:G4` (target Java i multi-release JAR) —
+  wymaga zgody użytkownika przed startem. Alternatywnie: dokończyć G2's
+  odłożoną weryfikację bridge/default methods, jeśli w przyszłej sesji
+  będzie dostępny JDK.
 
 Przy dodawaniu kolejnego wpisu zapisz:
 

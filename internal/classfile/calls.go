@@ -15,6 +15,11 @@ const (
 	CallSpecial   CallKind = "special"
 	CallStatic    CallKind = "static"
 	CallDynamic   CallKind = "dynamic"
+	// CallInit is never produced by ExtractCalls; internal/callgraph uses
+	// it for a class-initialization edge (JVM_GRAPH G3, callgraph.BasisInit)
+	// — there is no single invoke* instruction for the JVM implicitly
+	// running a <clinit>, so no real CallKind describes it either.
+	CallInit CallKind = "init"
 	// CallSynthetic is never produced by ExtractCalls; internal/callgraph
 	// uses it to mark an edge added from a profile's synthetic_edges
 	// (PLAN.md section 4) rather than found in any method's own bytecode —
@@ -41,6 +46,55 @@ type Call struct {
 	PC    int
 }
 
+// InitKind says which instruction produced an InitRef — the three JVMS
+// 5.5 triggers ariadne can see in a method body without a full
+// data-flow/value analysis (invokestatic is also a Call and handled via
+// that, not duplicated here — see InitRef's own doc comment).
+type InitKind string
+
+const (
+	InitNew       InitKind = "new"
+	InitGetStatic InitKind = "getstatic"
+	InitPutStatic InitKind = "putstatic"
+)
+
+// InitRef is one reference that, per the JVM's class-initialization
+// rules (JVMS 5.5), requires some class to be initialized (its <clinit>
+// run) before this instruction executes — the fourth kind of
+// JVM_GRAPH-G0-style edge basis, "initializes", next to "calls":
+//   - InitNew: `new` always initializes exactly the class it names —
+//     Owner is that class, Name/Desc are empty.
+//   - InitGetStatic/InitPutStatic: a `getstatic`/`putstatic` initializes
+//     whichever class actually *declares* the named field (Owner is the
+//     bytecode's literal Fieldref owner, which — exactly like a
+//     Methodref's owner before JVM_GRAPH G2 — is not necessarily the
+//     declaring class if the field is inherited; the caller resolves
+//     that, the same way internal/callgraph already resolves a call's
+//     declaring class).
+//
+// A compile-time-constant static field (a `static final` primitive/
+// String) never produces a getstatic/putstatic in the first place — the
+// JLS requires the compiler to inline its value (typically as `ldc`)
+// instead — so every InitRef this type actually represents is already,
+// by construction of how javac/kotlinc emit bytecode, a genuine
+// initialization trigger. ariadne does not need to separately detect
+// field constant-ness (G3's own "samo posiadanie literału klasy nie
+// staje się regułą inicjalizacji" is about `Foo.class`/ldc, which this
+// type never produces at all, not about constant static fields).
+//
+// invokestatic is deliberately not a separate InitKind: it is already a
+// Call (Kind: CallStatic), and internal/callgraph already resolves its
+// declaring class via hierarchy.ResolveExact for the ordinary call edge
+// (JVM_GRAPH G2) — reusing that result for the init edge avoids
+// resolving the same reference twice.
+type InitRef struct {
+	Kind  InitKind
+	Owner string // FQCN
+	Name  string // "" for InitNew
+	Desc  string // "" for InitNew
+	PC    int
+}
+
 // ExtractCalls decodes a method's bytecode and returns every call-site
 // edge out of it: invokevirtual/invokespecial/invokestatic/invokeinterface
 // resolved straight from the constant pool, and invokedynamic resolved
@@ -48,14 +102,18 @@ type Call struct {
 // LambdaMetafactory (a plain lambda or method reference); any other
 // invokedynamic (e.g. string concatenation via StringConcatFactory) is
 // skipped, not errored, and counted by the caller if it wants to report
-// how many dynamic call sites went unresolved.
-func (c *ClassFile) ExtractCalls(code []byte) ([]Call, int, error) {
+// how many dynamic call sites went unresolved. It also returns every
+// InitRef found in the same pass (JVM_GRAPH G3) — one walk over the
+// decoded instructions serves both, since new/getstatic/putstatic sit
+// right alongside the invoke* opcodes in the same switch.
+func (c *ClassFile) ExtractCalls(code []byte) ([]Call, []InitRef, int, error) {
 	instrs, err := decodeInstructions(code)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 
 	var calls []Call
+	var initRefs []InitRef
 	unresolvedDynamic := 0
 	for _, in := range instrs {
 		switch in.opcode {
@@ -63,7 +121,7 @@ func (c *ClassFile) ExtractCalls(code []byte) ([]Call, int, error) {
 			idx := u16(in.operand)
 			owner, name, desc, _, err := c.pool.methodref(idx)
 			if err != nil {
-				return nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
+				return nil, nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
 			}
 			calls = append(calls, Call{Kind: kindFor(in.opcode), Owner: owner, Name: name, Desc: desc, PC: in.pc})
 
@@ -71,7 +129,7 @@ func (c *ClassFile) ExtractCalls(code []byte) ([]Call, int, error) {
 			idx := u16(in.operand) // operand: indexbyte1,2, count, 0
 			owner, name, desc, _, err := c.pool.methodref(idx)
 			if err != nil {
-				return nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
+				return nil, nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
 			}
 			calls = append(calls, Call{Kind: CallInterface, Owner: owner, Name: name, Desc: desc, PC: in.pc})
 
@@ -79,16 +137,36 @@ func (c *ClassFile) ExtractCalls(code []byte) ([]Call, int, error) {
 			idx := u16(in.operand) // operand: indexbyte1,2, 0, 0
 			call, ok, err := c.resolveInvokeDynamic(idx, in.pc)
 			if err != nil {
-				return nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
+				return nil, nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
 			}
 			if ok {
 				calls = append(calls, call)
 			} else {
 				unresolvedDynamic++
 			}
+
+		case opNew:
+			idx := u16(in.operand)
+			owner, err := c.pool.className(idx)
+			if err != nil {
+				return nil, nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
+			}
+			initRefs = append(initRefs, InitRef{Kind: InitNew, Owner: owner, PC: in.pc})
+
+		case opGetStatic, opPutStatic:
+			idx := u16(in.operand)
+			owner, name, desc, err := c.pool.fieldref(idx)
+			if err != nil {
+				return nil, nil, 0, fmt.Errorf("pc=%d: %w", in.pc, err)
+			}
+			kind := InitGetStatic
+			if in.opcode == opPutStatic {
+				kind = InitPutStatic
+			}
+			initRefs = append(initRefs, InitRef{Kind: kind, Owner: owner, Name: name, Desc: desc, PC: in.pc})
 		}
 	}
-	return calls, unresolvedDynamic, nil
+	return calls, initRefs, unresolvedDynamic, nil
 }
 
 func kindFor(opcode byte) CallKind {

@@ -386,7 +386,11 @@ func TestEdgeAndNodeCountsAreConsistent(t *testing.T) {
 	if g.EdgeCount() < g.PreCHAEdgeCount() {
 		t.Errorf("EdgeCount() = %d, want >= PreCHAEdgeCount() = %d", g.EdgeCount(), g.PreCHAEdgeCount())
 	}
-	if g.CHAEdgeCount() != g.EdgeCount()-g.PreCHAEdgeCount() {
-		t.Errorf("CHAEdgeCount() = %d, want EdgeCount()-PreCHAEdgeCount() = %d", g.CHAEdgeCount(), g.EdgeCount()-g.PreCHAEdgeCount())
+	// JVM_GRAPH G3: EdgeCount splits three ways now, not two — direct +
+	// CHA + init — so CHAEdgeCount must account for InitEdgeCount too,
+	// not just PreCHAEdgeCount.
+	if g.CHAEdgeCount() != g.EdgeCount()-g.PreCHAEdgeCount()-g.InitEdgeCount() {
+		t.Errorf("CHAEdgeCount() = %d, want EdgeCount()-PreCHAEdgeCount()-InitEdgeCount() = %d",
+			g.CHAEdgeCount(), g.EdgeCount()-g.PreCHAEdgeCount()-g.InitEdgeCount())
 	}
 }
