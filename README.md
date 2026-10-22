@@ -422,7 +422,8 @@ all) and, when there is one, the bytecode offset of the actual invoke
 instruction — e.g. `(virtual call, resolution: direct, pc=77)` — so a
 reader can jump straight to `javap -c -p` output instead of trusting the
 method names alone (`internal/reach.EntryEdge`, `internal/callgraph.Edge`;
-RECOMMENDATION's [JVM_GRAPH:G0](RECOMMENDATION/JVM_GRAPH_IMPLEMENTATION_PLAN.MD)).
+RECOMMENDATION's JVM_GRAPH:G0, now archived — see
+[archive/2026-10-22/jvm_graph/COMPLETION.md](archive/2026-10-22/jvm_graph/COMPLETION.md)).
 The underlying call graph also keeps every call site that produced an
 edge (not just the first one that happened to be seen) as evidence,
 even when several calls to the same target collapse into one edge.

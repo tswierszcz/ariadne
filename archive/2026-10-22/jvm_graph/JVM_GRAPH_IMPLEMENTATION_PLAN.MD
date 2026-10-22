@@ -1,3 +1,9 @@
+> **Archived 2026-10-22 — status DONE.** See [COMPLETION.md](COMPLETION.md)
+> for what shipped, what was verified, and the one remaining limitation
+> (G2's bridge/default-method real-bytecode check, blocked on a JDK not
+> being available in this environment). The phase text below is
+> historical — the pre-implementation plan, not a live backlog.
+
 # Podstawy grafu JVM — fazy implementacji G0–G5
 
 Status: plan. Wymagania: [JVM_GRAPH.MD](JVM_GRAPH.MD). Kontrakty B0–B4: [ROADMAP.MD](ROADMAP.MD).

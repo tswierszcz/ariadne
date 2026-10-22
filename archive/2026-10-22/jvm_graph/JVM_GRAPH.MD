@@ -1,3 +1,8 @@
+> **Archived 2026-10-22 — status DONE.** See [COMPLETION.md](COMPLETION.md)
+> for what shipped, what was verified, and the one remaining limitation.
+> The text below is the functional spec as it stood when the area's work
+> finished; it is historical, not a live plan.
+
 # Podstawy grafu JVM — rekomendacja funkcjonalna
 
 Status: plan. Implementacja: [JVM_GRAPH_IMPLEMENTATION_PLAN.MD](JVM_GRAPH_IMPLEMENTATION_PLAN.MD). Wspólne kontrakty: [ROADMAP.MD](ROADMAP.MD).
