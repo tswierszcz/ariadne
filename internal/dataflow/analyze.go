@@ -16,7 +16,7 @@ import (
 // handle (jsr/ret, an internal inconsistency) is reported through
 // MethodFacts.Aborted, never as an error or a panic.
 func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
-	f := &MethodFacts{calls: map[bytecodeir.Site][]valueflow.Value{}, receivers: map[bytecodeir.Site]valueflow.Value{}}
+	f := &MethodFacts{calls: map[bytecodeir.Site][]valueflow.Value{}, receivers: map[bytecodeir.Site]valueflow.Value{}, fieldWrites: map[bytecodeir.Site]valueflow.Value{}}
 	if len(m.Code) == 0 {
 		return f, nil
 	}
@@ -37,20 +37,24 @@ func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodF
 	opByPC := make(map[int]classfile.LocalOp, len(ops))
 	for _, op := range ops {
 		opByPC[op.PC] = op
-		if op.Kind != classfile.LocalOpCall {
-			continue
-		}
-		n, err := callArgCount(op.CallDesc)
-		if err != nil {
-			continue // malformed descriptor: this Site stays unregistered, so a lookup there is a genuine caller error, not a false "aborted" claim
-		}
-		args := make([]valueflow.Value, n)
-		for i := range args {
-			args[i] = valueflow.Unknown("call argument not yet analyzed")
-		}
-		f.calls[site(op.PC, bytecodeir.OpCall)] = args
-		if op.CallHasReceiver {
-			f.receivers[site(op.PC, bytecodeir.OpCall)] = valueflow.Unknown("receiver not yet analyzed")
+		switch op.Kind {
+		case classfile.LocalOpCall:
+			n, err := callArgCount(op.CallDesc)
+			if err != nil {
+				continue // malformed descriptor: this Site stays unregistered, so a lookup there is a genuine caller error, not a false "aborted" claim
+			}
+			args := make([]valueflow.Value, n)
+			for i := range args {
+				args[i] = valueflow.Unknown("call argument not yet analyzed")
+			}
+			f.calls[site(op.PC, bytecodeir.OpCall)] = args
+			if op.CallHasReceiver {
+				f.receivers[site(op.PC, bytecodeir.OpCall)] = valueflow.Unknown("receiver not yet analyzed")
+			}
+		case classfile.LocalOpFieldPut:
+			if op.IsStatic {
+				f.fieldWrites[site(op.PC, bytecodeir.OpFieldPut)] = valueflow.Unknown("field write not yet analyzed")
+			}
 		}
 	}
 

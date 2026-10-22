@@ -24,10 +24,11 @@ import (
 // call site found, plus whether the analysis gave up partway (Aborted)
 // and why.
 type MethodFacts struct {
-	calls     map[bytecodeir.Site][]valueflow.Value
-	receivers map[bytecodeir.Site]valueflow.Value
-	aborted   bool
-	reason    string
+	calls       map[bytecodeir.Site][]valueflow.Value
+	receivers   map[bytecodeir.Site]valueflow.Value
+	fieldWrites map[bytecodeir.Site]valueflow.Value
+	aborted     bool
+	reason      string
 }
 
 var _ valueflow.Facts = (*MethodFacts)(nil)
@@ -63,6 +64,24 @@ func (f *MethodFacts) ReceiverAt(at bytecodeir.Site) valueflow.Value {
 	v, ok := f.receivers[at]
 	if !ok {
 		panic(fmt.Sprintf("dataflow: ReceiverAt: no receiver recorded at %+v (static call, or not a real call site in this method)", at))
+	}
+	return v
+}
+
+// FieldValueAt returns the Value stored by a static field-put
+// instruction identified by at — DATA_FLOW D3's own prerequisite for
+// internal/dataflow.ResolveStaticField to find out what every writer of
+// a field actually stored there. A Site with no field-put recorded
+// (wrong Op, an instance field-put, or one this method's bytecode never
+// contains) is a caller error and panics, same discipline as
+// ArgumentAt/ReceiverAt.
+func (f *MethodFacts) FieldValueAt(at bytecodeir.Site) valueflow.Value {
+	if at.Op != bytecodeir.OpFieldPut {
+		panic(fmt.Sprintf("dataflow: FieldValueAt: Site.Op = %q, want %q", at.Op, bytecodeir.OpFieldPut))
+	}
+	v, ok := f.fieldWrites[at]
+	if !ok {
+		panic(fmt.Sprintf("dataflow: FieldValueAt: no field-put recorded at %+v (instance field, or not a real field-put site in this method)", at))
 	}
 	return v
 }

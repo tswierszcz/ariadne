@@ -78,21 +78,38 @@ func ResolveInvokes(h *hierarchy.Hierarchy, sites []InvokeSite) ([]ResolvedInvok
 				factsByMethod[key] = f
 				facts = f
 			}
-			out = append(out, resolveOne(fqcn, s, facts))
+			ri, resolveWarnings := resolveOne(h, fqcn, s, facts)
+			out = append(out, ri)
+			warnings = append(warnings, resolveWarnings...)
 		}
 	}
 	return out, warnings
 }
 
-func resolveOne(fqcn string, s InvokeSite, facts *dataflow.MethodFacts) ResolvedInvoke {
+// resolveOne reads back one InvokeSite's receiver. A KindField receiver
+// (DATA_FLOW D3: a static field read whose own writer wasn't resolved
+// within this same method) gets one more chance via
+// dataflow.ResolveStaticField, which looks at every write of that field
+// in its own declaring class — the "find a handle once, cache it in a
+// field, invoke from elsewhere" pattern DYNAMIC_LINKAGE L2's own
+// same-method-only resolution could not reach by itself.
+func resolveOne(h *hierarchy.Hierarchy, fqcn string, s InvokeSite, facts *dataflow.MethodFacts) (ResolvedInvoke, []string) {
 	ri := ResolvedInvoke{Site: s}
 	recvSite := bytecodeir.Site{Method: fqcn + "#" + s.CallerName, Descriptor: s.CallerDesc, PC: s.PC, Op: bytecodeir.OpCall}
 	val := facts.ReceiverAt(recvSite)
 
 	if aborted, reason := facts.Aborted(); aborted {
 		ri.UnresolvedReason = "local-value analysis for this method aborted: " + reason
-		return ri
+		return ri, nil
 	}
+
+	var warnings []string
+	if val.Kind == valueflow.KindField {
+		resolved, fieldWarnings := dataflow.ResolveStaticField(h, *val.Field)
+		warnings = fieldWarnings
+		val = resolved
+	}
+
 	switch val.Kind {
 	case valueflow.KindHandle:
 		ri.RequestedOwner, ri.Method = val.Handle.RequestedOwner, val.Handle.Name
@@ -101,5 +118,5 @@ func resolveOne(fqcn string, s InvokeSite, facts *dataflow.MethodFacts) Resolved
 	default:
 		ri.UnresolvedReason = fmt.Sprintf("the receiver is %s, not a resolved MethodHandles.Lookup find* result", val.Kind)
 	}
-	return ri
+	return ri, warnings
 }

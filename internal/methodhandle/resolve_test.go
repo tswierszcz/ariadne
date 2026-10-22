@@ -5,6 +5,7 @@ import (
 
 	"ariadne/internal/classfile"
 	"ariadne/internal/dataflow"
+	"ariadne/internal/hierarchy"
 )
 
 // TestResolveOne_handleReceiverResolves is L2's own positive example,
@@ -55,11 +56,64 @@ func TestResolveOne_handleReceiverResolves(t *testing.T) {
 	}
 
 	site := InvokeSite{CallerFQCN: "test.Caller", CallerName: "m", CallerDesc: desc, PC: 9, Exact: true}
-	ri := resolveOne("test.Caller", site, facts)
+	ri, _ := resolveOne(hierarchy.NewForTesting(nil), "test.Caller", site, facts)
 	if ri.RequestedOwner != "test.Foo" || ri.Method != "bar" {
 		t.Errorf("Requested = %s#%s, want test.Foo#bar", ri.RequestedOwner, ri.Method)
 	}
 	if ri.UnresolvedReason != "" {
 		t.Errorf("UnresolvedReason = %q, want empty", ri.UnresolvedReason)
+	}
+}
+
+// TestResolveOne_fieldReceiverFallsThroughToResolveStaticField confirms
+// resolveOne dispatches a KindField receiver to
+// dataflow.ResolveStaticField rather than treating it as a plain
+// unresolved value — exercised here against a field whose owner isn't
+// in the hierarchy at all, so it stays honestly unresolved without
+// needing real jar bytes (ResolveStaticField's own early-exit path,
+// before any file I/O). The positive, same-class-writer case is
+// covered at the dataflow layer (TestMergeFieldWriters_*) and verified
+// end-to-end against real petclinic/WebGoat bytecode (see
+// RECOMMENDATION's own status record).
+func TestResolveOne_fieldReceiverFallsThroughToResolveStaticField(t *testing.T) {
+	pool := []classfile.PoolEntry{
+		{Tag: classfile.TagUtf8, Str: "test/Caller"},                       // 1
+		{Tag: classfile.TagClass, NameIndex: 1},                            // 2
+		{Tag: classfile.TagUtf8, Str: "HANDLE"},                            // 3
+		{Tag: classfile.TagUtf8, Str: "Ljava/lang/invoke/MethodHandle;"},   // 4
+		{Tag: classfile.TagNameAndType, NameIndex: 3, DescriptorIndex: 4},  // 5
+		{Tag: classfile.TagFieldref, ClassIndex: 2, NameAndTypeIndex: 5},   // 6: test.Caller#HANDLE
+		{Tag: classfile.TagUtf8, Str: "java/lang/invoke/MethodHandle"},     // 7
+		{Tag: classfile.TagClass, NameIndex: 7},                            // 8
+		{Tag: classfile.TagUtf8, Str: "invokeExact"},                       // 9
+		{Tag: classfile.TagUtf8, Str: "()V"},                               // 10
+		{Tag: classfile.TagNameAndType, NameIndex: 9, DescriptorIndex: 10}, // 11
+		{Tag: classfile.TagMethodref, ClassIndex: 8, NameAndTypeIndex: 11}, // 12
+	}
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	code := []byte{
+		0xb2, 0x00, 0x06, // pc0 getstatic #6 (HANDLE)
+		0xb6, 0x00, 0x0c, // pc3 invokevirtual #12 (invokeExact)
+		0xb1, // pc6 return
+	}
+	m := classfile.Method{Name: "invokeHandle", Descriptor: "()V", AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 0}
+
+	facts, err := dataflow.Analyze(cf, "test.Caller", m)
+	if err != nil {
+		t.Fatalf("dataflow.Analyze: %v", err)
+	}
+
+	// An empty hierarchy: test.Caller#HANDLE cannot resolve, so
+	// ResolveStaticField must return KindUnknown without touching any
+	// jar, and resolveOne must surface that as UnresolvedReason, not
+	// panic or silently default to something else.
+	h := hierarchy.NewForTesting(nil)
+	site := InvokeSite{CallerFQCN: "test.Caller", CallerName: "invokeHandle", CallerDesc: "()V", PC: 3, Exact: true}
+	ri, _ := resolveOne(h, "test.Caller", site, facts)
+	if ri.RequestedOwner != "" {
+		t.Errorf("RequestedOwner = %q, want empty", ri.RequestedOwner)
+	}
+	if ri.UnresolvedReason == "" {
+		t.Errorf("UnresolvedReason is empty, want a non-empty explanation")
 	}
 }

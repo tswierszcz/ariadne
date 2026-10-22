@@ -67,7 +67,18 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 				return "stack underflow at a field-get instruction"
 			}
 		}
-		st.push(valueflow.Typed(op.FieldDesc), op.Width)
+		if op.IsStatic {
+			// DATA_FLOW D3: identify *which* static field this is,
+			// rather than discarding to a bare Typed(desc) — a consumer
+			// with hierarchy access (internal/dataflow.ResolveStaticField)
+			// can go find out what every writer actually stored there.
+			// Instance fields (getfield) stay Typed for now — see
+			// ResolveStaticField's own doc comment for why static came
+			// first.
+			st.push(valueflow.Field(valueflow.FieldRef{Owner: op.FieldOwner, Name: op.FieldName, Desc: op.FieldDesc}), op.Width)
+		} else {
+			st.push(valueflow.Typed(op.FieldDesc), op.Width)
+		}
 		return ""
 
 	case classfile.LocalOpFieldPut:
@@ -75,8 +86,15 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 		if !op.IsStatic {
 			n = 2
 		}
-		if _, ok := st.popN(n); !ok {
+		entries, ok := st.popN(n)
+		if !ok {
 			return "stack underflow at a field-put instruction"
+		}
+		if op.IsStatic {
+			// DATA_FLOW D3: record what was actually stored, for
+			// Facts.FieldValueAt — the other half of ResolveStaticField's
+			// own cross-method summary.
+			it.facts.fieldWrites[it.site(op.PC, bytecodeir.OpFieldPut)] = entries[0].v
 		}
 		return ""
 

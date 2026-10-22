@@ -65,7 +65,28 @@ const (
 	// values (bindTo/asType adaptation is DYNAMIC_LINKAGE L3's own
 	// scope, not modeled here).
 	KindHandle Kind = "handle"
+	// KindField identifies a value read straight off a static field
+	// (DATA_FLOW D3) — see FieldRef. D2 itself never resolves what was
+	// actually stored there (that needs looking at every method that
+	// writes the field, a genuinely interprocedural question); D2 only
+	// records *which* field was read, so a consumer with hierarchy
+	// access (internal/dataflow's own ResolveStaticField) can go find
+	// out. Distinct from KindTyped: "this came from field X, unexamined"
+	// is a strictly more useful fact than "this is some instance of the
+	// field's declared type", even before anyone resolves it further.
+	KindField Kind = "field"
 )
+
+// FieldRef identifies one static field a getstatic read — the Fieldref
+// exactly as the bytecode names it, before any inheritance resolution
+// (hierarchy.ResolveField, same as every other owner-as-named-in-bytecode
+// convention elsewhere in ariadne). Instance fields (getfield) are
+// deliberately out of this phase's scope — see
+// internal/dataflow.ResolveStaticField's own doc comment for why static
+// was chosen first.
+type FieldRef struct {
+	Owner, Name, Desc string
+}
 
 // HandleValue is DYNAMIC_LINKAGE L2's own model for a method handle
 // obtained via MethodHandles.Lookup#findStatic/findVirtual/findSpecial/
@@ -169,6 +190,9 @@ type Value struct {
 
 	// Handle is set only when Kind == KindHandle.
 	Handle *HandleValue
+
+	// Field is set only when Kind == KindField.
+	Field *FieldRef
 }
 
 // Const returns an exact known constant of the given runtime type.
@@ -191,6 +215,10 @@ func Functional(fv FunctionalValue) Value { return Value{Kind: KindFunctional, F
 // Handle returns a value identified as a method handle from a
 // MethodHandles.Lookup find* call.
 func Handle(hv HandleValue) Value { return Value{Kind: KindHandle, Handle: &hv} }
+
+// Field returns a value identified as a static field read, not yet
+// resolved to whatever was actually stored there.
+func Field(ref FieldRef) Value { return Value{Kind: KindField, Field: &ref} }
 
 // Null returns the null value.
 func Null() Value { return Value{Kind: KindNull} }
@@ -226,6 +254,8 @@ func (v Value) Equal(other Value) bool {
 		return v.Func != nil && other.Func != nil && v.Func.Site == other.Func.Site
 	case KindHandle:
 		return v.Handle != nil && other.Handle != nil && v.Handle.Site == other.Handle.Site
+	case KindField:
+		return v.Field != nil && other.Field != nil && *v.Field == *other.Field
 	default: // KindSet, KindUnknown
 		return false
 	}

@@ -15,12 +15,12 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1, D2: DONE; D3–D5: UNASSESSED | D2 daje realną, zweryfikowaną na skalę lokalną analizę wartości (stałe tekstowe/klasowe przez zmienne i gałęzie, argumenty wywołań) i odblokowuje `SERVICE_LOADING:S1`, ale nic w CLI go jeszcze nie używa. |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | F0: DONE; F1–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu (`profile.DetectAll`) i ustala (bez wdrożenia) kontrakt `Condition`/`FrameworkScenario`/`BeanDefinition`/`ConditionalBinding`/`ExternalEntry`. Rejestr B3 wciąż nieodnotowany. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
-| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method case): DONE; L1 (SAM-call materialization), L2 (cross-method tracking), L3–L4: UNASSESSED | L2 łączy `invoke()`/`invokeExact()` z `Lookup.find*`'s uchwytem i daje realną krawędź grafu (`Facts` rozszerzone o `ReceiverAt`), ale tylko w ramach jednej metody — na petclinic/WebGoat 0/0 z 10/46 realnych wywołań miało tak płytki zasięg (dominujący wzorzec to pole statyczne, poza zakresem bez D3). |
+| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
@@ -1648,6 +1648,107 @@ Przy dodawaniu kolejnego wpisu zapisz:
   jednocześnie `DYNAMIC_LINKAGE:L2`'s dominujący wzorzec MethodHandle
   i `FRAMEWORKS:F2`'s własną zależność). Wymaga propozycji i zgody
   użytkownika przed startem.
+
+### DATA_FLOW:D3 — Przepływ między metodami i streszczenia (wycinek: pola statyczne) — DONE for static-field summaries; measured effect on real apps is zero (2026-10-22)
+
+- **Zakres zlecenia i zależności:** D2 (gotowe wyżej), `JVM_GRAPH:G2`
+  (gotowe, zarchiwizowane). Rejestr B3 (ogólny mechanizm streszczeń)
+  nie istnieje jeszcze (nieodnotowany) — D3 celowo **nie** zbudowało
+  rejestru; zamiast tego rozszerzyło bezpośrednio
+  `internal/valueflow`/`internal/dataflow` o konkretny, wąski wycinek:
+  "zapis do pola statycznego w jednej metodzie, odczyt w innej metodzie
+  tej samej klasy" — dokładnie wzorzec zmierzony jako brakujący przy
+  weryfikacji `DYNAMIC_LINKAGE:L2`.
+- **Zmienione pliki:** `internal/valueflow/value.go` (nowy `KindField` +
+  `FieldRef{Owner,Name,Desc}` — `getstatic` identyfikuje teraz *które*
+  pole odczytał, zamiast spłaszczać do samego typu deklarowanego;
+  `Equal` dla `KindField` po identyczności referencji pola);
+  `internal/dataflow/facts.go` (`MethodFacts.fieldWrites`,
+  `FieldValueAt` — **metoda `MethodFacts`, nie część interfejsu
+  `valueflow.Facts`**, bo nic w projekcie nie konsumuje `Facts` przez
+  typ interfejsowy — ten sam poziom co istniejące `Aborted()`, żeby nie
+  rozszerzać kontraktu bez realnej potrzeby); `internal/dataflow/step.go`
+  (`LocalOpFieldGet` dla pola statycznego push'uje `valueflow.Field(...)`
+  zamiast `Typed`; `LocalOpFieldPut` dla pola statycznego zapisuje
+  wartość do `fieldWrites` przed odrzuceniem ze stosu — pola
+  instancyjne (`getfield`/`putfield`) **celowo nietknięte**, zostają
+  `Typed` jak wcześniej); `internal/dataflow/analyze.go`
+  (preregistration dla `fieldWrites`); nowy `internal/dataflow/fields.go`
+  (`ResolveStaticField` — dla danej `FieldRef`, `hierarchy.ResolveField`
+  znajduje deklarującą klasę, ponownie odczytuje ją przez
+  `JarClassReader`, i `mergeFieldWriters` [wydzielona, testowalna bez
+  I/O na jarach, ten sam wzorzec co `resolveOne`/`ResolveCallbacks`]
+  skanuje **tylko własne metody deklarującej klasy** po
+  `InitRefs`'owych wpisach `InitPutStatic` [już wyekstrahowane przez
+  `JVM_GRAPH:G3`, zero nowego skanu bytecode'u], analizuje każdego
+  pisarza, i scala wszystkie zapisane wartości przez `valueflow.Merge`);
+  `internal/methodhandle/resolve.go` (`resolveOne` rozpoznaje
+  `KindField` i woła `dataflow.ResolveStaticField` jako drugą szansę,
+  zanim ostatecznie uzna receiver za nierozwiązany).
+- **Zachowanie dostępne użytkownikowi:** mechanizm istnieje i działa
+  (potwierdzone testami z realnym scalaniem wielu pisarzy), ale **nie
+  zmienia niczego widocznego na petclinic/WebGoat** — patrz "Dowód".
+- **Spełnione kryteria (z D3's "Gotowe", częściowo — tylko wycinek pól
+  statycznych):** "fabryka zwraca właściwą wartość" (tu: pole, nie
+  fabryka) — `TestMergeFieldWriters_singleWriterResolves` (jeden
+  pisarz, wartość poprawnie scalona i dostępna). "Rekurencja zbiega
+  lub ujawnia limit" — nie dotyczy tego wycinka (pola statyczne nie
+  rekursją; `valueflow.Merge` i tak ma własny budżet z poprzednich
+  faz). "Dwa call sites nie tworzą nieuzasadnionej ścieżki" —
+  `TestMergeFieldWriters_noWriterIsHonestUnknown` (brak pisarza →
+  `KindUnknown`, nigdy fikcyjna wartość) i
+  `TestResolveOne_fieldReceiverFallsThroughToResolveStaticField`
+  (nierozwiązywalny właściciel → `UnresolvedReason`, bez paniki, bez
+  dotykania jara).
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych —
+  szczery, zmierzony wynik, nie taki jak oczekiwano:** `bin/ariadne
+  -offline` na petclinic i WebGoat po tej fazie daje **identyczne 0 z
+  10/46** rozwiązanych tożsamości `MethodHandle.invoke` jak przed D3
+  (`DYNAMIC_LINKAGE:L2`'s własny pomiar). Sprawdzone wprost, które z
+  10/46 realnych receiverów to teraz: **6/22 pole instancyjne**
+  (`getfield`, celowo poza zakresem tego wycinka), **3/24 wynik innego
+  wywołania** (zwykła propagacja międzymetodowa wyniku, D3's własny
+  nieukończony punkt "parametr → wynik"), **1 nierozpoznany bootstrap**
+  — **żaden z 10/46 nie używał pola statycznego**, czyli wzorzec, który
+  ta faza faktycznie obsługuje. Mechanizm jest realny i przetestowany
+  (ogólny wzorzec "`private static final X = ...;` ustawione raz,
+  odczytane gdzie indziej" jest bardzo częsty w Javie w ogóle — po
+  prostu nie w TYCH konkretnych 10/46 miejscach na tych dwóch
+  aplikacjach kontrolnych dla MethodHandle). **Zero zmian w
+  REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN** na obu aplikacjach,
+  bajt-identyczny `results.json`/`report.md` między dwoma przebiegami
+  petclinic. Czas przebiegu petclinic: ~9.6s (bez regresji
+  wydajnościowej odczuwalnej z poziomu CLI).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/dataflow`:
+  `TestAnalyze_staticFieldReadProducesKindField`,
+  `TestAnalyze_staticFieldWriteRecordsFieldValueAt`,
+  `TestMergeFieldWriters_*` [2], `TestResolveStaticField_*`;
+  `internal/methodhandle`:
+  `TestResolveOne_fieldReceiverFallsThroughToResolveStaticField`); `go
+  test -race ./...` dla całego projektu (zielone); `bin/ariadne
+  -offline` na petclinic (dwa przebiegi) i WebGoat (opisane wyżej).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersze "Data flow and
+  taint" i "General reflection, MethodHandle invocation..." oba
+  rozszerzone o D3's zakres **i** szczery, zerowy zmierzony efekt na
+  realnych aplikacjach — żadne z dwóch nie przedstawia tego jako
+  sukcesu większego niż jest).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** pola instancyjne (`getfield`/`putfield`) — wymagają
+  wiązania konkretnej instancji z miejscem jej utworzenia (prawdziwe
+  points-to, znacznie trudniejsze niż jedno niewątpliwe miejsce dla
+  pola statycznego), nietknięte. Propagacja wyniku przez zwykłe
+  wywołanie metody ("parametr → wynik", D3's własny drugi punkt) —
+  nietknięta, zwykły wynik wywołania to wciąż zawsze `KindUnknown`.
+  Klucz kontekstu/instancji, wersjonowanie/unieważnianie streszczeń po
+  zmianie kodu (CVE F3's snapshoty) — nietknięte, nie potrzebne przy
+  tak wąskim wycinku. Rejestr B3 — wciąż nieodnotowany.
+- **Następny krok:** Rozszerzenie D3 na pola instancyjne (bezpośrednio
+  adresuje 6/10 i 22/46 realnych przypadków zmierzonych tutaj) albo
+  propagacja wyniku zwykłego wywołania (3/10 i 24/46) — które z tych
+  dwóch faktycznie zamknęłoby zmierzony brak na petclinic/WebGoat.
+  Alternatywnie `FRAMEWORKS:F1` albo `ASYNC_CALLBACKS:A3`. Wymaga
+  propozycji i zgody użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
 
