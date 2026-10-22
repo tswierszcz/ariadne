@@ -291,10 +291,20 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		}), op.Width)
 		return ""
 	}
+	if hv, ok := lookupHandleValue(it.site(op.PC, bytecodeir.OpCall), op, args); ok {
+		// DYNAMIC_LINKAGE L2: a MethodHandles.Lookup find* call whose
+		// Class/name arguments are provable literals produces a real
+		// HandleValue, not a generic Unknown.
+		st.push(valueflow.Handle(hv), op.Width)
+		return ""
+	}
 	if op.Width > 0 {
 		reason := "call return value is not tracked by this analysis increment"
-		if op.CallKind == classfile.CallDynamic {
+		switch {
+		case op.CallKind == classfile.CallDynamic:
 			reason = fmt.Sprintf("invokedynamic bootstrap for %s#%s could not be resolved to a LambdaMetafactory implementation", op.SamInterface, op.SamMethod)
+		case op.CallOwner == lookupOwner:
+			reason = fmt.Sprintf("MethodHandles.Lookup#%s target is not statically known (Class/name argument not a literal)", op.CallName)
 		}
 		st.push(valueflow.Unknown(reason), op.Width)
 	}

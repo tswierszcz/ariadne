@@ -57,7 +57,43 @@ const (
 	// implementation of a functional interface that forwards straight to
 	// a resolved real method.
 	KindFunctional Kind = "functional"
+	// KindHandle identifies a method handle obtained from a
+	// MethodHandles.Lookup find* call (DYNAMIC_LINKAGE L2) — see
+	// HandleValue. Distinct from KindFunctional: this is a plain
+	// reflection-style lookup, not a LambdaMetafactory-created
+	// functional-interface implementation, and it carries no captured
+	// values (bindTo/asType adaptation is DYNAMIC_LINKAGE L3's own
+	// scope, not modeled here).
+	KindHandle Kind = "handle"
 )
+
+// HandleValue is DYNAMIC_LINKAGE L2's own model for a method handle
+// obtained via MethodHandles.Lookup#findStatic/findVirtual/findSpecial/
+// findConstructor: which lookup produced it and what it was asked to
+// find. A value in DATA_FLOW's own domain, same reasoning as
+// FunctionalValue — "possession is not invocation" (L2's own
+// "Sam lookup nie wywołuje ciała celu"): obtaining this value never
+// means the target method ran.
+type HandleValue struct {
+	// Site is the find* call that produced this value.
+	Site bytecodeir.Site
+	// RefKind is the JVMS 5.4.3.5 reference kind the find* method
+	// itself implies (classfile.RefInvokeStatic for findStatic,
+	// RefInvokeVirtual for findVirtual, RefInvokeSpecial for
+	// findSpecial, RefNewInvokeSpecial for findConstructor) — not
+	// derived from inspecting the target, since none is inspected here.
+	RefKind byte
+	// RequestedOwner is the Class literally passed to the find* call —
+	// not necessarily the class that actually declares Name (findVirtual
+	// in particular is routinely called with an interface or supertype;
+	// resolving the real declaring class needs hierarchy access this
+	// package deliberately doesn't have — see this package's own D0
+	// doc comment on staying independent of any specific consumer).
+	RequestedOwner string
+	// Name is the method name looked up — "<init>" for findConstructor,
+	// which takes no name argument at all.
+	Name string
+}
 
 // FunctionalValue is DYNAMIC_LINKAGE L0/L1's own model for a lambda or
 // method reference: which functional interface/method it implements,
@@ -130,6 +166,9 @@ type Value struct {
 
 	// Func is set only when Kind == KindFunctional.
 	Func *FunctionalValue
+
+	// Handle is set only when Kind == KindHandle.
+	Handle *HandleValue
 }
 
 // Const returns an exact known constant of the given runtime type.
@@ -148,6 +187,10 @@ func Alloc(site bytecodeir.Site, typ string) Value {
 
 // Functional returns a value identified as a lambda/method reference.
 func Functional(fv FunctionalValue) Value { return Value{Kind: KindFunctional, Func: &fv} }
+
+// Handle returns a value identified as a method handle from a
+// MethodHandles.Lookup find* call.
+func Handle(hv HandleValue) Value { return Value{Kind: KindHandle, Handle: &hv} }
 
 // Null returns the null value.
 func Null() Value { return Value{Kind: KindNull} }
@@ -181,6 +224,8 @@ func (v Value) Equal(other Value) bool {
 		return true
 	case KindFunctional:
 		return v.Func != nil && other.Func != nil && v.Func.Site == other.Func.Site
+	case KindHandle:
+		return v.Handle != nil && other.Handle != nil && v.Handle.Site == other.Handle.Site
 	default: // KindSet, KindUnknown
 		return false
 	}

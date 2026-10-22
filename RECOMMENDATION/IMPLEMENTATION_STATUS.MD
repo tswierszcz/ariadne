@@ -20,7 +20,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
-| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case): DONE; L1 (SAM-call materialization), L2–L4: UNASSESSED | L0/L1 dają realną `valueflow.KindFunctional` z przechwyconymi wartościami, skonsumowaną już przez ASYNC_CALLBACKS A1/A2 (69/46 z 135/134 rozwiązanych, wzrost z 53/35). Wirtualne/bound method references i MethodHandle poza LambdaMetafactory nietknięte. |
+| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (wartość uchwytu): DONE; L1 (SAM-call materialization), L2 (invoke/invokeExact → krawędź), L3–L4: UNASSESSED | L2 daje realną `valueflow.KindHandle` dla `Lookup.findStatic/findVirtual/findSpecial/findConstructor` (realne użycie na petclinic/WebGoat potwierdzone), ale **bez konsumenta** — połączenie `invoke()`/`invokeExact()` z uchwytem jako krawędź grafu wymaga rozszerzenia `Facts` o dostęp do receivera wywołania, odłożone do wyraźnej decyzji. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
@@ -1401,6 +1401,85 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - **Następny krok:** `ASYNC_CALLBACKS:A3` (teraz z lepszym pokryciem
   tożsamości callbacków) albo `DYNAMIC_LINKAGE:L2` (podstawowe
   MethodHandle) albo `SERVICE_LOADING:S3` (JPMS). Wymaga propozycji i
+  zgody użytkownika przed startem.
+
+### DYNAMIC_LINKAGE:L2 — Podstawowe MethodHandle (wartość, bez konsumenta) — DONE for the HandleValue model; invoke/invokeExact edge wiring explicitly deferred (2026-10-22)
+
+- **Zakres zlecenia i zależności:** L0–L1 (gotowe wyżej). Zanim
+  zaczęto, sprawdzono realne użycie na petclinic/WebGoat
+  (jednorazowy skrypt diagnostyczny, uruchomiony i usunięty): oba mają
+  prawdziwe wywołania `findStatic`/`findVirtual`/`findConstructor`/
+  `invoke`/`invokeExact`/`bindTo` w zależnościach (petclinic: 12
+  odrębnych par owner#name; WebGoat: 25, w tym 37×`invokeExact`,
+  22×`findStatic`) — to nie jest praca bez realnego pokrycia.
+- **Zmienione pliki:** `internal/valueflow/value.go` (nowy
+  `KindHandle` + `HandleValue{Site, RefKind, RequestedOwner, Name}` —
+  świadomie bez pola na deskryptor/dokładny przeciążenie, zgodnie z
+  tym, że żaden inny konsument w projekcie [`hierarchy.ResolveMethod`]
+  też nie wymaga dokładnego deskryptora; `RequestedOwner` to dosłowna
+  klasa podana do `find*`, nie klasa deklarująca — rozwiązanie tego
+  wymaga `hierarchy`, do którego ten pakiet świadomie nie ma dostępu);
+  nowy `internal/dataflow/methodhandle.go` (`lookupHandleValue` —
+  mały, jawny katalog czterech przeciążeń `find*`, rozpoznawany
+  bezpośrednio w `internal/dataflow` zamiast w osobnym pakiecie
+  konsumenckim, bo `java.lang.invoke.MethodHandles$Lookup` to część
+  rdzennej maszynerii JVM-owej, nie dowolna biblioteka — ten sam
+  poziom co `invokedynamic`/LambdaMetafactory już ma w `stepCall`);
+  `internal/dataflow/step.go` (`stepCall` push'uje `valueflow.Handle(...)`
+  gdy rozpoznany `find*` ma dowodliwie literalne argumenty `Class`+
+  `String`, inaczej `Unknown` z konkretnym powodem wymieniającym metodę
+  `find*`).
+- **Zachowanie dostępne użytkownikowi: żadne jeszcze** — świadomie,
+  tak jak DATA_FLOW D0: `HandleValue` istnieje i jest poprawny
+  (potwierdzone testami i realnym bytecode), ale nic go nie
+  konsumuje. `bin/ariadne -offline` na petclinic po tej fazie daje
+  **identyczne** liczby jak przed nią — brak zmiany zachowania, bo
+  brak nowego konsumenta w pipeline.
+- **Spełnione kryteria (z L2's "Gotowe", częściowo — patrz
+  "Niespełnione"):** "stały cel" —
+  `TestAnalyze_lookupFindStaticProducesHandleValue` (literalna klasa +
+  nazwa metody → poprawny `HandleValue` z właściwym `RefKind`).
+  "Nieznany lookup" — `TestAnalyze_lookupFindVirtualWithUnknownNameStaysUnknown`
+  (nazwa metody jako parametr, nie literał → `KindUnknown`, nie
+  zgadane). "Niezgodny typ" — nie dotyczy tego wycinka (wymaga
+  `MethodType`'owego rozwiązania, które `L2` samo odkłada — patrz
+  "Niespełnione"). "Sam lookup nie wywołuje ciała celu" — prawda z
+  konstrukcji: `HandleValue` nie tworzy żadnej krawędzi grafu, tylko
+  wartość.
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  jednorazowy skrypt diagnostyczny (napisany, uruchomiony, usunięty)
+  wołający `dataflow.Analyze` na każdej metodzie z kodem w realnym
+  petclinic (219077) i WebGoat (280172) — **0 błędów, 0 panik** na
+  obu, potwierdzające że nowa ścieżka rozpoznawania `Lookup.find*` jest
+  bezpieczna na pełnej skali, nie tylko na syntetycznych testach.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/dataflow`:
+  `TestAnalyze_lookupFindStaticProducesHandleValue`,
+  `TestAnalyze_lookupFindVirtualWithUnknownNameStaysUnknown`); `go test
+  -race ./...` dla całego projektu (zielone); jednorazowy skrypt
+  diagnostyczny opisany wyżej; `bin/ariadne -offline` na petclinic —
+  identyczne liczby jak przed fazą (potwierdzone wprost, nie
+  założone).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "General
+  reflection, MethodHandle invocation and custom bootstrap models":
+  Not implemented → Partial, z pełnym opisem zakresu, ograniczeń i
+  zmierzonych dowodów użycia na realnych aplikacjach).
+- **Niespełnione/odłożone — wymaga jawnej decyzji przed kontynuacją,
+  nie przeoczenie:** połączenie `handle.invoke(...)`/`invokeExact(...)`
+  z `HandleValue` jako krawędź grafu wywołań (L2's własny,
+  pozostający bez realizacji fragment "Gotowe") wymaga, żeby `Facts`
+  (kontrakt D0) ujawniał **receiver** wywołania, nie tylko argumenty —
+  `ArgumentAt` z definicji wyklucza receiver. To realna zmiana
+  kontraktu D0, nie szczegół implementacyjny, i świadomie nie została
+  wykonana bez uzgodnienia: albo nowa metoda `Facts.ReceiverAt(site)`,
+  albo inny mechanizm. `MethodType.methodType(...)`'s rozwiązywanie
+  (potrzebne, by `invokeExact`'s "niezgodny typ" miał sens) — też
+  nietknięte. L3 (`bindTo`/`asType`, `StringConcatFactory`,
+  `CONSTANT_Dynamic`), L4 (fixtures wymagające JDK) — nietknięte.
+- **Następny krok:** Zdecydować, czy/jak rozszerzyć `Facts` o dostęp
+  do receivera (dokończenie L2's własnego zakresu — realne połączenie
+  `invoke`/`invokeExact` z grafem), albo przejść do innego obszaru
+  (`ASYNC_CALLBACKS:A3`, `SERVICE_LOADING:S3`). Wymaga propozycji i
   zgody użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
