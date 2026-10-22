@@ -206,6 +206,31 @@ type LocalOp struct {
 	CallOwner, CallName, CallDesc string
 	CallKind                      CallKind // LocalOpCall only
 	CallHasReceiver               bool     // true for virtual/special/interface
+
+	// CallRefKind is the resolved implementation's MethodHandle
+	// reference kind (JVMS 5.4.3.5, e.g. RefInvokeStatic,
+	// RefNewInvokeSpecial) — DYNAMIC_LINKAGE L0's own "rodzaj
+	// REF_invokeVirtual/REF_invokeStatic/REF_newInvokeSpecial jest
+	// dostępny dla modelu". Set only for LocalOpCall with
+	// CallKind == CallDynamic and a resolved LambdaMetafactory impl; 0
+	// otherwise (0 is never a valid JVMS reference kind, so it
+	// unambiguously means "not applicable/not resolved").
+	CallRefKind byte
+	// SamInterface/SamMethod are the functional interface this
+	// invokedynamic's result implements and the single abstract method
+	// name being created for (e.g. "java.lang.Runnable"/"run") — read
+	// directly off the invokedynamic's own NameAndType, independent of
+	// whether the bootstrap itself could be resolved (DYNAMIC_LINKAGE
+	// L0: "zachować dynamiczne stałe... bez wykonywania bootstrapu").
+	// "" when the opcode isn't invokedynamic.
+	SamInterface, SamMethod string
+	// CallImplDesc is the resolved implementation method's own
+	// descriptor — distinct from CallDesc, which for LocalOpCall with
+	// CallKind == CallDynamic holds the invokedynamic *call site's own*
+	// descriptor (captured-argument types and the functional interface
+	// as return type), not the implementation's. "" when CallOwner is
+	// "" (unresolved) or CallKind != CallDynamic.
+	CallImplDesc string
 }
 
 // DecodeLocalOps decodes code into one LocalOp per instruction, resolving
@@ -395,7 +420,7 @@ func (c *ClassFile) decodeOneLocalOp(in instruction) (LocalOp, error) {
 		if e.tag != tagInvokeDynamic {
 			return LocalOp{}, fmt.Errorf("constant pool index %d is tag %d, want InvokeDynamic", idx, e.tag)
 		}
-		_, desc, err := c.pool.nameAndType(e.nameAndTypeIndex)
+		samMethod, desc, err := c.pool.nameAndType(e.nameAndTypeIndex)
 		if err != nil {
 			return LocalOp{}, err
 		}
@@ -403,9 +428,10 @@ func (c *ClassFile) decodeOneLocalOp(in instruction) (LocalOp, error) {
 		if err != nil {
 			return LocalOp{}, err
 		}
-		op := LocalOp{PC: pc, Kind: LocalOpCall, Width: returnWidth(desc), CallDesc: desc, CallKind: CallDynamic}
+		op := LocalOp{PC: pc, Kind: LocalOpCall, Width: returnWidth(desc), CallDesc: desc, CallKind: CallDynamic,
+			SamInterface: samInterfaceOf(desc), SamMethod: samMethod}
 		if ok {
-			op.CallOwner, op.CallName = call.Owner, call.Name
+			op.CallOwner, op.CallName, op.CallImplDesc, op.CallRefKind = call.Owner, call.Name, call.Desc, call.RefKind
 		}
 		return op, nil
 
@@ -554,6 +580,18 @@ func returnDescriptor(methodDesc string) (string, error) {
 		return "", fmt.Errorf("invalid method descriptor %q: missing ')'", methodDesc)
 	}
 	return methodDesc[i+1:], nil
+}
+
+// samInterfaceOf returns an invokedynamic call descriptor's return
+// type as an FQCN — the functional interface the created object
+// implements (always an object type; a SAM factory's result is never a
+// primitive or array). "" if the descriptor is malformed.
+func samInterfaceOf(desc string) string {
+	ret, err := returnDescriptor(desc)
+	if err != nil || len(ret) < 2 || ret[0] != 'L' {
+		return ""
+	}
+	return descriptorToFQCN(ret)
 }
 
 func indexByte(s string, b byte) int {

@@ -44,6 +44,12 @@ type Call struct {
 	Name  string
 	Desc  string
 	PC    int
+	// RefKind is the resolved implementation's MethodHandle reference
+	// kind (JVMS 5.4.3.5) for a CallDynamic edge whose LambdaMetafactory
+	// bootstrap was resolved — DYNAMIC_LINKAGE L0. 0 (never a valid
+	// JVMS reference kind) for every other Kind, or an unresolved
+	// dynamic call.
+	RefKind byte
 }
 
 // InitKind says which instruction produced an InitRef — the three JVMS
@@ -202,5 +208,5 @@ func (c *ClassFile) resolveInvokeDynamic(idx uint16, pc int) (Call, bool, error)
 	if !ok {
 		return Call{}, false, nil
 	}
-	return Call{Kind: CallDynamic, Owner: impl.Owner, Name: impl.Name, Desc: impl.Desc, PC: pc}, true, nil
+	return Call{Kind: CallDynamic, Owner: impl.Owner, Name: impl.Name, Desc: impl.Desc, PC: pc, RefKind: impl.Kind}, true, nil
 }

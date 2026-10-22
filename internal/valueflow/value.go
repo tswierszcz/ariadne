@@ -50,7 +50,50 @@ const (
 	// KindUnknown; "unknown" without a reason is not an acceptable
 	// result from any producer in this package's contract.
 	KindUnknown Kind = "unknown"
+	// KindFunctional identifies a lambda/method-reference object created
+	// by invokedynamic through LambdaMetafactory (DYNAMIC_LINKAGE L0/L1)
+	// — see FunctionalValue. Distinct from KindAlloc: the created object
+	// isn't a `new` of any class ariadne reads; it's a synthetic
+	// implementation of a functional interface that forwards straight to
+	// a resolved real method.
+	KindFunctional Kind = "functional"
 )
+
+// FunctionalValue is DYNAMIC_LINKAGE L0/L1's own model for a lambda or
+// method reference: which functional interface/method it implements,
+// which real method it dispatches straight to once that method runs,
+// and what it closed over at creation. A value in DATA_FLOW's own
+// domain — "a program can pass this around, store it, or never invoke
+// it" — not a call-graph edge (L0's own "odrębny od gotowej krawędzi
+// wywołania"); a consumer that wants an edge builds one from this.
+type FunctionalValue struct {
+	// Site is the invokedynamic instruction that created this value —
+	// its identity, the same role bytecodeir.Site plays for KindAlloc.
+	Site bytecodeir.Site
+	// SamInterface/SamMethod are the functional interface and its
+	// single abstract method this value implements (e.g.
+	// "java.lang.Runnable"/"run") — what a consumer eventually calls.
+	SamInterface, SamMethod string
+	// ImplOwner/ImplName/ImplDesc are the real method SamMethod
+	// dispatches straight to: a lambda body's own synthetic method, a
+	// method reference's target, or a constructor reference's
+	// constructor. Resolved once via the LambdaMetafactory bootstrap,
+	// never through CHA — this is not an ordinary virtual call site.
+	// "" when the bootstrap couldn't be resolved (e.g.
+	// StringConcatFactory): the value still exists as evidence a lambda
+	// was created, just with no known implementation.
+	ImplOwner, ImplName, ImplDesc string
+	// RefKind is the implementation MethodHandle's own JVMS 5.4.3.5
+	// reference kind (classfile.RefInvokeStatic and friends) — 0 when
+	// ImplOwner is "".
+	RefKind byte
+	// Captured holds every free-variable value this lambda/method
+	// reference closed over at creation, in argument order — DATA_FLOW's
+	// own domain: two creation sites of the same lambda shape may still
+	// carry different captured data, so this lives per-Value, not
+	// per-shape.
+	Captured []Value
+}
 
 // Value is one fact's abstract value in DATA_FLOW's domain. Exactly one
 // of Const/Type/AllocSite/Candidates/Reason is meaningful, selected by
@@ -84,6 +127,9 @@ type Value struct {
 	// Reason explains a KindUnknown value. Required (non-empty) whenever
 	// Kind == KindUnknown.
 	Reason string
+
+	// Func is set only when Kind == KindFunctional.
+	Func *FunctionalValue
 }
 
 // Const returns an exact known constant of the given runtime type.
@@ -99,6 +145,9 @@ func Typed(typ string) Value { return Value{Kind: KindTyped, Type: typ} }
 func Alloc(site bytecodeir.Site, typ string) Value {
 	return Value{Kind: KindAlloc, AllocSite: &site, Type: typ}
 }
+
+// Functional returns a value identified as a lambda/method reference.
+func Functional(fv FunctionalValue) Value { return Value{Kind: KindFunctional, Func: &fv} }
 
 // Null returns the null value.
 func Null() Value { return Value{Kind: KindNull} }
@@ -130,6 +179,8 @@ func (v Value) Equal(other Value) bool {
 		return v.AllocSite != nil && other.AllocSite != nil && *v.AllocSite == *other.AllocSite
 	case KindNull:
 		return true
+	case KindFunctional:
+		return v.Func != nil && other.Func != nil && v.Func.Site == other.Func.Site
 	default: // KindSet, KindUnknown
 		return false
 	}

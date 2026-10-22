@@ -11,28 +11,38 @@ import (
 )
 
 // ResolvedCallback is ASYNC_CALLBACKS A1's own result: one cataloged
-// RegistrationSite (A0) with its callback argument's concrete class
-// resolved, where possible.
+// RegistrationSite (A0) with its callback argument resolved, where
+// possible, to either a concrete class (a direct `new`) or a
+// lambda/method reference's own implementation (DYNAMIC_LINKAGE L0/L1).
+// Exactly one of TargetFQCN and ImplOwner is set on a resolved
+// ResolvedCallback; both are "" when UnresolvedReason explains why
+// neither applies.
 type ResolvedCallback struct {
 	Site RegistrationSite
 	// TargetFQCN is the concrete class whose CallbackMethod will
 	// actually run — set only when the argument was a provably exact
 	// allocation (valueflow.KindAlloc) of a class directly passed to the
-	// registration call. "" otherwise; see UnresolvedReason.
+	// registration call.
 	TargetFQCN string
-	// UnresolvedReason explains why TargetFQCN is "". A1's own declared
-	// scope deliberately stops at "a `new X(...)` passed directly or
-	// through a local variable" (DATA_FLOW D0-D2's own domain) — a
-	// lambda or method reference is reported as unresolved here with a
-	// reason naming that, not silently treated as "unknown receiver":
-	// DYNAMIC_LINKAGE L1 (not yet implemented) is what would resolve
-	// those, and this phase does not pretend to.
+	// ImplOwner/ImplName/ImplDesc are set instead of TargetFQCN when the
+	// argument was a lambda or method reference (valueflow.KindFunctional,
+	// DYNAMIC_LINKAGE L0/L1): the real method it dispatches straight to
+	// when CallbackMethod is invoked — already the exact declaring
+	// method (resolved once via LambdaMetafactory, not CHA), so a
+	// consumer building a call-graph edge from this needs no further
+	// hierarchy lookup, unlike TargetFQCN's own case.
+	ImplOwner, ImplName, ImplDesc string
+	// UnresolvedReason explains why neither TargetFQCN nor ImplOwner is
+	// set — e.g. a parameter, field read, or an unresolved dynamic
+	// bootstrap (StringConcatFactory and the like, never guessed at).
 	UnresolvedReason string
 }
 
 // ResolveCallbacks is ASYNC_CALLBACKS A1: for every cataloged
-// RegistrationSite (A0), resolve the concrete class passed as its
-// callback argument via DATA_FLOW D0-D2's local-value analysis — same
+// RegistrationSite (A0), resolve its callback argument via DATA_FLOW
+// D0-D2's local-value analysis — a concrete class for a direct `new`
+// allocation, or a lambda/method reference's own implementation method
+// (DYNAMIC_LINKAGE L0/L1, valueflow.KindFunctional) — using the same
 // re-read-the-class-file-for-its-pool approach SERVICE_LOADING S1 uses
 // (classfile.ClassFile's constant pool is not retained past
 // hierarchy.Build). A site whose Outcome isn't OutcomeCataloged (A0's
@@ -113,11 +123,18 @@ func resolveOne(fqcn string, s RegistrationSite, facts *dataflow.MethodFacts) Re
 	switch val.Kind {
 	case valueflow.KindAlloc:
 		rc.TargetFQCN = val.Type
+	case valueflow.KindFunctional:
+		if val.Func.ImplOwner == "" {
+			rc.UnresolvedReason = fmt.Sprintf(
+				"the argument is a lambda/method reference whose bootstrap could not be resolved (%s#%s)", val.Func.SamInterface, val.Func.SamMethod)
+			break
+		}
+		rc.ImplOwner, rc.ImplName, rc.ImplDesc = val.Func.ImplOwner, val.Func.ImplName, val.Func.ImplDesc
 	case valueflow.KindUnknown:
 		rc.UnresolvedReason = "the argument is unknown: " + val.Reason
 	default:
 		rc.UnresolvedReason = fmt.Sprintf(
-			"the argument is %s, not a direct `new` allocation (lambdas/method references need DYNAMIC_LINKAGE L1, not yet implemented)", val.Kind)
+			"the argument is %s, not a direct `new` allocation or a resolved lambda/method reference", val.Kind)
 	}
 	return rc
 }

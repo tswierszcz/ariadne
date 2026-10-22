@@ -29,9 +29,18 @@ const (
 	tagPackage            = 20
 )
 
-// MethodHandle reference kinds (JVM spec table 5.4.3.5), the ones that
-// matter for resolving a lambda/method-reference's implementation target.
+// MethodHandle reference kinds (JVM spec table 5.4.3.5). The complete
+// table, kept here even though field-access kinds (1-4) never produce a
+// LambdaMetafactory implementation method and so never matter to
+// ImplMethod/resolveInvokeDynamic — DYNAMIC_LINKAGE L0's own "rodzaj...
+// jest dostępny dla modelu" asks for the full set to be nameable, not
+// just the ones this package's own call-graph resolution currently uses.
 const (
+	RefGetField         = 1
+	RefGetStatic        = 2
+	RefPutField         = 3
+	RefPutStatic        = 4
+	RefInvokeVirtual    = 5 // an unbound instance method reference, e.g. String::length
 	RefInvokeStatic     = 6
 	RefInvokeSpecial    = 7
 	RefNewInvokeSpecial = 8 // a constructor reference, e.g. Foo::new

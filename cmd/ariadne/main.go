@@ -243,17 +243,18 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("callbacks: %d registration call sites found (%d a known API's uncataloged overload)", len(callbackSites), unsupportedCallbackAPIs)
 
 	// ASYNC_CALLBACKS A1: resolve each cataloged site's callback
-	// argument to a concrete class via DATA_FLOW D0-D2, where the
-	// argument was a direct `new` allocation.
+	// argument via DATA_FLOW D0-D2 — a concrete class for a direct `new`
+	// allocation, or a lambda/method reference's own implementation
+	// method (DYNAMIC_LINKAGE L0/L1).
 	resolvedCallbacks, callbackResolveWarnings := callback.ResolveCallbacks(h, callbackSites)
 	warnings = append(warnings, callbackResolveWarnings...)
 	resolvedCallbackCount := 0
 	for _, rc := range resolvedCallbacks {
-		if rc.TargetFQCN != "" {
+		if rc.TargetFQCN != "" || rc.ImplOwner != "" {
 			resolvedCallbackCount++
 		}
 	}
-	log("callbacks: %d of %d cataloged sites resolved to a concrete class", resolvedCallbackCount, len(resolvedCallbacks))
+	log("callbacks: %d of %d cataloged sites resolved to a concrete class or lambda/method reference", resolvedCallbackCount, len(resolvedCallbacks))
 
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {

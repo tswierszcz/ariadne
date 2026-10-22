@@ -195,37 +195,43 @@ None found.
 
 ## Callback identities resolved
 
-For every cataloged registration call site above, the concrete class actually passed
-as the callback argument (ASYNC_CALLBACKS A1), when it was a direct `new` allocation —
-still not a call-graph edge to that class's own callback method (ASYNC_CALLBACKS A2,
-not yet implemented). A lambda or method reference is correctly left unresolved (needs
-DYNAMIC_LINKAGE L1), not guessed at.
+For every cataloged registration call site above, what the callback argument actually
+was (ASYNC_CALLBACKS A1): a concrete class for a direct `new` allocation, or a
+lambda/method reference's own implementation method directly (DYNAMIC_LINKAGE L0/L1,
+resolved once via LambdaMetafactory) — see "Callback call-graph edges" below for the
+resulting call-graph edge (ASYNC_CALLBACKS A2). A lambda/method reference whose own
+bootstrap couldn't be resolved (e.g. `StringConcatFactory`, never LambdaMetafactory)
+is correctly left unresolved, not guessed at.
 {{if not .ResolvedCallbacks}}
 None found.
 {{else}}
-| Caller | Target class | Callback method |
+| Caller | Target | Callback method |
 |---|---|---|
-{{range .ResolvedCallbacks}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}{{.Site.CallerDesc}}` (pc={{.Site.PC}}) | {{if .TargetFQCN}}`{{.TargetFQCN}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} | `{{.Site.Model.CallbackInterface}}#{{.Site.Model.CallbackMethod}}` |
+{{range .ResolvedCallbacks}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}{{.Site.CallerDesc}}` (pc={{.Site.PC}}) | {{if .TargetFQCN}}`{{.TargetFQCN}}`{{else if .ImplOwner}}`{{.ImplOwner}}#{{.ImplName}}{{.ImplDesc}}` (lambda/method reference){{else}}unresolved: {{.UnresolvedReason}}{{end}} | `{{.Site.Model.CallbackInterface}}#{{.Site.Model.CallbackMethod}}` |
 {{end}}
 {{end}}
 
 ## Callback call-graph edges
 
 For every callback identity resolved above, a real call-graph edge (ASYNC_CALLBACKS
-A2) from the registration call site to the class that actually declares the callback
-method (may be a superclass — ordinary JVM method resolution). This is a "may run"
-edge, like a profile's synthetic edge or CHA's own dispatch expansion: it does not
-claim the registration call itself guarantees execution (the thread may never start,
-the task may be rejected or cancelled), and it never invents a thread identity. "Gap"
-means the resolved class doesn't resolve the callback method anywhere in the analyzed
-hierarchy (normally only when a class on that chain is missing from the input, not
-evidence the callback itself is unreachable).
+A2) from the registration call site to the method that will actually run: for a
+concrete class, the class that declares the callback method (may be a superclass —
+ordinary JVM method resolution); for a lambda or method reference (DYNAMIC_LINKAGE
+L0/L1), its own implementation method directly, already resolved once via
+LambdaMetafactory, never through CHA. This is a "may run" edge, like a profile's
+synthetic edge or CHA's own dispatch expansion: it does not claim the registration
+call itself guarantees execution (the thread may never start, the task may be
+rejected or cancelled), and it never invents a thread identity. "Gap" means the
+resolved class doesn't resolve the callback method anywhere in the analyzed hierarchy
+(normally only when a class on that chain is missing from the input, not evidence the
+callback itself is unreachable) — a lambda/method reference identity never has a Gap
+here, since nothing further needs resolving.
 {{if not .CallbackEdges}}
 None found.
 {{else}}
 | Caller | Target | Edge |
 |---|---|---|
-{{range .CallbackEdges}}| `{{.ResolvedCallback.Site.CallerFQCN}}#{{.ResolvedCallback.Site.CallerName}}{{.ResolvedCallback.Site.CallerDesc}}` (pc={{.ResolvedCallback.Site.PC}}) | `{{.ResolvedCallback.TargetFQCN}}` | {{if .DeclaringFQCN}}`{{.DeclaringFQCN}}#{{.ResolvedCallback.Site.Model.CallbackMethod}}` ({{.ResolvedCallback.Site.Model.Execution}}){{else}}**gap:** {{.Gap}}{{end}} |
+{{range .CallbackEdges}}| `{{.ResolvedCallback.Site.CallerFQCN}}#{{.ResolvedCallback.Site.CallerName}}{{.ResolvedCallback.Site.CallerDesc}}` (pc={{.ResolvedCallback.Site.PC}}) | {{if .ResolvedCallback.TargetFQCN}}`{{.ResolvedCallback.TargetFQCN}}`{{else}}`{{.ResolvedCallback.ImplOwner}}` (lambda/method reference){{end}} | {{if .DeclaringFQCN}}`{{.DeclaringFQCN}}#{{.DeclaringMethod}}` ({{.ResolvedCallback.Site.Model.Execution}}){{else}}**gap:** {{.Gap}}{{end}} |
 {{end}}
 {{end}}
 

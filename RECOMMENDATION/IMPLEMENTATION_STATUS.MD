@@ -19,8 +19,8 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
-| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` (51/33 z 53/35 na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum). A0–A2 domykają zadeklarowane MVP tego obszaru; lambdy/referencje metod (DYNAMIC_LINKAGE L1), continuations/listenery/reactive (A3) nietknięte. |
-| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Uporządkować istniejące lambda/method references przed szerszymi uchwytami. |
+| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
+| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case): DONE; L1 (SAM-call materialization), L2–L4: UNASSESSED | L0/L1 dają realną `valueflow.KindFunctional` z przechwyconymi wartościami, skonsumowaną już przez ASYNC_CALLBACKS A1/A2 (69/46 z 135/134 rozwiązanych, wzrost z 53/35). Wirtualne/bound method references i MethodHandle poza LambdaMetafactory nietknięte. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
@@ -1286,6 +1286,122 @@ Przy dodawaniu kolejnego wpisu zapisz:
   nieodnotowane) albo `SERVICE_LOADING:S3` (JPMS) albo inny obszar
   R1/R2 z ROADMAP.MD. Wymaga propozycji i zgody użytkownika przed
   startem.
+
+### DYNAMIC_LINKAGE:L0–L1 — Reprezentacja bootstrapów i lambdy/method references — DONE for the creation-site case; SAM-call materialization and bound/virtual references odłożone (2026-10-22)
+
+- **Zakres zlecenia i zależności:** JVM G0–G3 (gotowe, zarchiwizowane),
+  DATA_FLOW D0–D2 (gotowe wyżej). Rejestr modeli B3 nie istnieje
+  jeszcze (nieodnotowane) — zamiast czekać, L0/L1 rozszerzają
+  bezpośrednio istniejące struktury `classfile`/`valueflow`/`dataflow`,
+  bez budowania ogólnego rejestru modeli bibliotek. Sesja połączyła L0
+  (kontrakt: ekspozycja metadanych bootstrapu) z praktycznym wycinkiem
+  L1 (realna wartość `FunctionalValue` z miejsca tworzenia lambdy) w
+  jeden przyrost, bo L0 sam w sobie (tylko metadane, bez konsumenta)
+  nie dawałby żadnego mierzalnego efektu na realnym kodzie — ten sam
+  powód, dla którego wcześniejsze fazy D1/S0/A0 też łączyły "kontrakt"
+  z pierwszym realnym zastosowaniem, gdy to miało sens.
+- **Zmienione pliki:** `internal/classfile/pool.go` (dopełniona
+  tabela `Ref*` z JVMS 5.4.3.5 — `RefGetField`..`RefInvokeVirtual`,
+  wcześniej tylko 6–9 były nazwane); `internal/classfile/calls.go`
+  (`Call` zyskuje `RefKind byte` — rodzaj uchwytu rozwiązanej
+  implementacji; `resolveInvokeDynamic` go wypełnia);
+  `internal/classfile/localops.go` (`LocalOp` zyskuje
+  `CallRefKind`/`SamInterface`/`SamMethod`/`CallImplDesc` — SAM
+  interfejs i metoda czytane prosto z `NameAndType` niezależnie od
+  tego, czy bootstrap się rozwiązał; `CallImplDesc` oddzielony od
+  `CallDesc`, bo dla `invokedynamic` to dwa różne deskryptory — miejsca
+  wywołania vs. rzeczywistej implementacji); `internal/valueflow/value.go`
+  (nowy `KindFunctional` + `FunctionalValue{Site, SamInterface,
+  SamMethod, ImplOwner/Name/Desc, RefKind, Captured []Value}` —
+  "odrębny od gotowej krawędzi wywołania" model L0's własnego zapisu;
+  `Equal` dla `KindFunctional` po identyczności `Site`, jak `KindAlloc`);
+  `internal/dataflow/step.go` (`stepCall` dla `CallDynamic` z
+  rozwiązanym `CallOwner` push'uje `valueflow.Functional(...)` z
+  faktycznie przechwyconymi argumentami jako `Captured`, zamiast
+  ogólnego `Unknown`; nierozwiązany bootstrap wciąż `Unknown`, ale z
+  konkretnym powodem wymieniającym SAM interfejs);
+  `internal/callback/identity.go` (`ResolvedCallback` zyskuje
+  `ImplOwner/ImplName/ImplDesc`; `resolveOne` rozpoznaje
+  `KindFunctional` i rozwiązuje prosto do implementacji, bez
+  przechodzenia przez `TargetFQCN`); `internal/callback/edges.go`
+  (`FindCallbackEdges` dla `ImplOwner`-owej tożsamości łączy się
+  bezpośrednio, **bez** `hierarchy.ResolveExact` — to już dokładna
+  metoda deklarująca, nigdy luka); `internal/report/report.md.tmpl`
+  (sekcje "Callback identities resolved"/"Callback call-graph edges"
+  rozszerzone o przypadek lambda/method reference).
+- **Zachowanie dostępne użytkownikowi:** lambda/referencja metody
+  przekazana jako argument `Thread`/`Executor` rozwiązuje się teraz do
+  swojej rzeczywistej implementacji (statyczna metoda, konstruktor,
+  prywatna metoda ciała lambdy) i dostaje realną krawędź w grafie
+  wywołań — zamiast zatrzymywać się na "unresolved, needs
+  DYNAMIC_LINKAGE L1" (poprzedni stan A1). Przechwycone zmienne wolne
+  (captured) są dostępne jako osobne, już rozwiązane wartości, nie
+  ponownie spłaszczone do `Unknown`.
+- **Spełnione kryteria (z L0's "Gotowe"):** "rodzaj
+  REF_invokeVirtual/REF_invokeStatic/REF_newInvokeSpecial jest
+  dostępny dla modelu" — pełna tabela `Ref*` + `LocalOp.CallRefKind` +
+  `FunctionalValue.RefKind`, potwierdzone testem
+  `TestAnalyze_lambdaProducesFunctionalValue` (REF_invokeStatic na
+  realnym kształcie metody statycznej jako celu lambdy). "Nieznany
+  bootstrap ma diagnostykę przy konkretnym miejscu" — `SamInterface`/
+  `SamMethod` dostępne niezależnie od rozwiązania bootstrapu; powód
+  `Unknown` dla nierozwiązanego bootstrapu wymienia konkretny SAM
+  interfejs/metodę, nie ogólny tekst.
+- **Spełnione kryteria (z L1's "Gotowe", częściowo):** "natychmiastowe
+  wywołanie [...] i zapis w zmiennej [...] mają oczekiwane różnice" —
+  `TestAnalyze_lambdaProducesFunctionalValue`
+  (`FunctionalValue` z poprawnym `ImplOwner/Name/Desc`) i
+  `TestAnalyze_lambdaCapturesFreeVariable` (przechwycona stała
+  dostępna jako osobna wartość `KindConst`, nie zgubiona). "Reference
+  do override" — nietknięte w tym przyroście (patrz "Niespełnione").
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  jednorazowy skrypt diagnostyczny (napisany, uruchomiony, usunięty)
+  wywołujący `dataflow.Analyze` na każdej metodzie z kodem w realnym
+  petclinic (219077) i WebGoat (280172) — **0 błędów, 0 panik** na
+  obu, potwierdzające że nowa ścieżka tworzenia `FunctionalValue` jest
+  bezpieczna na pełnej skali. Realny efekt na ASYNC_CALLBACKS:
+  **petclinic 53→69 z 135 rozwiązanych tożsamości, 51→67 krawędzi
+  grafu; WebGoat 35→46 z 134, 33→44 krawędzi** — np.
+  `CommonsObjectPool2Metrics#lambda$registerNotificationListener$2`
+  rozwiązuje się prosto do
+  `#lambda$registerNotificationListener$1` (realny, zagnieżdżony
+  łańcuch lambd). **Zero zmian w REACHABLE/FRAMEWORK/NOT_REACHABLE/
+  UNKNOWN** na obu aplikacjach — nowe krawędzie nie prowadzą na tej
+  bazie do żadnej metody podatnej na obecnie mapowane CVE. Dwa
+  przebiegi petclinic dają bajt-identyczny `results.json` i
+  `report.md` (poza znacznikiem czasu).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone; poprawiony jeden istniejący test w
+  `internal/classfile/classfile_test.go`, który porównywał `Call` przez
+  pełną równość struktur i wymagał dopisania nowego pola `RefKind` do
+  oczekiwanej wartości — nie regresja, tylko test musiał nadrobić nowe
+  pole); nowe testy: `internal/dataflow`:
+  `TestAnalyze_lambdaProducesFunctionalValue`,
+  `TestAnalyze_lambdaCapturesFreeVariable`; `internal/callback`:
+  `TestResolveOne_lambdaResolvesToImplementationMethod`,
+  `TestFindCallbackEdges_lambdaSkipsHierarchyResolution`; `go test -race
+  ./...` dla całego projektu (zielone); jednorazowy skrypt
+  diagnostyczny opisany wyżej; `bin/ariadne -offline` na petclinic (dwa
+  przebiegi) i WebGoat.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersze "Lambdas and
+  method references" i "General callbacks and asynchronous execution
+  models" rozszerzone o nowy zakres i zmierzony efekt). `README.md`
+  ("Known limitations" — bullet o callbackach zaktualizowany, lambda
+  nie jest już opisywana jako "unresolved").
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** materializacja SAM-call'a jako samodzielny krok L1
+  (ogólny konsument wywołujący `samMethod` na dowolnym obiekcie
+  funkcyjnym, nie tylko przez ASYNC_CALLBACKS's katalog) — nietknięte;
+  wirtualne/bound method references (`obj::method`, REF_invokeVirtual
+  z przechwyconym receiverem) — rozpoznawane przez `RefKind`, ale nie
+  specjalnie interpretowane (traktowane identycznie jak statyczne);
+  L2 (MethodHandle.invoke/invokeExact, Lookup.findStatic/findVirtual) —
+  nietknięte; L3 (bindTo/asType, StringConcatFactory, CONSTANT_Dynamic),
+  L4 (fixtures wymagające JDK) — nietknięte.
+- **Następny krok:** `ASYNC_CALLBACKS:A3` (teraz z lepszym pokryciem
+  tożsamości callbacków) albo `DYNAMIC_LINKAGE:L2` (podstawowe
+  MethodHandle) albo `SERVICE_LOADING:S3` (JPMS). Wymaga propozycji i
+  zgody użytkownika przed startem.
 
 ## Punkt startowy następnej sesji
 

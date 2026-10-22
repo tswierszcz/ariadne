@@ -649,14 +649,16 @@ report:
 - **Callbacks and async execution** (`Thread`, `Executor`/
   `ExecutorService`): every call site registering one is inventoried
   (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),
-  the concrete `Runnable`/`Callable` class passed directly is resolved
-  where possible (ASYNC_CALLBACKS A1 — "Callback identities resolved"
-  section), and a real call-graph edge connects the registration site to
-  that class's own `run`/`call` method (ASYNC_CALLBACKS A2 — "Callback
-  call-graph edges" section). A lambda/method reference is left
-  unresolved rather than guessed at (needs DYNAMIC_LINKAGE L1), and
-  nothing beyond the registration→callback edge itself is modeled
-  (`CompletionStage`, listeners, reactive operators).
+  the concrete `Runnable`/`Callable` class or lambda/method reference
+  passed directly is resolved where possible — a lambda resolves
+  straight to its own implementation method (DYNAMIC_LINKAGE L0/L1)
+  (ASYNC_CALLBACKS A1 — "Callback identities resolved" section), and a
+  real call-graph edge connects the registration site to that method
+  (ASYNC_CALLBACKS A2 — "Callback call-graph edges" section). Nothing
+  beyond the registration→callback edge itself is modeled
+  (`CompletionStage`, listeners, reactive operators), and a lambda whose
+  own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
+  left unresolved rather than guessed at.
 - **Serialization gadgets and config-driven behavior** (XML wiring,
   `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the

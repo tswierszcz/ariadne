@@ -100,8 +100,8 @@ func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 		{Kind: CallSpecial, Owner: "fixture.FormalGreeter", Name: "<init>", Desc: "()V"}:                                                     1,
 		{Kind: CallSpecial, Owner: "fixture.CasualGreeter", Name: "<init>", Desc: "()V"}:                                                     1,
 		{Kind: CallInterface, Owner: "fixture.Greeter", Name: "greet", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                       2,
-		{Kind: CallDynamic, Owner: "fixture.App", Name: "lambda$handle$0", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                   1,
-		{Kind: CallDynamic, Owner: "fixture.Util", Name: "shout", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                            1,
+		{Kind: CallDynamic, Owner: "fixture.App", Name: "lambda$handle$0", Desc: "(Ljava/lang/String;)Ljava/lang/String;", RefKind: RefInvokeStatic}: 1,
+		{Kind: CallDynamic, Owner: "fixture.Util", Name: "shout", Desc: "(Ljava/lang/String;)Ljava/lang/String;", RefKind: RefInvokeStatic}:          1,
 	}
 
 	cases := []struct {

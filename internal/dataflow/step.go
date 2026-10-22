@@ -273,8 +273,30 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		args[i] = e.v
 	}
 	it.facts.calls[it.site(op.PC, bytecodeir.OpCall)] = args
+
+	if op.CallKind == classfile.CallDynamic && op.CallOwner != "" {
+		// DYNAMIC_LINKAGE L0/L1: a resolved LambdaMetafactory creation
+		// site produces a real FunctionalValue, not a generic Unknown
+		// — args here are exactly the captured free variables (indy
+		// never has a receiver, so popN == len(args) above already).
+		st.push(valueflow.Functional(valueflow.FunctionalValue{
+			Site:         it.site(op.PC, bytecodeir.OpCall),
+			SamInterface: op.SamInterface,
+			SamMethod:    op.SamMethod,
+			ImplOwner:    op.CallOwner,
+			ImplName:     op.CallName,
+			ImplDesc:     op.CallImplDesc,
+			RefKind:      op.CallRefKind,
+			Captured:     args,
+		}), op.Width)
+		return ""
+	}
 	if op.Width > 0 {
-		st.push(valueflow.Unknown("call return value is not tracked by this analysis increment"), op.Width)
+		reason := "call return value is not tracked by this analysis increment"
+		if op.CallKind == classfile.CallDynamic {
+			reason = fmt.Sprintf("invokedynamic bootstrap for %s#%s could not be resolved to a LambdaMetafactory implementation", op.SamInterface, op.SamMethod)
+		}
+		st.push(valueflow.Unknown(reason), op.Width)
 	}
 	return ""
 }

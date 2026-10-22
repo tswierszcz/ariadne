@@ -120,3 +120,76 @@ func TestResolveOne_parameterStaysUnresolved(t *testing.T) {
 		t.Errorf("UnresolvedReason is empty, want a non-empty explanation")
 	}
 }
+
+// TestResolveOne_lambdaResolvesToImplementationMethod is A1's own
+// DYNAMIC_LINKAGE L0/L1 extension: a lambda passed directly as the
+// callback argument resolves straight to its own implementation
+// method, not to a concrete class.
+//
+// Bytecode (static void m()): `new Thread(() -> {})`.
+//
+//	pc0:  new #2 (java.lang.Thread)
+//	pc3:  dup
+//	pc4:  invokedynamic #10 (run()Ljava/lang/Runnable;)
+//	pc9:  invokespecial #6 (Thread#<init>(Runnable)V)
+//	pc12: pop
+//	pc13: return
+func TestResolveOne_lambdaResolvesToImplementationMethod(t *testing.T) {
+	pool := []classfile.PoolEntry{
+		{Tag: classfile.TagUtf8, Str: "java/lang/Thread"},                 // 1
+		{Tag: classfile.TagClass, NameIndex: 1},                           // 2
+		{Tag: classfile.TagUtf8, Str: "<init>"},                           // 3
+		{Tag: classfile.TagUtf8, Str: "(Ljava/lang/Runnable;)V"},          // 4
+		{Tag: classfile.TagNameAndType, NameIndex: 3, DescriptorIndex: 4}, // 5
+		{Tag: classfile.TagMethodref, ClassIndex: 2, NameAndTypeIndex: 5}, // 6: Thread#<init>(Runnable)V
+		{Tag: classfile.TagUtf8, Str: "run"},                              // 7
+		{Tag: classfile.TagUtf8, Str: "()Ljava/lang/Runnable;"},           // 8
+		{Tag: classfile.TagNameAndType, NameIndex: 7, DescriptorIndex: 8}, // 9
+		{Tag: classfile.TagInvokeDynamic, NameAndTypeIndex: 9},            // 10 (bootstrap attr index 0)
+	}
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	cf.Bootstrap = []classfile.BootstrapMethod{
+		{
+			Kind: classfile.RefInvokeStatic, Owner: "java.lang.invoke.LambdaMetafactory", Name: "metafactory",
+			Args: []classfile.BootstrapArg{
+				{},
+				{IsMethodHandle: true, Kind: classfile.RefInvokeStatic, Owner: "test.Caller", Name: "lambda$m$0", Desc: "()V"},
+				{},
+			},
+		},
+	}
+	code := []byte{
+		0xbb, 0x00, 0x02, // pc0 new #2 (Thread)
+		0x59,                         // pc3 dup
+		0xba, 0x00, 0x0a, 0x00, 0x00, // pc4 invokedynamic #10
+		0xb7, 0x00, 0x06, // pc9 invokespecial #6 (Thread#<init>(Runnable)V)
+		0x57, // pc12 pop
+		0xb1, // pc13 return
+	}
+	m := classfile.Method{Name: "m", Descriptor: "()V", AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 0}
+
+	facts, err := dataflow.Analyze(cf, "test.Caller", m)
+	if err != nil {
+		t.Fatalf("dataflow.Analyze: %v", err)
+	}
+	if aborted, reason := facts.Aborted(); aborted {
+		t.Fatalf("Analyze aborted: %s", reason)
+	}
+
+	model, ok := Lookup(fqcnThread, "<init>", "(Ljava/lang/Runnable;)V")
+	if !ok {
+		t.Fatal("DefaultCatalog is missing Thread(Runnable)")
+	}
+	site := RegistrationSite{CallerFQCN: "test.Caller", CallerName: "m", CallerDesc: "()V", PC: 9, Model: model, Outcome: OutcomeCataloged}
+
+	rc := resolveOne("test.Caller", site, facts)
+	if rc.TargetFQCN != "" {
+		t.Errorf("TargetFQCN = %q, want empty (this is a lambda, not a `new`)", rc.TargetFQCN)
+	}
+	if rc.ImplOwner != "test.Caller" || rc.ImplName != "lambda$m$0" || rc.ImplDesc != "()V" {
+		t.Errorf("Impl = %s#%s%s, want test.Caller#lambda$m$0()V", rc.ImplOwner, rc.ImplName, rc.ImplDesc)
+	}
+	if rc.UnresolvedReason != "" {
+		t.Errorf("UnresolvedReason = %q, want empty", rc.UnresolvedReason)
+	}
+}
