@@ -211,6 +211,23 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	warnings = append(warnings, svcWarnings...)
 	log("ServiceLoader: %d provider registrations found", len(svcRegs))
 
+	// SERVICE_LOADING S1: resolve the service-interface Class argument at
+	// every ServiceLoader.load(...)/loadInstalled(...) call site, using
+	// DATA_FLOW D0-D2's local-value analysis — still never a call-graph
+	// edge (see serviceload.ServiceLoadSite's own doc comment).
+	svcLoadSites, svcLoadWarnings, err := serviceload.FindLoadSites(h)
+	if err != nil {
+		return fmt.Errorf("finding ServiceLoader.load call sites: %w", err)
+	}
+	warnings = append(warnings, svcLoadWarnings...)
+	resolvedLoadSites := 0
+	for _, s := range svcLoadSites {
+		if s.Interface != "" {
+			resolvedLoadSites++
+		}
+	}
+	log("ServiceLoader: %d load() call sites found, %d resolved to a service interface", len(svcLoadSites), resolvedLoadSites)
+
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {
 		return fmt.Errorf("loading default profile catalog: %w", err)
@@ -413,7 +430,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

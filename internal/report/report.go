@@ -76,13 +76,20 @@ type Data struct {
 	// call-graph edges — see serviceload.ServiceRegistration's own doc
 	// comment for why S0 deliberately stops there.
 	ServiceRegistrations []serviceload.ServiceRegistration
+
+	// ServiceLoadSites is SERVICE_LOADING S1's own result: every
+	// ServiceLoader.load(...)/loadInstalled(...) call site found, with
+	// its service interface resolved where DATA_FLOW D0-D2's
+	// local-value analysis could — still not a call-graph edge, same
+	// reasoning as ServiceRegistrations.
+	ServiceLoadSites []serviceload.ServiceLoadSite
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -101,6 +108,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		TotalCVEs:            len(sorted),
 		WarningMessages:      warnings,
 		ServiceRegistrations: svcRegs,
+		ServiceLoadSites:     svcLoadSites,
 	}
 
 	for _, r := range sorted {

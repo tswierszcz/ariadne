@@ -16,7 +16,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1, D2: DONE; D3–D5: UNASSESSED | D2 daje realną, zweryfikowaną na skalę lokalną analizę wartości (stałe tekstowe/klasowe przez zmienne i gałęzie, argumenty wywołań) i odblokowuje `SERVICE_LOADING:S1`, ale nic w CLI go jeszcze nie używa. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0: DONE; S1–S4: UNASSESSED | S1 jest teraz odblokowane (DATA_FLOW D0–D2: DONE) — rozwiązanie argumentu `Class` przy `ServiceLoader.load(...)` przez `internal/dataflow.Analyze`'s `Facts.ArgumentAt`. |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1: DONE; S2–S4: UNASSESSED | S1 rozwiązuje argument `Class` przy `ServiceLoader.load(...)`/`loadInstalled(...)` (13/31 rozwiązanych na petclinic/WebGoat), ale żadna krawędź grafu wywołań do konstruktora providera jeszcze nie powstaje (S2). |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Katalog API i powiązanie callbacka z właściwym obiektem. |
@@ -822,6 +822,94 @@ Przy dodawaniu kolejnego wpisu zapisz:
   ServiceLoader" (dowody, nie fikcyjna krawędź grafu wywołań, zgodnie z
   S0's własnym zastrzeżeniem). Wymaga propozycji i zgody użytkownika
   przed startem.
+
+### SERVICE_LOADING:S1 — Argument usługi i lokalne użycie loadera — DONE (2026-10-22)
+
+- **Zakres zlecenia i zależności:** S0 (gotowe wyżej), DATA_FLOW D0–D2
+  (gotowe wyżej), JVM G2 (gotowe, zarchiwizowane). Rejestr modeli B3 nie
+  istnieje jeszcze (nieodnotowane) — zamiast czekać na całą fazę,
+  zaimplementowano tylko to, co S1 faktycznie potrzebuje (cztery
+  konkretne przeciążenia `ServiceLoader.load`/`loadInstalled`
+  rozpoznane po nazwie+deskryptorze), bez budowania ogólnego rejestru.
+- **Zmienione pliki:** `internal/serviceload/inventory.go`
+  (`ServiceLoadSite` rozszerzone o `LoaderKind`, `PC`,
+  `UnresolvedReason` — poprzednio sam stub kontraktu z S0); nowy
+  `internal/serviceload/loadsites.go` (`FindLoadSites` — dla każdej
+  klasy w hierarchii, której `Method.Calls` (już wyekstrahowane przy
+  budowie hierarchii) zawiera wywołanie jednego z czterech znanych
+  przeciążeń `ServiceLoader`, plik klasy jest **ponownie odczytany** z
+  jara (bo `hierarchy.Build` celowo nie zachowuje `pool`-a potrzebnego
+  `DecodeLocalOps`-owi), a `internal/dataflow.Analyze` rozwiązuje
+  argument `Class` przez `Facts.ArgumentAt`; `loadSitesInMethod` i
+  `anyServiceLoaderCall` wydzielone do bezpośredniego testowania bez
+  I/O na jarach); `cmd/ariadne/main.go` (wywołanie `FindLoadSites` po
+  S0's `Inventory`, log z liczbą znalezionych/rozwiązanych wywołań);
+  `internal/report/report.go`/`report.md.tmpl` (nowa sekcja
+  "ServiceLoader.load call sites" — tabela caller/loader/interfejs,
+  jawnie opisana jako "nie krawędź grafu wywołań", zgodnie z S0's
+  własnym wymogiem).
+- **Zachowanie dostępne użytkownikowi:** raport ma teraz tabelę
+  wszystkich wywołań `ServiceLoader.load`/`loadInstalled` w aplikacji i
+  zależnościach, z rozwiązanym interfejsem usługi tam, gdzie argument
+  był dowodliwie stałą `Class`-ową, i jawnym powodem braku rozwiązania
+  (typ znany, ale nie konkretna wartość; `KindUnknown`; albo cała
+  metoda przerwana przez `dataflow.Analyze`) gdzie nie — **bez żadnej
+  nowej krawędzi w grafie wywołań** (S1's własny wymóg zachowany: zero
+  zmian w `internal/callgraph`/`internal/reach`, potwierdzone wprost —
+  identyczne liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN na
+  petclinic i WebGoat przed/po tej fazie). `ServiceLoadSite.LoaderKind`
+  odróżnia classpath/jawny loader/`ModuleLayer`/`loadInstalled`, zgodnie
+  z S1's własnym wymogiem "nie przyjmować bez dowodu, że dowolny loader
+  widzi wszystkie artefakty".
+- **Spełnione kryteria (z S1's "Gotowe"):** "dwa loadery dla różnych
+  usług nie mieszają dostawców" — każdy `ServiceLoadSite` jest
+  samodzielnym faktem przy konkretnym `(metoda, pc)`, nigdy scalanym
+  między wywołaniami; potwierdzone na realnym przebiegu petclinic:
+  `com.fasterxml.jackson.databind.ObjectMapper#secureGetServiceLoader`
+  ma **dwa** wywołania w jednej metodzie (pc=13 `classpath` 1-argumentowe,
+  pc=21 `explicit` 2-argumentowe) poprawnie rozróżnione jako dwa
+  niezależne site'y. "Niewykorzystany loader nie uruchamia
+  konstruktora" — prawda z konstrukcji: S1 nie tworzy żadnej krawędzi
+  do konstruktora providera w ogóle (to S2, nietknięte).
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  `bin/ariadne -offline` na petclinic: **29 wywołań `load()`, 13
+  rozwiązanych** do prawdziwego interfejsu usługi — np.
+  `java.nio.file.spi.FileSystemProvider`,
+  `javax.persistence.spi.PersistenceProvider`,
+  `javax.validation.spi.ValidationProvider`,
+  `javax.websocket.ContainerProvider`, `org.jboss.logging.LoggerProvider`
+  — reszta poprawnie nierozwiązana (parametr `Class<T>` przekazywany
+  dalej przez bibliotekę, np. Jacksona/Logbacka własne
+  `secureGetServiceLoader`, nigdy zgadany). WebGoat: **48 wywołań, 31
+  rozwiązanych**. Zero zmian w licznikach REACHABLE/FRAMEWORK/
+  NOT_REACHABLE/UNKNOWN na obu aplikacjach względem bazowej wartości
+  przed tą fazą (3/62/26/51/6 i 42/44/18/56/0) — szczery wynik: S1 nie
+  dotyka reachability, tylko dodaje nową, osobną informację do raportu.
+  Dwa przebiegi petclinic dają bajt-identyczny `results.json` i
+  `report.md` (poza znacznikiem czasu).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/serviceload`:
+  `TestLoadSitesInMethod_literalClassResolves`,
+  `TestLoadSitesInMethod_unknownArgumentStaysUnresolved`,
+  `TestAnyServiceLoaderCall`); `go test -race ./...` dla całego
+  projektu (zielone); `go build -o bin/ariadne ./cmd/ariadne` i dwa
+  pełne przebiegi `-offline` na petclinic i jeden na WebGoat (opisane
+  wyżej).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "ServiceLoader
+  and JPMS service models" rozszerzony o S1's zakres i zmierzone
+  dowody). `README.md` ("Known limitations" i sekcja 8 "The report"
+  rozszerzone o nową sekcję raportu).
+- **Niespełnione/odłożone:** S2 (materializacja konstruktora providera
+  jako cel grafu), S3 (JPMS `module-info`/`uses`/`provides`), S4 —
+  nietknięte. Rejestr modeli B3 (ogólny mechanizm dla wielu torów, nie
+  tylko ServiceLoader) wciąż nieodnotowany; S1 go nie zakłada, tylko
+  rozpoznaje cztery konkretne przeciążenia po nazwie wprost.
+- **Następny krok:** `SERVICE_LOADING:S2` (materializacja i krawędzie
+  dispatch — cele konstruktora/fabryki providera jako rzeczywisty cel
+  w grafie wywołań, zależny od `JVM_GRAPH:G3` i rejestru B3) albo inny
+  obszar R1 (ASYNC_CALLBACKS A0–A2, teraz również odblokowany przez
+  DATA_FLOW D0–D2). Wymaga propozycji i zgody użytkownika przed
+  startem.
 
 ## Punkt startowy następnej sesji
 

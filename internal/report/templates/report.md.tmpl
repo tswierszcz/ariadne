@@ -120,7 +120,7 @@ A declarative inventory of `META-INF/services/<Interface>` files across the app 
 its dependencies (SERVICE_LOADING S0) — **not call-graph edges**: a registration here
 says a jar *declares* a provider, not that anything in the app ever calls
 `ServiceLoader.load` for it, or that the provider is ever actually instantiated (that
-needs SERVICE_LOADING S1/S2, not yet implemented). "found" means the provider class
+needs SERVICE_LOADING S2, not yet implemented). "found" means the provider class
 exists somewhere in the analyzed classes/dependencies, not that it is reachable.
 {{if not .ServiceRegistrations}}
 None found.
@@ -128,6 +128,26 @@ None found.
 | Interface | Provider | Found | Source |
 |---|---|---|---|
 {{range .ServiceRegistrations}}| `{{.Interface}}` | `{{.ProviderClass}}` | {{if .ProviderFound}}yes{{else}}**no**{{end}} | `{{.SourceJar}}` |
+{{end}}
+{{end}}
+
+## ServiceLoader.load call sites
+
+Every `ServiceLoader.load(...)`/`loadInstalled(...)` call site found in the app or its
+dependencies (SERVICE_LOADING S1), with its service-interface argument resolved by
+DATA_FLOW D0-D2's local-value analysis where possible — **still not a call-graph
+edge**: this says a method *asks for* providers of an interface, not that any
+provider's constructor runs (that needs SERVICE_LOADING S2, not yet implemented).
+"Loader" distinguishes the thread context class loader (`classpath`) from a
+caller-named `ClassLoader`/`ModuleLayer` (`explicit`/`module-layer`) or the extension
+class loader (`installed`) — different loaders are not guaranteed to see the same
+providers as a `META-INF/services` registration above.
+{{if not .ServiceLoadSites}}
+None found.
+{{else}}
+| Caller | Loader | Interface |
+|---|---|---|
+{{range .ServiceLoadSites}}| `{{.CallerMethod}}` (pc={{.PC}}) | {{.LoaderKind}} | {{if .Interface}}`{{.Interface}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
 {{end}}
 {{end}}
 

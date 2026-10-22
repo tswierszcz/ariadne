@@ -13,10 +13,10 @@ import (
 // call-graph edge: a registration exists whether or not anything in the
 // analyzed app ever calls ServiceLoader.load for this interface, and
 // whether or not the provider is ever actually instantiated. Those are
-// SERVICE_LOADING S1 (which call sites name this interface — needs
-// DATA_FLOW D0-D2 to resolve the Class argument) and S2 (does the
-// provider's constructor/factory actually get modeled as reachable)
-// respectively, neither of which this phase (S0) attempts.
+// SERVICE_LOADING S1 (FindLoadSites — which call sites name this
+// interface) and S2 (does the provider's constructor/factory actually
+// get modeled as reachable, not yet implemented) respectively, neither
+// of which this phase (S0) attempts.
 type ServiceRegistration struct {
 	Interface     string // the service interface FQCN
 	ProviderClass string // the FQCN this registration names
@@ -32,16 +32,46 @@ type ServiceRegistration struct {
 	ProviderFound bool
 }
 
-// ServiceLoadSite is SERVICE_LOADING S1's own concept: an app call to
-// ServiceLoader.load(...)/loadInstalled(...), with the service
-// interface it names (when resolvable) and the calling method. S0
-// defines this type as a stable contract for S1 to populate; S0 itself
-// never constructs one, since finding and resolving these call sites
-// needs DATA_FLOW D0-D2 (to resolve the Class argument at a call site),
-// which S0 does not depend on.
+// LoaderKind distinguishes which java.util.ServiceLoader factory a call
+// site used — SERVICE_LOADING S1's own explicit requirement ("odróżnić
+// classpath, system loader i jawnie podany loader. Nie przyjmować bez
+// dowodu, że dowolny loader widzi wszystkie artefakty"): a caller-named
+// ClassLoader or a ModuleLayer is not guaranteed to see the same
+// artifacts as the thread context class loader every registration in
+// ServiceRegistration was found under.
+type LoaderKind string
+
+const (
+	LoaderClasspath   LoaderKind = "classpath"    // load(Class) — the thread context class loader
+	LoaderExplicit    LoaderKind = "explicit"     // load(Class, ClassLoader) — a caller-named loader
+	LoaderModuleLayer LoaderKind = "module-layer" // load(ModuleLayer, Class)
+	LoaderInstalled   LoaderKind = "installed"    // loadInstalled(Class) — the extension class loader
+)
+
+// ServiceLoadSite is SERVICE_LOADING S1's own concept: one app call to
+// ServiceLoader.load(...)/loadInstalled(...), with the service interface
+// it names (when resolvable), which loader it used, and the calling
+// method. S0 defined this type as a stable contract; FindLoadSites (S1)
+// is what actually constructs it, using DATA_FLOW D0-D2's local-value
+// analysis to resolve the Class argument at each call site.
 type ServiceLoadSite struct {
-	Interface    string // "" until S1 resolves the argument
+	// Interface is the service interface's FQCN, resolved from the
+	// call's Class argument — set only when that argument was a
+	// provably exact Class literal (valueflow.KindConst). "" otherwise;
+	// see UnresolvedReason for why.
+	Interface    string
 	CallerMethod string // "fqcn#name(desc)"
+	LoaderKind   LoaderKind
+	// PC is the invoke* instruction's bytecode offset within
+	// CallerMethod — evidence for which call site this is, same
+	// reasoning as JVM_GRAPH G0's own Call.PC.
+	PC int
+	// UnresolvedReason explains why Interface is "" — the argument's
+	// value.Kind (e.g. "the argument is KindTyped: known type, no known
+	// constant" for an unresolvable variable) or, if the whole method's
+	// local-value analysis gave up, that reason instead. Empty when
+	// Interface is resolved.
+	UnresolvedReason string
 }
 
 // ProviderMaterialization is SERVICE_LOADING S2's own concept: a

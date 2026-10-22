@@ -411,8 +411,10 @@ wiring at build time via Jandex indexing and bytecode recording, the same
 `invokedynamic` count, dependency identification rate), a status/severity
 summary, the full CVE table, every `REACHABLE` CVE's full call path with
 its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
-review, the list of unidentified dependency jars, and a fixed Limitations
-section (see below).
+review, the list of unidentified dependency jars, a `META-INF/services`
+provider inventory and every resolved `ServiceLoader.load(...)` call
+site (SERVICE_LOADING S0/S1 — see "Known limitations" below for what
+these do and don't claim), and a fixed Limitations section (see below).
 
 The entry call line also names the call kind, the resolution rule
 (`direct`: the edge is exactly the call site's own symbolic target; `cha`:
@@ -642,10 +644,12 @@ report:
 - **Serialization gadgets and config-driven behavior** (XML wiring,
   `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
-  report's own "ServiceLoader provider registrations" section), but
-  this is not a call-graph edge: no connection yet from a
-  `ServiceLoader.load(...)` call site to the interface it names, and no
-  provider construction modeled as reachable.
+  report's own "ServiceLoader provider registrations" section), and
+  every `ServiceLoader.load(...)`/`loadInstalled(...)` call site is found
+  with its service-interface argument resolved where possible
+  (SERVICE_LOADING S1 — "ServiceLoader.load call sites" section), but
+  neither is a call-graph edge: no provider construction is modeled as
+  reachable yet.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

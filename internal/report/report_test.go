@@ -36,7 +36,7 @@ func TestBuildAndRenderMarkdown(t *testing.T) {
 		UnresolvedDyn: 1, DepsTotal: 10, DepsIdentified: 9,
 		UnidentifiedJar: []string{"mystery-1.0.jar"},
 	}
-	data := Build(h, list, results, []string{"some warning"}, nil)
+	data := Build(h, list, results, []string{"some warning"}, nil, nil)
 
 	if data.TotalCVEs != 4 {
 		t.Fatalf("TotalCVEs = %d, want 4", data.TotalCVEs)
@@ -70,7 +70,7 @@ func TestBuildAndRenderMarkdown(t *testing.T) {
 }
 
 func TestBuildAndRenderMarkdown_emptyResultsDoNotPanic(t *testing.T) {
-	data := Build(Header{App: "empty"}, nil, nil, nil, nil)
+	data := Build(Header{App: "empty"}, nil, nil, nil, nil, nil)
 	md, err := RenderMarkdown(data)
 	if err != nil {
 		t.Fatalf("RenderMarkdown: %v", err)
@@ -112,7 +112,7 @@ func TestLLMSourceLabelHeaderAndNotes(t *testing.T) {
 		{CVE: "CVE-2099-0011", Status: reach.StatusNotReachable, Methods: []string{"a.C#m"}, Source: "llm", Model: "z-ai/glm-5.3", Evidence: "diff"},
 	}
 	h := Header{App: "app", GeneratedAt: time.Now(), LLMModel: "z-ai/glm-5.3", LLMMapped: 2, LLMSkipped: 3}
-	md, err := RenderMarkdown(Build(h, list, results, nil, nil))
+	md, err := RenderMarkdown(Build(h, list, results, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("RenderMarkdown: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestLLMSourceLabelHeaderAndNotes(t *testing.T) {
 	}
 
 	// Without -llm, none of it appears.
-	md, err = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil, nil))
+	md, err = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("RenderMarkdown: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestLLMSourceLabelHeaderAndNotes(t *testing.T) {
 func TestNotApplicableRowAndExplanation(t *testing.T) {
 	results := []reach.Result{{CVE: "CVE-2019-8331", Status: reach.StatusNotApplicable, Note: "org.webjars:bootstrap 3.3.6 contains only client-side web assets"}}
 	list := []cves.CVE{{ID: "CVE-2019-8331", Affected: []cves.Affected{{Package: "org.webjars:bootstrap", Version: "3.3.6"}}}}
-	md, err := RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, list, results, nil, nil))
+	md, err := RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, list, results, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("RenderMarkdown: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestNotApplicableRowAndExplanation(t *testing.T) {
 		}
 	}
 
-	md, _ = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil, nil))
+	md, _ = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil, nil, nil))
 	if !strings.Contains(md, "| NOT_APPLICABLE | 0 |") || strings.Contains(md, "not** a verdict") {
 		t.Errorf("with no NOT_APPLICABLE results the row should read 0 and the explanation be absent")
 	}
