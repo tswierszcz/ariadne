@@ -16,7 +16,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0, D1, D2: DONE; D3–D5: UNASSESSED | D2 daje realną, zweryfikowaną na skalę lokalną analizę wartości (stałe tekstowe/klasowe przez zmienne i gałęzie, argumenty wywołań) i odblokowuje `SERVICE_LOADING:S1`, ale nic w CLI go jeszcze nie używa. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1: DONE; S2–S4: UNASSESSED | S1 rozwiązuje argument `Class` przy `ServiceLoader.load(...)`/`loadInstalled(...)` (13/31 rozwiązanych na petclinic/WebGoat), ale żadna krawędź grafu wywołań do konstruktora providera jeszcze nie powstaje (S2). |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
 | FRAMEWORKS | [F0–F5](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wykorzystać istniejące profile; nie mylić ich z pełnym modelem runtime’u. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Katalog API i powiązanie callbacka z właściwym obiektem. |
@@ -909,6 +909,122 @@ Przy dodawaniu kolejnego wpisu zapisz:
   w grafie wywołań, zależny od `JVM_GRAPH:G3` i rejestru B3) albo inny
   obszar R1 (ASYNC_CALLBACKS A0–A2, teraz również odblokowany przez
   DATA_FLOW D0–D2). Wymaga propozycji i zgody użytkownika przed
+  startem.
+
+### SERVICE_LOADING:S2 — Materializacja i krawędzie dispatch — DONE for the constructor target; iterator/`Provider.get` API out of scope (2026-10-22)
+
+- **Zakres zlecenia i zależności:** S1 (gotowe wyżej), `JVM_GRAPH:G3`
+  (gotowe, zarchiwizowane — wzorzec krawędzi `<clinit>`). Rejestr
+  modeli B3 nie istnieje jeszcze (nieodnotowane) — zamiast czekać na
+  całą fazę, S2 rozpoznaje tylko jeden, konkretny, jawnie zakodowany
+  kształt (konstruktor bezargumentowy publiczny, zgodnie z
+  `META-INF/services`'s własnym kontraktem), bez budowania ogólnego
+  rejestru modeli.
+- **Zmienione pliki:** `internal/serviceload/inventory.go`
+  (`ProviderMaterialization` zyskuje `Gap string`; dokumentacja
+  poprawiona, żeby nie wspominać "provider() factory" — S2 celowo
+  obsługuje wyłącznie klasyczny mechanizm `META-INF/services`'s
+  konstruktora, nie Java 9+'s modułowego `provider()`, co jest
+  zakresem S3); nowy `internal/serviceload/materialize.go`
+  (`FindMaterializations` — łączy `ServiceRegistration` z
+  rozwiązanymi `ServiceLoadSite`'ami po interfejsie, materializuje
+  wyłącznie zarejestrowanych i *używanych* providerów, po jednym razie
+  na parę (interfejs, klasa) nawet przy duplikacie wpisu; sprawdza
+  publiczny bezargumentowy konstruktor przez
+  `hierarchy.ClassInfo.MethodByNameAndDesc`, z jawną luką (`Gap`) dla
+  klasy abstrakcyjnej/interfejsu, braku konstruktora albo konstruktora
+  niepublicznego; `EdgeTargets` — łączy site'y z materializacjami w
+  konkretne pary (caller, provider) do dodania jako krawędzie);
+  `internal/callgraph/graph.go` (`BasisServiceLoader` — nowa, odrębna
+  od `BasisSynthetic`, żeby czytelnik raportu odróżnił zgadywany proxy
+  profilu od rozwiązanej rejestracji ServiceLoader); nowy
+  `internal/callgraph/serviceloader_edges.go`
+  (`ApplyServiceLoaderEdges` — dla każdej pary dodaje krawędź do
+  `<init>()V` providera (`CallSynthetic`/`BasisServiceLoader`, z
+  prawdziwym PC wywołania `ServiceLoader.load` jako dowodem) oraz,
+  jeśli istnieje, powiązaną krawędź do `<clinit>()V`
+  (`CallInit`/`BasisServiceLoader`) — "związane inicjalizacje" z S2's
+  własnego zapisu); `cmd/ariadne/main.go` (wywołanie
+  `FindMaterializations`/`EdgeTargets`/`ApplyServiceLoaderEdges` po
+  zbudowaniu grafu i profilowych `synthetic_edges`, log z liczbą
+  zamodelowanych providerów/dodanych krawędzi);
+  `internal/report/report.go`/`report.md.tmpl` (nowa sekcja
+  "ServiceLoader provider constructors modeled").
+- **Zachowanie dostępne użytkownikowi:** graf wywołań ma teraz
+  prawdziwą krawędź od miejsca wywołania `ServiceLoader.load(X.class)`
+  do konstruktora każdego zarejestrowanego providera `X`, więc
+  reachability BFS (`internal/reach`) może przejść przez nią jak przez
+  każdą inną krawędź — bez żadnej specjalnej listy instancji tylko dla
+  ServiceLoader (S2's własny wymóg: "nie tworzyć oddzielnej prywatnej
+  listy instancji"). Raport ma nową tabelę interfejs/provider/cel
+  konstruktora, z jawną luką tam, gdzie konstruktor nie istnieje albo
+  nie jest publiczny.
+- **Spełnione kryteria (z S2's "Gotowe", częściowo — patrz "Niespełnione"):**
+  "pozytywna ścieżka" — `TestFindMaterializations_resolvesPublicNoArgConstructor`
+  i `TestApplyServiceLoaderEdges` (realna krawędź w grafie,
+  potwierdzona `g.EdgeBetween`, z poprawnym `Kind`/`Basis`/`Sites`).
+  "Ujemny przypadek deklaracji bez użycia" —
+  `TestFindMaterializations_unusedInterfaceIsNotAGap`: rejestracja,
+  której interfejsu żaden rozwiązany site nie nazwał, nie dostaje
+  żadnej materializacji. "Brak celu" —
+  `TestFindMaterializations_gapCases` (klasa abstrakcyjna, brak
+  konstruktora, konstruktor niepubliczny — trzy podtesty, każdy z
+  jawną `Gap`, nigdy fikcyjnym celem). "Powtórzony wpis" —
+  `TestFindMaterializations_duplicateRegistrationMaterializedOnce`:
+  ten sam provider zarejestrowany w dwóch różnych jarach dla tego
+  samego interfejsu materializuje się raz. Ponowne zastosowanie tych
+  samych krawędzi nie dubluje ich — sprawdzone wprost w
+  `TestApplyServiceLoaderEdges`'s ostatnim kroku (zero nowych krawędzi
+  przy powtórnym wywołaniu).
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  `bin/ariadne -offline` na petclinic: **8 providerów
+  zamodelowanych, 10 krawędzi dodanych** — np.
+  `javax.persistence.spi.PersistenceProvider` →
+  `org.hibernate.jpa.HibernatePersistenceProvider#<init>()V`,
+  `javax.validation.spi.ValidationProvider` →
+  `org.hibernate.validator.HibernateValidator#<init>()V`. WebGoat:
+  **147 providerów, 158 krawędzi** (różnica 147→158 to krawędzie
+  `<clinit>` dla klas, które go mają). **Zero luk (`Gap`) na obu
+  aplikacjach** — każdy znaleziony, używany provider miał publiczny
+  konstruktor bezargumentowy; mechanizm luk pozostaje więc zweryfikowany
+  tylko testami jednostkowymi na tych dwóch kontrolnych aplikacjach,
+  nie realnym przykładem — odnotowane szczerze, nie przemilczane.
+  **Zero zmian w licznikach REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN**
+  na obu aplikacjach (3/62/26/51/6 i 42/44/18/56/0, identyczne jak
+  przed S2) — nowe krawędzie do konstruktorów providerów nie prowadzą
+  na tej bazie do żadnej metody podatnej na obecnie mapowane CVE,
+  szczery wynik, nie oczekiwany z góry. Dwa przebiegi petclinic dają
+  bajt-identyczny `results.json` i `report.md` (poza znacznikiem czasu).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/serviceload`:
+  `TestFindMaterializations_*` [4], `TestEdgeTargets_*`;
+  `internal/callgraph`: `TestApplyServiceLoaderEdges`); `go test -race
+  ./...` dla całego projektu (zielone); `go build -o bin/ariadne
+  ./cmd/ariadne` i dwa pełne przebiegi `-offline` na petclinic plus
+  jeden na WebGoat (opisane wyżej).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "ServiceLoader
+  and JPMS service models" rozszerzony o S2's pełny zakres, nowy
+  `BasisServiceLoader` i zmierzone dowody). `README.md` ("Known
+  limitations", sekcja 8 "The report", i opis `resolution rule" przy
+  entry call rozszerzone o `serviceloader`).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** "Obsłużyć część iterator API i `Provider.get`" —
+  **nie zaimplementowane w tym przyroście**; S2 modeluje wyłącznie
+  konstruktor providera jako cel, nie żadne wywołanie metody na
+  zwróconym `ServiceLoader`/`Iterator`/`Provider` — odnotowane jako
+  otwarty zakres tej samej fazy, nie nowa faza. "Typy przekazać do
+  późniejszego RTA" — nie dotknięte (RTA samo nie istnieje jeszcze,
+  GRAPH_PRECISION). Java 9+'s modułowy `provider()` (statyczna
+  fabryka) — poza zakresem, to S3 (JPMS). Weryfikacja loadera
+  (czy jawnie podany `ClassLoader`/`ModuleLayer` faktycznie widzi dany
+  provider) — nie sprawdzana; S2 łączy niezależnie od `LoaderKind`,
+  co jest świadomą, odnotowaną niedokładnością (nadmiarowa, nie
+  brakująca, ścieżka), nie przemilczanym założeniem.
+- **Następny krok:** `SERVICE_LOADING:S3` (JPMS i warstwy —
+  `module-info`'s `uses`/`provides`, zależne od `JVM_GRAPH:G4` i
+  ewentualnie `DATA_FLOW:D3`) domknęłoby cały obszar SERVICE_LOADING.
+  Alternatywnie: `ASYNC_CALLBACKS:A0–A2`, teraz również odblokowane
+  przez `DATA_FLOW:D0–D2`. Wymaga propozycji i zgody użytkownika przed
   startem.
 
 ## Punkt startowy następnej sesji

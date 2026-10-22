@@ -257,6 +257,23 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("applied %d synthetic edges from profile %q (e.g. Spring Data repository proxies)", added, prof.Name)
 	}
 
+	// SERVICE_LOADING S2: connect each resolved ServiceLoadSite to its
+	// registered providers' public no-argument constructors (plus their
+	// own <clinit>, if any) — still never claiming a provider nobody's
+	// resolved code actually asks for (see serviceload.FindMaterializations's
+	// own doc comment).
+	svcMaterializations := serviceload.FindMaterializations(h, svcLoadSites, svcRegs)
+	svcEdgeTargets := serviceload.EdgeTargets(svcLoadSites, svcMaterializations)
+	var svcGraphEdges []callgraph.ServiceLoaderEdge
+	for _, e := range svcEdgeTargets {
+		svcGraphEdges = append(svcGraphEdges, callgraph.ServiceLoaderEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, ProviderFQCN: e.ProviderFQCN,
+		})
+	}
+	svcEdgesAdded := callgraph.ApplyServiceLoaderEdges(g, svcGraphEdges)
+	log("ServiceLoader: %d provider constructors modeled as call-graph targets (%d edges added)", len(svcEdgeTargets), svcEdgesAdded)
+
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
@@ -430,7 +447,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

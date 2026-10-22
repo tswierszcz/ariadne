@@ -83,13 +83,21 @@ type Data struct {
 	// local-value analysis could — still not a call-graph edge, same
 	// reasoning as ServiceRegistrations.
 	ServiceLoadSites []serviceload.ServiceLoadSite
+
+	// ServiceMaterializations is SERVICE_LOADING S2's own result: every
+	// registered provider whose interface was actually resolved at some
+	// ServiceLoadSite, with the constructor modeled as a call-graph
+	// target or, if that wasn't possible, why (Gap) — "brak
+	// implementacji daje lukę, nie brak podatności", never silently
+	// dropped.
+	ServiceMaterializations []serviceload.ProviderMaterialization
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -102,13 +110,14 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 	}
 
 	data := Data{
-		Header:          h,
-		StatusCounts:    map[string]int{},
-		SeverityCounts:  map[string]int{},
-		TotalCVEs:            len(sorted),
-		WarningMessages:      warnings,
-		ServiceRegistrations: svcRegs,
-		ServiceLoadSites:     svcLoadSites,
+		Header:                  h,
+		StatusCounts:            map[string]int{},
+		SeverityCounts:          map[string]int{},
+		TotalCVEs:               len(sorted),
+		WarningMessages:         warnings,
+		ServiceRegistrations:    svcRegs,
+		ServiceLoadSites:        svcLoadSites,
+		ServiceMaterializations: svcMaterializations,
 	}
 
 	for _, r := range sorted {

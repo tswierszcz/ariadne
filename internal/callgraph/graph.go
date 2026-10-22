@@ -42,6 +42,16 @@ const (
 	// directly (the JVM runs it implicitly), which is also why Kind is
 	// CallInit rather than one of the ordinary invoke kinds.
 	BasisInit EdgeBasis = "init"
+	// BasisServiceLoader is a SERVICE_LOADING S2 edge: a
+	// ServiceLoader.load(...)/loadInstalled(...) call site whose service
+	// interface S1 resolved, connected to a registered provider's public
+	// no-argument constructor (or, for the related class-initialization
+	// edge, that provider's own <clinit>). Distinct from BasisSynthetic:
+	// both stand in for something with no single bytecode call site, but
+	// a reader needs to tell a profile's proxy guess apart from a
+	// resolved ServiceLoader registration — different evidence, different
+	// confidence.
+	BasisServiceLoader EdgeBasis = "serviceloader"
 )
 
 // CallSite is one piece of evidence for why an edge exists: the bytecode

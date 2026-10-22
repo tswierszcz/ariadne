@@ -127,6 +127,9 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method)
 
 		site := ServiceLoadSite{
 			CallerMethod: fmt.Sprintf("%s#%s%s", fqcn, m.Name, m.Descriptor),
+			CallerFQCN:   fqcn,
+			CallerName:   m.Name,
+			CallerDesc:   m.Descriptor,
 			LoaderKind:   ov.kind,
 			PC:           c.PC,
 		}

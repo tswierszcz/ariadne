@@ -412,15 +412,18 @@ wiring at build time via Jandex indexing and bytecode recording, the same
 summary, the full CVE table, every `REACHABLE` CVE's full call path with
 its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
 review, the list of unidentified dependency jars, a `META-INF/services`
-provider inventory and every resolved `ServiceLoader.load(...)` call
-site (SERVICE_LOADING S0/S1 — see "Known limitations" below for what
-these do and don't claim), and a fixed Limitations section (see below).
+provider inventory, every resolved `ServiceLoader.load(...)` call site,
+and which of those providers got a real constructor call-graph edge
+(SERVICE_LOADING S0/S1/S2 — see "Known limitations" below for what these
+do and don't claim), and a fixed Limitations section (see below).
 
 The entry call line also names the call kind, the resolution rule
 (`direct`: the edge is exactly the call site's own symbolic target; `cha`:
 class-hierarchy-analysis expanded it to a subtype, so trust it less;
 `synthetic`: a profile's `synthetic_edges`, with no real call site at
-all) and, when there is one, the bytecode offset of the actual invoke
+all; `serviceloader`: a resolved `ServiceLoader.load(...)` call site
+connected to a registered provider's constructor, SERVICE_LOADING S2)
+and, when there is one, the bytecode offset of the actual invoke
 instruction — e.g. `(virtual call, resolution: direct, pc=77)` — so a
 reader can jump straight to `javap -c -p` output instead of trusting the
 method names alone (`internal/reach.EntryEdge`, `internal/callgraph.Edge`;
@@ -644,12 +647,15 @@ report:
 - **Serialization gadgets and config-driven behavior** (XML wiring,
   `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
-  report's own "ServiceLoader provider registrations" section), and
-  every `ServiceLoader.load(...)`/`loadInstalled(...)` call site is found
-  with its service-interface argument resolved where possible
-  (SERVICE_LOADING S1 — "ServiceLoader.load call sites" section), but
-  neither is a call-graph edge: no provider construction is modeled as
-  reachable yet.
+  report's own "ServiceLoader provider registrations" section), every
+  `ServiceLoader.load(...)`/`loadInstalled(...)` call site is found with
+  its service-interface argument resolved where possible (SERVICE_LOADING
+  S1 — "ServiceLoader.load call sites" section), and each resolved
+  interface's registered providers get a real call-graph edge to their
+  public no-argument constructor (SERVICE_LOADING S2 — "ServiceLoader
+  provider constructors modeled" section). Still not modeled: any
+  iterator/`Provider.get` method call on the resulting provider instance,
+  and JPMS `module-info`'s `uses`/`provides`.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

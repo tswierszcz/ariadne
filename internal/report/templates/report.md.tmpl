@@ -135,19 +135,40 @@ None found.
 
 Every `ServiceLoader.load(...)`/`loadInstalled(...)` call site found in the app or its
 dependencies (SERVICE_LOADING S1), with its service-interface argument resolved by
-DATA_FLOW D0-D2's local-value analysis where possible — **still not a call-graph
-edge**: this says a method *asks for* providers of an interface, not that any
-provider's constructor runs (that needs SERVICE_LOADING S2, not yet implemented).
-"Loader" distinguishes the thread context class loader (`classpath`) from a
-caller-named `ClassLoader`/`ModuleLayer` (`explicit`/`module-layer`) or the extension
-class loader (`installed`) — different loaders are not guaranteed to see the same
-providers as a `META-INF/services` registration above.
+DATA_FLOW D0-D2's local-value analysis where possible. This step itself is not a
+call-graph edge — see "ServiceLoader provider constructors modeled" below for which of
+these actually got one. "Loader" distinguishes the thread context class loader
+(`classpath`) from a caller-named `ClassLoader`/`ModuleLayer`
+(`explicit`/`module-layer`) or the extension class loader (`installed`) — different
+loaders are not guaranteed to see the same providers as a `META-INF/services`
+registration above.
 {{if not .ServiceLoadSites}}
 None found.
 {{else}}
 | Caller | Loader | Interface |
 |---|---|---|
 {{range .ServiceLoadSites}}| `{{.CallerMethod}}` (pc={{.PC}}) | {{.LoaderKind}} | {{if .Interface}}`{{.Interface}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{end}}
+{{end}}
+
+## ServiceLoader provider constructors modeled
+
+For every interface actually resolved above, the registered providers for it
+(SERVICE_LOADING S2) — each one's public no-argument constructor is added as a
+call-graph target from the resolving call site, plus a related edge to the provider's
+own class-initializer if it has one. A registration whose interface nothing resolved
+to calls for is correctly left out (not a gap — nothing asks for it). "Gap" explains
+why a found, used provider still got no constructor target (e.g. no public
+no-argument constructor) — a missing implementation, not evidence the provider is
+unreachable. This still only covers the constructor itself: no iterator/`Provider.get`
+method call on the resulting instance is modeled (SERVICE_LOADING S2's own remaining
+scope).
+{{if not .ServiceMaterializations}}
+None found.
+{{else}}
+| Interface | Provider | Constructor target |
+|---|---|---|
+{{range .ServiceMaterializations}}| `{{.Registration.Interface}}` | `{{.Registration.ProviderClass}}` | {{if .ConstructorMethod}}`{{.ConstructorMethod}}`{{else}}**gap:** {{.Gap}}{{end}} |
 {{end}}
 {{end}}
 

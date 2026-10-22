@@ -60,7 +60,10 @@ type ServiceLoadSite struct {
 	// provably exact Class literal (valueflow.KindConst). "" otherwise;
 	// see UnresolvedReason for why.
 	Interface    string
-	CallerMethod string // "fqcn#name(desc)"
+	CallerMethod string // "fqcn#name(desc)", for display — see CallerFQCN/CallerName/CallerDesc for the same identity split for programmatic use (SERVICE_LOADING S2's own graph-edge lookup needs the parts, not the joined string)
+	CallerFQCN   string
+	CallerName   string
+	CallerDesc   string
 	LoaderKind   LoaderKind
 	// PC is the invoke* instruction's bytecode offset within
 	// CallerMethod — evidence for which call site this is, same
@@ -75,13 +78,23 @@ type ServiceLoadSite struct {
 }
 
 // ProviderMaterialization is SERVICE_LOADING S2's own concept: a
-// provider's constructor (or, for a module provider, its provider()
-// factory method) modeled as an actual call-graph target reachable from
-// a ServiceLoadSite. S0 defines this type as a stable contract for S2;
-// S0 itself never constructs one.
+// provider's constructor modeled as an actual call-graph target reachable
+// from a ServiceLoadSite that names its interface. S0 defined this type
+// as a stable contract; FindMaterializations (S2) is what actually
+// constructs it.
 type ProviderMaterialization struct {
-	Registration      ServiceRegistration
-	ConstructorMethod string // "fqcn#<init>(desc)" or a provider() factory; empty until S2
+	Registration ServiceRegistration
+	// ConstructorMethod is "fqcn#<init>()V" when the provider has a
+	// public no-argument constructor — the only shape the legacy
+	// META-INF/services mechanism actually instantiates (the Java 9+
+	// module-provider "public static provider()" factory method is a
+	// different mechanism, SERVICE_LOADING S3's own JPMS scope, not
+	// this one). "" when Gap explains why no target could be modeled.
+	ConstructorMethod string
+	// Gap explains why ConstructorMethod is "" — never a silent drop
+	// (S2's own requirement: "brak implementacji daje lukę, nie brak
+	// podatności").
+	Gap string
 }
 
 // Inventory scans every META-INF/services/* file in the app and every
