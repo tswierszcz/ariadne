@@ -80,6 +80,17 @@ type Graph struct {
 	preCHAEdges       int
 	chaEdges          int
 	unresolvedDynamic int
+	// unresolvedOwner counts direct calls whose declared receiver type is
+	// itself part of the analyzed universe, but whose method could not
+	// be resolved to any declaring class within it (JVM_GRAPH G2). This
+	// is expected to be a large number on any real app: it is dominated
+	// by methods genuinely inherited from a class outside the analyzed
+	// input — almost always the JDK (Thread#start, Object#toString,
+	// AbstractList#get, ...), which ariadne never reads by design, one
+	// level removed through an app/dependency class that itself extends
+	// it. It is not, on its own, evidence of a bug or a gap worth
+	// chasing; see UnresolvedOwnerCount's own doc comment.
+	unresolvedOwner int
 }
 
 // NodeCount is the number of distinct methods in the graph.
@@ -107,6 +118,22 @@ func (g *Graph) CHAEdgeCount() int { return g.chaEdges }
 // whole graph had a bootstrap method ariadne couldn't resolve to a real
 // target (StringConcatFactory and the like; see classfile.ExtractCalls).
 func (g *Graph) UnresolvedDynamicCount() int { return g.unresolvedDynamic }
+
+// UnresolvedOwnerCount is how many direct calls (JVM_GRAPH G2) named a
+// receiver type that is part of the analyzed universe, but whose method
+// resolution still failed to find any declaring class in its
+// superclass/superinterface chain. Measured on real petclinic/WebGoat
+// runs: a few thousand, the large majority a class in the analyzed
+// input inheriting a method from the JDK (or any other class outside
+// the input) one or more levels up a chain this package never reads
+// past — e.g. an app class extending java.lang.Thread and calling the
+// inherited start(). That is the expected, common case, not a sign of
+// a problem: ariadne cannot tell "the JDK provides this, as expected"
+// apart from "this is a genuine hole in the dependency set" once
+// resolution has to cross outside the universe it actually read, so
+// this count is informational only, not an actionable diagnostic on
+// its own.
+func (g *Graph) UnresolvedOwnerCount() int { return g.unresolvedOwner }
 
 // Key renders a node id back to its "fqcn#name(desc)" string.
 func (g *Graph) Key(id uint32) string {

@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 )
 
@@ -201,6 +202,179 @@ func TestEvidenceIsPreservedAcrossDuplicateCallSites(t *testing.T) {
 			t.Errorf("duplicate PC %d across Sites: %v", s.PC, appendEdge.Sites)
 		}
 		seenPCs[s.PC] = true
+	}
+}
+
+// TestCHA_overloadsAreNotConflated is JVM_GRAPH G2's own fix, tested
+// against a hand-built hierarchy (no JDK available to compile a new
+// fixture class with two overloads of the same name): an interface with
+// two overloads of "process", a subtype that overrides both, each
+// calling a different, distinguishable method on a "library" class. A
+// call site that invokes exactly one overload must CHA-expand only to
+// that overload's own override, never to the other — the bug the old
+// name-only `MethodsByName` CHA expansion had (it returned every
+// same-named overload regardless of which one the call site actually
+// invoked).
+func TestCHA_overloadsAreNotConflated(t *testing.T) {
+	const (
+		stringDesc = "(Ljava/lang/String;)V"
+		intDesc    = "(I)V"
+	)
+	iface := &hierarchy.ClassInfo{
+		FQCN:        "test.Multi",
+		SuperClass:  "java.lang.Object",
+		AccessFlags: classfile.AccInterface | classfile.AccAbstract,
+		Methods: []hierarchy.Method{
+			{Method: classfile.Method{Name: "process", Descriptor: stringDesc, AccessFlags: classfile.AccAbstract | classfile.AccPublic}},
+			{Method: classfile.Method{Name: "process", Descriptor: intDesc, AccessFlags: classfile.AccAbstract | classfile.AccPublic}},
+		},
+	}
+	impl := &hierarchy.ClassInfo{
+		FQCN:       "test.MultiImpl",
+		SuperClass: "java.lang.Object",
+		Interfaces: []string{"test.Multi"},
+		Methods: []hierarchy.Method{
+			{
+				Method: classfile.Method{Name: "process", Descriptor: stringDesc, AccessFlags: classfile.AccPublic},
+				Calls:  []classfile.Call{{Kind: classfile.CallStatic, Owner: "test.Vulnerable", Name: "stringPath", Desc: "()V"}},
+			},
+			{
+				Method: classfile.Method{Name: "process", Descriptor: intDesc, AccessFlags: classfile.AccPublic},
+				Calls:  []classfile.Call{{Kind: classfile.CallStatic, Owner: "test.Vulnerable", Name: "intPath", Desc: "()V"}},
+			},
+		},
+	}
+	caller := &hierarchy.ClassInfo{
+		FQCN:       "test.Caller",
+		SuperClass: "java.lang.Object",
+		Methods: []hierarchy.Method{
+			{
+				Method: classfile.Method{Name: "callString", Descriptor: "()V", AccessFlags: classfile.AccPublic},
+				Calls:  []classfile.Call{{Kind: classfile.CallInterface, Owner: "test.Multi", Name: "process", Desc: stringDesc, PC: 0}},
+			},
+		},
+	}
+	vulnerable := &hierarchy.ClassInfo{
+		FQCN:       "test.Vulnerable",
+		SuperClass: "java.lang.Object",
+		Methods: []hierarchy.Method{
+			{Method: classfile.Method{Name: "stringPath", Descriptor: "()V", AccessFlags: classfile.AccStatic | classfile.AccPublic}},
+			{Method: classfile.Method{Name: "intPath", Descriptor: "()V", AccessFlags: classfile.AccStatic | classfile.AccPublic}},
+		},
+	}
+
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{iface, impl, caller, vulnerable})
+	g := Build(h, nil)
+
+	callerID, ok := g.ID("test.Caller", "callString", "()V")
+	if !ok {
+		t.Fatalf("test.Caller#callString not found")
+	}
+
+	wantTo := "test.MultiImpl#process" + stringDesc
+	dontWantTo := "test.MultiImpl#process" + intDesc
+	var foundWanted, foundUnwanted bool
+	for _, e := range g.Edges(callerID) {
+		switch g.Key(e.To) {
+		case wantTo:
+			foundWanted = true
+			if e.Basis != BasisCHA {
+				t.Errorf("edge to %s: Basis = %q, want %q", wantTo, e.Basis, BasisCHA)
+			}
+		case dontWantTo:
+			foundUnwanted = true
+		}
+	}
+	if !foundWanted {
+		t.Errorf("caller has no CHA edge to the overload it actually called (%s); edges: %v", wantTo, targetNames(g, g.Edges(callerID)))
+	}
+	if foundUnwanted {
+		t.Errorf("caller has a CHA edge to the *other* overload (%s) it never called — overloads were conflated", dontWantTo)
+	}
+
+	// And the called overload's own body must still lead to its own
+	// target, not the other overload's.
+	implStringID, ok := g.ID("test.MultiImpl", "process", stringDesc)
+	if !ok {
+		t.Fatalf("test.MultiImpl#process%s not found", stringDesc)
+	}
+	wantVuln := "test.Vulnerable#stringPath()V"
+	var reachesStringPath bool
+	for _, e := range g.Edges(implStringID) {
+		if g.Key(e.To) == wantVuln {
+			reachesStringPath = true
+		}
+	}
+	if !reachesStringPath {
+		t.Errorf("test.MultiImpl#process%s has no edge to %s", stringDesc, wantVuln)
+	}
+}
+
+// TestResolveTarget_inheritedMethodLeadsToDeclaringClass is the direct-
+// edge half of JVM_GRAPH G2 (the CHA half is
+// TestCHA_overloadsAreNotConflated above, and the real-bytecode
+// end-to-end case is internal/reach's
+// TestAnalyze_inheritedMethodMatchedThroughSubclassCall): a static call
+// whose declared owner only inherits the method, never overriding it
+// itself, must lead to the class that actually supplies the body, with
+// no diagnostic (owner is part of the analyzed universe and resolution
+// succeeds) — not a dead-end node under the subclass's own name.
+func TestResolveTarget_inheritedMethodLeadsToDeclaringClass(t *testing.T) {
+	base := &hierarchy.ClassInfo{
+		FQCN:       "test.Base",
+		SuperClass: "java.lang.Object",
+		Methods: []hierarchy.Method{
+			{
+				Method: classfile.Method{Name: "helper", Descriptor: "()V", AccessFlags: classfile.AccPublic},
+				Calls:  []classfile.Call{{Kind: classfile.CallStatic, Owner: "test.Vulnerable", Name: "stringPath", Desc: "()V"}},
+			},
+		},
+	}
+	sub := &hierarchy.ClassInfo{FQCN: "test.Sub", SuperClass: "test.Base"} // inherits helper(), overrides nothing
+	caller := &hierarchy.ClassInfo{
+		FQCN:       "test.Caller2",
+		SuperClass: "java.lang.Object",
+		Methods: []hierarchy.Method{
+			{
+				Method: classfile.Method{Name: "run", Descriptor: "()V", AccessFlags: classfile.AccPublic},
+				// invokevirtual on the subclass, exactly as classfile.ExtractCalls
+				// would decode a call written as "new Sub().helper()".
+				Calls: []classfile.Call{{Kind: classfile.CallVirtual, Owner: "test.Sub", Name: "helper", Desc: "()V"}},
+			},
+		},
+	}
+	vulnerable := &hierarchy.ClassInfo{
+		FQCN:       "test.Vulnerable",
+		SuperClass: "java.lang.Object",
+		Methods: []hierarchy.Method{
+			{Method: classfile.Method{Name: "stringPath", Descriptor: "()V", AccessFlags: classfile.AccStatic | classfile.AccPublic}},
+		},
+	}
+
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{base, sub, caller, vulnerable})
+	g := Build(h, nil)
+
+	if g.UnresolvedOwnerCount() != 0 {
+		t.Errorf("UnresolvedOwnerCount() = %d, want 0 (test.Sub is in the universe and test.Base supplies helper())", g.UnresolvedOwnerCount())
+	}
+
+	callerID, _ := g.ID("test.Caller2", "run", "()V")
+	wantTo := "test.Base#helper()V"
+	dontWantTo := "test.Sub#helper()V"
+	var foundWanted, foundDeadEnd bool
+	for _, e := range g.Edges(callerID) {
+		switch g.Key(e.To) {
+		case wantTo:
+			foundWanted = true
+		case dontWantTo:
+			foundDeadEnd = true
+		}
+	}
+	if !foundWanted {
+		t.Errorf("caller has no edge to %s (the actual declaring class); edges: %v", wantTo, targetNames(g, g.Edges(callerID)))
+	}
+	if foundDeadEnd {
+		t.Errorf("caller has a dead-end edge to %s (the subclass that merely inherits helper) instead of being redirected to %s", dontWantTo, wantTo)
 	}
 }
 

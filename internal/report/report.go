@@ -23,6 +23,7 @@ type Header struct {
 	PreCHAEdges     int
 	CHAEdges        int
 	UnresolvedDyn   int
+	UnresolvedOwner int
 	DepsTotal       int
 	DepsIdentified  int
 	UnidentifiedJar []string

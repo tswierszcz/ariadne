@@ -14,7 +14,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
-| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1: DONE (2026-10-22); G2–G5: UNASSESSED | G2 (dokładne rozwiązywanie wywołań, współdzielone z CVE F4) jest następnym naturalnym krokiem. |
+| JVM_GRAPH | [G0–G5](JVM_GRAPH_IMPLEMENTATION_PLAN.MD) | G0, G1: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here); G3–G5: UNASSESSED | G3 (relacje inicjalizacji, `<clinit>`) jest następnym naturalnym krokiem. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wymaga odpowiednich fundamentów JVM; nie zakładać istnienia CFG/value analysis. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Rejestry usług i lokalne wartości według zależności planu. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
@@ -160,6 +160,107 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 - **Następny krok:** `JVM_GRAPH:G2` (dokładne rozwiązywanie wywołań —
   lookup `fqcn+name+descriptor+rodzaj wywołania`, współdzielone z CVE
   F4) — wymaga zgody użytkownika przed startem.
+
+### JVM_GRAPH:G2 — Dokładne rozwiązywanie wywołań — DONE for overloads/inheritance; bridge/default-method real-bytecode verification pending (2026-10-22)
+
+- **Zakres zlecenia i zależności:** G1 (gotowe wyżej). Współdzielony
+  selektor metody z CVE F4 nie istnieje (F4 nieodnotowane) — z opisu F4
+  wzięto tylko to, co G2 faktycznie potrzebuje: dopasowanie po
+  `fqcn+name+descriptor`, nie całą fazę F4 (role `vulnerable`/
+  `entry_point` z odpowiedzi LLM, wersjonowanie zakresów itd. — to
+  zostaje nienaruszone, czeka na F4 samą).
+- **Ograniczenie środowiska, odnotowane szczerze:** to środowisko ma
+  tylko JRE (`openjdk-21-jre`/`openjdk-25-jre`), nie JDK — `javac` nie
+  istnieje, więc nie dało się skompilować nowych klas fixture z
+  przeciążeniami/bridge methods/default methods, jak proponowało G2's
+  własne "Gotowe". Zamiast tego: (1) `hierarchy.NewForTesting` (nowy,
+  mały, wyraźnie opisany jako testowy konstruktor `*Hierarchy` z
+  gotowych `*ClassInfo`, bez I/O na jarach) pozwala testować dokładnie
+  te kształty (przeciążenia, diamond interfaces) bez JDK; (2) scenariusz
+  "odziedziczona metoda wołająca bibliotekę" jest pokryty **realnym,
+  skompilowanym bytecode** — `testdata/reachfixture` już miało tę
+  dokładną sytuację od wcześniejszej fazy (Phase 5 w PLAN.md), więc
+  istniejący test `TestAnalyze_inheritedMethodMatchedThroughSubclassCall`
+  służy jako prawdziwa, bytecode'owa weryfikacja tego przypadku, nie
+  tylko konstrukcja testowa. Bridge methods i default methods **nie
+  zostały** osobno zweryfikowane na realnym skompilowanym bytecode w tym
+  przyroście — logika rozwiązywania jest zaprojektowana tak, by je
+  obsłużyć bez specjalnych przypadków (patrz komentarz w
+  `resolve.go`/`build.go`), ale to pozostaje nieprzetestowane na
+  prawdziwych `.class`; zarejestrowane jako ograniczenie, nie przemilczane.
+- **Zmienione pliki:** `internal/hierarchy/hierarchy.go`
+  (`ClassInfo.MethodByNameAndDesc`, `NewForTesting`);
+  `internal/hierarchy/resolve.go` (refaktor na współdzielone
+  `resolveBy`, nowy `ResolveExact` — dokładny odpowiednik `ResolveMethod`,
+  który zostaje jako jawny tryb legacy/przybliżony, bo LLM-grounding i
+  vulnmap nigdy nie mają deskryptora); `internal/callgraph/build.go`
+  (`resolveTarget` przekierowuje krawędź bezpośrednią na rzeczywistą
+  klasę deklarującą metodę; CHA filtruje teraz po dokładnym deskryptorze,
+  nie tylko nazwie); `internal/callgraph/graph.go`
+  (`UnresolvedOwnerCount`); `internal/reach/match.go` (komentarz
+  wyjaśniający, czemu dopasowanie podatnych metod zostaje
+  overload-insensitive, i jak to teraz współdziała z G2); `cmd/ariadne/main.go`,
+  `internal/report/report.go`, `internal/report/templates/report.md.tmpl`
+  (nowa, jawnie nie-alarmująca linia diagnostyczna).
+- **Zachowanie dostępne użytkownikowi:** (1) ścieżki w raporcie teraz
+  pokazują rzeczywistą klasę deklarującą metodę, nie martwy węzeł pod
+  nazwą podklasy; (2) CHA nie łączy już różnych przeciążeń tej samej
+  nazwy; (3) nowa linia w raporcie "Calls resolved outside the analyzed
+  input" — **jawnie opisana jako informacyjna, nie alarm**, po tym jak
+  pierwsza wersja tego liczika (nazwana "unresolved call owners") okazała
+  się być zdominowana przez zwykłe, oczekiwane dziedziczenie z JDK
+  (`java.lang.Thread#start`, `javax.swing.JFrame#setSize`, ...) —
+  sprawdzone wprost próbką 20 przykładów z realnego przebiegu na
+  petclinic, nie założone.
+- **Spełnione kryteria (z G2's "Gotowe", częściowo — patrz wyżej):**
+  - "fixtures obejmują odziedziczoną metodę wołającą bibliotekę" —
+    tak, na realnym bytecode (`testdata/reachfixture`).
+  - "przeciążenia" — tak, ale na ręcznie zbudowanej hierarchii
+    (`TestCHA_overloadsAreNotConflated`,
+    `TestResolveExact_overloadsAndDiamondInterface`), nie na
+    skompilowanym bytecode (brak JDK).
+  - "override" — tak, pokryte już istniejącym
+    `TestCHA_interfaceCallReachesBothImplementations` (bytecode) plus
+    nowymi testami.
+  - "default method" i "bridge" — **nie zweryfikowane na realnym
+    bytecode**; logika jest zaprojektowana żeby to obsłużyć (patrz
+    komentarz), ale to twierdzenie projektowe, nie zmierzony wynik.
+    Odnotowane jako otwarte ograniczenie tej fazy.
+  - "nieprawidłowy lub brakujący cel daje diagnostykę" — tak
+    (`UnresolvedOwnerCount`), ale po korekcie: pierwsza wersja nazwy i
+    opisu była myląca (patrz wyżej), poprawiona po realnej weryfikacji,
+    nie przed nią.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone); `go test -race
+  ./internal/callgraph/... ./internal/hierarchy/... ./internal/reach/...`
+  (zielone); `bin/ariadne -offline` na petclinic (`-profile spring`:
+  REACHABLE 3→3, FRAMEWORK 59→62, NOT_REACHABLE 29→26, węzły 273180→257640,
+  krawędzie 1229725→908326 — CHA-dodane krawędzie 630816→310418, spadek
+  o połowę, zgodny z oczekiwaniem po naprawieniu konfliktu przeciążeń)
+  i WebGoat (REACHABLE 40→42, FRAMEWORK 43→44, NOT_REACHABLE 21→18);
+  jednorazowy skrypt diagnostyczny (uruchomiony i usunięty) próbkujący
+  8868 przypadków "unresolved owner" na petclinic, potwierdzający że
+  dominują wywołania dziedziczone z JDK (`antlr.*`/`java.lang.Thread`/
+  `javax.swing.JFrame` w przykładach); dwa przebiegi petclinic dają
+  bajt-identyczny `results.json`; ręczne porównanie `results.json` przed/po
+  wykazało **jeden rzeczywisty, potwierdzony false-positive naprawiony**:
+  `CVE-2021-22118` FRAMEWORK → NOT_REACHABLE — stara (nazw-only) CHA
+  tworzyła sztuczną ścieżkę przez Spring WebFlux'owy reaktywny
+  multipart reader, którego klasyczny Spring MVC/Servlet stack petclinic
+  w ogóle nie używa; to jest dokładnie ten rodzaj artefaktu CHA, który
+  `-framework-check`'s LLM (Phase 8) był zbudowany żeby wyławiać —
+  teraz usunięty strukturalnie, nie tylko oflagowany.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Direct calls, CHA
+  and inheritance" rozszerzony o nowy zakres, ograniczenia i zmierzony
+  efekt). `README.md`/`FAQ.md` nie opisywały wcześniej tego mechanizmu
+  na tyle szczegółowo, żeby wymagały zmiany.
+- **Niespełnione/odłożone:** bridge/default-method weryfikacja na
+  realnym bytecode (potrzebuje JDK w środowisku lub przeniesienia tej
+  weryfikacji do sesji, która go ma); CVE F4's właściwy zakres (wersje,
+  role LLM, model v2) nienaruszony.
+- **Następny krok:** `JVM_GRAPH:G3` (relacje inicjalizacji — krawędzie do
+  `<clinit>` przy `new`/`getstatic`/`putstatic`/`invokestatic`) — wymaga
+  zgody użytkownika przed startem.
 
 Przy dodawaniu kolejnego wpisu zapisz:
 

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"testing"
 
+	"ariadne/internal/classfile"
 	"ariadne/internal/input"
 )
 
@@ -80,6 +81,74 @@ func TestResolveMethod_notFound(t *testing.T) {
 	_, found := h.ResolveMethod("fixture.FormalGreeter", "noSuchMethod")
 	if found {
 		t.Errorf("ResolveMethod(FormalGreeter, noSuchMethod) unexpectedly found")
+	}
+}
+
+func TestResolveExact_declaredDirectly(t *testing.T) {
+	h := buildFixture(t)
+	const desc = "(Ljava/lang/String;)Ljava/lang/String;"
+	declaring, found := h.ResolveExact("fixture.FormalGreeter", "greet", desc)
+	if !found || declaring != "fixture.FormalGreeter" {
+		t.Errorf("ResolveExact(FormalGreeter, greet, desc) = (%q, %v), want (fixture.FormalGreeter, true)", declaring, found)
+	}
+}
+
+func TestResolveExact_wrongDescriptorNotFound(t *testing.T) {
+	h := buildFixture(t)
+	// greet's real descriptor takes a String; a different one must not
+	// match, even though the name is otherwise right — exactly the
+	// overload-blindness ResolveMethod has and ResolveExact (JVM_GRAPH
+	// G2) does not.
+	_, found := h.ResolveExact("fixture.FormalGreeter", "greet", "(I)V")
+	if found {
+		t.Errorf("ResolveExact(FormalGreeter, greet, wrong desc) unexpectedly found")
+	}
+}
+
+// TestResolveExact_overloadsAndDiamondInterface exercises two JVM_GRAPH
+// G2 shapes that need a hand-built hierarchy (no JDK here to compile a
+// fixture with overloads or multiple interface inheritance):
+//   - two overloads of the same name on a class low in the chain must
+//     each resolve independently, by descriptor, not conflate;
+//   - a method declared on two unrelated interfaces reachable from the
+//     same class (a diamond) must resolve to the closer one when the
+//     superclass chain itself has nothing — "closer" here meaning
+//     "found first in the breadth-first interface queue", which for two
+//     interfaces both directly implemented by the same class means
+//     declaration order.
+func TestResolveExact_overloadsAndDiamondInterface(t *testing.T) {
+	const strDesc = "(Ljava/lang/String;)V"
+	const intDesc = "(I)V"
+
+	base := &ClassInfo{
+		FQCN:       "test.Base",
+		SuperClass: "java.lang.Object",
+		Methods: []Method{
+			{Method: classfile.Method{Name: "process", Descriptor: strDesc}},
+			{Method: classfile.Method{Name: "process", Descriptor: intDesc}},
+		},
+	}
+	sub := &ClassInfo{FQCN: "test.Sub", SuperClass: "test.Base"}
+
+	h := NewForTesting([]*ClassInfo{base, sub})
+	if d, ok := h.ResolveExact("test.Sub", "process", strDesc); !ok || d != "test.Base" {
+		t.Errorf("ResolveExact(Sub, process, strDesc) = (%q, %v), want (test.Base, true)", d, ok)
+	}
+	if d, ok := h.ResolveExact("test.Sub", "process", intDesc); !ok || d != "test.Base" {
+		t.Errorf("ResolveExact(Sub, process, intDesc) = (%q, %v), want (test.Base, true)", d, ok)
+	}
+
+	ifaceA := &ClassInfo{FQCN: "test.IfaceA", Methods: []Method{{Method: classfile.Method{Name: "shared", Descriptor: "()V"}}}}
+	ifaceB := &ClassInfo{FQCN: "test.IfaceB", Methods: []Method{{Method: classfile.Method{Name: "shared", Descriptor: "()V"}}}}
+	diamond := &ClassInfo{FQCN: "test.Diamond", SuperClass: "java.lang.Object", Interfaces: []string{"test.IfaceA", "test.IfaceB"}}
+
+	hd := NewForTesting([]*ClassInfo{ifaceA, ifaceB, diamond})
+	d, ok := hd.ResolveExact("test.Diamond", "shared", "()V")
+	if !ok {
+		t.Fatalf("ResolveExact(Diamond, shared, ()V) not found")
+	}
+	if d != "test.IfaceA" {
+		t.Errorf("ResolveExact(Diamond, shared, ()V) = %q, want test.IfaceA (declared first)", d)
 	}
 }
 

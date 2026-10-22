@@ -61,7 +61,21 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 			clear(seen)
 
 			for _, call := range m.Calls {
-				toID := g.intern(call.Owner, call.Name, call.Desc)
+				// JVM_GRAPH G2: call.Owner is the bytecode's literal
+				// Methodref owner — the call's declared/static receiver
+				// type, which does not have to be the class that actually
+				// declares the method (an inherited, non-overridden call).
+				// Resolve to the real declaring class so the direct edge
+				// leads to an available implementation body instead of a
+				// dead-end node with no Calls of its own; an owner outside
+				// the analyzed universe (almost always a JDK type) is left
+				// exactly as the bytecode named it, same as before this
+				// phase.
+				toOwner, resolveOK := resolveTarget(h, call.Owner, call.Name, call.Desc)
+				if !resolveOK {
+					g.unresolvedOwner++
+				}
+				toID := g.intern(toOwner, call.Name, call.Desc)
 				if addOrMerge(g, seen, callerID, toID, call.Kind, BasisDirect, call.PC) {
 					g.preCHAEdges++
 				}
@@ -72,6 +86,11 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 				if skip(call.Owner) {
 					continue
 				}
+				// CHA expands from the call's own declared receiver type
+				// (call.Owner, deliberately not toOwner above): any
+				// subtype of *that* static type could be the runtime
+				// receiver, regardless of which class actually supplies
+				// the inherited body for Owner itself.
 				for _, sub := range h.Subtypes(call.Owner) {
 					if skip(sub) {
 						continue
@@ -80,10 +99,23 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 					if !ok {
 						continue
 					}
-					for _, subMethod := range subInfo.MethodsByName(call.Name) {
-						subID := g.intern(sub, subMethod.Name, subMethod.Descriptor)
-						addOrMerge(g, seen, callerID, subID, call.Kind, BasisCHA, call.PC)
+					// Exact descriptor match (JVM_GRAPH G2), not
+					// MethodsByName's name-only match: a subtype that
+					// overrides a *different* overload of the same name
+					// must not be wired up as if it overrode this one. A
+					// bridge method generated for a covariant-return or
+					// generic override already carries the exact erased
+					// descriptor being looked for here, so it needs no
+					// special handling — it resolves like any other
+					// declared method, and its own Calls (the delegating
+					// invocation to the real, covariant-signature
+					// implementation) carry the analysis the rest of the
+					// way.
+					if _, ok := subInfo.MethodByNameAndDesc(call.Name, call.Desc); !ok {
+						continue
 					}
+					subID := g.intern(sub, call.Name, call.Desc)
+					addOrMerge(g, seen, callerID, subID, call.Kind, BasisCHA, call.PC)
 				}
 			}
 			g.unresolvedDynamic += m.UnresolvedDynamic
@@ -95,6 +127,39 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 	g.chaEdges = g.EdgeCount() - g.preCHAEdges
 
 	return g
+}
+
+// resolveTarget finds the class that actually declares name+desc,
+// following the JVM's own method-resolution order (JVM_GRAPH G2,
+// hierarchy.ResolveExact), so a direct edge can lead to an available
+// implementation body instead of a dead-end node on a class that merely
+// inherits the method without overriding it.
+//
+// ok is true both for the ordinary case (owner already declares the
+// method, or owner is outside the analyzed universe — almost always a
+// JDK type ariadne never read, where there's nothing more precise to
+// resolve to) and for a successful resolution to a different declaring
+// class. ok is false when owner *is* part of the analyzed universe but
+// resolution still found no declaring class anywhere in its
+// superclass/superinterface chain — expected to be common (see
+// Graph.UnresolvedOwnerCount's own doc comment: this is dominated by
+// methods actually inherited from the JDK or another class outside the
+// input, one level removed, not by genuine bugs), so this is
+// informational, not a reliable signal to investigate on its own.
+// resolvedOwner falls back to owner unchanged either way, so the caller
+// still gets a valid (if imprecise) dead-end node instead of nothing.
+func resolveTarget(h *hierarchy.Hierarchy, owner, name, desc string) (resolvedOwner string, ok bool) {
+	ownerInfo, inUniverse := h.Lookup(owner)
+	if !inUniverse {
+		return owner, true
+	}
+	if _, declared := ownerInfo.MethodByNameAndDesc(name, desc); declared {
+		return owner, true
+	}
+	if declaring, found := h.ResolveExact(owner, name, desc); found {
+		return declaring, true
+	}
+	return owner, false
 }
 
 // edgeKey identifies an edge for seen-set dedup purposes, deliberately

@@ -7,6 +7,7 @@
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}
 - **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA)
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
+- **Calls resolved outside the analyzed input:** {{.UnresolvedOwner}} (informational — expected to be a few thousand on a real app; dominated by methods actually inherited from the JDK or another class outside `-app`/`-deps`, not evidence of a bug on its own)
 - **Dependencies:** {{.DepsTotal}} total, {{.DepsIdentified}} identified{{if .UnidentifiedJar}}, {{len .UnidentifiedJar}} unidentified{{end}}
 {{- if .LLMModel}}
 - **LLM-assisted mapping:** {{.LLMModel}} ({{.LLMMapped}} CVEs mapped, {{.LLMSkipped}} skipped)

@@ -5,6 +5,8 @@
 package hierarchy
 
 import (
+	"sort"
+
 	"ariadne/internal/classfile"
 	"ariadne/internal/input"
 )
@@ -65,6 +67,19 @@ func (c *ClassInfo) MethodByName(name string) (Method, bool) {
 	return Method{}, false
 }
 
+// MethodByNameAndDesc returns the method declared directly on this class
+// matching both name and descriptor exactly — the exact-signature
+// counterpart to MethodByName's overload-insensitive lookup, used where
+// ariadne needs to tell distinct overloads apart (JVM_GRAPH G2).
+func (c *ClassInfo) MethodByNameAndDesc(name, desc string) (Method, bool) {
+	for _, m := range c.Methods {
+		if m.Name == name && m.Descriptor == desc {
+			return m, true
+		}
+	}
+	return Method{}, false
+}
+
 // MethodsByName returns every method named name declared directly on this
 // class — there can be more than one, since Java allows overloads and
 // ariadne matches by name only. Used where a caller needs every overload
@@ -107,6 +122,32 @@ type Hierarchy struct {
 	// Duplicate's own doc comment) — structured evidence behind the
 	// plain-string warnings Build also returns.
 	duplicates []Duplicate
+}
+
+// NewForTesting builds a Hierarchy directly from already-constructed
+// ClassInfo values, skipping jar I/O entirely. Production code always
+// goes through Build; this exists for tests elsewhere (internal/callgraph,
+// internal/reach) that need a specific class/method/descriptor shape —
+// e.g. two overloads of the same name, so CHA's overload-sensitivity
+// (JVM_GRAPH G2) can be tested precisely — without compiling a new
+// fixture, which this repo's own test suite deliberately avoids
+// depending on (go test needs no JDK).
+func NewForTesting(classes []*ClassInfo) *Hierarchy {
+	m := make(map[string]*ClassInfo, len(classes))
+	for _, c := range classes {
+		m[c.FQCN] = c
+	}
+	sorted := make([]string, 0, len(m))
+	for fqcn := range m {
+		sorted = append(sorted, fqcn)
+	}
+	sort.Strings(sorted)
+	return &Hierarchy{
+		classes:       m,
+		direct:        buildDirectSubtypes(m, sorted),
+		subtypesCache: make(map[string][]string),
+		sorted:        sorted,
+	}
 }
 
 // Duplicates returns every class-name collision Build resolved while

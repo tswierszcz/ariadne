@@ -131,11 +131,24 @@ func TestAnalyze_directCallIntoFrameworkPackageIsReachableNotFramework(t *testin
 
 func TestAnalyze_inheritedMethodMatchedThroughSubclassCall(t *testing.T) {
 	// callsInheritedMethodThroughSubclass calls riskyInstance() on a
-	// VulnerableLibSub instance; VulnerableLibSub doesn't override it,
-	// so the bytecode's Methodref owner is the subclass (confirmed by
-	// hand with javap) even though VulnerableLib is the "vulnerable
-	// class" named in vulnmap. matchVulnerableMethod must still find
-	// this call.
+	// VulnerableLibSub instance; VulnerableLibSub doesn't override it, so
+	// the bytecode's Methodref owner is the subclass (confirmed by hand
+	// with javap) even though VulnerableLib is both the "vulnerable
+	// class" named in vulnmap and the one that actually declares
+	// riskyInstance. Before JVM_GRAPH G2, internal/callgraph.Build
+	// blindly interned a dead-end node literally named
+	// "VulnerableLibSub#riskyInstance()V" (no outgoing edges of its own,
+	// since VulnerableLibSub's own declared methods don't include it),
+	// and matchVulnerableMethod's own inheritance check was the only
+	// thing finding it. G2 fixes this at the source instead: the direct
+	// edge now resolves to the class that actually supplies the method
+	// body, so the reported path correctly names VulnerableLib, not the
+	// subclass — a strictly more accurate report, and
+	// matchVulnerableMethod's inheritance check is no longer the only
+	// thing making this REACHABLE (the call graph itself is now
+	// connected correctly), though it stays in place as a second line of
+	// defense for cases where the declaring class genuinely isn't part
+	// of the analyzed universe at all.
 	e, _, _ := buildEngine(t)
 	r := analyzeOne(t, e, []string{"reachfixture.VulnerableLib#riskyInstance"})
 	if r.Status != StatusReachable {
@@ -143,7 +156,7 @@ func TestAnalyze_inheritedMethodMatchedThroughSubclassCall(t *testing.T) {
 	}
 	want := []string{
 		"reachfixture.AppEntry#callsInheritedMethodThroughSubclass()V",
-		"reachfixture.VulnerableLibSub#riskyInstance()V",
+		"reachfixture.VulnerableLib#riskyInstance()V",
 	}
 	if !reflect.DeepEqual(r.Path, want) {
 		t.Errorf("Path = %v, want %v", r.Path, want)
