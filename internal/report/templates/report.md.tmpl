@@ -473,17 +473,19 @@ None found.
 
 ## Dependency injection
 
-Every `@Autowired` field/constructor injection point found on an application class
-(FRAMEWORKS F2), resolved against the Spring bean names found above by declared
+Every `@Autowired`/`@Value` field/constructor injection point found on an application
+class (FRAMEWORKS F2), resolved against the Spring bean names found above by declared
 type, then `@Qualifier`, then `@Primary` — the same disambiguation order Spring's
 own container uses. "Unresolved" means no known bean matched, or more than one did
-with nothing to tell them apart; never a guess.
+with nothing to tell them apart; never a guess. A `@Value` point is reported
+separately, as a config value, never as an unresolved bean — Spring resolves it
+against property sources, not the bean catalog, so there is no bean lookup to fail.
 {{if not .Injections}}
 None found.
 {{else}}
 | Class | Member | Type | Qualifier | Resolved |
 |---|---|---|---|---|
-{{range .Injections}}| `{{.FQCN}}` | `{{.Member}}` | `{{.Type}}` | {{if .Qualifier}}`{{.Qualifier}}`{{else}}—{{end}} | {{if .Resolved}}`{{.Resolved}}`{{else}}unresolved: {{.Reason}} (candidates: {{.Candidates}}){{end}} |
+{{range .Injections}}| `{{.FQCN}}` | `{{.Member}}` | `{{.Type}}` | {{if .Qualifier}}`{{.Qualifier}}`{{else}}—{{end}} | {{if .Resolved}}`{{.Resolved}}`{{else if .ValueExpression}}config value: `{{.ValueExpression}}`{{else}}unresolved: {{.Reason}} (candidates: {{.Candidates}}){{end}} |
 {{end}}
 {{end}}
 

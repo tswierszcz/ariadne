@@ -230,7 +230,7 @@ type ProxyHandlerRow struct {
 // since this package's own template.Parse registers no custom join
 // function.
 type InjectionRow struct {
-	FQCN, Member, Type, Qualifier, Resolved, Reason, Candidates string
+	FQCN, Member, Type, Qualifier, Resolved, Reason, Candidates, ValueExpression string
 }
 
 // WebXMLRootRow is Data's own rendering-friendly form of
@@ -463,13 +463,14 @@ func injectionRows(injections []profile.ResolvedInjection) []InjectionRow {
 			candidates = strings.Join(inj.Candidates, ", ")
 		}
 		out[i] = InjectionRow{
-			FQCN:       inj.FQCN,
-			Member:     inj.Member,
-			Type:       inj.Type,
-			Qualifier:  inj.Qualifier,
-			Resolved:   inj.Resolved,
-			Reason:     inj.Reason,
-			Candidates: candidates,
+			FQCN:            inj.FQCN,
+			Member:          inj.Member,
+			Type:            inj.Type,
+			Qualifier:       inj.Qualifier,
+			Resolved:        inj.Resolved,
+			Reason:          inj.Reason,
+			Candidates:      candidates,
+			ValueExpression: inj.ValueExpression,
 		}
 	}
 	return out

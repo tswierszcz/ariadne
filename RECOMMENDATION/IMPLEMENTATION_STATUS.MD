@@ -18,7 +18,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
-| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: pięć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). AOP/pointcut, `@Value`-owe właściwości, rejestr B3 — nietknięte. |
+| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
@@ -3155,6 +3155,80 @@ Przy dodawaniu kolejnego wpisu zapisz:
   rejestr B3, albo `@Value`-owe właściwości — wymaga propozycji i
   zgody użytkownika przed startem.
 
+### FRAMEWORKS:F2 — szósty wycinek (`@Value`-owe punkty wstrzyknięcia) — DONE for this scope (2026-10-23)
+
+- **Zakres zlecenia i zależności:** zgoda użytkownika na rekomendację
+  po odrzuceniu dwóch droższych opcji. Przed startem zbadano
+  REFLECTION:R3 (parameter-flow tracking) — nowa infrastruktura
+  interproceduralna, najprawdopodobniej zerowy efekt na obu
+  aplikacjach (proxy-forwarding kończy się na nieobecnym w hierarchii
+  interfejsie JDK; biblioteki wewnętrzne używają runtime-computed
+  nazw) — i FRAMEWORKS:F3's podłączenie proxy-dispatchu (realny,
+  jedyny przypadek na WebGoat celuje w `java.sql.Connection`, którego
+  nie ma w analizowanej hierarchii zależności). Obie odrzucone jako
+  niekorzystny koszt/wartość. `@Value`-owe właściwości wybrane jako
+  tańsza, bezpośrednio w domenie Springa (obie aplikacje kontrolne).
+- **Zmienione pliki:** `internal/profile/di.go` (`valueFQCN`, nowe
+  pole `InjectionPoint.ValueExpression`, nowy `valueExpression`
+  (odpowiednik `qualifierValue`), pole-skan rozszerzony — `@Value`
+  samo, bez `@Autowired`, teraz też wyzwala punkt — i
+  `constructorInjectionPoints` przechwytuje `@Value` na parametrze tą
+  samą ścieżką co `@Qualifier`; `ResolveInjections` odcina
+  `ValueExpression`-owy punkt **przed** wyszukiwaniem beanów —
+  `Resolved=""` (słusznie — realnie nie ma beana), ale `Reason` mówi
+  teraz `a @Value config value ("..."), not a bean lookup`, nigdy
+  generyczne "no known bean"); `internal/report/report.go`
+  (`InjectionRow.ValueExpression`); `report.md.tmpl` (kolumna
+  Resolved renderuje `config value: \`...\`` dla takich wierszy).
+- **Zachowanie dostępne użytkownikowi:** raportowa tabela "Dependency
+  injection" nie myli już punktu config-value z nierozwiązanym
+  wstrzyknięciem beana — każdy `@Value` dostaje własny, uczciwy,
+  odrębny wiersz.
+- **Dowód na realnym bytecode — ujawnienie wcześniej niewidocznego
+  faktu, nie tylko lepsze opisanie istniejącego:** `bin/ariadne
+  -offline -profile spring` na WebGoat: punkty wstrzyknięcia skaczą z
+  **43 do 45** — pole-samo-`@Value` nigdy wcześniej nie było skanowane
+  w ogóle (pętla po polach wymagała `@Autowired`), więc
+  `LessonMenuService`'s własne pola `excludeCategories`/
+  `excludeLessons` (SpEL `#{'${exclude.categories}'.split(',')}`,
+  dzielące property na `List<String>`) były **całkowicie niewidoczne**
+  dla `InjectionPoints`, nie tylko błędnie skategoryzowane. Po
+  dodaniu: **37 rozwiązanych** (niezmienione), **8** nierozwiązanych w
+  pełni wyjaśnionych: **3** realne `@Value` (poprzednia sesja
+  zaraportowała tylko 1 — te dwa nowo znalezione pola błędnie trafiły
+  do "4 `List<Bean>`", bo nie były jeszcze widoczne jako osobna
+  kategoria), **4** realne `List<Bean>` (parametry konstruktora,
+  odrębne od tych pól — `CourseConfiguration`×2, pozostałe
+  `LessonMenuService`'s konstruktorowe), **1** framework-provided
+  bean. petclinic bez zmiany (8 punktów, 8/8, zero `@Value` w kodzie).
+  `REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN` niezmienione na obu
+  (3/62/26/51/6 petclinic, 42/44/18/56/0 WebGoat) — `@Value` to fakt
+  konfiguracyjny, nigdy krawędź grafu, ten sam rygor co reszta tej
+  fazy. Dwa przebiegi offline na każdej aplikacji dają bajt-identyczny
+  `results.json`. `go build ./...`, `go vet ./...`, `go test ./...`,
+  `go test -race ./...` wszystkie zielone.
+- **Spełnione kryteria:** 3 nowe testy jednostkowe `internal/profile`:
+  `TestInjectionPoints_valueFieldWithoutAutowired`,
+  `TestInjectionPoints_valueConstructorParam`,
+  `TestResolveInjections_valueExpressionIsNotUnresolved`. Wszystkie
+  istniejące testy DI przeszły bez zmian (sygnatura
+  `InjectionPoints`/`ResolveInjections` niezmieniona, tylko nowe pole
+  struktury).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "DI/AOP/
+  configuration execution models" rozszerzony o szósty wycinek i
+  korektę liczb 43/37/6 → 45/37/8). `README.md` (akapit "DI"
+  zaktualizowany o `@Value`'s własne zachowanie i poprawione liczby).
+- **Niespełnione/odłożone:** `List<Bean>`/`Map<String,Bean>` collection
+  injection, framework-provided beans jako katalog, integracja z XML
+  `<bean>`, AOP/pointcut, REFLECTION:R3, FRAMEWORKS:F3's dalszy zakres,
+  rejestr B3 — nietknięte, zgodnie z własnym, wąskim zakresem tego
+  wycinka.
+- **Następny krok:** rejestr B3, REFLECTION:R3 (`setAccessible`/
+  przepływ między metodami — zmierzony wcześniej jako
+  prawdopodobnie kosztowny i niskiej wartości), albo FRAMEWORKS:F3's
+  dalszy zakres (AOP pointcut/advice) — wymaga propozycji i zgody
+  użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
@@ -3189,9 +3263,22 @@ Przy dodawaniu kolejnego wpisu zapisz:
    konstruktor nigdy nie jest dziedziczony) — realne krawędzie istnieją
    (petclinic 7, WebGoat 5) ale zero dodatkowego efektu na
    reachability na obu aplikacjach, uczciwie zmierzone i odnotowane.
-   Naturalny następny krok to R3 (`setAccessible`/przepływ między
-   metodami), FRAMEWORKS:F3's podłączenie `ProxyHandlers` do tych
-   krawędzi, rejestr B3, albo `@Value`-owe właściwości.
+   Zbadano i **odrzucono** dwie droższe opcje: REFLECTION:R3
+   (parameter-flow tracking — nowa infrastruktura interproceduralna,
+   najprawdopodobniej zerowy efekt, bo realne wzorce na obu
+   aplikacjach to proxy-forwarding do nieobecnego w hierarchii
+   interfejsu JDK albo biblioteki z runtime-computed nazwami) i
+   FRAMEWORKS:F3's podłączenie proxy-dispatchu (jedyny realny przypadek
+   na WebGoat celuje w `java.sql.Connection`, nieobecny w analizowanej
+   hierarchii zależności — też zero). Zamiast nich: FRAMEWORKS:F2's
+   szósty wycinek (`@Value`-owe punkty wstrzyknięcia) jest gotowy —
+   WebGoat skacze z 43 do **45** punktów (2 pola `@Value` nigdy
+   wcześniej nieskanowane), wszystkie 8 nierozwiązanych w pełni
+   wyjaśnione (3 `@Value`, 4 `List<Bean>`, 1 framework-provided bean),
+   zero wpływu na reachability (fakt konfiguracyjny, nie krawędź).
+   Naturalny następny krok to rejestr B3, REFLECTION:R3 (mimo
+   zmierzonego niskiego prawdopodobieństwa efektu), albo FRAMEWORKS:F3's
+   dalszy zakres (AOP pointcut/advice).
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

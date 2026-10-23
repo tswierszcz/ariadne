@@ -37,6 +37,7 @@ import (
 const (
 	autowiredFQCN = "org.springframework.beans.factory.annotation.Autowired"
 	qualifierFQCN = "org.springframework.beans.factory.annotation.Qualifier"
+	valueFQCN     = "org.springframework.beans.factory.annotation.Value"
 )
 
 // InjectionPoint is one DI injection point found on an application
@@ -56,6 +57,14 @@ type InjectionPoint struct {
 	Type string
 	// Qualifier is "" when no `@Qualifier` is given.
 	Qualifier string
+	// ValueExpression is `@Value`'s own element ("${...}"/"#{...}"/a
+	// plain literal) when this point carries that annotation, "" when
+	// it doesn't. A `@Value` point is a config-value injection, never a
+	// bean lookup — Spring resolves it against property sources, not
+	// the bean catalog this package otherwise matches against —  so
+	// ResolveInjections treats it as a wholly different, already-
+	// explained case rather than an unresolved bean.
+	ValueExpression string
 }
 
 // InjectionPoints finds every DI injection point on h's application
@@ -93,16 +102,21 @@ func InjectionPoints(h *hierarchy.Hierarchy, stereotypeBeans []BeanName) []Injec
 			continue
 		}
 		for _, f := range ci.Fields {
-			if !hasAnnotationType(f.AnnotationDetails, autowiredFQCN) {
+			hasValue := hasAnnotationType(f.AnnotationDetails, valueFQCN)
+			if !hasAnnotationType(f.AnnotationDetails, autowiredFQCN) && !hasValue {
 				continue
 			}
 			typ, ok := classfile.FieldTypeFQCN(f.Descriptor)
 			if !ok {
 				continue
 			}
+			ve := ""
+			if hasValue {
+				ve = valueExpression(f.AnnotationDetails)
+			}
 			out = append(out, InjectionPoint{
 				FQCN: fqcn, Member: f.Name, ParamIndex: -1,
-				Type: typ, Qualifier: qualifierValue(f.AnnotationDetails),
+				Type: typ, Qualifier: qualifierValue(f.AnnotationDetails), ValueExpression: ve,
 			})
 		}
 		containerManaged := stereotyped[fqcn] || hasAny(ci.Annotations, []string{configurationFQCN})
@@ -142,11 +156,12 @@ func constructorInjectionPoints(fqcn string, ci *hierarchy.ClassInfo, containerM
 		if !ok {
 			continue
 		}
-		qualifier := ""
+		qualifier, ve := "", ""
 		if i < len(chosen.ParameterAnnotationDetails) {
 			qualifier = qualifierValue(chosen.ParameterAnnotationDetails[i])
+			ve = valueExpression(chosen.ParameterAnnotationDetails[i])
 		}
-		out = append(out, InjectionPoint{FQCN: fqcn, Member: "<init>", ParamIndex: i, Type: typ, Qualifier: qualifier})
+		out = append(out, InjectionPoint{FQCN: fqcn, Member: "<init>", ParamIndex: i, Type: typ, Qualifier: qualifier, ValueExpression: ve})
 	}
 	return out
 }
@@ -163,6 +178,24 @@ func hasAnnotationType(anns []classfile.Annotation, fqcn string) bool {
 func qualifierValue(anns []classfile.Annotation) string {
 	for _, a := range anns {
 		if a.Type != qualifierFQCN {
+			continue
+		}
+		if v, ok := a.Value("value"); ok {
+			if s, ok := v.Const.(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// valueExpression is qualifierValue's own counterpart for `@Value`
+// ("${property.name}", "#{spEL}", or a plain literal default — all
+// read back as whatever literal string was compiled into the
+// annotation, never evaluated).
+func valueExpression(anns []classfile.Annotation) string {
+	for _, a := range anns {
+		if a.Type != valueFQCN {
 			continue
 		}
 		if v, ok := a.Value("value"); ok {
@@ -208,6 +241,17 @@ func ResolveInjections(h *hierarchy.Hierarchy, points []InjectionPoint, beans []
 	out := make([]ResolvedInjection, len(points))
 	for i, p := range points {
 		ri := ResolvedInjection{InjectionPoint: p}
+		if p.ValueExpression != "" {
+			// A @Value point is never a bean lookup — Spring resolves
+			// it against property sources, which this package has no
+			// model of (and none is needed: there is no bean/object to
+			// find, so no candidate search and no "no known bean"
+			// Reason, which would misreport an already-fully-explained
+			// fact as an unresolved one).
+			ri.Reason = fmt.Sprintf("a @Value config value (%q), not a bean lookup", p.ValueExpression)
+			out[i] = ri
+			continue
+		}
 		subtypeSet := make(map[string]bool)
 		for _, s := range h.Subtypes(p.Type) {
 			subtypeSet[s] = true

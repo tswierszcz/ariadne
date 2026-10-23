@@ -733,23 +733,35 @@ report:
   container generates implements exactly that interface, nothing
   else). A framework-provided bean (`JdbcTemplate`, `DataSource`,
   ...) is still not a known candidate, so those injection points are
-  correctly reported unresolved rather than guessed (confirmed on
-  petclinic: its own 8 injection points, all Spring Data repository
-  interfaces, resolve 8/8; WebGoat: **43** real injection points
-  (the implicit-sole-constructor rule only applies to a class Spring
-  actually container-manages — a stereotype or `@Configuration` class
-  — a 2026-10-23 fix removing injection points the original rule had
-  fabricated for Lombok-generated POJOs, plain enums, and manually-
-  `new`'d helper classes, none of which Spring ever autowires), **37**
-  genuinely resolved, with all 6 remaining unresolved honestly
-  explained: 1 real `@Value` (`DatabaseConfiguration`'s own `String`),
-  4 real `List<Bean>` collection injections (out of scope, see below),
-  and 1 real framework-provided bean (`UserService`'s own
-  `JdbcTemplate`) — nothing left unaccounted for). A factory method
-  whose own construction is ambiguous or programmatic (anything beyond
-  its declared return type) is not resolved further. No AOP/pointcut
-  model, and no call-graph edges from a resolved injection — it is a
-  wiring fact, not a call. **Web.xml roots**: a
+  correctly reported unresolved rather than guessed. A `@Value`-
+  annotated field or constructor parameter (a config value, e.g.
+  `@Value("${spring.datasource.driver-class-name}")`) is recognized as
+  its own, separate case: never run through the bean search at all, so
+  it reports as "config value: `${...}`" rather than a misleading
+  "unresolved: no known bean" — Spring resolves it against property
+  sources, not the bean catalog, so there genuinely is no bean to find
+  (confirmed on petclinic: its own 8 injection points, all Spring Data
+  repository interfaces, resolve 8/8, no `@Value` anywhere in its own
+  source; WebGoat: **45** real injection points (**43** — the
+  implicit-sole-constructor rule only applies to a class Spring
+  actually container-manages, a stereotype or `@Configuration` class,
+  not every class with exactly one constructor — plus **2** `@Value`
+  fields that weren't scanned at all before `@Value` field recognition
+  was added, since Spring treats `@Value` as its own injection
+  annotation, independent of `@Autowired`), **37** genuinely resolved, with all 8
+  remaining honestly explained: **3** real `@Value` config values
+  (`DatabaseConfiguration`'s own `String driverClassName` constructor
+  parameter, plus `LessonMenuService`'s own `excludeCategories`/
+  `excludeLessons` fields — SpEL expressions splitting a property into
+  a `List<String>`, found to be `@Value`, not `List<Bean>`, once field
+  recognition existed to catch them), **4** real `List<Bean>`
+  collection injections (out of scope, see below), and **1** real
+  framework-provided bean (`UserService`'s own `JdbcTemplate`) —
+  nothing left unaccounted for). A factory method whose own
+  construction is ambiguous or programmatic (anything beyond its
+  declared return type) is not resolved further. No AOP/pointcut
+  model, and no call-graph edges from a resolved injection or a
+  `@Value` config value — neither is a call. **Web.xml roots**: a
   `web.xml`-declared servlet/filter/listener's own lifecycle method(s)
   (`doGet`, `doFilter`, `contextInitialized`, ... — only the
   well-known container-callback names, never every public method)

@@ -2,6 +2,7 @@ package profile
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"ariadne/internal/classfile"
@@ -224,5 +225,95 @@ func TestResolveInjections_primaryDisambiguates(t *testing.T) {
 	got := ResolveInjections(h, points, beans)
 	if len(got) != 1 || got[0].Resolved != "test.FooServiceImplB" {
 		t.Errorf("ResolveInjections(primary) = %+v, want Resolved=test.FooServiceImplB", got)
+	}
+}
+
+// TestInjectionPoints_valueFieldWithoutAutowired confirms a `@Value`
+// field is captured even with no `@Autowired` alongside it — Spring
+// treats `@Value` as its own, independent injection annotation, not
+// something that needs `@Autowired` to take effect.
+func TestInjectionPoints_valueFieldWithoutAutowired(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:  "test.Consumer",
+			IsApp: true,
+			Fields: []classfile.Field{
+				{Name: "driverClassName", Descriptor: "Ljava/lang/String;", AnnotationDetails: []classfile.Annotation{
+					{Type: valueFQCN, Values: map[string]classfile.ElementValue{
+						"value": {Kind: classfile.ElementConst, Const: "${spring.datasource.driver-class-name}"},
+					}},
+				}},
+			},
+			Methods: []hierarchy.Method{
+				{Method: classfile.Method{Name: "<init>", Descriptor: "()V"}},
+			},
+		},
+	})
+
+	points := InjectionPoints(h, nil)
+	want := []InjectionPoint{{
+		FQCN: "test.Consumer", Member: "driverClassName", ParamIndex: -1, Type: "java.lang.String",
+		ValueExpression: "${spring.datasource.driver-class-name}",
+	}}
+	if !reflect.DeepEqual(points, want) {
+		t.Errorf("InjectionPoints = %+v, want %+v", points, want)
+	}
+}
+
+// TestInjectionPoints_valueConstructorParam confirms the real WebGoat
+// shape this increment addresses: DatabaseConfiguration's own
+// `@Value("${spring.datasource.driver-class-name}") String
+// driverClassName` constructor parameter.
+func TestInjectionPoints_valueConstructorParam(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.DatabaseConfiguration",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{Method: classfile.Method{
+					Name: "<init>", Descriptor: "(Ljava/lang/String;)V",
+					ParameterAnnotationDetails: [][]classfile.Annotation{
+						{{Type: valueFQCN, Values: map[string]classfile.ElementValue{
+							"value": {Kind: classfile.ElementConst, Const: "${spring.datasource.driver-class-name}"},
+						}}},
+					},
+				}},
+			},
+		},
+	})
+
+	points := InjectionPoints(h, nil)
+	want := []InjectionPoint{{
+		FQCN: "test.DatabaseConfiguration", Member: "<init>", ParamIndex: 0, Type: "java.lang.String",
+		ValueExpression: "${spring.datasource.driver-class-name}",
+	}}
+	if !reflect.DeepEqual(points, want) {
+		t.Errorf("InjectionPoints = %+v, want %+v", points, want)
+	}
+}
+
+// TestResolveInjections_valueExpressionIsNotUnresolved confirms a
+// @Value point is reported as its own, already-explained fact — never
+// run through the bean-candidate search, never reported with
+// ResolveInjections' own "no known bean assignable to ..." Reason
+// (which would misreport a config-value injection as a failed bean
+// lookup).
+func TestResolveInjections_valueExpressionIsNotUnresolved(t *testing.T) {
+	h := hierarchy.NewForTesting(nil)
+	points := []InjectionPoint{{
+		FQCN: "test.DatabaseConfiguration", Member: "<init>", ParamIndex: 0, Type: "java.lang.String",
+		ValueExpression: "${spring.datasource.driver-class-name}",
+	}}
+
+	got := ResolveInjections(h, points, nil)
+	if len(got) != 1 {
+		t.Fatalf("ResolveInjections = %+v, want exactly 1", got)
+	}
+	if got[0].Resolved != "" || got[0].Candidates != nil {
+		t.Errorf("ResolveInjections(@Value) = %+v, want Resolved=\"\" and no Candidates", got[0])
+	}
+	if got[0].Reason == "" || strings.Contains(got[0].Reason, "no known bean") {
+		t.Errorf("Reason = %q, want a @Value-specific explanation, not the generic no-known-bean one", got[0].Reason)
 	}
 }
