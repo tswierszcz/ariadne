@@ -52,8 +52,28 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 		return ""
 
 	case classfile.LocalOpArrayStore:
-		if _, ok := st.popN(3); !ok {
+		entries, ok := st.popN(3)
+		if !ok {
 			return "stack underflow at an array-store instruction"
+		}
+		// REFLECTION R1: an `aastore` through a provable literal index
+		// into a KindArray mutates that array's own Elements *in place*
+		// — every other Value still holding the same *ArrayValue
+		// pointer (a `dup`'d stack copy, or a local the array was
+		// stored to) observes this write, the same real-JVM "one heap
+		// object, many references" semantics `dup` itself already
+		// gets right (see ArrayValue's own doc comment). Any other
+		// shape (not an object array, the array isn't a KindArray, the
+		// index isn't a provable literal, or it's out of this array's
+		// own proven length) is left exactly as before — a silent,
+		// sound no-op, never a guess.
+		if op.IsObjectArray {
+			arr, idx := entries[0].v, entries[1].v
+			if arr.Kind == valueflow.KindArray && idx.Kind == valueflow.KindConst && idx.Type == "int" {
+				if i, ok := idx.Const.(int); ok && i >= 0 && i < len(arr.Array.Elements) {
+					arr.Array.Elements[i] = entries[2].v
+				}
+			}
 		}
 		return ""
 
@@ -111,8 +131,30 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 		return ""
 
 	case classfile.LocalOpNewArray:
-		if _, ok := st.pop(); !ok {
+		lenEntry, ok := st.pop()
+		if !ok {
 			return "stack underflow at an array-allocation instruction"
+		}
+		// REFLECTION R1: an `anewarray` of a provable literal, known
+		// length gets a real KindArray instead of the generic KindAlloc
+		// every array allocation otherwise gets — see ArrayValue's own
+		// doc comment for why this needs its own Kind (a mutable
+		// payload, unlike every other Kind). A negative or unprovable
+		// length (anything but KindConst/"int") falls back to the
+		// existing Alloc — same honest "don't know" as before.
+		if op.IsObjectArray && lenEntry.v.Kind == valueflow.KindConst && lenEntry.v.Type == "int" {
+			if n, ok := lenEntry.v.Const.(int); ok && n >= 0 {
+				elements := make([]valueflow.Value, n)
+				for i := range elements {
+					elements[i] = valueflow.Unknown("array element not yet written")
+				}
+				st.push(valueflow.Array(&valueflow.ArrayValue{
+					Site:        it.site(op.PC, bytecodeir.OpNew),
+					ElementType: op.TypeName,
+					Elements:    elements,
+				}), op.Width)
+				return ""
+			}
 		}
 		st.push(valueflow.Alloc(it.site(op.PC, bytecodeir.OpNew), op.TypeName), op.Width)
 		return ""
@@ -279,6 +321,8 @@ func constValue(op classfile.LocalOp) valueflow.Value {
 		return valueflow.Const("java.lang.Class", op.ConstStr)
 	case classfile.ConstKindNull:
 		return valueflow.Null()
+	case classfile.ConstKindInt:
+		return valueflow.Const("int", op.ConstInt)
 	default:
 		return valueflow.Unknown("constant kind outside DATA_FLOW D2's declared scope (not a string/class literal)")
 	}
@@ -341,6 +385,16 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		// already produces, not a generic Unknown.
 		st.push(cv, op.Width)
 		return ""
+	}
+	if op.CallHasReceiver {
+		if rm, ok := reflectiveMethodValue(it.site(op.PC, bytecodeir.OpCall), op, entries[0].v, args); ok {
+			// REFLECTION R1: a getMethod/getDeclaredMethod call on a
+			// known Class, with a literal name and a fully-literal
+			// Class[] parameter-types array, produces a real
+			// ReflectiveMethodValue instead of a generic Unknown.
+			st.push(valueflow.ReflectiveMethod(rm), op.Width)
+			return ""
+		}
 	}
 	if op.Width > 0 {
 		if op.CallKind == classfile.CallStatic || op.CallKind == classfile.CallSpecial {

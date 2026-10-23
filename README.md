@@ -811,10 +811,17 @@ report:
   literal already gives (REFLECTION R0/R1's own first slice) — so any
   existing consumer reading a Class-typed value (e.g. `ServiceLoader.
   load(Class)`'s own argument) now also sees one reached via
-  `forName`. A runtime-computed name still resolves to nothing, never
-  guessed. This is value-knowledge only — no call-graph edge comes
-  from it; `Method.invoke`/`Constructor.newInstance` (REFLECTION R2)
-  remain unmodeled, so the rest of this limitation stands.
+  `forName`. A second slice: `Class#getMethod`/`getDeclaredMethod`
+  called with a literal name and a literal `Class[]` parameter-types
+  array (`getMethod("foo", String.class)` and the like) resolves to a
+  known owner/name/parameter-types fact, `getMethod` and
+  `getDeclaredMethod` kept distinct. A runtime-computed name, or an
+  array with any non-literal/primitive-typed element (`int.class`
+  compiles to a field read, not a literal, and is correctly left
+  unresolved), still resolves to nothing, never guessed. This is
+  value-knowledge only — no call-graph edge comes from either slice;
+  `Method.invoke`/`Constructor.newInstance` (REFLECTION R2) remain
+  unmodeled, so the rest of this limitation stands.
 - **Six profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus` and `generic`** — every framework PLAN.md section 4 originally
   named for Phase 7, plus the `spring`/`generic` pair from the base plan.

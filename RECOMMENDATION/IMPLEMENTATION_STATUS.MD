@@ -17,7 +17,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
-| REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1 (wycinek A: `Class.forName` z literałem): DONE dla tego zakresu; R1 (`getMethod`/`getDeclaredMethod`), R2–R4: UNASSESSED | `Class.forName("literał")`/3-arg overload rozwiązuje się do tego samego `KindConst`/`java.lang.Class`, co literał `.class` — R0's decyzja projektowa: reużycie istniejącego Kind, nie nowy typ. Zmierzony efekt na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa `Class.forName`), uczciwie odnotowane. `getMethod`/`getDeclaredMethod` (wymaga dekodowania literału `Class[]`) i R2 (realne krawędzie `invoke`/`newInstance`) nietknięte. |
+| REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1 (oba wycinki: `Class.forName`, `getMethod`/`getDeclaredMethod`): DONE dla tego zakresu; R2–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2 (realne krawędzie `invoke`/`newInstance`) nietknięte. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: pięć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). AOP/pointcut, `@Value`-owe właściwości, rejestr B3 — nietknięte. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
@@ -2891,6 +2891,82 @@ Przy dodawaniu kolejnego wpisu zapisz:
   `getDeclaredMethod`, dekodowanie `Class[]`), albo R2 po jego
   ukończeniu — wymaga propozycji i zgody użytkownika przed startem.
 
+### REFLECTION:R1 — drugi wycinek (`getMethod`/`getDeclaredMethod`) — DONE for this scope; R2–R4 nietknięte (2026-10-23)
+
+- **Zakres zlecenia i zależności:** zgoda użytkownika na "najbardziej
+  naturalną kontynuację" R1. Przed startem zbadano realny koszt:
+  śledzenie literału `Class[]` wymaga **nowej maszynerii**, nie tylko
+  recognizera — `aastore` dziś bezwarunkowo odrzuca zapisywaną
+  wartość, a `dup` kopiuje `Value` przez wartość (Go struct copy), nie
+  przez referencję, więc mutacja przez `aastore` nie byłaby widoczna
+  w innych kopiach na stosie. Druga, odkryta w trakcie eskalacja:
+  D2 w ogóle nie śledzi literałów `int` (`iconst_*`/`bipush`/`sipush`/
+  `ldc` Integer — świadomie poza zakresem, "stałe napisowe/klasowe"
+  tylko), a `aastore` potrzebuje indeksu. Obie eskalacje przedstawione
+  użytkownikowi z wyceną kosztu przed startem; zgoda na pełny,
+  skorygowany zakres.
+- **Nowe pole `IsObjectArray`** (`internal/classfile/localops.go`) —
+  odróżnia `anewarray`/`aastore` (obiektowe) od `newarray`/prymitywnych
+  wariantów store, które współdzielą te same `LocalOpKind`.
+- **Nowy `ConstKindInt`** (`internal/classfile/localops.go`) — minimalne
+  śledzenie literałów `int` (`iconst_m1`..`iconst_5`, `bipush`,
+  `sipush`, `ldc` Integer), celowo nie pełna arytmetyka — tylko do
+  odczytu indeksu `aastore`.
+- **Nowy `Kind` `KindArray`** (`internal/valueflow/value.go`) —
+  jedyny `Kind`, którego payload (`*ArrayValue`) jest **wskaźnikiem
+  mutowalnym w miejscu**, nie niemutowalną kopią jak każdy inny `Kind`
+  — żeby `dup`'owane kopie tej samej tablicy na stosie widziały
+  mutację `aastore` (prawdziwa semantyka referencji JVM, nie kopii).
+  `LocalOpNewArray` (`internal/dataflow/step.go`) tworzy `KindArray`
+  tylko dla `anewarray` z literalną, nieujemną długością; inaczej
+  (prymityw, długość nieprowadna) — bez zmiany, stary opakowany
+  `KindAlloc`. `LocalOpArrayStore` mutuje `Elements[idx]` w miejscu
+  tylko dla `aastore` z literalnym indeksem w granicach tablicy.
+- **Nowy `Kind` `KindReflectiveMethod`** i `internal/dataflow/
+  reflectapi.go`'s `reflectiveMethodValue` — rozpoznaje `Class#
+  getMethod`/`getDeclaredMethod` na znanym receiverze (`KindConst`/
+  `java.lang.Class`), z literalną nazwą i w pełni literalną tablicą
+  `Class[]`; zwraca owner FQCN, nazwę, typy parametrów,
+  `getMethod`/`getDeclaredMethod` rozróżnione (`Declared` bool).
+  Typ prymitywny parametru (np. `int.class`, kompilowany jako
+  `getstatic Integer.TYPE`, nie literał `ldc`) poprawnie nie jest
+  rozwiązywany — nie fabrykowane.
+- **Dowód na realnym bytecode:** `bin/ariadne -offline` na petclinic
+  i WebGoat (pełna hierarchia 29k/40k klas) — **brak crasha**, liczby
+  SERVICE_LOADING S1 niezmienione (żadna z aplikacji nie używa
+  `getMethod`/`getDeclaredMethod` na `java.lang.Class` — jedyne
+  trafienia `getMethod()` w kodzie aplikacji to niezwiązane API
+  żądania HTTP). `REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN`
+  niezmienione. Dwa przebiegi na obu dają bajt-identyczny
+  `results.json`.
+- **Spełnione kryteria:** nowe testy jednostkowe: `internal/classfile`
+  (zmiana istniejącego `TestDecodeLocalOps_ldcStringAndClass` →
+  `..._ldcStringClassAndInteger`), `internal/dataflow`:
+  `TestReflectiveMethodValue_literalGetMethodResolves`,
+  `TestReflectiveMethodValue_twoElementArrayResolves` (potwierdza
+  mechanizm współdzielonego wskaźnika przy więcej niż jednym
+  `dup`+`aastore`), `TestReflectiveMethodValue_zeroArgArrayResolves`,
+  `TestReflectiveMethodValue_nonLiteralNameIsNotFabricated`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet
+  ./...`, `go test ./...`, `go test -race ./...` (wszystkie zielone);
+  `bin/ariadne -offline` na petclinic (dwa przebiegi) i WebGoat (dwa
+  przebiegi), opisane wyżej.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Reflection
+  (Class/Method/Constructor)" rozszerzony o drugi wycinek).
+  `README.md` (akapit "Reflection under-approximates" rozszerzony).
+- **Niespełnione/odłożone:** `Method.invoke`/`Constructor.newInstance`
+  (R2, realne krawędzie grafu) — nietknięte, zależy od R0+R1 w pełni
+  (teraz oba gotowe dla swojego zakresu). R3 (przepływ między
+  metodami, `setAccessible`), R4 (kwalifikacja) — nietknięte. `KindArray`
+  obsługuje tylko prostą, liniową konstrukcję literału (bez przechowania
+  w zmiennej lokalnej między osobnymi grupami `dup`/`aastore` poza
+  tym, co mechanizm wskaźnikowy daje "za darmo") — nietestowane poza
+  tym, co projekt czyni poprawnym z definicji.
+- **Następny krok:** R2 (`Method.invoke`/`Constructor.newInstance`,
+  realne krawędzie grafu — odblokuje F3's pełną rezolucję dispatchu),
+  rejestr B3, albo `@Value`-owe właściwości — wymaga propozycji i
+  zgody użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
@@ -2909,14 +2985,16 @@ Przy dodawaniu kolejnego wpisu zapisz:
    rozwiązanych, 6 w pełni wyjaśnionych. FRAMEWORKS:F3 ma pierwszy,
    najwęższy wycinek gotowy (tożsamość proxy/target/interceptor,
    `internal/aop`) — bez rezolucji dispatchu, bo to wymaga
-   REFLECTION:R2. REFLECTION:R0+R1 ma pierwszy wycinek gotowy
-   (`Class.forName` z literałem, reużycie `KindConst` zamiast nowego
-   `Kind`) — zmierzony efekt zerowy na petclinic/WebGoat (żadna z
-   aplikacji nie używa `Class.forName`), uczciwie odnotowany. Naturalny
-   następny krok to R1's drugi wycinek (`getMethod`/`getDeclaredMethod`,
-   wymaga dekodowania literału `Class[]`), R2 po jego ukończeniu
-   (odblokuje realne krawędzie dla F3), rejestr B3, albo `@Value`-owe
-   właściwości.
+   REFLECTION:R2. REFLECTION:R0+R1 ma oba wycinki gotowe (`Class.
+   forName` z literałem — reużycie `KindConst`; `getMethod`/
+   `getDeclaredMethod` z literalną tablicą `Class[]` — nowy `KindArray`
+   wskaźnikowy mutowalny przez `aastore`, nowy `KindReflectiveMethod`,
+   minimalne śledzenie literałów `int`) — zmierzony efekt zerowy na
+   petclinic/WebGoat (żadna z aplikacji nie używa tych API), uczciwie
+   odnotowany, brak crasha na pełnej hierarchii. Naturalny następny
+   krok to R2 (`Method.invoke`/`Constructor.newInstance`, realne
+   krawędzie grafu — odblokuje F3's pełną rezolucję dispatchu),
+   rejestr B3, albo `@Value`-owe właściwości.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

@@ -160,15 +160,25 @@ const (
 
 // ConstKind narrows LocalOpConst to exactly the two literal kinds DATA_FLOW
 // D2 is in scope for ("stałe napisowe/klasowe" — string/class constants);
-// every other constant-producing instruction (int/float/long/double
+// every other constant-producing instruction (float/long/double
 // literals, MethodType/MethodHandle/Dynamic constants) still gets a
 // LocalOpConst so the stack stays balanced, just with ConstKind == "".
+//
+// ConstKindInt is REFLECTION R1's own narrow addition (2026-10-23): an
+// `int` literal, tracked for exactly one purpose — reading back a
+// literal array index at an `aastore` site (see internal/dataflow's
+// own array-literal tracking) — not a general arithmetic-constant
+// feature. `iconst_m1`..`iconst_5`, `bipush`, `sipush`, and an `ldc`
+// of an Integer pool entry all produce it; `long`/`float`/`double`
+// constants and any arithmetic result remain untracked, same as
+// before.
 type ConstKind string
 
 const (
 	ConstKindString ConstKind = "string"
 	ConstKindClass  ConstKind = "class"
 	ConstKindNull   ConstKind = "null"
+	ConstKindInt    ConstKind = "int"
 )
 
 // LocalOp is one instruction, decoded enough for DATA_FLOW D2's abstract
@@ -193,6 +203,7 @@ type LocalOp struct {
 
 	ConstKind ConstKind // LocalOpConst only; "" if untracked (see ConstKind's own doc)
 	ConstStr  string    // the string value, or a Class literal's FQCN
+	ConstInt  int       // ConstKindInt only: the literal int value
 
 	FieldOwner, FieldName, FieldDesc string // LocalOpFieldGet/FieldPut
 	IsStatic                         bool   // LocalOpFieldGet/FieldPut: getstatic/putstatic
@@ -202,6 +213,20 @@ type LocalOp struct {
 	// for `newarray int`, or a resolved FQCN for `anewarray`).
 	TypeName string
 	Dims     int // LocalOpMultiNewArray only
+
+	// IsObjectArray is true for LocalOpNewArray when the opcode was
+	// `anewarray` (an object/array element type, TypeName a resolved
+	// FQCN) rather than `newarray` (a primitive element type, TypeName
+	// one of primitiveArrayType's own single-letter codes); and for
+	// LocalOpArrayStore when the opcode was specifically `aastore`
+	// (storing an object reference) rather than one of the primitive
+	// array-store opcodes (`iastore`/`lastore`/.../`sastore`) that
+	// LocalOpArrayStore also covers. REFLECTION R1's own array-literal
+	// tracking (a `Class[]` built via `anewarray`+`aastore`) needs this
+	// distinction; no other consumer does yet, so it is left unset
+	// (false) for every other LocalOpKind rather than added everywhere
+	// on spec.
+	IsObjectArray bool
 
 	CallOwner, CallName, CallDesc string
 	CallKind                      CallKind // LocalOpCall only
@@ -277,8 +302,10 @@ func (c *ClassFile) decodeOneLocalOp(in instruction) (LocalOp, error) {
 		}
 		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 2}, nil
 
-	case opBipush, opSipush:
-		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 1}, nil
+	case opBipush:
+		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 1, ConstKind: ConstKindInt, ConstInt: int(int8(in.operand[0]))}, nil
+	case opSipush:
+		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 1, ConstKind: ConstKindInt, ConstInt: int(int16(u16(in.operand)))}, nil
 
 	default:
 		if op := localOpByRange(in); op != nil {
@@ -289,7 +316,7 @@ func (c *ClassFile) decodeOneLocalOp(in instruction) (LocalOp, error) {
 
 	switch {
 	case in.opcode >= opIconstM1 && in.opcode <= opIconst5:
-		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 1}, nil
+		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 1, ConstKind: ConstKindInt, ConstInt: int(in.opcode) - int(opIconst0)}, nil
 	case in.opcode == opLconst0 || in.opcode == opLconst1:
 		return LocalOp{PC: pc, Kind: LocalOpConst, Width: 2}, nil
 	case in.opcode >= opFconst0 && in.opcode <= opFconst2:
@@ -334,7 +361,7 @@ func (c *ClassFile) decodeOneLocalOp(in instruction) (LocalOp, error) {
 	case in.opcode >= opIaload && in.opcode <= opSaload:
 		return LocalOp{PC: pc, Kind: LocalOpArrayLoad, Width: 1}, nil
 	case in.opcode >= opIastore && in.opcode <= opSastore:
-		return LocalOp{PC: pc, Kind: LocalOpArrayStore}, nil
+		return LocalOp{PC: pc, Kind: LocalOpArrayStore, IsObjectArray: in.opcode == opAastore}, nil
 
 	case in.opcode == opGetStatic || in.opcode == opGetField:
 		idx := u16(in.operand)
@@ -368,7 +395,7 @@ func (c *ClassFile) decodeOneLocalOp(in instruction) (LocalOp, error) {
 		if err != nil {
 			return LocalOp{}, err
 		}
-		return LocalOp{PC: pc, Kind: LocalOpNewArray, Width: 1, TypeName: owner}, nil
+		return LocalOp{PC: pc, Kind: LocalOpNewArray, Width: 1, TypeName: owner, IsObjectArray: true}, nil
 	case in.opcode == opMultiNewArray:
 		idx := u16(in.operand)
 		owner, err := c.pool.className(idx)
@@ -647,9 +674,15 @@ func (c *ClassFile) decodeLdc(pc int, idx uint16, width int) (LocalOp, error) {
 			return LocalOp{}, err
 		}
 		return LocalOp{PC: pc, Kind: LocalOpConst, Width: width, ConstKind: ConstKindClass, ConstStr: name}, nil
+	case tagInteger:
+		v, err := c.pool.integer(idx)
+		if err != nil {
+			return LocalOp{}, err
+		}
+		return LocalOp{PC: pc, Kind: LocalOpConst, Width: width, ConstKind: ConstKindInt, ConstInt: int(v)}, nil
 	default:
-		// Integer/Float/MethodType/MethodHandle/Dynamic: out of D2's
-		// declared scope — keep the stack balanced, track nothing.
+		// Float/MethodType/MethodHandle/Dynamic: out of D2's declared
+		// scope — keep the stack balanced, track nothing.
 		return LocalOp{PC: pc, Kind: LocalOpConst, Width: width}, nil
 	}
 }

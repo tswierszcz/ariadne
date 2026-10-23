@@ -1,6 +1,7 @@
 package dataflow
 
 import (
+	"ariadne/internal/bytecodeir"
 	"ariadne/internal/classfile"
 	"ariadne/internal/valueflow"
 )
@@ -66,4 +67,80 @@ func classForNameValue(op classfile.LocalOp, args []valueflow.Value) (valueflow.
 		return valueflow.Value{}, false
 	}
 	return valueflow.Const("java.lang.Class", fqcn), true
+}
+
+// getMethodDesc is the exact descriptor both `getMethod` and
+// `getDeclaredMethod` share — `Class<?>...` varargs always compile to
+// a literal `Class[]` second parameter, never a different shape.
+const getMethodDesc = "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;"
+
+// reflectiveMethodValue recognizes a `Class#getMethod`/
+// `getDeclaredMethod` call whose receiver is a known Class, whose
+// method-name argument is a provable string literal, and whose
+// parameter-types argument is a `Class[]` array every element of
+// which is itself a provable Class literal (REFLECTION R1's own
+// "bazowy lookup... oraz listę typów parametrów" case) — never an
+// array with any still-unwritten/non-literal element, which would
+// silently claim a resolved overload this analysis cannot actually
+// prove (R1's own "nie dopasowywać wszystkich przeciążeń jako
+// dokładnego wyniku").
+//
+// ok is false for any other call, including one on an unresolved
+// receiver, a runtime-computed name, or a parameter-types array this
+// analysis couldn't fully track (see ArrayValue's own doc comment for
+// when that happens) — left for the caller to fall through to the
+// generic KindCallResult, never guessed at.
+func reflectiveMethodValue(site bytecodeir.Site, op classfile.LocalOp, receiver valueflow.Value, args []valueflow.Value) (valueflow.ReflectiveMethodValue, bool) {
+	if op.CallOwner != classOwner || op.CallDesc != getMethodDesc {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	var declared bool
+	switch op.CallName {
+	case "getMethod":
+		declared = false
+	case "getDeclaredMethod":
+		declared = true
+	default:
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	if receiver.Kind != valueflow.KindConst || receiver.Type != "java.lang.Class" {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	ownerFQCN, ok := receiver.Const.(string)
+	if !ok {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	if len(args) != 2 {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	nameVal := args[0]
+	if nameVal.Kind != valueflow.KindConst || nameVal.Type != "java.lang.String" {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	name, ok := nameVal.Const.(string)
+	if !ok {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	paramTypesVal := args[1]
+	if paramTypesVal.Kind != valueflow.KindArray || paramTypesVal.Array.ElementType != "java.lang.Class" {
+		return valueflow.ReflectiveMethodValue{}, false
+	}
+	paramTypes := make([]string, len(paramTypesVal.Array.Elements))
+	for i, e := range paramTypesVal.Array.Elements {
+		if e.Kind != valueflow.KindConst || e.Type != "java.lang.Class" {
+			return valueflow.ReflectiveMethodValue{}, false
+		}
+		t, ok := e.Const.(string)
+		if !ok {
+			return valueflow.ReflectiveMethodValue{}, false
+		}
+		paramTypes[i] = t
+	}
+	return valueflow.ReflectiveMethodValue{
+		Site:       site,
+		OwnerFQCN:  ownerFQCN,
+		Name:       name,
+		ParamTypes: paramTypes,
+		Declared:   declared,
+	}, true
 }

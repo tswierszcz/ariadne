@@ -101,14 +101,14 @@ func TestDecodeLocalOps_dupFamily(t *testing.T) {
 	}
 }
 
-func TestDecodeLocalOps_ldcStringAndClass(t *testing.T) {
+func TestDecodeLocalOps_ldcStringClassAndInteger(t *testing.T) {
 	p := pool{
 		{},
 		{tag: tagUtf8, str: "hello"},       // 1
 		{tag: tagString, nameIndex: 1},     // 2
 		{tag: tagUtf8, str: "test/Target"}, // 3
 		{tag: tagClass, nameIndex: 3},      // 4
-		{tag: tagInteger},                  // 5: out of D2's declared scope
+		{tag: tagInteger},                  // 5: REFLECTION R1's own int tracking
 	}
 	cf := &ClassFile{pool: p}
 
@@ -125,8 +125,8 @@ func TestDecodeLocalOps_ldcStringAndClass(t *testing.T) {
 	if ops[1].ConstKind != ConstKindClass || ops[1].ConstStr != "test.Target" {
 		t.Errorf("ldc class = %+v, want ConstKindClass \"test.Target\"", ops[1])
 	}
-	if ops[2].ConstKind != "" {
-		t.Errorf("ldc integer = %+v, want ConstKind \"\" (out of D2's scope)", ops[2])
+	if ops[2].ConstKind != ConstKindInt || ops[2].ConstInt != 0 {
+		t.Errorf("ldc integer = %+v, want ConstKindInt 0", ops[2])
 	}
 }
 
