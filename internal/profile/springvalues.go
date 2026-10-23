@@ -203,6 +203,38 @@ func BeanNames(h *hierarchy.Hierarchy) []BeanName {
 	return out
 }
 
+// springDataRepositoryFQCN is Spring Data's own marker interface —
+// the same type `internal/profile/profiles/spring.yaml`'s own
+// `synthetic_edges` entry already keys its proxy call-graph edges off
+// of (`from_subtypes_of: org.springframework.data.repository.Repository`).
+// RepositoryBeans reuses that exact check for DI resolution, rather
+// than inventing a second notion of "is this a Spring Data repository".
+const springDataRepositoryFQCN = "org.springframework.data.repository.Repository"
+
+// RepositoryBeans finds every application interface that is a
+// (transitive) subtype of Spring Data's own `Repository` marker
+// interface — FRAMEWORKS F2's own "known factory" case for the
+// container-generated proxy bean Spring Data creates for each such
+// interface. The bean's FQCN is the interface itself: Spring Data's
+// real runtime proxy always implements exactly that declared
+// repository interface, never a separate named type, so there is
+// nothing else to derive here (unlike BeanMethods, where the factory
+// method's own return type has to be read). Only an application
+// interface counts — a concrete class is never how a Spring Data
+// repository is declared, and a dependency-jar interface (not IsApp)
+// has no application-level bean name to report at all.
+func RepositoryBeans(h *hierarchy.Hierarchy) []BeanName {
+	var out []BeanName
+	for _, fqcn := range h.Subtypes(springDataRepositoryFQCN) {
+		ci, ok := h.Lookup(fqcn)
+		if !ok || !ci.IsApp || !ci.IsInterface() {
+			continue
+		}
+		out = append(out, BeanName{FQCN: fqcn})
+	}
+	return out
+}
+
 // configurationFQCN and beanMethodFQCN are Spring's own factory-method
 // shape: a `@Bean` method is only ever meaningful inside a
 // `@Configuration` class (a plain `@Component`'s own methods are never

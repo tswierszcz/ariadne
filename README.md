@@ -726,18 +726,25 @@ report:
   (`@Component`-family stereotypes) *and* `@Bean` factory methods on
   `@Configuration` classes — a factory method's bean FQCN is its own
   declared return type, its name is `@Bean("...")`/`value()`/`name()`
-  or (Spring's own default) the method name. A Spring Data repository
-  interface or a framework-provided bean (`JdbcTemplate`, `DataSource`,
+  or (Spring's own default) the method name — and, now, every
+  application interface that is a (transitive) subtype of Spring
+  Data's own `Repository` marker interface, reported as a bean whose
+  FQCN is the interface itself (the same real proxy Spring Data's own
+  container generates implements exactly that interface, nothing
+  else). A framework-provided bean (`JdbcTemplate`, `DataSource`,
   ...) is still not a known candidate, so those injection points are
   correctly reported unresolved rather than guessed (confirmed on
-  petclinic: its own 8 injection points are all Spring Data repository
-  interfaces, correctly 0/8 resolved even with one real `@Bean` method
-  found; WebGoat: 21 `@Bean` methods found, and resolution jumps from
-  7/74 to 40/74 genuinely resolved). A factory method whose own
-  construction is ambiguous or programmatic (anything beyond its
-  declared return type) is not resolved further. No AOP/pointcut
-  model, and no call-graph edges from a resolved injection — it is a
-  wiring fact, not a call. **Web.xml roots**: a
+  petclinic: its own 8 injection points, all Spring Data repository
+  interfaces, now resolve 8/8; WebGoat: 21 `@Bean` methods plus every
+  repository interface push resolution from 7/74 up to **50/74**
+  genuinely resolved — only 2 of the remaining 24 are a true
+  framework-provided bean, `JdbcTemplate`/`ResourceLoader`; the bulk
+  is `@Value`-style property injection of `String`/`List`/`Integer`/
+  `Boolean`, a different, untouched mechanism, not a missing bean). A
+  factory method whose own construction is ambiguous or programmatic
+  (anything beyond its declared return type) is not resolved further.
+  No AOP/pointcut model, and no call-graph edges from a resolved
+  injection — it is a wiring fact, not a call. **Web.xml roots**: a
   `web.xml`-declared servlet/filter/listener's own lifecycle method(s)
   (`doGet`, `doFilter`, `contextInitialized`, ... — only the
   well-known container-callback names, never every public method)

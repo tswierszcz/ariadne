@@ -319,6 +319,76 @@ func TestBeanMethods_resolvesRealInjectionPoint(t *testing.T) {
 	}
 }
 
+func TestRepositoryBeans_appInterfaceSubtypeOfRepository(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{FQCN: "org.springframework.data.repository.Repository", AccessFlags: classfile.AccInterface},
+		{
+			FQCN:        "test.OwnerRepository",
+			IsApp:       true,
+			AccessFlags: classfile.AccInterface,
+			Interfaces:  []string{"org.springframework.data.repository.Repository"},
+		},
+	})
+
+	beans := RepositoryBeans(h)
+	want := []BeanName{{FQCN: "test.OwnerRepository"}}
+	if !reflect.DeepEqual(beans, want) {
+		t.Errorf("RepositoryBeans = %+v, want %+v", beans, want)
+	}
+}
+
+func TestRepositoryBeans_concreteClassNotABean(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{FQCN: "org.springframework.data.repository.Repository", AccessFlags: classfile.AccInterface},
+		{
+			FQCN:       "test.OwnerRepositoryImpl",
+			IsApp:      true,
+			Interfaces: []string{"org.springframework.data.repository.Repository"},
+		},
+	})
+
+	if beans := RepositoryBeans(h); len(beans) != 0 {
+		t.Errorf("RepositoryBeans = %+v, want none (a concrete class is never how a repository is declared)", beans)
+	}
+}
+
+func TestRepositoryBeans_unrelatedInterfaceSkipped(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{FQCN: "org.springframework.data.repository.Repository", AccessFlags: classfile.AccInterface},
+		{FQCN: "test.PlainInterface", IsApp: true, AccessFlags: classfile.AccInterface},
+	})
+
+	if beans := RepositoryBeans(h); len(beans) != 0 {
+		t.Errorf("RepositoryBeans = %+v, want none (not a Repository subtype)", beans)
+	}
+}
+
+func TestRepositoryBeans_resolvesRealInjectionPoint(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{FQCN: "org.springframework.data.repository.Repository", AccessFlags: classfile.AccInterface},
+		{
+			FQCN:        "test.OwnerRepository",
+			IsApp:       true,
+			AccessFlags: classfile.AccInterface,
+			Interfaces:  []string{"org.springframework.data.repository.Repository"},
+		},
+		{
+			FQCN:  "test.Consumer",
+			IsApp: true,
+			Fields: []classfile.Field{
+				{Name: "repo", Descriptor: "Ltest/OwnerRepository;", AnnotationDetails: []classfile.Annotation{{Type: autowiredFQCN}}},
+			},
+		},
+	})
+
+	beans := RepositoryBeans(h)
+	points := InjectionPoints(h)
+	resolved := ResolveInjections(h, points, beans)
+	if len(resolved) != 1 || resolved[0].Resolved != "test.OwnerRepository" {
+		t.Errorf("ResolveInjections = %+v, want one entry resolved to test.OwnerRepository", resolved)
+	}
+}
+
 func TestProfileConditions_noActiveListIsUnknown(t *testing.T) {
 	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
 		{

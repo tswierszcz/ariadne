@@ -410,9 +410,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	springRoutes := profile.Routes(h)
 	springBeanNames := profile.BeanNames(h)
 	springBeanMethods := profile.BeanMethods(h)
+	springRepositoryBeans := profile.RepositoryBeans(h)
 	springProfileConditions := profile.ProfileConditions(h, activeProfiles)
-	log("frameworks: %d Spring MVC routes, %d @Component-family bean names, %d @Bean factory methods, %d @Profile conditions found (active profiles: %s)",
-		len(springRoutes), len(springBeanNames), len(springBeanMethods), len(springProfileConditions), cfg.activeProfiles)
+	log("frameworks: %d Spring MVC routes, %d @Component-family bean names, %d @Bean factory methods, %d Spring Data repository beans, %d @Profile conditions found (active profiles: %s)",
+		len(springRoutes), len(springBeanNames), len(springBeanMethods), len(springRepositoryBeans), len(springProfileConditions), cfg.activeProfiles)
 
 	// FRAMEWORKS F2: first DI — every @Autowired field/constructor
 	// injection point, resolved against springBeanNames plus
@@ -422,7 +423,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// same order Spring's own container uses). Unresolved means no
 	// candidate or an undisambiguated one, never a guess.
 	injectionPoints := profile.InjectionPoints(h)
-	allBeans := append(append([]profile.BeanName{}, springBeanNames...), springBeanMethods...)
+	allBeans := append(append(append([]profile.BeanName{}, springBeanNames...), springBeanMethods...), springRepositoryBeans...)
 	resolvedInjections := profile.ResolveInjections(h, injectionPoints, allBeans)
 	resolvedInjectionCount := 0
 	for _, inj := range resolvedInjections {
