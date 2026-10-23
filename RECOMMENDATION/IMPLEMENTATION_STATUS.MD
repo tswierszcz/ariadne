@@ -12,7 +12,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
-| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. |
+| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: sama decyzja architektoniczna + kontrakt (`internal/models`) zrobione; koordynator iteracji (`internal/analysis`) NIE; B0–B2, B4: UNASSESSED | Uzgodnić B0–B1 z CVE/JVM; nie traktować całego R0 jako ukończonego po samym projekcie. B3's własny kontrakt (`Model`/`Registry`/`Fact`, dopasowanie po dokładnym `Signature`+GAV, nie po nazwie) jest gotowy i udokumentowany jako wyłącznie kontrakt — zob. własny wpis fazy. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
@@ -3229,6 +3229,112 @@ Przy dodawaniu kolejnego wpisu zapisz:
   dalszy zakres (AOP pointcut/advice) — wymaga propozycji i zgody
   użytkownika przed startem.
 
+### ROADMAP:B3 — sama decyzja architektoniczna i kontrakt (`internal/models`) — DONE for this scope; koordynator iteracji NIE (2026-10-23)
+
+- **Zakres zlecenia i zależności:** zgoda użytkownika po przeczytaniu
+  ROADMAP.MD na miejscu i ustaleniu, że pełne B3 (rejestr modeli +
+  koordynator iteracji z kolejką pracy i punktem stałym) to
+  wieloetapowe przedsięwzięcie architektoniczne, nie jednosesyjny
+  przyrost jak REFLECTION/FRAMEWORKS. Zgoda ograniczona wyłącznie do
+  decyzji o kierunku zależności pakietów i samego kontraktu modelu —
+  bez koordynatora.
+- **Decyzja architektoniczna (ROADMAP.MD's własny prerequisite
+  "ustalić kierunek zależności pakietów przed refaktorem, aby uniknąć
+  cyklu profile → callgraph → models → profile"):** `internal/models`
+  może zależeć wyłącznie od pakietów-liści bez własnej zależności
+  zwrotnej do `internal/profile`/`internal/callgraph` —
+  `internal/classfile`, `internal/input` (potwierdzone: `internal/
+  input` nie importuje żadnego innego pakietu `internal/` — prawdziwy
+  liść), `internal/bytecodeir`. Nigdy nie importuje `internal/profile`
+  ani `internal/callgraph` samemu. Przyszły koordynator iteracji
+  (`internal/analysis`, nie zbudowany tutaj) jest jedynym pakietem,
+  któremu wolno zależeć jednocześnie od `internal/models` i
+  `internal/callgraph`; `internal/profile` może zależeć od `internal/
+  models` (wybór ID modeli dla aktywnego profilu), nigdy odwrotnie, i
+  nigdy od `internal/analysis` — profile zostaje "dostawcą
+  konfiguracji i wyboru modeli, nie drugim koordynatorem"
+  (dosłowne słowa ROADMAP.MD). Graf zależności zostaje DAG-iem: models
+  ← analysis → callgraph, profile → models, nic nie wskazuje z powrotem
+  w profile.
+- **Nowy pakiet `internal/models` — kontrakt, nie silnik:** `Signature`
+  (Owner/Name/Desc dokładnie jak w bytecode, ten sam konwencja co
+  `valueflow.CallResultRef`/`FieldRef`) — dopasowanie zawsze po
+  dokładnym wywołaniu, nigdy po samej nazwie metody w całej aplikacji
+  (B3's własne explicite wymaganie). `VersionRange` (Min/Max,
+  honestly nieudawający pełnego semver — tagi pre-release/metadata to
+  świadomie nieobsłużony przypadek, patrz niżej). `Model` (ID,
+  Artifact — Maven "group:artifact", Versions, Signatures, Source —
+  B3's własne "identyfikator, obsługiwane sygnatury, zakres wersji,
+  źródło semantyki", wszystkie cztery pola jednocześnie). `Fact`
+  (ModelID, Incomplete, Reason — kształt, jaki przyszła ewaluacja
+  modelu będzie zwracać; nic w tym pakiecie jeszcze nie produkuje
+  `Fact`). `Registry` (`Register`/`Lookup` — `Lookup` dopasowuje po
+  dokładnym `Signature`, a gdy `Model.Artifact != ""`, też po
+  `input.GAV`'s własnym `PackageName()`+`Version` wewnątrz
+  `VersionRange`; `Model` bez `Artifact` dopasowuje niezależnie od
+  GAV — API czysto JDK-owe bez koordynatu Maven; `gav == nil`
+  (klasa aplikacji) dopasowuje tylko modele bez `Artifact` —
+  nigdy zgadywane).
+- **Wersja nieudawana za pełną:** `inclusiveVersionInRange` porównuje
+  tylko kropkowane segmenty numeryczne (np. "5.3.21") — wersja, której
+  nie da się tak sparsować (kwalifikator typu "-RELEASE", segment
+  nienumeryczny) **nie jest wykluczana**, tylko włączona (B0's własne
+  "każdy limit poszerza do nieznanej wartości z diagnostyką, nigdy po
+  prostu nie odrzuca kandydata") — pełny semver pozostaje świadomie
+  nieobsłużony, nie udawany.
+- **Spełnione kryteria (częściowe — tylko kontrakt):** "rejestr
+  modeli z identyfikatorem, obsługiwanymi sygnaturami, zakresem
+  wersji i źródłem semantyki" — spełnione. "Obsługę znanego API
+  przypinać do konkretnego wywołania/obiektu, nie do wszystkich metod
+  o tej samej nazwie" — spełnione przez samą konstrukcję `Signature`.
+  "Budżety i stan incomplete z przyczyną" — kształt (`Fact`) istnieje,
+  ale nic go jeszcze nie produkuje. **Niespełnione, świadomie, nie
+  przez przeoczenie:** "Graf, odkryte alokacje i streszczenia
+  wartości wpływają na siebie... kolejka pracy i kontrolowany punkt
+  stały" (koordynator), "Przy poprawianiu modelu unieważniać zależne
+  wyniki" (invalidation), RTA/points-to update rules
+  (GRAPH_PRECISION's własny zakres). **"Gotowe" z B3's własnego planu
+  ("model usługi może wprowadzić typ, który uruchamia kolejne
+  poprawne rozwinięcie grafu, a limit zatrzymania jest widoczny") NIE
+  jest spełnione** — to wymaga koordynatora, nie samego kontraktu.
+- **Zero wpływu na działanie binarki:** `internal/models` nie jest
+  podłączony do `cmd/ariadne/main.go`, `internal/callgraph` ani
+  `internal/profile` w żaden sposób — potwierdzone (`go build`
+  niezmieniony dla żadnego innego pakietu, `bin/ariadne` przebudowane
+  bez zmiany zachowania, nic nowego do zmierzenia na petclinic/
+  WebGoat, bo nic realnie nie działa jeszcze na realnym grafie).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet
+  ./...`, `go test ./...`, `go test -race ./...` (wszystkie zielone,
+  24 pakiety, włącznie z nowym `internal/models`).
+- **Spełnione kryteria (testy):** nowe testy jednostkowe `internal/
+  models`: `TestRegistry_lookupMatchesExactSignatureOnly` (nazwa sama
+  nie wystarcza — inny owner/inny deskryptor nie dopasowuje),
+  `TestRegistry_artifactAndVersionGateTheMatch` (w zakresie/za stary/
+  za nowy/złe artifact/brak GAV), `TestRegistry_
+  noArtifactModelMatchesRegardlessOfGAV`,
+  `TestInclusiveVersionInRange_unparseableVersionWidensRatherThanExcludes`,
+  `TestInclusiveVersionInRange_boundaryValuesAreInclusive`,
+  `TestInclusiveVersionInRange_missingTrailingSegmentReadsAsZero`.
+- **Zmiany w dokumentacji:** tylko ten plik — `docs/SUPPORT.MD`/
+  `README.md` celowo nietknięte, bo ten przyrost nie zmienia żadnej
+  obserwowalnej dla użytkownika zdolności (nic nie jest podłączone;
+  nie ma nic nowego do opisania w dokumentacji user-facing). To jest
+  świadoma decyzja, nie przeoczenie reguły "kod + weryfikacja +
+  dokumentacja w tym samym commicie" z catch-up skill — ta reguła
+  dotyczy zmian zachowania, a to jest wyłącznie kontrakt.
+- **Niespełnione/odłożone (zgodnie z własnym, świadomie wąskim
+  zakresem tej sesji, nie przez przeoczenie):** `internal/analysis`
+  (koordynator iteracji, kolejka pracy, punkt stały) — nietknięty,
+  to jest następny, znacznie większy krok B3. Żaden realny model
+  biblioteki (np. Spring `BeanUtils.copyProperties`) nie jest jeszcze
+  zarejestrowany — `internal/models` eksportuje tylko typ, zero
+  instancji `Model` istnieje poza testami.
+- **Następny krok:** `internal/analysis` (koordynator iteracji —
+  wymaga własnej propozycji zakresu, to największy pozostały krok
+  B3), REFLECTION:R3, albo FRAMEWORKS:F3's dalszy zakres (AOP
+  pointcut/advice) — wymaga propozycji i zgody użytkownika przed
+  startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
@@ -3276,9 +3382,20 @@ Przy dodawaniu kolejnego wpisu zapisz:
    wcześniej nieskanowane), wszystkie 8 nierozwiązanych w pełni
    wyjaśnione (3 `@Value`, 4 `List<Bean>`, 1 framework-provided bean),
    zero wpływu na reachability (fakt konfiguracyjny, nie krawędź).
-   Naturalny następny krok to rejestr B3, REFLECTION:R3 (mimo
-   zmierzonego niskiego prawdopodobieństwa efektu), albo FRAMEWORKS:F3's
-   dalszy zakres (AOP pointcut/advice).
+   ROADMAP:B3 — sprawdzono w ROADMAP.MD, że pełne B3 (rejestr +
+   koordynator iteracji z kolejką pracy i punktem stałym) jest
+   wieloetapowym przedsięwzięciem architektonicznym, nie jednosesyjnym
+   przyrostem. Zgoda użytkownika ograniczona do samej decyzji o
+   kierunku zależności pakietów + kontraktu: nowy `internal/models`
+   (`Signature`/`VersionRange`/`Model`/`Fact`/`Registry`, dopasowanie
+   po dokładnym wywołaniu + GAV, nigdy po samej nazwie) jest gotowy,
+   ale **nic jeszcze nie podłączony** do `callgraph`/`profile`/
+   `cmd/ariadne` — zero wpływu na działanie binarki, potwierdzone.
+   Koordynator iteracji (`internal/analysis`) to następny, osobno
+   wymagający zgody, znacznie większy krok. Naturalny następny krok:
+   `internal/analysis`, REFLECTION:R3 (mimo zmierzonego niskiego
+   prawdopodobieństwa efektu), albo FRAMEWORKS:F3's dalszy zakres (AOP
+   pointcut/advice).
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 
