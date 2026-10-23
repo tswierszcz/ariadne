@@ -365,6 +365,39 @@ No servlets found.
 Unmodeled elements found: {{range $i, $e := .WebXML.Skipped}}{{if $i}}, {{end}}`<{{$e}}>`{{end}}.
 {{end}}
 
+## Spring XML bean definitions
+
+Every `<bean>` found in a Spring classic XML config resource on the app's own
+classpath (FRAMEWORKS F1) — `<property>`/`<constructor-arg>` wiring is not modeled,
+only each bean's own identity, class, scope and `@Primary`-equivalent `primary`
+attribute.
+{{if not .SpringXMLBeans}}
+None found.
+{{else}}
+| Resource | Bean | Class | Scope | Primary |
+|---|---|---|---|---|
+{{range .SpringXMLBeans}}| `{{.Source}}` | {{if .ID}}`{{.ID}}`{{else}}(anonymous){{end}} | `{{.Class}}` | {{if .Scope}}`{{.Scope}}`{{else}}(default){{end}} | {{.Primary}} |
+{{end}}
+{{end}}
+
+## Configuration conflicts
+
+Every bean name claimed, with a *different* class, by more than one source — an
+`@Component`-family annotation and/or a Spring XML `<bean>` (FRAMEWORKS F1). These
+are reported as distinct candidates, never silently merged into one assumed winner:
+Spring's own real bean-definition-override behavior is configurable
+(`allow-bean-definition-overriding`) and not modeled here. The same name with the
+*same* class from two sources (a harmless re-declaration) is not a conflict and
+does not appear below.
+{{if not .ConfigConflicts}}
+None found.
+{{else}}
+| Name | Candidates |
+|---|---|
+{{range .ConfigConflicts}}| `{{.Name}}` | {{range $i, $c := .Candidates}}{{if $i}}, {{end}}{{$c.Kind}}: `{{$c.Class}}`{{end}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

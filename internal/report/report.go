@@ -147,6 +147,46 @@ type Data struct {
 
 	// WebXML is FRAMEWORKS F1's own ograniczony odczyt web.xml result.
 	WebXML WebXMLInput
+
+	// SpringXMLBeans is FRAMEWORKS F1's own XML bean definitions
+	// result: every `<bean>` found in a Spring classic XML config
+	// resource inside the app's own classpath, keyed by that
+	// resource's own path.
+	SpringXMLBeans []XMLBeanRow
+
+	// ConfigConflicts is FRAMEWORKS F1's own "priorytet/konflikt"
+	// result: every bean name declared with a different class by more
+	// than one source (an annotation stereotype and/or an XML
+	// `<bean>`) — reported as distinct candidates, never silently
+	// merged into one assumed winner. Spring's own real
+	// bean-definition-override behavior is configurable
+	// (allow-bean-definition-overriding) and not modeled here; this is
+	// detection, not resolution.
+	ConfigConflicts []ConfigConflictRow
+}
+
+// XMLBeanRow is Data's own rendering-friendly form of springxml.Bean,
+// with its source resource's own path attached (springxml.Bean itself
+// doesn't know which resource it came from — that's
+// input.FindBeansXML's own concern, one layer up, same split
+// internal/webxml's Module tagging already uses).
+type XMLBeanRow struct {
+	Source, ID, Class, Scope string
+	Primary                  bool
+}
+
+// NamedBeanCandidate is one source's own claim to a bean name —
+// ConfigConflictRow's own building block.
+type NamedBeanCandidate struct {
+	// Kind is "annotation" or the XML resource's own path.
+	Kind, Class string
+}
+
+// ConfigConflictRow is one bean name claimed, with a different class,
+// by more than one source.
+type ConfigConflictRow struct {
+	Name       string
+	Candidates []NamedBeanCandidate
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
@@ -198,7 +238,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -229,6 +269,8 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		SpringProfileConditions:   profileConditionRows(springProfileConditions),
 		ActiveProfiles:            activeProfiles,
 		WebXML:                    webXML,
+		SpringXMLBeans:            springXMLBeans,
+		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
 	}
 
 	for _, r := range sorted {
@@ -282,6 +324,49 @@ func sourceLabel(r reach.Result) string {
 // routeRows converts profile.Route into Data's own rendering-friendly
 // RouteRow, joining Paths/HTTPMethods — HTTPMethods nil (unspecified)
 // renders as "any", never a guessed single verb.
+// buildConfigConflicts groups every named bean claim (an annotation's
+// own explicit name, an XML <bean>'s own id) by name, and keeps only
+// the names where more than one *distinct class* claims it — the same
+// name with the same class from two sources is not a conflict (e.g. an
+// XML bean re-declaring exactly the bean an annotation already names,
+// a common no-op override pattern). Order is first-seen across
+// annotationBeans then springXMLBeans, both of which are already
+// deterministically ordered by their own callers — never a map
+// iteration, which this codebase's own byte-identical-results.json
+// contract cannot tolerate.
+func buildConfigConflicts(annotationBeans []profile.BeanName, xmlBeans []XMLBeanRow) []ConfigConflictRow {
+	byName := map[string][]NamedBeanCandidate{}
+	var order []string
+	add := func(name string, c NamedBeanCandidate) {
+		if name == "" {
+			return
+		}
+		if _, ok := byName[name]; !ok {
+			order = append(order, name)
+		}
+		byName[name] = append(byName[name], c)
+	}
+	for _, b := range annotationBeans {
+		add(b.Name, NamedBeanCandidate{Kind: "annotation", Class: b.FQCN})
+	}
+	for _, b := range xmlBeans {
+		add(b.ID, NamedBeanCandidate{Kind: b.Source, Class: b.Class})
+	}
+
+	var out []ConfigConflictRow
+	for _, name := range order {
+		candidates := byName[name]
+		distinctClasses := map[string]bool{}
+		for _, c := range candidates {
+			distinctClasses[c.Class] = true
+		}
+		if len(distinctClasses) > 1 {
+			out = append(out, ConfigConflictRow{Name: name, Candidates: candidates})
+		}
+	}
+	return out
+}
+
 func routeRows(routes []profile.Route) []RouteRow {
 	out := make([]RouteRow, len(routes))
 	for i, r := range routes {

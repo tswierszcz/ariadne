@@ -431,8 +431,10 @@ was given — FRAMEWORKS F1, sourced from real annotation element values,
 not just the bare presence of the annotation), a limited, safe reading
 of every `WEB-INF/web.xml` found in a WAR/EAR input (servlets, filters,
 listeners, context params, with every other element named as unmodeled
-rather than silently dropped — FRAMEWORKS F1), and a fixed Limitations
-section (see below).
+rather than silently dropped — FRAMEWORKS F1), every Spring classic XML
+`<bean>` found on the app's own classpath, every bean name claimed by
+more than one source with a different class (flagged, never
+auto-resolved), and a fixed Limitations section (see below).
 
 The entry call line also names the call kind, the resolution rule
 (`direct`: the edge is exactly the call site's own symbolic target; `cha`:
@@ -699,14 +701,22 @@ report:
   own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
   left unresolved rather than guessed at.
 - **Serialization gadgets** are not modeled. **`web.xml`** (a WAR's own
-  deployment descriptor, and an EAR's per-module ones) is read in a
-  limited, safe way (FRAMEWORKS F1 — the report's own "web.xml"
-  section): `<servlet>`/`<servlet-mapping>`/`<filter>`/
-  `<filter-mapping>`/`<listener>`/`<context-param>`, with every other
-  element named as unmodeled rather than silently dropped. No call-graph
-  edges come from this yet — it is inventory, not wiring, same
-  reasoning as ServiceLoader's own declarations below. Spring XML bean
-  definitions (`<bean id="..." class="...">`) are not modeled at all.
+  deployment descriptor, and an EAR's per-module ones) and **Spring
+  classic XML bean definitions** (`<bean id="..." class="...">`,
+  wherever a `<beans>`-rooted `.xml` resource is found on the app's own
+  classpath) are both read in a limited, safe way (FRAMEWORKS F1 — the
+  report's own "web.xml" / "Spring XML bean definitions" sections):
+  `<servlet>`/`<servlet-mapping>`/`<filter>`/`<filter-mapping>`/
+  `<listener>`/`<context-param>` for the former, each bean's own
+  identity/class/scope/primary for the latter (`<property>`/
+  `<constructor-arg>` wiring is not modeled), with every other element
+  named as unmodeled rather than silently dropped. A bean name claimed
+  by both an annotation and an XML `<bean>` with a *different* class is
+  flagged as a conflict (the report's own "Configuration conflicts"
+  section) — detected, never resolved: Spring's own real
+  bean-definition-override behavior is configurable and not modeled.
+  No call-graph edges come from either reader — it is inventory, not
+  wiring, same reasoning as ServiceLoader's own declarations below.
   **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
   report's own "ServiceLoader provider registrations" section), every

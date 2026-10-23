@@ -3,6 +3,7 @@ package input
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -434,4 +435,65 @@ func packDirAsJar(dir, jarPath string) error {
 		return fmt.Errorf("packing %s: %w", dir, err)
 	}
 	return zw.Close()
+}
+
+// FindBeansXML scans appClassesJar's own entries (never a dependency
+// jar — same "app's own config only" scope Routes/BeanNames already
+// use) for every `.xml` resource whose outermost element is `<beans>`
+// (Spring's own classic XML bean-definitions shape), and returns each
+// one's full bytes keyed by its own zip entry path. META-INF/* is
+// skipped (manifest/service-provider metadata, never a Spring config
+// file). A `.xml` file that fails to parse at all (truly malformed, not
+// just "not a <beans> document") is skipped with a warning rather than
+// failing the whole scan — one broken resource should not block
+// reading every other one.
+func FindBeansXML(appClassesJar string) (map[string][]byte, []string, error) {
+	zr, err := zip.OpenReader(appClassesJar)
+	if err != nil {
+		return nil, nil, fmt.Errorf("opening %s: %w", appClassesJar, err)
+	}
+	defer zr.Close()
+
+	out := map[string][]byte{}
+	var warnings []string
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() || !strings.HasSuffix(f.Name, ".xml") || strings.HasPrefix(f.Name, "META-INF/") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("opening %s in %s: %v", f.Name, appClassesJar, err))
+			continue
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("reading %s in %s: %v", f.Name, appClassesJar, err))
+			continue
+		}
+		if isSpringBeansRoot(data) {
+			out[f.Name] = data
+		}
+	}
+	return out, warnings, nil
+}
+
+// isSpringBeansRoot reports whether data's outermost XML element is
+// named "beans" (any namespace — Spring's own schema URI is not
+// checked, the same namespace-agnostic approach webxml's own
+// <web-app> detection uses). A document that fails to decode at all
+// (not valid XML, or truly empty) is reported false, not an error —
+// FindBeansXML's own caller only cares "is this a Spring beans file",
+// and a non-XML `.xml`-named resource is simply not one.
+func isSpringBeansRoot(data []byte) bool {
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return false
+		}
+		if start, ok := tok.(xml.StartElement); ok {
+			return start.Name.Local == "beans"
+		}
+	}
 }

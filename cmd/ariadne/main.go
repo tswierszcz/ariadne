@@ -27,6 +27,7 @@ import (
 	"ariadne/internal/reach"
 	"ariadne/internal/report"
 	"ariadne/internal/serviceload"
+	"ariadne/internal/springxml"
 	"ariadne/internal/vulnmap"
 	"ariadne/internal/webxml"
 )
@@ -213,6 +214,31 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			len(modules), len(webXMLInput.Servlets), len(webXMLInput.Filters), len(webXMLInput.Listeners), len(webXMLInput.ContextParams), len(webXMLInput.Skipped))
 	}
 
+	// FRAMEWORKS F1: Spring classic XML bean definitions found on the
+	// app's own classpath (never a dependency jar).
+	var springXMLBeans []report.XMLBeanRow
+	beansXMLResources, beansXMLWarnings, err := input.FindBeansXML(prepared.AppClassesJar)
+	if err != nil {
+		return fmt.Errorf("scanning %s for Spring XML bean definitions: %w", prepared.AppClassesJar, err)
+	}
+	if len(beansXMLResources) > 0 {
+		resources := make([]string, 0, len(beansXMLResources))
+		for path := range beansXMLResources {
+			resources = append(resources, path)
+		}
+		sort.Strings(resources)
+		for _, path := range resources {
+			parsed, err := springxml.Parse(bytes.NewReader(beansXMLResources[path]))
+			if err != nil {
+				return fmt.Errorf("parsing %s: %w", path, err)
+			}
+			for _, b := range parsed.Beans {
+				springXMLBeans = append(springXMLBeans, report.XMLBeanRow{Source: path, ID: b.ID, Class: b.Class, Scope: b.Scope, Primary: b.Primary})
+			}
+		}
+		log("Spring XML bean definitions: %d resource(s), %d beans found", len(resources), len(springXMLBeans))
+	}
+
 	var depsList []input.GAV
 	if cfg.depsList != "" {
 		f, err := os.Open(cfg.depsList)
@@ -249,6 +275,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("building hierarchy: %w", err)
 	}
+	warnings = append(warnings, beansXMLWarnings...)
 	maxBytecode := 0
 	mrVariants := 0
 	for _, ci := range h.All() {
@@ -607,7 +634,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

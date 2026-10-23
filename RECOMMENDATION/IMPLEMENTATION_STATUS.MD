@@ -2223,6 +2223,111 @@ Przy dodawaniu kolejnego wpisu zapisz:
   serwletów (ta faza) jako dodatkowego źródła. Wymaga propozycji i
   zgody użytkownika przed startem.
 
+### FRAMEWORKS:F1 — Adnotacje, zasoby i jawna konfiguracja (wycinek: XML bean definitions + wykrywanie konfliktów nazw beanów) — DONE for this scope; F1 archiwizowalne jako zamknięte (2026-10-23)
+
+- **Zakres zlecenia i zależności:** F1's poprzednie cztery części
+  (gotowe wyżej). Kontynuacja na życzenie użytkownika ("konczyc" po
+  pytaniu czy dokończyć F1 czy przejść do F2) — ten przyrost domyka
+  F1's realny, wykonany zakres (XML bean definitions + priorytet/
+  konflikt, w wąskim, szczerym sensie opisanym poniżej).
+- **Nowy pakiet `internal/springxml`:** `Parse` dekoduje ograniczony
+  podzbiór klasycznego Spring XML wiring — `<bean id="..." class="..."
+  scope="..." primary="...">`, z `name` jako fallback dla brakującego
+  `id` (pierwszy alias z listy rozdzielanej spacją/przecinkiem).
+  **Celowo nie modelowane:** `<property>`/`<constructor-arg>` — nic w
+  tym przyroście ich nie konsumuje, więc nie zostały dodane (reguła
+  projektu "nie buduj czego nikt nie używa"). Bezpieczny z konstrukcji
+  tak jak `internal/webxml` (ten sam test na niezdefiniowaną encję).
+- **`internal/input.FindBeansXML`:** skanuje **tylko własne wpisy**
+  `app-classes.jar` (nigdy jar zależności — ta sama zasada co
+  `Routes`/`BeanNames`) w poszukiwaniu zasobu `.xml`, którego
+  zewnętrzny element to `<beans>` (bez względu na namespace, tak jak
+  `web-app`'owa detekcja w `internal/webxml`); `META-INF/*` wykluczone.
+  Plik, który nie parsuje się jako XML w ogóle, jest cicho odrzucany
+  jako "to nie jest plik beanów" (nie błąd) — ale błąd odczytu samego
+  wpisu zip trafia do warningów, nie jest przemilczany.
+- **Wykrywanie konfliktów (`internal/report`'s `buildConfigConflicts`):**
+  grupuje każdą jawnie nazwaną deklarację beana (adnotacja ze swoim
+  `value()`, `<bean>`'s own `id`) po nazwie; nazwa zgłoszona przez
+  więcej niż jedno źródło z **inną** klasą trafia do "Configuration
+  conflicts" jako lista kandydatów — **nigdy nie wybiera zwycięzcy**
+  (prawdziwe zachowanie Springa `allow-bean-definition-overriding` jest
+  konfigurowalne i nie jest tu modelowane: to detekcja, nie
+  rozstrzygnięcie). Ta sama nazwa z tą samą klasą z dwóch źródeł to
+  nie konflikt (nieszkodliwa redeklaracja).
+- **Zachowanie dostępne użytkownikowi:** raport pokazuje teraz
+  zadeklarowane beany XML (tożsamość/klasa/scope/primary) i realne
+  konflikty nazw między adnotacjami a XML — dwie nowe sekcje raportu.
+- **Dowód na realnym bytecode:** ten sam ograniczenie środowiska (brak
+  JDK) jak przy `web.xml`'owym przyroście — zamiast kompilować nową
+  aplikację, realny, już skompilowany `app-classes.jar` petclinic
+  przepakowany pod `WEB-INF/classes/` plus ręcznie napisany
+  `web.xml` + `applicationContext.xml` (2 beany, jeden wskazujący na
+  realną, skompilowaną klasę `OwnerController`). `bin/ariadne -offline`
+  na tym WAR: **oba beany XML poprawnie wyekstrahowane** (id, klasa,
+  scope, primary), **zero fałszywych konfliktów** (bo petclinic's
+  własne stereotypy nie mają jawnej nazwy — `Name==""` poprawnie
+  wyklucza je z detekcji, zgodnie z zaprojektowanym zachowaniem). Dwa
+  przebiegi dają bajt-identyczny `results.json`. Petclinic/WebGoat jako
+  zwykłe jary (bez WAR/XML beanów) — zero zmian w zachowaniu, `go run`
+  nie loguje nawet linii o XML beanach (bo nic nie znaleziono).
+  **Pozytywna ścieżka samego konfliktu** (dwa źródła, różna klasa, ta
+  sama nazwa) zweryfikowana tylko na testach jednostkowych
+  (`TestBuildConfigConflicts_*`) — żadna z dwóch aplikacji kontrolnych
+  nie ma jawnie nazwanego stereotypu, więc nie da się tego zademonstrować
+  end-to-end na nich bez modyfikacji ich bytecode (niemożliwej bez
+  JDK) — szczerze odnotowany brak pokrycia na realnej aplikacji.
+- **Spełnione kryteria (z F1's własnego "Gotowe", częściowo —
+  F1's plan miał więcej punktów niż ten całościowy wysiłek zrealizował,
+  patrz niżej):** "wzajemnie wykluczające się warunki nie mogą być
+  scalane w pozornie jeden aktywny scenariusz" — tak, dla konfliktów
+  nazw beanów: `TestBuildConfigConflicts_differentClassSameNameIsConflict`
+  (zgłoszone jako kandydaci, nie scalone) i
+  `TestBuildConfigConflicts_sameClassSameNameIsNotAConflict`
+  (nieszkodliwa redeklaracja poprawnie odróżniona).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/springxml`:
+  `TestParse_fullShape`, `TestParse_malformedDocumentIsError`,
+  `TestParse_undefinedEntityIsError`, `TestParse_emptyBeans`;
+  `internal/input`: `TestFindBeansXML_findsSpringBeansFile`,
+  `TestFindBeansXML_noBeansFilesIsEmpty`, `TestIsSpringBeansRoot`;
+  `internal/report`: `TestBuildConfigConflicts_*` [4]); `go test -race
+  ./...` dla całego projektu (zielone); realny WAR zbudowany z
+  istniejącego skompilowanego `app-classes.jar` petclinic + ręcznie
+  napisany `web.xml`/`applicationContext.xml`, dwa przebiegi
+  `bin/ariadne -offline` (opisane wyżej); petclinic/WebGoat jako zwykłe
+  jary bez zmian.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Configuration
+  (web.xml, XML bean definitions)" rozszerzony o XML bean definitions i
+  detekcję konfliktów; wiersz "Profiles and selected roots" poprawiony).
+  `README.md` (akapit o `web.xml`/XML beanach w "Known limitations"
+  rozszerzony; nowy akapit w sekcji 8 o dwóch nowych sekcjach raportu).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem tej fazy — F1's
+  plan ma więcej punktów niż ten całościowy wysiłek faktycznie
+  zrealizował; nie przez przeoczenie, każdy punkt rozważony i
+  świadomie odłożony lub uznany za poza zakresem pilota):**
+  `<property>`/`<constructor-arg>` wiring w XML beanach — nietknięte
+  (nic go nie konsumuje). **Rozstrzygnięcie** konfliktu (wybór
+  zwycięzcy) — z definicji nietknięte, to świadomie detekcja, nie
+  rozstrzygnięcie (prawdziwe zachowanie Springa jest konfigurowalne).
+  Krawędzie grafu z deklaracji `web.xml`/XML beanów (serwlet/bean jako
+  root) — celowo nietknięte, inny krok. Jawne wejście plików/
+  właściwości scenariusza poza `-active-profiles` — nietknięte. DI/
+  wiring (`@Autowired`/`@Qualifier` na punkcie wstrzyknięcia,
+  konstruktor/pole) — to F2's własny zakres, nietknięty tutaj celowo.
+- **Następny krok:** F1's realnie wykonany zakres (5 przyrostów:
+  wartości adnotacji, rozwiązywanie między klasami, realne wartości
+  Spring MVC, `web.xml`, XML bean definitions + konflikty) jest teraz
+  w stanie, w którym kolejne punkty planu F1 (rozstrzyganie
+  konfliktów, pełny priorytet wielu źródeł, jawne wejście plików) albo
+  wymagają decyzji projektowej poza zakresem mechanicznego kroku, albo
+  są z definicji poza zakresem (DI to F2). Zalecane: rozważyć
+  archiwizację F1 jako zamkniętego dla jego faktycznie zrealizowanego
+  zakresu (podobnie jak JVM_GRAPH G0-G5), i przejście do
+  `FRAMEWORKS:F2` (DI, `@Bean`, wiązanie qualifier/primary), które
+  może już korzystać z `BeanNames` i XML beanów jako dodatkowych
+  źródeł. Wymaga propozycji i zgody użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
