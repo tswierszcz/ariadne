@@ -27,6 +27,14 @@ type MethodFacts struct {
 	calls       map[bytecodeir.Site][]valueflow.Value
 	receivers   map[bytecodeir.Site]valueflow.Value
 	fieldWrites map[bytecodeir.Site]valueflow.Value
+	returns     map[bytecodeir.Site]valueflow.Value
+	// returnOrder lists every value-returning return site's own Site, in
+	// the order Analyze's own instruction decode found them (ascending
+	// PC) — DATA_FLOW D3's own ResolveCallResult merges in this order,
+	// since map iteration order is random and this codebase's own
+	// determinism contract (byte-identical results.json across runs)
+	// does not tolerate that.
+	returnOrder []bytecodeir.Site
 	aborted     bool
 	reason      string
 }

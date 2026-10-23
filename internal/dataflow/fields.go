@@ -198,15 +198,30 @@ func mergeConstructorFieldWriters(cf *classfile.ClassFile, declaring string, met
 
 // ResolveField is DATA_FLOW D3's single entry point for a KindField
 // receiver: it resolves ref to its declaring class and real access
-// flags exactly once, then dispatches to whichever of
-// ResolveStaticField/ResolveInstanceField structurally applies. A
-// caller that instead tried both (static first, falling through to
+// flags exactly once (resolveFieldOnce), then — since a field's own
+// stored value can itself be an unresolved KindField (a field whose
+// writer just reads another field) or KindCallResult (`private static
+// final MethodHandle H = findIt();` — a field initialized from a
+// direct call) — chases that one more hop via chaseFieldOrCall, the
+// same cycle-guarded chase ResolveCallResult's own public entry point
+// uses. A caller that instead tried ResolveStaticField/
+// ResolveInstanceField directly (static first, falling through to
 // instance on any Unknown) would, for a *static* field whose <clinit>-
 // computed value just isn't provable, get that call's honest reason
 // silently overwritten by ResolveInstanceField's "not written in a
 // constructor" — true of every static field, and misleading about why
 // resolution actually failed.
 func ResolveField(h *hierarchy.Hierarchy, ref valueflow.FieldRef) (valueflow.Value, []string) {
+	visited := map[string]bool{fieldKey(ref): true}
+	raw, warnings := resolveFieldOnce(h, ref)
+	v, chaseWarnings := chaseFieldOrCall(h, raw, visited)
+	return v, append(warnings, chaseWarnings...)
+}
+
+// resolveFieldOnce is ResolveField's own one-hop dispatch, with no
+// further chasing — the piece chaseFieldOrCall calls back into when a
+// call-result chase lands on a field.
+func resolveFieldOnce(h *hierarchy.Hierarchy, ref valueflow.FieldRef) (valueflow.Value, []string) {
 	declaring, ok := h.ResolveField(ref.Owner, ref.Name, ref.Desc)
 	if !ok {
 		return valueflow.Unknown(fmt.Sprintf(
@@ -225,6 +240,14 @@ func ResolveField(h *hierarchy.Hierarchy, ref valueflow.FieldRef) (valueflow.Val
 		return ResolveStaticField(h, ref)
 	}
 	return ResolveInstanceField(h, ref)
+}
+
+// fieldKey is chaseFieldOrCall's own visited-set key for a FieldRef —
+// distinct from a CallResultRef's key (callKey) by its "field:" prefix,
+// since the two share one visited set when a chase crosses between
+// them.
+func fieldKey(ref valueflow.FieldRef) string {
+	return "field:" + ref.Owner + "#" + ref.Name + ":" + ref.Desc
 }
 
 // fieldPutPCs decodes m's own local ops and returns the byte offset of

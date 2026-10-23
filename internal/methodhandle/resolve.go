@@ -90,9 +90,13 @@ func ResolveInvokes(h *hierarchy.Hierarchy, sites []InvokeSite) ([]ResolvedInvok
 // (DATA_FLOW D3: a field read whose own writer wasn't resolved within
 // this same method) gets one more chance via dataflow.ResolveField,
 // which picks ResolveStaticField or ResolveInstanceField once it knows
-// the field's real access flags — the "find a handle once, cache it in
-// a field, invoke from elsewhere" pattern DYNAMIC_LINKAGE L2's own
-// same-method-only resolution could not reach by itself.
+// the field's real access flags; a KindCallResult receiver (DATA_FLOW
+// D3: an invokestatic/invokespecial call whose own return value wasn't
+// resolved within this same method) gets the same chance via
+// dataflow.ResolveCallResult — together, the "find a handle once,
+// cache it in a field, invoke from elsewhere" and "look it up in a
+// helper method, invoke from elsewhere" patterns DYNAMIC_LINKAGE L2's
+// own same-method-only resolution could not reach by itself.
 func resolveOne(h *hierarchy.Hierarchy, fqcn string, s InvokeSite, facts *dataflow.MethodFacts) (ResolvedInvoke, []string) {
 	ri := ResolvedInvoke{Site: s}
 	recvSite := bytecodeir.Site{Method: fqcn + "#" + s.CallerName, Descriptor: s.CallerDesc, PC: s.PC, Op: bytecodeir.OpCall}
@@ -104,9 +108,14 @@ func resolveOne(h *hierarchy.Hierarchy, fqcn string, s InvokeSite, facts *datafl
 	}
 
 	var warnings []string
-	if val.Kind == valueflow.KindField {
+	switch val.Kind {
+	case valueflow.KindField:
 		resolved, fieldWarnings := dataflow.ResolveField(h, *val.Field)
 		warnings = fieldWarnings
+		val = resolved
+	case valueflow.KindCallResult:
+		resolved, callWarnings := dataflow.ResolveCallResult(h, *val.Call)
+		warnings = callWarnings
 		val = resolved
 	}
 

@@ -16,7 +16,7 @@ import (
 // handle (jsr/ret, an internal inconsistency) is reported through
 // MethodFacts.Aborted, never as an error or a panic.
 func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
-	f := &MethodFacts{calls: map[bytecodeir.Site][]valueflow.Value{}, receivers: map[bytecodeir.Site]valueflow.Value{}, fieldWrites: map[bytecodeir.Site]valueflow.Value{}}
+	f := &MethodFacts{calls: map[bytecodeir.Site][]valueflow.Value{}, receivers: map[bytecodeir.Site]valueflow.Value{}, fieldWrites: map[bytecodeir.Site]valueflow.Value{}, returns: map[bytecodeir.Site]valueflow.Value{}}
 	if len(m.Code) == 0 {
 		return f, nil
 	}
@@ -54,6 +54,12 @@ func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodF
 		case classfile.LocalOpFieldPut:
 			if op.IsStatic {
 				f.fieldWrites[site(op.PC, bytecodeir.OpFieldPut)] = valueflow.Unknown("field write not yet analyzed")
+			}
+		case classfile.LocalOpReturn:
+			if op.Width > 0 {
+				s := site(op.PC, bytecodeir.OpReturn)
+				f.returns[s] = valueflow.Unknown("return value not yet analyzed")
+				f.returnOrder = append(f.returnOrder, s)
 			}
 		}
 	}

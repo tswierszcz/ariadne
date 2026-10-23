@@ -659,18 +659,22 @@ report:
 - **`MethodHandle`**: a `MethodHandles.Lookup#findStatic/findVirtual/
   findSpecial/findConstructor` call with a literal target, and an
   `invoke()`/`invokeExact()` call whose receiver is that same handle —
-  found *earlier in the same method*, cached in a *static* field and
-  read from a different method, or cached in a *final instance* field
-  set only by a `this.field = ...` store in a constructor (DATA_FLOW
-  D3's two field slices) — gets a real call-graph edge (DYNAMIC_LINKAGE
-  L2 — "MethodHandle call-graph edges" section). Measured honestly on
-  real petclinic/WebGoat: this still adds zero edges on these two
-  specific apps. The dominant reason on both is an ordinary method call
-  result flowing into the receiver (plain interprocedural return-value
-  propagation, not modeled); WebGoat's dependencies also use real
-  instance-field handle caches, but they are lazily-reassigned
-  (non-final) fields — exactly the shape the instance-field slice
-  correctly declines to resolve rather than guess at.
+  found *earlier in the same method*, cached in a static or *final
+  instance* field and read from a different method, or returned by a
+  direct (`invokestatic`/`invokespecial`) helper call, with fields and
+  calls chased through each other where one resolves to the other
+  (DATA_FLOW D3's three slices) — gets a real call-graph edge
+  (DYNAMIC_LINKAGE L2 — "MethodHandle call-graph edges" section).
+  Measured honestly on real petclinic/WebGoat: this still adds zero
+  edges on these two specific apps, but the chase now reaches each
+  site's *true* root cause instead of stopping early — e.g. one
+  petclinic field-backed receiver resolves all the way through to a
+  `findVirtual` call whose own argument isn't a literal, genuinely
+  unresolvable, not a missed field write. The remaining real gaps:
+  non-final instance-field handle caches (WebGoat's JRuby dependency
+  reassigns its cache fields, so the deliberately final-only field
+  slice correctly declines them), and calls into JDK-internal classes
+  outside the analyzed hierarchy.
 - **Callbacks and async execution** (`Thread`, `Executor`/
   `ExecutorService`): every call site registering one is inventoried
   (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),

@@ -76,6 +76,19 @@ const (
 	// fact than "this is some instance of the field's declared type",
 	// even before anyone resolves it further.
 	KindField Kind = "field"
+	// KindCallResult identifies a value that is the return value of an
+	// invokestatic/invokespecial call (DATA_FLOW D3's own second
+	// interprocedural summary) — see CallResultRef. D2 itself never
+	// resolves what the callee actually returns (another genuinely
+	// interprocedural question, same reasoning as KindField); it only
+	// records *which* method was called, so a consumer with hierarchy
+	// access (internal/dataflow's own ResolveCallResult) can go analyze
+	// that method's own return value(s). Deliberately excludes
+	// virtual/interface calls: their real target depends on the
+	// receiver's runtime type (CHA), so resolving "the" return value
+	// here would silently assume one override, exactly the kind of
+	// guess this package's contract forbids.
+	KindCallResult Kind = "callresult"
 )
 
 // FieldRef identifies one field a getstatic/getfield read — the Fieldref
@@ -87,6 +100,16 @@ const (
 // ResolveInstanceField (the latter scoped, for now, to a final field
 // written only in a constructor — see its own doc comment).
 type FieldRef struct {
+	Owner, Name, Desc string
+}
+
+// CallResultRef identifies one invokestatic/invokespecial call site's
+// target method — Owner/Name/Desc exactly as the bytecode's own
+// Methodref names it, before any resolution (the same owner-as-named
+// convention FieldRef already follows). A consumer with hierarchy
+// access resolves Owner to the real declaring class before analyzing
+// that method's own body.
+type CallResultRef struct {
 	Owner, Name, Desc string
 }
 
@@ -195,6 +218,9 @@ type Value struct {
 
 	// Field is set only when Kind == KindField.
 	Field *FieldRef
+
+	// Call is set only when Kind == KindCallResult.
+	Call *CallResultRef
 }
 
 // Const returns an exact known constant of the given runtime type.
@@ -221,6 +247,11 @@ func Handle(hv HandleValue) Value { return Value{Kind: KindHandle, Handle: &hv} 
 // Field returns a value identified as a static field read, not yet
 // resolved to whatever was actually stored there.
 func Field(ref FieldRef) Value { return Value{Kind: KindField, Field: &ref} }
+
+// CallResult returns a value identified as an invokestatic/invokespecial
+// call's return value, not yet resolved to what the callee actually
+// returns.
+func CallResult(ref CallResultRef) Value { return Value{Kind: KindCallResult, Call: &ref} }
 
 // Null returns the null value.
 func Null() Value { return Value{Kind: KindNull} }
@@ -258,6 +289,8 @@ func (v Value) Equal(other Value) bool {
 		return v.Handle != nil && other.Handle != nil && v.Handle.Site == other.Handle.Site
 	case KindField:
 		return v.Field != nil && other.Field != nil && *v.Field == *other.Field
+	case KindCallResult:
+		return v.Call != nil && other.Call != nil && *v.Call == *other.Call
 	default: // KindSet, KindUnknown
 		return false
 	}

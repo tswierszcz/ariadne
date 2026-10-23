@@ -244,9 +244,16 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 
 	case classfile.LocalOpReturn:
 		if op.Width > 0 {
-			if _, ok := st.pop(); !ok {
+			e, ok := st.pop()
+			if !ok {
 				return "stack underflow at a return instruction"
 			}
+			// DATA_FLOW D3: record what this return site actually
+			// returns, for ResolveCallResult's own cross-method
+			// summary — the return-value half of the same
+			// identify-here/resolve-there split KindField already
+			// uses for fields.
+			it.facts.returns[it.site(op.PC, bytecodeir.OpReturn)] = e.v
 		}
 		return "" // terminal
 
@@ -328,6 +335,18 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		return ""
 	}
 	if op.Width > 0 {
+		if op.CallKind == classfile.CallStatic || op.CallKind == classfile.CallSpecial {
+			// DATA_FLOW D3's second interprocedural summary: an
+			// invokestatic/invokespecial target is already exactly
+			// resolved (no CHA ambiguity, unlike a virtual/interface
+			// call, which could dispatch to any override at runtime) —
+			// a consumer with hierarchy access
+			// (internal/dataflow.ResolveCallResult) can go analyze that
+			// one method's own return value(s), the same
+			// identify-here/resolve-there split KindField already uses.
+			st.push(valueflow.CallResult(valueflow.CallResultRef{Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc}), op.Width)
+			return ""
+		}
 		reason := "call return value is not tracked by this analysis increment"
 		switch {
 		case op.CallKind == classfile.CallDynamic:

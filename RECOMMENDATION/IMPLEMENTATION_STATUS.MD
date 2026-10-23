@@ -1882,6 +1882,127 @@ Przy dodawaniu kolejnego wpisu zapisz:
   Alternatywnie `FRAMEWORKS:F1` albo `ASYNC_CALLBACKS:A3`. Wymaga
   propozycji i zgody użytkownika przed startem.
 
+### DATA_FLOW:D3 — Przepływ między metodami i streszczenia (wycinek: wynik wywołania invokestatic/invokespecial + wspólne łączenie pole↔wywołanie) — DONE for this shape; measured effect on real apps is zero, diagnoza znacznie głębsza (2026-10-23)
+
+- **Zakres zlecenia i zależności:** D3's poprzednie dwa wpisy (pola
+  statyczne i instancyjne, gotowe wyżej). Zgoda użytkownika: kontynuacja
+  tego samego wątku, adresująca zmierzony największy pozostały brak
+  (propagacja wyniku zwykłego wywołania). Celowo wyłączone: wywołania
+  virtual/interface (cel zależy od typu w czasie działania — CHA — więc
+  streszczenie tutaj byłoby zgadywaniem jednego override'u; tylko
+  `invokestatic`/`invokespecial`, dokładnie rozwiązane już samym
+  bytecode).
+- **Zmienione pliki:** `internal/valueflow/value.go` (`KindCallResult` +
+  `CallResultRef{Owner,Name,Desc}`, konstruktor `CallResult`, przypadek w
+  `Equal`); `internal/dataflow/facts.go` (`MethodFacts.returns` +
+  `returnOrder` — lista Site'ów w kolejności PC, bo iteracja po mapie w
+  Go jest losowa, a projekt wymaga bajt-identycznych przebiegów);
+  `internal/dataflow/analyze.go` (preregistracja każdego zwrotu z
+  wartością, tak jak już robiono dla wywołań/zapisów pól);
+  `internal/dataflow/step.go` (`LocalOpReturn` zapisuje faktycznie
+  zwróconą wartość; `stepCall` dla `CallStatic`/`CallSpecial` z
+  `op.Width > 0` produkuje teraz `valueflow.CallResult(...)` zamiast
+  gołego `Unknown`); nowy `internal/dataflow/callresults.go`
+  (`ResolveCallResult` — rozwiązuje dokładną deklarującą klasę przez
+  `hierarchy.ResolveExact` [to samo G2 współdzieli z CVE F4], czyta jar,
+  `mergeReturns` scala wszystkie zwroty w deterministycznej kolejności
+  PC; `chaseFieldOrCall` — **wspólne, bezpieczne pod cyklami** łączenie
+  pól i wyników wywołań: jeśli rozwiązana wartość pola jest sama
+  `KindCallResult` [`private static final MethodHandle H = findIt();`]
+  albo rozwiązany wynik wywołania jest sam `KindField` [getter zwracający
+  scache'owane pole], chase idzie o jeden krok dalej, z jednym wspólnym
+  `visited` dla obu rodzajów kluczy, żeby łańcuch przeplatający pola i
+  wywołania nie zapętlił się w nieskończoność); `internal/dataflow/fields.go`
+  (`ResolveField` i `ResolveCallResult`'s publiczne funkcje teraz
+  wywołują `chaseFieldOrCall` po pierwszym rozwiązaniu, zamiast zwracać
+  surowy, częściowo rozwiązany wynik; `resolveFieldOnce`/
+  `resolveCallResultOnce` to nowe, nieeksportowane "jeden krok bez
+  chase'owania" rdzenie, do których chase wraca); `internal/methodhandle/resolve.go`
+  (`resolveOne` rozszerzone o `case valueflow.KindCallResult` wołające
+  `dataflow.ResolveCallResult`, obok istniejącego `KindField`).
+- **Zachowanie dostępne użytkownikowi:** mechanizm istnieje, działa, i —
+  w przeciwieństwie do obu poprzednich wycinków D3 — **widocznie
+  pogłębia realną diagnozę na petclinic**: `HazelcastIMapAdapter#GET_NAME`
+  (pole statyczne, którego powód niepowodzenia wcześniej brzmiał "call
+  return value is not tracked") teraz rozwiązuje się w pełni przez
+  pole→wywołanie→`findVirtual`, docierając do **prawdziwej przyczyny
+  źródłowej**: "MethodHandles.Lookup#findVirtual target is not
+  statically known (Class/name argument not a literal)" — realne,
+  różne ograniczenie, nie poprzednia, powierzchowna wiadomość.
+- **Spełnione kryteria:** "fabryka/wywołanie zwraca właściwą wartość" —
+  `TestMergeReturns_singleReturnResolves`. "Metoda void/bez zwrotu
+  wartości daje szczere Unknown" — `TestMergeReturns_voidMethodIsHonestUnknown`.
+  "Rekurencja zbiega lub ujawnia limit" —
+  `TestChaseFieldOrCall_cycleDoesNotHang` (cykl wykryty, Unknown, bez
+  zapętlenia). "Łączenie pole↔wywołanie faktycznie się odbywa, nie jest
+  tylko zadeklarowane" — `TestChaseFieldOrCall_fieldToCallResultChases`
+  (dowodzi, że `chaseFieldOrCall` dysponuje `KindCallResult`, nie
+  zwraca go bez zmian). "Tylko invokestatic/invokespecial, nie
+  virtual/interface" — `TestAnalyze_staticCallResultProducesKindCallResult`
+  (bezpośrednio na realnym bytecode `invokestatic`).
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych —
+  szczery, zmierzony wynik:** `bin/ariadne -offline` na petclinic i
+  WebGoat po tej fazie daje **identyczne 0 z 10/46** rozwiązanych
+  tożsamości `MethodHandle.invoke` jak przed tym przyrostem — ale
+  diagnoza jest teraz znacznie głębsza:
+  - **petclinic:** jedyne pole-oparte miejsce (`GET_NAME`) teraz
+    rozwiązuje się w pełni przez 2 skoki (pole→wywołanie→lookup) do
+    swojej prawdziwej przyczyny (opisanej wyżej) — wcześniej kończyło
+    się na płytszym "no writer found"/"call return value not tracked".
+    Jedno miejsce (`JSONUtils$1#run`) zmieniło powód z "call return
+    value not tracked" na "the receiver is set" (bogatszy, bardziej
+    precyzyjny `KindSet` zamiast gołego `Unknown`) — wciąż
+    nierozwiązane, ale z lepszą informacją.
+  - **WebGoat:** dwa nowe, realne wzorce ujawnione: wywołania do
+    `java.lang.invoke.MethodHandles#foldArguments/insertArguments/guardWithTest`
+    (kombinatory MethodHandle) poprawnie zgłaszane jako nierozwiązane,
+    bo `java.lang.invoke.MethodHandles` to klasa JDK nigdy nie czytana
+    (poza analizowanym uniwersum) — nie defekt tej fazy. 10 prawdziwych
+    pól instancyjnych JRuby (`CompiledIRMethod#specific`,
+    `DynamicMethod#handle`, `HandleMethod#target0-4`) wciąż poprawnie
+    odrzuconych jako nie-final (bez zmian względem poprzedniej fazy).
+    6 miejsc ujawniło nowy, szczery powód: "local variable value before
+    the exception that entered this handler is not tracked" (D1's
+    własne, wcześniej istniejące ograniczenie obsługi wyjątków, teraz
+    widoczne jako finalna przyczyna po głębszym chase'u, nie nowy błąd).
+  - **Zero zmian w REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN** na obu
+    aplikacjach (petclinic 3/62/26/51/6, WebGoat 42/44/18/56/0 —
+    identyczne z bazową wartością). Dwa przebiegi petclinic i dwa
+    przebiegi WebGoat dają bajt-identyczny `results.json`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/dataflow`:
+  `callresults_test.go` — `TestAnalyze_staticCallResultProducesKindCallResult`,
+  `TestMergeReturns_singleReturnResolves`,
+  `TestMergeReturns_voidMethodIsHonestUnknown`,
+  `TestResolveCallResult_unresolvableOwnerIsUnknown`,
+  `TestChaseFieldOrCall_cycleDoesNotHang`,
+  `TestChaseFieldOrCall_fieldToCallResultChases`); `go test -race
+  ./...` dla całego projektu (zielone); `bin/ariadne -offline` na
+  petclinic (dwa przebiegi) i WebGoat (dwa przebiegi), opisane wyżej.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersze "Data flow and
+  taint" i "General reflection, MethodHandle invocation..." oba
+  rozszerzone o ten wycinek i pełny, głębszy rozkład diagnoz).
+  `README.md` (akapit o `MethodHandle` w "Known limitations"
+  rozszerzony o wywołania bezpośrednie i wspólny chase).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** wywołania virtual/interface — nietknięte z definicji
+  (CHA-owa niejednoznaczność celu). Pola instancyjne nie-final —
+  nietknięte (prawdziwy points-to). Klasy JDK poza analizowanym
+  uniwersum (np. `java.lang.invoke.MethodHandles` samo) — strukturalnie
+  nieosiągalne bez ich wczytania, nie w zakresie tej fazy. Obsługa
+  wyjątków na poziomie D1 (stan lokalny przed handlerem) —
+  nietknięta, osobne ograniczenie. Klucz kontekstu/instancji,
+  wersjonowanie streszczeń (CVE F3), rejestr B3 — nietknięte.
+- **Następny krok:** Zmierzony brak na obu aplikacjach kontrolnych jest
+  teraz wyłącznie: (1) pola instancyjne nie-final (potrzebuje
+  points-to — większy, osobny temat), (2) klasy JDK poza uniwersum
+  (nie do naprawienia bez wczytania JDK), (3) D1's obsługa wyjątków.
+  Żadne z tych trzech nie jest małym, mechanicznym kolejnym krokiem w
+  tym samym stylu co D3's trzy dotychczasowe wycinki — to dobry
+  moment, żeby rozważyć inny obszar: `FRAMEWORKS:F1` albo
+  `ASYNC_CALLBACKS:A3`. Wymaga propozycji i zgody użytkownika przed
+  startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
