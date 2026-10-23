@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"ariadne/internal/aop"
 	"ariadne/internal/callback"
 	"ariadne/internal/cves"
 	"ariadne/internal/methodhandle"
@@ -190,6 +191,20 @@ type Data struct {
 	// above already compute — adds no new call-graph edge and no new
 	// `-roots profile` entry point of its own.
 	ExternalEntries []ExternalEntryRow
+
+	// ProxyHandlers is FRAMEWORKS F3's own first slice: every
+	// application class implementing `InvocationHandler`, with its own
+	// candidate target field(s) (a `final` instance field of a
+	// reference type) — identity only, no new call-graph edge, since
+	// binding a proxy call to its real dispatch needs REFLECTION R2's
+	// own `Method.invoke` reconstruction, which does not exist yet.
+	ProxyHandlers []ProxyHandlerRow
+}
+
+// ProxyHandlerRow is Data's own rendering-friendly form of
+// aop.ProxyHandler — TargetFields joined to a plain string.
+type ProxyHandlerRow struct {
+	FQCN, TargetFields string
 }
 
 // InjectionRow is Data's own rendering-friendly form of
@@ -286,7 +301,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -321,6 +336,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		Injections:                injectionRows(injections),
 		WebXMLRoots:               webXMLRootRows(webXMLRoots),
 		ExternalEntries:           externalEntryRows(externalEntries),
+		ProxyHandlers:             proxyHandlerRows(proxyHandlers),
 		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
 	}
 
@@ -393,6 +409,18 @@ func webXMLRootRows(roots []profile.WebXMLRoot) []WebXMLRootRow {
 	out := make([]WebXMLRootRow, len(roots))
 	for i, r := range roots {
 		out[i] = WebXMLRootRow{FQCN: r.FQCN, Method: r.Method, Kind: string(r.Kind)}
+	}
+	return out
+}
+
+func proxyHandlerRows(handlers []aop.ProxyHandler) []ProxyHandlerRow {
+	out := make([]ProxyHandlerRow, len(handlers))
+	for i, p := range handlers {
+		fields := make([]string, len(p.TargetFields))
+		for j, f := range p.TargetFields {
+			fields[j] = f.Name + ": " + f.Type
+		}
+		out[i] = ProxyHandlerRow{FQCN: p.FQCN, TargetFields: strings.Join(fields, ", ")}
 	}
 	return out
 }

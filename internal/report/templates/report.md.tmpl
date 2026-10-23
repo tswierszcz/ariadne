@@ -449,6 +449,27 @@ None found.
 {{end}}
 {{end}}
 
+## Proxy/interceptor identity
+
+Every application class implementing `java.lang.reflect.InvocationHandler`
+(FRAMEWORKS F3), with its own candidate target field(s) — a `final` instance
+field of a reference type, the idiom a hand-written or Lombok-generated
+proxy handler uses to hold the real object it forwards to. Identity only: no
+new call-graph edge comes from this, since binding a proxy call to its real
+dispatch needs `Method.invoke` receiver reconstruction (REFLECTION R2, not
+built yet) — reporting one here without it would fabricate a dispatch this
+analysis cannot actually prove. CGLIB-generated proxy subclasses are never
+listed here at all: they exist only as bytecode the JVM generates at
+runtime, never as a `.class` file in the analyzed jars.
+{{if not .ProxyHandlers}}
+None found.
+{{else}}
+| Class | Candidate target field(s) |
+|---|---|
+{{range .ProxyHandlers}}| `{{.FQCN}}` | {{if .TargetFields}}{{.TargetFields}}{{else}}none found{{end}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

@@ -767,6 +767,19 @@ report:
   `-roots profile` entry point and no new call-graph edge, since an
   external parser/dispatcher's own call into application code is
   never fabricated, only shown to exist ahead of the listed method.
+  **Proxy/interceptor identity**: every application class implementing
+  `java.lang.reflect.InvocationHandler` is listed with its own
+  candidate target field(s) — a `final` instance field of a reference
+  type (FRAMEWORKS F3's own first slice — the report's own "Proxy/
+  interceptor identity" section). Identity only, no call-graph edge:
+  binding a proxy call to its real dispatch needs `Method.invoke`
+  receiver reconstruction (REFLECTION R2, not built), and reporting
+  one without it would fabricate a dispatch this slice cannot prove.
+  CGLIB-generated proxy subclasses are never listed — they exist only
+  as bytecode the JVM generates at runtime, never as a `.class` file
+  in the analyzed jars. Confirmed on real petclinic/WebGoat: WebGoat
+  has exactly one (`LessonConnectionInvocationHandler`, with its own
+  `targetConnection: java.sql.Connection` field); petclinic has none.
   **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
   report's own "ServiceLoader provider registrations" section), every

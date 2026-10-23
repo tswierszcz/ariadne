@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"ariadne/internal/aop"
 	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/cves"
@@ -448,6 +449,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	externalEntries := profile.ExternalEntries(h, activeProfiles, servletClasses, filterClasses, listenerClasses)
 	log("frameworks: %d external entries cataloged (http/servlet/filter/listener)", len(externalEntries))
 
+	// FRAMEWORKS F3's own first slice: proxy/target/interceptor
+	// identity only — no new call-graph edge (see aop.FindProxyHandlers'
+	// own doc comment for why: that needs REFLECTION R2, not built).
+	proxyHandlers := aop.FindProxyHandlers(h)
+	if len(proxyHandlers) > 0 {
+		log("frameworks: %d InvocationHandler implementations found", len(proxyHandlers))
+	}
+
 	log("building call graph")
 	g := callgraph.Build(h, nil)
 	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA, %d class-init), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
@@ -698,7 +707,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)
