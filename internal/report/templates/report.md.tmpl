@@ -271,6 +271,42 @@ None found.
 {{end}}
 {{end}}
 
+## Reflective Method#invoke call sites
+
+Every `java.lang.reflect.Method#invoke` call site found, with its Method receiver
+resolved back to the `Class#getMethod`/`getDeclaredMethod` call that produced it,
+where possible (REFLECTION R1/R2). A receiver that was a parameter, a field read, or
+an unresolved lookup is correctly left unresolved, not guessed at.
+{{if not .ReflectInvokeSites}}
+None found.
+{{else}}
+| Caller | Method |
+|---|---|
+{{range .ReflectInvokeSites}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}{{.Site.CallerDesc}}` (pc={{.Site.PC}}) | {{if .OwnerFQCN}}`{{.OwnerFQCN}}#{{.MethodName}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{end}}
+{{end}}
+
+## Reflective invoke call-graph edges
+
+For every resolved Method above, a real call-graph edge (REFLECTION R2) from the
+`invoke` call site to the real dispatch target — the invocation target's own concrete
+allocation type when provable, the `Class` the lookup was performed on otherwise —
+connected to *every* overload of the resolved method name on that declaring class. A
+"may run" edge, same reasoning as a profile's synthetic edge or DYNAMIC_LINKAGE L2's
+own `BasisMethodHandle`. "Gap" means either no declaring class resolves the method
+anywhere in the dispatch root's hierarchy, a parameter type isn't a plain class literal
+this phase can resolve dispatch by, or the literal argument array's own length proves
+an argument-count mismatch with the resolved Method — never a fabricated edge once
+that is proven.
+{{if not .ReflectInvokeEdges}}
+None found.
+{{else}}
+| Caller | Target |
+|---|---|
+{{range .ReflectInvokeEdges}}| `{{.ResolvedInvoke.Site.CallerFQCN}}#{{.ResolvedInvoke.Site.CallerName}}{{.ResolvedInvoke.Site.CallerDesc}}` (pc={{.ResolvedInvoke.Site.PC}}) | {{if .DeclaringFQCN}}`{{.DeclaringFQCN}}#{{.ResolvedInvoke.MethodName}}`{{else}}**gap:** {{.Gap}}{{end}} |
+{{end}}
+{{end}}
+
 ## Spring MVC routes
 
 Every HTTP mapping found on an application method (FRAMEWORKS F1), with its real

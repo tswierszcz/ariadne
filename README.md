@@ -819,9 +819,20 @@ report:
   array with any non-literal/primitive-typed element (`int.class`
   compiles to a field read, not a literal, and is correctly left
   unresolved), still resolves to nothing, never guessed. This is
-  value-knowledge only — no call-graph edge comes from either slice;
-  `Method.invoke`/`Constructor.newInstance` (REFLECTION R2) remain
-  unmodeled, so the rest of this limitation stands.
+  value-knowledge only — no call-graph edge comes from either slice.
+  A third slice, REFLECTION R2: every `java.lang.reflect.Method#invoke`
+  call site whose Method receiver resolves back to one of the above
+  `getMethod`/`getDeclaredMethod` facts now gets a real "may run"
+  call-graph edge (`BasisReflection`) to every overload of the resolved
+  method name on the real dispatch target (the invoked object's own
+  concrete allocation type when provable, the `Class` the lookup was
+  performed on otherwise) — the same reasoning as a profile's synthetic
+  edge or `MethodHandle.invoke`'s own `BasisMethodHandle`. A receiver
+  that isn't one of those resolved facts (a parameter, a field read, an
+  unresolved call result) is correctly left with no edge, not guessed.
+  `Constructor.newInstance`, `getDeclared*`'s access-check bypass, and
+  any runtime-computed class/method name remain unmodeled, so the rest
+  of this limitation still stands.
 - **Six profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus` and `generic`** — every framework PLAN.md section 4 originally
   named for Phase 7, plus the `spring`/`generic` pair from the base plan.

@@ -17,7 +17,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
-| REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1 (oba wycinki: `Class.forName`, `getMethod`/`getDeclaredMethod`): DONE dla tego zakresu; R2–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2 (realne krawędzie `invoke`/`newInstance`) nietknięte. |
+| REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1 (oba wycinki: `Class.forName`, `getMethod`/`getDeclaredMethod`): DONE dla tego zakresu; R2: `Method#invoke` → realne krawędzie DONE, `Constructor.newInstance` nietknięty; R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa (nowa): `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). `Constructor.newInstance` (R2's druga połowa) nietknięty. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: pięć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). AOP/pointcut, `@Value`-owe właściwości, rejestr B3 — nietknięte. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
@@ -2967,6 +2967,100 @@ Przy dodawaniu kolejnego wpisu zapisz:
   rejestr B3, albo `@Value`-owe właściwości — wymaga propozycji i
   zgody użytkownika przed startem.
 
+### REFLECTION:R2 — pierwsza połowa (`Method#invoke` → realne krawędzie) — DONE for this scope; `Constructor.newInstance`, R3–R4 nietknięte (2026-10-23)
+
+- **Zakres zlecenia i zależności:** kontynuacja uzgodnionej ścieżki
+  R0+R1→R2 (oba wycinki R1 gotowe wyżej). Ten przyrost obejmuje
+  wyłącznie `Method#invoke`; `Constructor.newInstance` to R2's własna
+  druga połowa (alokacja, nie wywołanie), świadomie odłożona, nie
+  pominięta przez przeoczenie.
+- **Nowy pakiet `internal/reflectinvoke`:** `sites.go` (`FindInvokeSites`
+  — każde miejsce wywołania `java.lang.reflect.Method#invoke(Object,
+  Object...)`); `resolve.go` (`ResolveInvokes`/`resolveOne` — czyta
+  Method-receiver z powrotem do R1's `valueflow.KindReflectiveMethod`,
+  z tym samym jednostopniowym pościgiem przez `KindField`/
+  `KindCallResult`, jaki `internal/methodhandle`'s własny
+  `resolveOne` już stosuje dla receivera `MethodHandle`; receiver,
+  który jest parametrem metody, pozostaje nierozwiązany, nie
+  zgadywany); `edges.go` (`FindInvokeEdges`/`EdgeTargets` — rozwiązuje
+  realny cel dyspozycji po **parametrach**, nie deskryptorze pełnym,
+  bo `getMethod` nigdy nie dowodzi typu zwracanego).
+- **Nowa maszyneria w `internal/hierarchy`:** `ClassInfo.
+  MethodByNameAndParams`/`Hierarchy.ResolveByParams` — odpowiednik
+  `MethodByNameAndDesc`/`ResolveExact`, ale dopasowujący tylko po
+  liście parametrów (ten sam porządek wyszukiwania JVM), bo `getMethod`
+  nigdy nie podaje typu zwracanego do porównania. Nowy eksportowany
+  `classfile.ParamDescriptors` (opakowanie istniejącego
+  `parseParamDescriptors`) dostarcza mu listę deskryptorów bez pełnego
+  deskryptora metody.
+- **Nowy `EdgeBasis` `BasisReflection`** (`internal/callgraph/graph.go`)
+  — krawędź "może zadziałać", ten sam rygor co `BasisCallback`/
+  `BasisMethodHandle`: samo posiadanie obiektu `Method` nigdy nie
+  dowodzi, że `invoke` faktycznie wykona się w runtime (złapany
+  `ReflectiveOperationException`, martwa gałąź).
+- **Rozwiązywanie dyspozycji, nie tylko identyczność:** cel krawędzi to
+  realny typ alokacji obiektu docelowego (pierwszy argument `invoke`),
+  gdy przepływ wartości go dowodzi (`ObjType`), a `Class`, na którym
+  wykonano `getMethod`/`getDeclaredMethod`, tylko jako fallback — ta
+  sama zasada rozdziału "żądany typ vs realny cel", którą
+  DYNAMIC_LINKAGE L2 już stosuje dla `RequestedOwner`. Krawędź łączy
+  się z *każdym* przeciążeniem rozwiązanej nazwy metody na rozwiązanej
+  klasie deklarującej (ten sam overload-insensitive kontrakt co
+  pozostałe syntetyczne generatory krawędzi w tym kodzie) — sama
+  precyzja wyboru klasy deklarującej już jest exact po parametrach,
+  nie po samej nazwie.
+- **Uczciwe "Gap", nigdy fabrykacja:** receiver nierozwiązany, typ
+  parametru niebędący prostym literałem klasy (tablica, prymityw),
+  żadna klasa nie deklaruje metody o tej nazwie/liczbie parametrów w
+  całej hierarchii dispatch roota, albo **dowiedziona** niezgodność
+  liczby argumentów (literalna tablica `Object[]` krótsza/dłuższa niż
+  lista parametrów rozwiązanej metody) — każdy z tych czterech
+  przypadków raportowany jako `Gap` z konkretnym powodem, zero
+  fabrykowanych krawędzi.
+- **Dwie nowe sekcje raportu:** "Reflective Method#invoke call sites"
+  (każde miejsce wywołania, receiver rozwiązany albo z powodem braku)
+  i "Reflective invoke call-graph edges" (każdy rozwiązany Method →
+  realny cel albo Gap) — `internal/report/report.go` (`Data.
+  ReflectInvokeSites`/`ReflectInvokeEdges`, `Build`'s nowe dwa
+  parametry), `report.md.tmpl`.
+- **Dowód na realnym bytecode — efekt NIEzerowy, inaczej niż R0/R1:**
+  `bin/ariadne -offline -profile spring` na petclinic: 619 miejsc
+  `Method#invoke`, 5 rozwiązanych do realnej krawędzi
+  (`AprLifecycleListener→SSL#randSet`/`initialize`,
+  `SessionRemote→Engine#getInstance`, dwa miejsca `HCANNHelper` w
+  warstwie refleksji Hibernate) — `REACHABLE/FRAMEWORK/NOT_REACHABLE/
+  UNKNOWN/NOT_APPLICABLE` idzie z **3/59/29/51/6 na 3/62/26/51/6** (3
+  przypadki NOT_REACHABLE→FRAMEWORK). WebGoat (`-profile spring`): 628
+  miejsc, 4 rozwiązane do 3 krawędzi — z **40/43/21/56/0 na
+  42/44/18/56/0**. Dwa przebiegi offline na każdej aplikacji dają
+  bajt-identyczny `results.json`. `go build ./...`, `go vet ./...`,
+  `go test ./...` wszystkie zielone (23 pakiety, włącznie z nowym
+  `internal/reflectinvoke`).
+- **Spełnione kryteria:** nowe testy jednostkowe `internal/reflectinvoke`
+  (`sites_test.go`, `resolve_test.go` — receiver rozwiązany/nierozwiązany
+  przez pole/wynik wywołania/parametr, `edges_test.go` — realna krawędź,
+  wszystkie cztery przypadki Gap) i `internal/hierarchy/
+  resolve_params_test.go` (`ResolveByParams`/`MethodByNameAndParams`,
+  dziedziczenie, brak dopasowania).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Reflection
+  (Class/Method/Constructor)" rozszerzony o R2 i zmierzony, niezerowy
+  efekt). `README.md` (akapit "Reflection under-approximates"
+  rozszerzony o trzeci wycinek).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem, nie przez
+  przeoczenie):** `Constructor.newInstance` (R2's własna druga
+  połowa — alokacja, nietknięta), `getDeclared*`'s własny bypass
+  kontroli dostępu/`setAccessible` (R3), kwalifikacja (R4), Method
+  receiver docierający jako parametr metody (pościg przez pole/wynik
+  wywołania działa, przez parametr — nie). FRAMEWORKS:F3's pełna
+  rezolucja dispatchu proxy (`internal/aop`'s `ProxyHandlers`
+  podłączone do tych krawędzi) — nie podłączone w tym przyroście, to
+  F3's własny następny wycinek.
+- **Następny krok:** `Constructor.newInstance` (R2's druga połowa),
+  FRAMEWORKS:F3's podłączenie proxy-handlerów do tych krawędzi, R3
+  (`setAccessible`/przepływ między metodami), rejestr B3, albo
+  `@Value`-owe właściwości — wymaga propozycji i zgody użytkownika
+  przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
@@ -2991,10 +3085,16 @@ Przy dodawaniu kolejnego wpisu zapisz:
    wskaźnikowy mutowalny przez `aastore`, nowy `KindReflectiveMethod`,
    minimalne śledzenie literałów `int`) — zmierzony efekt zerowy na
    petclinic/WebGoat (żadna z aplikacji nie używa tych API), uczciwie
-   odnotowany, brak crasha na pełnej hierarchii. Naturalny następny
-   krok to R2 (`Method.invoke`/`Constructor.newInstance`, realne
-   krawędzie grafu — odblokuje F3's pełną rezolucję dispatchu),
-   rejestr B3, albo `@Value`-owe właściwości.
+   odnotowany, brak crasha na pełnej hierarchii. REFLECTION:R2's
+   pierwsza połowa (`Method#invoke` → realne krawędzie, `internal/
+   reflectinvoke`, nowy `BasisReflection`) jest gotowa — **efekt
+   niezerowy**, inaczej niż R0/R1: petclinic 5 nowych krawędzi (3/59/
+   29/51/6→3/62/26/51/6), WebGoat 3 nowe krawędzie (40/43/21/56/0→
+   42/44/18/56/0). `Constructor.newInstance` (R2's druga połowa, nowa
+   alokacja nie wywołanie) nietknięty. Naturalny następny krok to
+   `Constructor.newInstance`, FRAMEWORKS:F3's podłączenie `ProxyHandlers`
+   do tych nowych krawędzi, R3 (`setAccessible`/przepływ między
+   metodami), rejestr B3, albo `@Value`-owe właściwości.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

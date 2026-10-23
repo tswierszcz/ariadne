@@ -26,6 +26,7 @@ import (
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
+	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/report"
 	"ariadne/internal/serviceload"
 	"ariadne/internal/springxml"
@@ -525,6 +526,27 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("method handles: %d invoke/invokeExact call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
 		len(handleInvokeSites), len(handleEdgeTargets), handleEdgesAdded)
 
+	// REFLECTION R2: find every java.lang.reflect.Method#invoke call
+	// site, read its Method receiver back via REFLECTION R1's own
+	// KindReflectiveMethod, and connect it to every overload of the
+	// resolved target method name on its real dispatch target — a "may
+	// run" edge, like DYNAMIC_LINKAGE L2's own BasisMethodHandle.
+	reflectInvokeSites := reflectinvoke.FindInvokeSites(h)
+	resolvedReflectInvokes, reflectResolveWarnings := reflectinvoke.ResolveInvokes(h, reflectInvokeSites)
+	warnings = append(warnings, reflectResolveWarnings...)
+	reflectEdgeResults := reflectinvoke.FindInvokeEdges(h, resolvedReflectInvokes)
+	reflectEdgeTargets := reflectinvoke.EdgeTargets(reflectEdgeResults)
+	var reflectGraphEdges []callgraph.ReflectInvokeEdge
+	for _, e := range reflectEdgeTargets {
+		reflectGraphEdges = append(reflectGraphEdges, callgraph.ReflectInvokeEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetMethod: e.TargetMethod,
+		})
+	}
+	reflectEdgesAdded := callgraph.ApplyReflectInvokeEdges(g, reflectGraphEdges)
+	log("reflection: %d Method#invoke call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
+		len(reflectInvokeSites), len(reflectEdgeTargets), reflectEdgesAdded)
+
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
@@ -707,7 +729,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

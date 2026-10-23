@@ -14,6 +14,7 @@ import (
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
+	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/serviceload"
 )
 
@@ -195,10 +196,19 @@ type Data struct {
 	// ProxyHandlers is FRAMEWORKS F3's own first slice: every
 	// application class implementing `InvocationHandler`, with its own
 	// candidate target field(s) (a `final` instance field of a
-	// reference type) — identity only, no new call-graph edge, since
-	// binding a proxy call to its real dispatch needs REFLECTION R2's
-	// own `Method.invoke` reconstruction, which does not exist yet.
+	// reference type) — identity only, no new call-graph edge; wiring
+	// one of these up to REFLECTION R2's own ReflectInvokeEdges remains
+	// FRAMEWORKS F3's own next slice, not done here.
 	ProxyHandlers []ProxyHandlerRow
+
+	// ReflectInvokeSites/ReflectInvokeEdges are REFLECTION R2's own
+	// result: every java.lang.reflect.Method#invoke call site found,
+	// and each one's resolved Method receiver connected to its real
+	// dispatch target as a call-graph edge (or a Gap explaining why
+	// not — an unresolved receiver, an unsupported parameter type, or a
+	// proven argument-count mismatch).
+	ReflectInvokeSites []reflectinvoke.ResolvedInvoke
+	ReflectInvokeEdges []reflectinvoke.InvokeEdgeResult
 }
 
 // ProxyHandlerRow is Data's own rendering-friendly form of
@@ -301,7 +311,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler, reflectInvokeSites []reflectinvoke.ResolvedInvoke, reflectInvokeEdges []reflectinvoke.InvokeEdgeResult) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -338,6 +348,8 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		ExternalEntries:           externalEntryRows(externalEntries),
 		ProxyHandlers:             proxyHandlerRows(proxyHandlers),
 		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
+		ReflectInvokeSites:        reflectInvokeSites,
+		ReflectInvokeEdges:        reflectInvokeEdges,
 	}
 
 	for _, r := range sorted {

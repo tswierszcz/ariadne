@@ -72,6 +72,19 @@ const (
 	// no fixed overload to begin with, same reasoning the rest of
 	// ariadne already applies to CVE-vulnerable-method matching).
 	BasisMethodHandle EdgeBasis = "methodhandle"
+	// BasisReflection is a REFLECTION R2 edge: a
+	// java.lang.reflect.Method#invoke call site whose Method receiver
+	// DATA_FLOW D2/REFLECTION R1 resolved back to a getMethod/
+	// getDeclaredMethod call, connected to every overload of the
+	// resolved method name on its real dispatch target (the invocation
+	// target's own concrete allocation type when provable, the Class
+	// the lookup was performed on otherwise — internal/reflectinvoke's
+	// own FindInvokeEdges). Possible, not certain, same "may run"
+	// reasoning as BasisCallback/BasisMethodHandle: reflectively
+	// obtaining a Method never guarantees invoke actually runs it at
+	// runtime (a caught ReflectiveOperationException, a branch that
+	// never executes).
+	BasisReflection EdgeBasis = "reflection"
 )
 
 // CallSite is one piece of evidence for why an edge exists: the bytecode

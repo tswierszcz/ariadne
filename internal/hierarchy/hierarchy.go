@@ -113,6 +113,38 @@ func (c *ClassInfo) MethodByNameAndDesc(name, desc string) (Method, bool) {
 	return Method{}, false
 }
 
+// MethodByNameAndParams returns the method declared directly on this
+// class matching name and exactly these parameter descriptors, ignoring
+// return type — REFLECTION R2's own counterpart to MethodByNameAndDesc:
+// a `Class#getMethod(String, Class...)` call proves the parameter types
+// but never the return type, and two methods can't legally share a name
+// and parameter list with different return types (bridge methods aside,
+// which this never matches against — see ResolveByParams's own doc
+// comment), so matching on parameters alone is still exact, not
+// overload-insensitive the way MethodByName is.
+func (c *ClassInfo) MethodByNameAndParams(name string, paramDescs []string) (Method, bool) {
+	for _, m := range c.Methods {
+		if m.Name != name {
+			continue
+		}
+		mp, err := classfile.ParamDescriptors(m.Descriptor)
+		if err != nil || len(mp) != len(paramDescs) {
+			continue
+		}
+		match := true
+		for i := range mp {
+			if mp[i] != paramDescs[i] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return m, true
+		}
+	}
+	return Method{}, false
+}
+
 // MethodsByName returns every method named name declared directly on this
 // class — there can be more than one, since Java allows overloads and
 // ariadne matches by name only. Used where a caller needs every overload

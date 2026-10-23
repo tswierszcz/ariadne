@@ -45,6 +45,15 @@ func slotWidth(fieldDescriptor string) int {
 	return 1
 }
 
+// ParamDescriptors is parseParamDescriptors, exported for a caller
+// (REFLECTION R2) that needs a method's parameter descriptors alone,
+// without a return type to match against — a reflective `getMethod`
+// lookup never provides one, unlike ArgumentSlots's own callers, which
+// always have a full descriptor already.
+func ParamDescriptors(descriptor string) ([]string, error) {
+	return parseParamDescriptors(descriptor)
+}
+
 // parseParamDescriptors splits a method descriptor's parameter section
 // "(...)" into individual field descriptors (JVMS 4.3.2/4.3.3).
 func parseParamDescriptors(descriptor string) ([]string, error) {

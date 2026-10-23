@@ -86,6 +86,20 @@ func (h *Hierarchy) ResolveExact(fqcn, name, desc string) (declaringClass string
 	})
 }
 
+// ResolveByParams is ResolveExact's REFLECTION R2 counterpart: it finds
+// which class in fqcn's superclass/superinterface chain declares a
+// method matching name and paramDescs, the same JVM lookup order, but
+// without requiring a return type — a resolved `Class#getMethod` call
+// proves the parameter types, never the return type (ClassInfo's own
+// MethodByNameAndParams doc comment explains why matching without it is
+// still exact, not an overload-insensitive guess).
+func (h *Hierarchy) ResolveByParams(fqcn, name string, paramDescs []string) (declaringClass string, found bool) {
+	return h.resolveBy(fqcn, func(ci *ClassInfo) bool {
+		_, ok := ci.MethodByNameAndParams(name, paramDescs)
+		return ok
+	})
+}
+
 // ResolveField finds which class/interface actually declares a field
 // with this exact name and descriptor, following the JVM's own field
 // resolution order (JVMS 5.4.3.2) — deliberately *not* the same order as
