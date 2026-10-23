@@ -13,17 +13,17 @@ Zależności: B0–B1, JVM G0–G2 i kontrakt rejestru B3.
 
 Gotowe: obecny profil zachowuje działanie, a dostępność biblioteki i aktywna konfiguracja są osobnymi informacjami.
 
-## F1. Adnotacje, zasoby i jawna konfiguracja
+## F1. Adnotacje, zasoby i jawna konfiguracja — DONE (zarchiwizowane 2026-10-23)
 
-Zależności: F0, JVM G1/G4 dla pochodzenia i wybranych klas.
-
-- Rozszerzyć `internal/classfile/annotations.go` i struktury klas/metod/pól o wartości, typy, tablice i powiązanie parametrów. Zachować dotychczasowe listy nazw przez adapter.
-- Zachować w obsługiwanym zakresie adnotacje niewidoczne runtime, wartości domyślne, meta-adnotacje i repeatable annotations. Nie traktować nieznanej kompozycji jako znanego endpointu.
-- W `internal/input` zachować zasoby i pochodzenie modułu. Wprowadzić jawne wejście plików i właściwości scenariusza, zamiast czytać przypadkowe środowisko hosta.
-- Zaimplementować ograniczony odczyt `web.xml` oraz XML bean definitions; odnotować pominięte elementy. XML nie pobiera zewnętrznych definicji ani nie uruchamia kodu.
-- Określić priorytet konfiguracji i konflikty. Wzajemnie wykluczające się warunki nie mogą być scalane w pozornie jeden aktywny scenariusz.
-
-Gotowe: wartości qualifiera, profilu i trasy mają źródło; brak pliku lub nieobsługiwany warunek daje unknown, nie false.
+Zrealizowane dla swojego faktycznego zakresu i zweryfikowane na realnym
+bytecode; zobacz
+[archive/2026-10-23/frameworks/FRAMEWORKS_F1.md](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md)
+po pełny zapis (co zrobione, dowody, co celowo odłożone) i
+`docs/SUPPORT.MD` po bieżący opis zachowania. Konflikty nazw beanów są
+wykrywane, nie rozstrzygane; pełny priorytet wielu źródeł konfiguracji i
+jawne wejście plików/właściwości scenariusza (poza `-active-profiles`)
+pozostają nieruszone — żadny z tych punktów nie trafił do zrealizowanego
+zakresu, odnotowane szczerze w archiwum.
 
 ## F2. Pierwsze DI i model zewnętrznych wejść
 
