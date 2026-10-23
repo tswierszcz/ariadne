@@ -26,10 +26,11 @@ func readPool(rd *reader) (pool, error) {
 			b := rd.bytes(uint32(n))
 			e.str = string(b)
 		case tagInteger, tagFloat:
-			rd.u4()
+			e.raw32 = rd.u4()
 		case tagLong, tagDouble:
-			rd.u4()
-			rd.u4()
+			hi := rd.u4()
+			lo := rd.u4()
+			e.raw64 = uint64(hi)<<32 | uint64(lo)
 		case tagClass, tagString, tagMethodType, tagModule, tagPackage:
 			e.nameIndex = rd.u2()
 		case tagFieldref, tagMethodref, tagInterfaceMethodref:

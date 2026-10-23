@@ -5,7 +5,10 @@
 // instead of shelling out to a bytecode-based tool.
 package classfile
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Constant pool tags (JVM spec table 4.4-A), including every tag added up
 // through Java 21 (Dynamic/InvokeDynamic/Module/Package).
@@ -79,6 +82,19 @@ type cpEntry struct {
 
 	// tagDynamic/tagInvokeDynamic: index into the class's bootstrap_methods table
 	bootstrapMethodAttrIndex uint16
+
+	// tagInteger: the raw 4 bytes, read as a two's-complement int32.
+	// tagFloat: the raw 4 bytes, IEEE 754 bit pattern (math.Float32frombits).
+	// FRAMEWORKS F1's own need: an annotation element_value's 'B'/'C'/'I'/
+	// 'S'/'Z' const_value_index point at an Integer entry (narrowed by the
+	// element_value's own tag, JVM spec 4.7.16.1), and 'F' at a Float one.
+	raw32 uint32
+
+	// tagLong/tagDouble: the raw 8 bytes (hi u4 in the upper 32 bits, lo
+	// u4 in the lower 32, matching the two u4 reads readPool already did),
+	// read as int64 or IEEE 754 double bits (math.Float64frombits) by an
+	// element_value's 'J'/'D' tag.
+	raw64 uint64
 }
 
 // pool is a class file's constant pool, 1-indexed as the JVM spec requires
@@ -194,6 +210,56 @@ func (p pool) fieldref(idx uint16) (owner, name, desc string, err error) {
 		return "", "", "", err
 	}
 	return owner, name, desc, nil
+}
+
+// integer resolves an Integer constant to its int32 value — used by an
+// annotation element_value's 'B'/'C'/'I'/'S'/'Z' tags (FRAMEWORKS F1),
+// each narrowing the same int32 differently per JVM spec 4.7.16.1.
+func (p pool) integer(idx uint16) (int32, error) {
+	e, err := p.get(idx)
+	if err != nil {
+		return 0, err
+	}
+	if e.tag != tagInteger {
+		return 0, fmt.Errorf("constant pool index %d is tag %d, want Integer", idx, e.tag)
+	}
+	return int32(e.raw32), nil
+}
+
+// float32Val resolves a Float constant to its float32 value.
+func (p pool) float32Val(idx uint16) (float32, error) {
+	e, err := p.get(idx)
+	if err != nil {
+		return 0, err
+	}
+	if e.tag != tagFloat {
+		return 0, fmt.Errorf("constant pool index %d is tag %d, want Float", idx, e.tag)
+	}
+	return math.Float32frombits(e.raw32), nil
+}
+
+// long resolves a Long constant to its int64 value.
+func (p pool) long(idx uint16) (int64, error) {
+	e, err := p.get(idx)
+	if err != nil {
+		return 0, err
+	}
+	if e.tag != tagLong {
+		return 0, fmt.Errorf("constant pool index %d is tag %d, want Long", idx, e.tag)
+	}
+	return int64(e.raw64), nil
+}
+
+// doubleVal resolves a Double constant to its float64 value.
+func (p pool) doubleVal(idx uint16) (float64, error) {
+	e, err := p.get(idx)
+	if err != nil {
+		return 0, err
+	}
+	if e.tag != tagDouble {
+		return 0, fmt.Errorf("constant pool index %d is tag %d, want Double", idx, e.tag)
+	}
+	return math.Float64frombits(e.raw64), nil
 }
 
 // methodHandle resolves a MethodHandle constant: its reference kind, and

@@ -25,16 +25,36 @@ type Method struct {
 	Name        string
 	Descriptor  string
 	// Annotations are the FQCNs of this method's RuntimeVisibleAnnotations
-	// (e.g. "org.springframework.web.bind.annotation.GetMapping").
+	// and RuntimeInvisibleAnnotations (e.g.
+	// "org.springframework.web.bind.annotation.GetMapping") — kept as a
+	// plain name list so every existing consumer (internal/profile's own
+	// name matching) keeps working unchanged; see AnnotationDetails for
+	// element values (FRAMEWORKS F1).
 	Annotations []string
+	// AnnotationDetails is Annotations' own richer form: every
+	// annotation fully decoded, including element values — FRAMEWORKS
+	// F1's own "wartości, typy, tablice" requirement. Same order as
+	// Annotations (AnnotationDetails[i].Type == Annotations[i]).
+	AnnotationDetails []Annotation
 	// ParameterAnnotations are the FQCNs of each parameter's own
-	// RuntimeVisibleParameterAnnotations (e.g. CDI's
-	// "javax.enterprise.event.Observes" on an observer method's event
-	// parameter), nil if the method has no such attribute at all. Index i
-	// holds parameter i's annotations; a parameter with none gets an empty
-	// (not nil) slice, so len(ParameterAnnotations) still tells apart "no
-	// attribute" from "attribute present, nothing annotated".
+	// RuntimeVisibleParameterAnnotations/RuntimeInvisibleParameterAnnotations
+	// (e.g. CDI's "javax.enterprise.event.Observes" on an observer
+	// method's event parameter), nil if the method has no such attribute
+	// at all. Index i holds parameter i's annotations; a parameter with
+	// none gets an empty (not nil) slice, so len(ParameterAnnotations)
+	// still tells apart "no attribute" from "attribute present, nothing
+	// annotated".
 	ParameterAnnotations [][]string
+	// ParameterAnnotationDetails is ParameterAnnotations' own richer
+	// form, same indexing and the same Visible+Invisible merge.
+	ParameterAnnotationDetails [][]Annotation
+	// DefaultValue is this method's own AnnotationDefault attribute
+	// (JVM spec 4.7.22) — present only when this method is itself an
+	// element declaration on an *annotation interface*
+	// (`String value() default "x";`), giving the value a usage site
+	// gets when it omits this element. nil when absent (no default, or
+	// this method isn't an annotation element at all).
+	DefaultValue *ElementValue
 	// Code is the raw bytecode from this method's Code attribute, or nil
 	// for an abstract/native method.
 	Code []byte
@@ -60,6 +80,15 @@ type Field struct {
 	AccessFlags uint16
 	Name        string
 	Descriptor  string
+	// Annotations/AnnotationDetails are this field's own
+	// RuntimeVisibleAnnotations+RuntimeInvisibleAnnotations (FRAMEWORKS
+	// F1, new — before F1 a field carried no annotation information at
+	// all, so e.g. Spring's `@Autowired`/`@Qualifier`/`@Value` on a
+	// field were invisible to ariadne even though the method/class
+	// forms already were). Same name-list/richer-form split as Method's
+	// own fields.
+	Annotations       []string
+	AnnotationDetails []Annotation
 }
 
 // BootstrapMethod is one entry of the class-level BootstrapMethods
@@ -126,8 +155,12 @@ type ClassFile struct {
 	Interfaces  []string
 	Fields      []Field
 	Methods     []Method
-	Annotations []string // class-level RuntimeVisibleAnnotations, as FQCNs
-	Bootstrap   []BootstrapMethod
+	Annotations []string // class-level RuntimeVisible+RuntimeInvisibleAnnotations, as FQCNs
+	// AnnotationDetails is Annotations' own richer form (FRAMEWORKS F1)
+	// — see Method.AnnotationDetails's own doc comment for the same
+	// name-list/richer-form split.
+	AnnotationDetails []Annotation
+	Bootstrap         []BootstrapMethod
 
 	pool pool // kept only so resolveInvokeDynamic (calls.go) can look up the CONSTANT_InvokeDynamic entry for each invokedynamic instruction
 }
@@ -196,7 +229,7 @@ func Parse(r io.Reader) (*ClassFile, error) {
 		methods = append(methods, m)
 	}
 
-	var classAnnotations []string
+	var classAnnotations []Annotation
 	var bootstrap []BootstrapMethod
 	classAttrCount := rd.u2()
 	for i := uint16(0); i < classAttrCount && rd.err == nil; i++ {
@@ -205,11 +238,12 @@ func Parse(r io.Reader) (*ClassFile, error) {
 			return nil, fmt.Errorf("class attribute %d: %w", i, err)
 		}
 		switch name {
-		case "RuntimeVisibleAnnotations":
-			classAnnotations, err = parseAnnotations(data, p)
+		case "RuntimeVisibleAnnotations", "RuntimeInvisibleAnnotations":
+			anns, err := parseAnnotations(data, p)
 			if err != nil {
-				return nil, fmt.Errorf("class RuntimeVisibleAnnotations: %w", err)
+				return nil, fmt.Errorf("class %s: %w", name, err)
 			}
+			classAnnotations = append(classAnnotations, anns...)
 		case "BootstrapMethods":
 			bootstrap, err = parseBootstrapMethods(data, p)
 			if err != nil {
@@ -235,17 +269,18 @@ func Parse(r io.Reader) (*ClassFile, error) {
 	}
 
 	return &ClassFile{
-		MinorVersion: minor,
-		MajorVersion: major,
-		AccessFlags:  accessFlags,
-		ThisClass:    thisName,
-		SuperClass:   superName,
-		Interfaces:   interfaces,
-		Fields:       fields,
-		Methods:      methods,
-		Annotations:  classAnnotations,
-		Bootstrap:    bootstrap,
-		pool:         p,
+		MinorVersion:      minor,
+		MajorVersion:      major,
+		AccessFlags:       accessFlags,
+		ThisClass:         thisName,
+		SuperClass:        superName,
+		Interfaces:        interfaces,
+		Fields:            fields,
+		Methods:           methods,
+		Annotations:       annotationNames(classAnnotations),
+		AnnotationDetails: classAnnotations,
+		Bootstrap:         bootstrap,
+		pool:              p,
 	}, nil
 }
 
@@ -254,9 +289,19 @@ func readField(rd *reader, p pool) (Field, error) {
 	nameIdx := rd.u2()
 	descIdx := rd.u2()
 	attrCount := rd.u2()
+	var annotations []Annotation
 	for i := uint16(0); i < attrCount && rd.err == nil; i++ {
-		if _, _, err := readAttribute(rd, p); err != nil {
+		name, data, err := readAttribute(rd, p)
+		if err != nil {
 			return Field{}, err
+		}
+		switch name {
+		case "RuntimeVisibleAnnotations", "RuntimeInvisibleAnnotations":
+			anns, err := parseAnnotations(data, p)
+			if err != nil {
+				return Field{}, fmt.Errorf("%s: %w", name, err)
+			}
+			annotations = append(annotations, anns...)
 		}
 	}
 	if rd.err != nil {
@@ -270,7 +315,13 @@ func readField(rd *reader, p pool) (Field, error) {
 	if err != nil {
 		return Field{}, fmt.Errorf("descriptor: %w", err)
 	}
-	return Field{AccessFlags: accessFlags, Name: name, Descriptor: desc}, nil
+	return Field{
+		AccessFlags:       accessFlags,
+		Name:              name,
+		Descriptor:        desc,
+		Annotations:       annotationNames(annotations),
+		AnnotationDetails: annotations,
+	}, nil
 }
 
 func readMethod(rd *reader, p pool) (Method, error) {
@@ -279,8 +330,9 @@ func readMethod(rd *reader, p pool) (Method, error) {
 	descIdx := rd.u2()
 	attrCount := rd.u2()
 
-	var annotations []string
-	var paramAnnotations [][]string
+	var annotations []Annotation
+	var paramAnnotations [][]Annotation
+	var defaultValue *ElementValue
 	var code CodeAttr
 	for i := uint16(0); i < attrCount && rd.err == nil; i++ {
 		name, data, err := readAttribute(rd, p)
@@ -288,16 +340,24 @@ func readMethod(rd *reader, p pool) (Method, error) {
 			return Method{}, err
 		}
 		switch name {
-		case "RuntimeVisibleAnnotations":
-			annotations, err = parseAnnotations(data, p)
+		case "RuntimeVisibleAnnotations", "RuntimeInvisibleAnnotations":
+			anns, err := parseAnnotations(data, p)
 			if err != nil {
-				return Method{}, fmt.Errorf("RuntimeVisibleAnnotations: %w", err)
+				return Method{}, fmt.Errorf("%s: %w", name, err)
 			}
-		case "RuntimeVisibleParameterAnnotations":
-			paramAnnotations, err = parseParameterAnnotations(data, p)
+			annotations = append(annotations, anns...)
+		case "RuntimeVisibleParameterAnnotations", "RuntimeInvisibleParameterAnnotations":
+			anns, err := parseParameterAnnotations(data, p)
 			if err != nil {
-				return Method{}, fmt.Errorf("RuntimeVisibleParameterAnnotations: %w", err)
+				return Method{}, fmt.Errorf("%s: %w", name, err)
 			}
+			paramAnnotations = mergeParameterAnnotations(paramAnnotations, anns)
+		case "AnnotationDefault":
+			ev, err := parseAnnotationDefault(data, p)
+			if err != nil {
+				return Method{}, fmt.Errorf("AnnotationDefault: %w", err)
+			}
+			defaultValue = &ev
 		case "Code":
 			code, err = parseCodeAttribute(data, p)
 			if err != nil {
@@ -317,17 +377,27 @@ func readMethod(rd *reader, p pool) (Method, error) {
 	if err != nil {
 		return Method{}, fmt.Errorf("descriptor: %w", err)
 	}
+	var paramAnnotationNames [][]string
+	if paramAnnotations != nil {
+		paramAnnotationNames = make([][]string, len(paramAnnotations))
+		for i, anns := range paramAnnotations {
+			paramAnnotationNames[i] = annotationNames(anns)
+		}
+	}
 	return Method{
-		AccessFlags:          accessFlags,
-		Name:                 name,
-		Descriptor:           desc,
-		Annotations:          annotations,
-		ParameterAnnotations: paramAnnotations,
-		Code:                 code.Code,
-		MaxStack:             code.MaxStack,
-		MaxLocals:            code.MaxLocals,
-		ExceptionTable:       code.ExceptionTable,
-		LineNumbers:          code.LineNumbers,
+		AccessFlags:                accessFlags,
+		Name:                       name,
+		Descriptor:                 desc,
+		Annotations:                annotationNames(annotations),
+		AnnotationDetails:          annotations,
+		ParameterAnnotations:       paramAnnotationNames,
+		ParameterAnnotationDetails: paramAnnotations,
+		DefaultValue:               defaultValue,
+		Code:                       code.Code,
+		MaxStack:                   code.MaxStack,
+		MaxLocals:                  code.MaxLocals,
+		ExceptionTable:             code.ExceptionTable,
+		LineNumbers:                code.LineNumbers,
 	}, nil
 }
 

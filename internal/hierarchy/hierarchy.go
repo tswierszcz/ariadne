@@ -44,8 +44,11 @@ type ClassInfo struct {
 	// Fields are this class's own declared fields (JVM_GRAPH G3 needs
 	// these to resolve which class actually declares a field a
 	// getstatic/putstatic refers to — the field equivalent of Methods).
-	Fields       []classfile.Field
-	Annotations  []string
+	Fields      []classfile.Field
+	Annotations []string
+	// AnnotationDetails is Annotations' own richer form, element values
+	// included (FRAMEWORKS F1).
+	AnnotationDetails []classfile.Annotation
 	// SourceJar is the path of the jar this class was read from — the app
 	// jar (or the in-memory jar PrepareAppInput packed from a classes
 	// directory) for an app class, or the dependency jar's own path

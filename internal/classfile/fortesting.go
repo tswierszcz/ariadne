@@ -27,6 +27,9 @@ type PoolEntry struct {
 	ReferenceIndex uint16 // TagMethodHandle
 
 	BootstrapMethodAttrIndex uint16 // TagDynamic/TagInvokeDynamic
+
+	Raw32 uint32 // TagInteger (int32 bits)/TagFloat (IEEE 754 bits)
+	Raw64 uint64 // TagLong (int64 bits)/TagDouble (IEEE 754 bits)
 }
 
 // Constant pool tags, exported for NewClassFileForTesting callers — the
@@ -68,6 +71,8 @@ func NewClassFileForTesting(thisClass string, entries []PoolEntry) *ClassFile {
 			referenceKind:            e.ReferenceKind,
 			referenceIndex:           e.ReferenceIndex,
 			bootstrapMethodAttrIndex: e.BootstrapMethodAttrIndex,
+			raw32:                    e.Raw32,
+			raw64:                    e.Raw64,
 		}
 	}
 	return &ClassFile{ThisClass: thisClass, pool: p}

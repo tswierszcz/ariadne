@@ -55,19 +55,20 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool, targetJava int) 
 		}
 
 		out = append(out, &ClassInfo{
-			FQCN:           cf.ThisClass,
-			SuperClass:     cf.SuperClass,
-			Interfaces:     cf.Interfaces,
-			AccessFlags:    cf.AccessFlags,
-			MajorVersion:   cf.MajorVersion,
-			Methods:        methods,
-			Fields:         cf.Fields,
-			Annotations:    cf.Annotations,
-			SourceJar:      jarPath,
-			SourceEntry:    sel.file.Name,
-			VariantVersion: sel.variant,
-			GAV:            gav,
-			IsApp:          isApp,
+			FQCN:              cf.ThisClass,
+			SuperClass:        cf.SuperClass,
+			Interfaces:        cf.Interfaces,
+			AccessFlags:       cf.AccessFlags,
+			MajorVersion:      cf.MajorVersion,
+			Methods:           methods,
+			Fields:            cf.Fields,
+			Annotations:       cf.Annotations,
+			AnnotationDetails: cf.AnnotationDetails,
+			SourceJar:         jarPath,
+			SourceEntry:       sel.file.Name,
+			VariantVersion:    sel.variant,
+			GAV:               gav,
+			IsApp:             isApp,
 		})
 	}
 	return out, warnings, nil
