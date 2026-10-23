@@ -33,7 +33,7 @@ func TestInjectionPoints_autowiredField(t *testing.T) {
 		},
 	})
 
-	points := InjectionPoints(h)
+	points := InjectionPoints(h, nil)
 	want := []InjectionPoint{{FQCN: "test.Consumer", Member: "service", ParamIndex: -1, Type: "test.FooService"}}
 	if !reflect.DeepEqual(points, want) {
 		t.Errorf("InjectionPoints = %+v, want %+v", points, want)
@@ -51,8 +51,57 @@ func TestInjectionPoints_soleConstructorImplicitlyAutowired(t *testing.T) {
 		},
 	})
 
-	points := InjectionPoints(h)
+	points := InjectionPoints(h, []BeanName{{FQCN: "test.Consumer"}})
 	want := []InjectionPoint{{FQCN: "test.Consumer", Member: "<init>", ParamIndex: 0, Type: "test.FooService"}}
+	if !reflect.DeepEqual(points, want) {
+		t.Errorf("InjectionPoints = %+v, want %+v", points, want)
+	}
+}
+
+// TestInjectionPoints_soleConstructorOnPlainClassIsNotFabricated is
+// this session's own fix: a class with exactly one constructor but no
+// stereotype annotation and no `@Configuration` is never container-
+// managed by Spring at all (an enum's compiler-generated constructor,
+// a Lombok-generated POJO, a manually-`new`'d helper — all confirmed
+// real false-positive shapes found on WebGoat), so it must contribute
+// no injection point, unlike TestInjectionPoints_soleConstructorImplicitlyAutowired
+// above where the class *is* a known stereotype bean.
+func TestInjectionPoints_soleConstructorOnPlainClassIsNotFabricated(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:  "test.PlainPojo",
+			IsApp: true,
+			Methods: []hierarchy.Method{
+				{Method: classfile.Method{Name: "<init>", Descriptor: "(Ljava/lang/String;)V"}},
+			},
+		},
+	})
+
+	if points := InjectionPoints(h, nil); len(points) != 0 {
+		t.Errorf("InjectionPoints(plain class, no stereotype/@Configuration) = %+v, want none", points)
+	}
+}
+
+// TestInjectionPoints_soleConstructorOnConfigurationClass confirms the
+// other half of the same fix: a `@Configuration` class is container-
+// managed even though BeanNames (the @Component-family stereotype
+// scan) never catalogs it — the real WebGoat shape this session found
+// (`WebSecurityConfig`, `@Configuration` plus Lombok's own
+// `@AllArgsConstructor`, no `@Autowired` anywhere).
+func TestInjectionPoints_soleConstructorOnConfigurationClass(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.SecurityConfig",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{Method: classfile.Method{Name: "<init>", Descriptor: "(Ltest/FooService;)V"}},
+			},
+		},
+	})
+
+	points := InjectionPoints(h, nil)
+	want := []InjectionPoint{{FQCN: "test.SecurityConfig", Member: "<init>", ParamIndex: 0, Type: "test.FooService"}}
 	if !reflect.DeepEqual(points, want) {
 		t.Errorf("InjectionPoints = %+v, want %+v", points, want)
 	}
@@ -70,7 +119,7 @@ func TestInjectionPoints_multipleConstructorsWithoutAutowiredIsSkipped(t *testin
 		},
 	})
 
-	points := InjectionPoints(h)
+	points := InjectionPoints(h, []BeanName{{FQCN: "test.Consumer"}})
 	if len(points) != 0 {
 		t.Errorf("InjectionPoints(ambiguous constructors, none @Autowired) = %+v, want none", points)
 	}
@@ -92,7 +141,10 @@ func TestInjectionPoints_autowiredConstructorAmongSeveralIsChosen(t *testing.T) 
 		},
 	})
 
-	points := InjectionPoints(h)
+	// Not a stereotype/@Configuration class — confirms the explicit
+	// `@Autowired` path stays unrestricted by this session's own fix,
+	// unlike the implicit sole-constructor rule.
+	points := InjectionPoints(h, nil)
 	want := []InjectionPoint{{FQCN: "test.Consumer", Member: "<init>", ParamIndex: 0, Type: "test.FooService"}}
 	if !reflect.DeepEqual(points, want) {
 		t.Errorf("InjectionPoints = %+v, want %+v", points, want)

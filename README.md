@@ -735,16 +735,21 @@ report:
   ...) is still not a known candidate, so those injection points are
   correctly reported unresolved rather than guessed (confirmed on
   petclinic: its own 8 injection points, all Spring Data repository
-  interfaces, now resolve 8/8; WebGoat: 21 `@Bean` methods plus every
-  repository interface push resolution from 7/74 up to **50/74**
-  genuinely resolved — only 2 of the remaining 24 are a true
-  framework-provided bean, `JdbcTemplate`/`ResourceLoader`; the bulk
-  is `@Value`-style property injection of `String`/`List`/`Integer`/
-  `Boolean`, a different, untouched mechanism, not a missing bean). A
-  factory method whose own construction is ambiguous or programmatic
-  (anything beyond its declared return type) is not resolved further.
-  No AOP/pointcut model, and no call-graph edges from a resolved
-  injection — it is a wiring fact, not a call. **Web.xml roots**: a
+  interfaces, resolve 8/8; WebGoat: **43** real injection points
+  (the implicit-sole-constructor rule only applies to a class Spring
+  actually container-manages — a stereotype or `@Configuration` class
+  — a 2026-10-23 fix removing injection points the original rule had
+  fabricated for Lombok-generated POJOs, plain enums, and manually-
+  `new`'d helper classes, none of which Spring ever autowires), **37**
+  genuinely resolved, with all 6 remaining unresolved honestly
+  explained: 1 real `@Value` (`DatabaseConfiguration`'s own `String`),
+  4 real `List<Bean>` collection injections (out of scope, see below),
+  and 1 real framework-provided bean (`UserService`'s own
+  `JdbcTemplate`) — nothing left unaccounted for). A factory method
+  whose own construction is ambiguous or programmatic (anything beyond
+  its declared return type) is not resolved further. No AOP/pointcut
+  model, and no call-graph edges from a resolved injection — it is a
+  wiring fact, not a call. **Web.xml roots**: a
   `web.xml`-declared servlet/filter/listener's own lifecycle method(s)
   (`doGet`, `doFilter`, `contextInitialized`, ... — only the
   well-known container-callback names, never every public method)

@@ -422,7 +422,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// stereotype class does) by type, @Qualifier, then @Primary (the
 	// same order Spring's own container uses). Unresolved means no
 	// candidate or an undisambiguated one, never a guess.
-	injectionPoints := profile.InjectionPoints(h)
+	injectionPoints := profile.InjectionPoints(h, springBeanNames)
 	allBeans := append(append(append([]profile.BeanName{}, springBeanNames...), springBeanMethods...), springRepositoryBeans...)
 	resolvedInjections := profile.ResolveInjections(h, injectionPoints, allBeans)
 	resolvedInjectionCount := 0

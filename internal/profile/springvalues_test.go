@@ -312,7 +312,7 @@ func TestBeanMethods_resolvesRealInjectionPoint(t *testing.T) {
 	})
 
 	beans := append(BeanNames(h), BeanMethods(h)...)
-	points := InjectionPoints(h)
+	points := InjectionPoints(h, nil)
 	resolved := ResolveInjections(h, points, beans)
 	if len(resolved) != 1 || resolved[0].Resolved != "test.Customizer" {
 		t.Errorf("ResolveInjections = %+v, want one entry resolved to test.Customizer", resolved)
@@ -382,7 +382,7 @@ func TestRepositoryBeans_resolvesRealInjectionPoint(t *testing.T) {
 	})
 
 	beans := RepositoryBeans(h)
-	points := InjectionPoints(h)
+	points := InjectionPoints(h, nil)
 	resolved := ResolveInjections(h, points, beans)
 	if len(resolved) != 1 || resolved[0].Resolved != "test.OwnerRepository" {
 		t.Errorf("ResolveInjections = %+v, want one entry resolved to test.OwnerRepository", resolved)

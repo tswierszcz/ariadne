@@ -12,6 +12,19 @@
 // yet combined with F1's own XML `<bean>` inventory, which lives in a
 // different package (internal/springxml) this one does not import,
 // to keep this increment's own blast radius small.
+//
+// A fix, not a feature (2026-10-23): Spring 4.3's own implicit
+// sole-constructor autowiring rule only ever applies to a class the
+// container actually manages — a stereotype-annotated one or a
+// `@Configuration` one — never to every application class that merely
+// happens to declare exactly one constructor. The original version of
+// this file applied it unconditionally, which fabricated injection
+// points for Lombok-generated POJOs (`@lombok.Value`,
+// `@AllArgsConstructor` — a same-named, unrelated annotation to
+// Spring's own), plain enums (their compiler-generated constructor),
+// and manually-`new`'d helper classes — confirmed on WebGoat by
+// tracing its own source for every previously-reported String/List/
+// Integer/Boolean "unresolved" entry.
 package profile
 
 import (
@@ -54,7 +67,25 @@ type InjectionPoint struct {
 // several constructors and none `@Autowired` has no basis to pick one,
 // so it contributes no constructor injection points at all — never a
 // guessed choice.
-func InjectionPoints(h *hierarchy.Hierarchy) []InjectionPoint {
+// InjectionPoints finds every DI injection point on h's application
+// classes. stereotypeBeans is F1's own BeanNames catalog (the
+// @Component-family stereotype scan) — Spring 4.3's own implicit
+// sole-constructor autowiring rule (see constructorInjectionPoints)
+// only applies to a class the container actually constructs by
+// scanning it, which means a stereotype-annotated class or a
+// `@Configuration` one (itself container-managed, independent of
+// BeanNames, which never catalogs `@Configuration` as a stereotype).
+// An ordinary application class with no such annotation — an enum, a
+// Lombok-generated POJO, a manually-`new`'d helper — has its own
+// "sole constructor" too, but Spring never autowires it; treating it
+// as a real injection point would be a fabricated positive, not an
+// honest gap.
+func InjectionPoints(h *hierarchy.Hierarchy, stereotypeBeans []BeanName) []InjectionPoint {
+	stereotyped := make(map[string]bool, len(stereotypeBeans))
+	for _, b := range stereotypeBeans {
+		stereotyped[b.FQCN] = true
+	}
+
 	var out []InjectionPoint
 	for _, fqcn := range h.SortedFQCNs() {
 		ci, ok := h.Lookup(fqcn)
@@ -74,12 +105,13 @@ func InjectionPoints(h *hierarchy.Hierarchy) []InjectionPoint {
 				Type: typ, Qualifier: qualifierValue(f.AnnotationDetails),
 			})
 		}
-		out = append(out, constructorInjectionPoints(fqcn, ci)...)
+		containerManaged := stereotyped[fqcn] || hasAny(ci.Annotations, []string{configurationFQCN})
+		out = append(out, constructorInjectionPoints(fqcn, ci, containerManaged)...)
 	}
 	return out
 }
 
-func constructorInjectionPoints(fqcn string, ci *hierarchy.ClassInfo) []InjectionPoint {
+func constructorInjectionPoints(fqcn string, ci *hierarchy.ClassInfo, containerManaged bool) []InjectionPoint {
 	var ctors []hierarchy.Method
 	for _, m := range ci.Methods {
 		if m.Name == "<init>" {
@@ -93,7 +125,7 @@ func constructorInjectionPoints(fqcn string, ci *hierarchy.ClassInfo) []Injectio
 			break
 		}
 	}
-	if chosen == nil && len(ctors) == 1 {
+	if chosen == nil && len(ctors) == 1 && containerManaged {
 		chosen = &ctors[0]
 	}
 	if chosen == nil {
