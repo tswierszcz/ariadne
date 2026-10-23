@@ -722,16 +722,22 @@ report:
   **DI**: every `@Autowired` field/constructor injection point is
   resolved against the known Spring bean names by type, then
   `@Qualifier`, then `@Primary` (FRAMEWORKS F2 — the report's own
-  "Dependency injection" section), but only against annotation-declared
-  beans — a Spring Data repository interface, an `@Bean` factory
-  method, or a framework-provided bean (`JdbcTemplate`, `DataSource`,
-  ...) is not a known candidate, so those injection points are
+  "Dependency injection" section), against annotation-declared beans
+  (`@Component`-family stereotypes) *and* `@Bean` factory methods on
+  `@Configuration` classes — a factory method's bean FQCN is its own
+  declared return type, its name is `@Bean("...")`/`value()`/`name()`
+  or (Spring's own default) the method name. A Spring Data repository
+  interface or a framework-provided bean (`JdbcTemplate`, `DataSource`,
+  ...) is still not a known candidate, so those injection points are
   correctly reported unresolved rather than guessed (confirmed on
   petclinic: its own 8 injection points are all Spring Data repository
-  interfaces, correctly 0/8 resolved; WebGoat gives the positive case,
-  7/74 genuinely resolved). No `@Bean` construction modeling, no
-  AOP/pointcut model, and no call-graph edges from a resolved
-  injection — it is a wiring fact, not a call. **Web.xml roots**: a
+  interfaces, correctly 0/8 resolved even with one real `@Bean` method
+  found; WebGoat: 21 `@Bean` methods found, and resolution jumps from
+  7/74 to 40/74 genuinely resolved). A factory method whose own
+  construction is ambiguous or programmatic (anything beyond its
+  declared return type) is not resolved further. No AOP/pointcut
+  model, and no call-graph edges from a resolved injection — it is a
+  wiring fact, not a call. **Web.xml roots**: a
   `web.xml`-declared servlet/filter/listener's own lifecycle method(s)
   (`doGet`, `doFilter`, `contextInitialized`, ... — only the
   well-known container-callback names, never every public method)

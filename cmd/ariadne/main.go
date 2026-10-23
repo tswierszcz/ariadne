@@ -409,17 +409,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	springRoutes := profile.Routes(h)
 	springBeanNames := profile.BeanNames(h)
+	springBeanMethods := profile.BeanMethods(h)
 	springProfileConditions := profile.ProfileConditions(h, activeProfiles)
-	log("frameworks: %d Spring MVC routes, %d @Component-family bean names, %d @Profile conditions found (active profiles: %s)",
-		len(springRoutes), len(springBeanNames), len(springProfileConditions), cfg.activeProfiles)
+	log("frameworks: %d Spring MVC routes, %d @Component-family bean names, %d @Bean factory methods, %d @Profile conditions found (active profiles: %s)",
+		len(springRoutes), len(springBeanNames), len(springBeanMethods), len(springProfileConditions), cfg.activeProfiles)
 
 	// FRAMEWORKS F2: first DI — every @Autowired field/constructor
-	// injection point, resolved against springBeanNames by type,
-	// @Qualifier, then @Primary (the same order Spring's own container
-	// uses). Unresolved means no candidate or an undisambiguated one,
-	// never a guess.
+	// injection point, resolved against springBeanNames plus
+	// springBeanMethods (F2's own "known factories" slice: a @Bean
+	// method's declared return type counts as a bean exactly like a
+	// stereotype class does) by type, @Qualifier, then @Primary (the
+	// same order Spring's own container uses). Unresolved means no
+	// candidate or an undisambiguated one, never a guess.
 	injectionPoints := profile.InjectionPoints(h)
-	resolvedInjections := profile.ResolveInjections(h, injectionPoints, springBeanNames)
+	allBeans := append(append([]profile.BeanName{}, springBeanNames...), springBeanMethods...)
+	resolvedInjections := profile.ResolveInjections(h, injectionPoints, allBeans)
 	resolvedInjectionCount := 0
 	for _, inj := range resolvedInjections {
 		if inj.Resolved != "" {

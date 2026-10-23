@@ -162,6 +162,163 @@ func TestBeanNames_noExplicitNameIsEmpty(t *testing.T) {
 	}
 }
 
+func TestBeanMethods_explicitNameAndPrimary(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.CacheConfig",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{
+					Method: classfile.Method{
+						Name:       "customizer",
+						Descriptor: "()Ltest/Customizer;",
+						AnnotationDetails: []classfile.Annotation{
+							{Type: "org.springframework.context.annotation.Bean", Values: map[string]classfile.ElementValue{
+								"value": strArrayElement("myCustomizer"),
+							}},
+							{Type: "org.springframework.context.annotation.Primary"},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	beans := BeanMethods(h)
+	if len(beans) != 1 {
+		t.Fatalf("BeanMethods = %+v, want 1 entry", beans)
+	}
+	b := beans[0]
+	if b.FQCN != "test.Customizer" || b.Name != "myCustomizer" || !b.Primary {
+		t.Errorf("BeanMethods[0] = %+v, want FQCN=test.Customizer Name=myCustomizer Primary=true", b)
+	}
+}
+
+func TestBeanMethods_noExplicitNameDefaultsToMethodName(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.CacheConfig",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{
+					Method: classfile.Method{
+						Name:              "customizer",
+						Descriptor:        "()Ltest/Customizer;",
+						AnnotationDetails: []classfile.Annotation{{Type: "org.springframework.context.annotation.Bean"}},
+					},
+				},
+			},
+		},
+	})
+
+	beans := BeanMethods(h)
+	if len(beans) != 1 || beans[0].Name != "customizer" || beans[0].Primary {
+		t.Errorf("BeanMethods = %+v, want one entry with Name=customizer Primary=false", beans)
+	}
+}
+
+func TestBeanMethods_ignoresNonConfigurationClasses(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:  "test.PlainService",
+			IsApp: true,
+			Methods: []hierarchy.Method{
+				{
+					Method: classfile.Method{
+						Name:              "customizer",
+						Descriptor:        "()Ltest/Customizer;",
+						AnnotationDetails: []classfile.Annotation{{Type: "org.springframework.context.annotation.Bean"}},
+					},
+				},
+			},
+		},
+	})
+
+	if beans := BeanMethods(h); len(beans) != 0 {
+		t.Errorf("BeanMethods = %+v, want no entries (class has no @Configuration)", beans)
+	}
+}
+
+func TestBeanMethods_ignoresMethodsWithoutBeanAnnotation(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.CacheConfig",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{Method: classfile.Method{Name: "helper", Descriptor: "()Ltest/Customizer;"}},
+			},
+		},
+	})
+
+	if beans := BeanMethods(h); len(beans) != 0 {
+		t.Errorf("BeanMethods = %+v, want no entries (method has no @Bean)", beans)
+	}
+}
+
+func TestBeanMethods_voidReturnContributesNothing(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.CacheConfig",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{
+					Method: classfile.Method{
+						Name:              "init",
+						Descriptor:        "()V",
+						AnnotationDetails: []classfile.Annotation{{Type: "org.springframework.context.annotation.Bean"}},
+					},
+				},
+			},
+		},
+	})
+
+	if beans := BeanMethods(h); len(beans) != 0 {
+		t.Errorf("BeanMethods = %+v, want no entries (void return is never a bean type)", beans)
+	}
+}
+
+// TestBeanMethods_resolvesRealInjectionPoint confirms the actual
+// wiring this increment adds: a field injected by interface type,
+// where the only known bean of that type comes from a @Bean factory
+// method (not a stereotype class) — ResolveInjections itself is
+// unchanged, but it must see the factory-method bean to resolve this.
+func TestBeanMethods_resolvesRealInjectionPoint(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{
+			FQCN:        "test.CacheConfig",
+			IsApp:       true,
+			Annotations: []string{"org.springframework.context.annotation.Configuration"},
+			Methods: []hierarchy.Method{
+				{
+					Method: classfile.Method{
+						Name:              "customizer",
+						Descriptor:        "()Ltest/Customizer;",
+						AnnotationDetails: []classfile.Annotation{{Type: "org.springframework.context.annotation.Bean"}},
+					},
+				},
+			},
+		},
+		{
+			FQCN:  "test.Consumer",
+			IsApp: true,
+			Fields: []classfile.Field{
+				{Name: "customizer", Descriptor: "Ltest/Customizer;", AnnotationDetails: []classfile.Annotation{{Type: autowiredFQCN}}},
+			},
+		},
+	})
+
+	beans := append(BeanNames(h), BeanMethods(h)...)
+	points := InjectionPoints(h)
+	resolved := ResolveInjections(h, points, beans)
+	if len(resolved) != 1 || resolved[0].Resolved != "test.Customizer" {
+		t.Errorf("ResolveInjections = %+v, want one entry resolved to test.Customizer", resolved)
+	}
+}
+
 func TestProfileConditions_noActiveListIsUnknown(t *testing.T) {
 	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
 		{

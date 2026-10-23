@@ -203,6 +203,89 @@ func BeanNames(h *hierarchy.Hierarchy) []BeanName {
 	return out
 }
 
+// configurationFQCN and beanMethodFQCN are Spring's own factory-method
+// shape: a `@Bean` method is only ever meaningful inside a
+// `@Configuration` class (a plain `@Component`'s own methods are never
+// treated as bean factories by Spring's container).
+const (
+	configurationFQCN = "org.springframework.context.annotation.Configuration"
+	beanMethodFQCN    = "org.springframework.context.annotation.Bean"
+)
+
+// BeanMethods finds every `@Bean`-annotated method on h's
+// `@Configuration`-annotated application classes — FRAMEWORKS F2's own
+// "known factories" case. The bean's FQCN is the method's own return
+// type (the object the factory method actually constructs), never the
+// declaring @Configuration class itself; Name is the method's own
+// `@Bean("...")`/`value()`/`name()` element when given, or (Spring's
+// own real default) the method's own name otherwise.
+//
+// A method whose return type isn't an ordinary object type (void, or a
+// primitive/array — never a valid bean type) contributes nothing,
+// honestly, rather than guessing. Ambiguous or programmatic factories
+// (a return type that is an interface with more than one app-class
+// implementor, or any construction logic beyond the declared return
+// type) are deliberately out of this slice's own scope — see
+// FRAMEWORKS_IMPLEMENTATION_PLAN.MD's own F2 "niejednoznaczne... fabryki
+// zachowują alternatywy/luki" requirement; BeanMethods never resolves
+// those, it only reports the method's declared return type as-is,
+// identically to how BeanNames already treats one stereotype as one
+// bean without resolving interface/implementation ambiguity itself.
+func BeanMethods(h *hierarchy.Hierarchy) []BeanName {
+	var out []BeanName
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, ok := h.Lookup(fqcn)
+		if !ok || !ci.IsApp {
+			continue
+		}
+		if !hasAny(ci.Annotations, []string{configurationFQCN}) {
+			continue
+		}
+		for _, m := range ci.Methods {
+			ann, found := findAnnotation(m.AnnotationDetails, beanMethodFQCN)
+			if !found {
+				continue
+			}
+			retType, ok := methodReturnTypeFQCN(m.Descriptor)
+			if !ok {
+				continue
+			}
+			names := stringArrayValue(firstOf(ann, "value", "name"))
+			name := m.Name
+			if len(names) > 0 {
+				name = names[0]
+			}
+			out = append(out, BeanName{
+				FQCN:    retType,
+				Name:    name,
+				Primary: hasAnnotationType(m.AnnotationDetails, "org.springframework.context.annotation.Primary"),
+			})
+		}
+	}
+	return out
+}
+
+// findAnnotation returns the first of anns with the given type.
+func findAnnotation(anns []classfile.Annotation, fqcn string) (classfile.Annotation, bool) {
+	for _, a := range anns {
+		if a.Type == fqcn {
+			return a, true
+		}
+	}
+	return classfile.Annotation{}, false
+}
+
+// methodReturnTypeFQCN reads a method descriptor's own return type as
+// an FQCN — "" (ok=false) for void, a primitive, or an array, none of
+// which Spring ever treats as a `@Bean` method's constructed object.
+func methodReturnTypeFQCN(descriptor string) (string, bool) {
+	i := strings.IndexByte(descriptor, ')')
+	if i < 0 || i+1 >= len(descriptor) {
+		return "", false
+	}
+	return classfile.FieldTypeFQCN(descriptor[i+1:])
+}
+
 // ProfileCondition is one `@Profile(...)` usage, with its declared
 // profile name(s)/expression(s) and — only when the caller gave an
 // explicit active-profile list — whether it is actually active.
