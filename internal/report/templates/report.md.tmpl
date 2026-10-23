@@ -414,6 +414,22 @@ None found.
 {{end}}
 {{end}}
 
+## web.xml-declared roots (`-roots profile`)
+
+Every lifecycle method a web.xml-declared servlet/filter/listener class actually
+declares (FRAMEWORKS F2) — added as a real entry point under `-roots profile`,
+shown here regardless of which `-roots` mode this run used. A plain old servlet
+with no annotation at all previously contributed nothing under `-roots profile`;
+only `-roots all` (every application method) happened to still cover it.
+{{if not .WebXMLRoots}}
+None found.
+{{else}}
+| Class | Method | Kind |
+|---|---|---|
+{{range .WebXMLRoots}}| `{{.FQCN}}` | `{{.Method}}` | {{.Kind}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

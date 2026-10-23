@@ -173,6 +173,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// codebase's own byte-identical-results.json determinism contract
 	// does not tolerate that.
 	var webXMLInput report.WebXMLInput
+	// servletClasses/filterClasses/listenerClasses (deduplicated, in
+	// first-seen order) are FRAMEWORKS F2's own input to
+	// profile.WebXMLRoots/WebXMLAppRoots, collected here since they're
+	// the one raw fact (which classes web.xml names) that only exists
+	// at this point, before h/g exist.
+	var servletClasses, filterClasses, listenerClasses []string
 	if len(prepared.WebXMLs) > 0 {
 		modules := make([]string, 0, len(prepared.WebXMLs))
 		for module := range prepared.WebXMLs {
@@ -180,6 +186,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 		sort.Strings(modules)
 		skippedSeen := map[string]bool{}
+		servletClassSeen := map[string]bool{}
+		filterClassSeen := map[string]bool{}
+		listenerClassSeen := map[string]bool{}
 		for _, module := range modules {
 			parsed, err := webxml.Parse(bytes.NewReader(prepared.WebXMLs[module]))
 			if err != nil {
@@ -187,18 +196,30 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			}
 			for _, s := range parsed.Servlets {
 				webXMLInput.Servlets = append(webXMLInput.Servlets, report.ServletRow{Module: module, Name: s.Name, Class: s.Class})
+				if !servletClassSeen[s.Class] {
+					servletClassSeen[s.Class] = true
+					servletClasses = append(servletClasses, s.Class)
+				}
 			}
 			for _, m := range parsed.ServletMappings {
 				webXMLInput.ServletMappings = append(webXMLInput.ServletMappings, report.ServletMappingRow{Module: module, Name: m.Name, URLPattern: m.URLPattern})
 			}
 			for _, f := range parsed.Filters {
 				webXMLInput.Filters = append(webXMLInput.Filters, report.FilterRow{Module: module, Name: f.Name, Class: f.Class})
+				if !filterClassSeen[f.Class] {
+					filterClassSeen[f.Class] = true
+					filterClasses = append(filterClasses, f.Class)
+				}
 			}
 			for _, m := range parsed.FilterMappings {
 				webXMLInput.FilterMappings = append(webXMLInput.FilterMappings, report.FilterMappingRow{Module: module, Name: m.Name, URLPattern: m.URLPattern, ServletName: m.ServletName})
 			}
 			for _, l := range parsed.Listeners {
 				webXMLInput.Listeners = append(webXMLInput.Listeners, report.ListenerRow{Module: module, Class: l.Class})
+				if !listenerClassSeen[l.Class] {
+					listenerClassSeen[l.Class] = true
+					listenerClasses = append(listenerClasses, l.Class)
+				}
 			}
 			for _, p := range parsed.ContextParams {
 				webXMLInput.ContextParams = append(webXMLInput.ContextParams, report.ContextParamRow{Module: module, Name: p.Name, Value: p.Value})
@@ -407,6 +428,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("frameworks: %d DI injection points found, %d resolved to exactly one bean", len(injectionPoints), resolvedInjectionCount)
 
+	// FRAMEWORKS F2: inventory of web.xml-declared lifecycle methods
+	// that WebXMLAppRoots would add under -roots profile — shown
+	// regardless of which -roots mode this run actually used, same as
+	// every other inventory section in this report.
+	webXMLRootsFound := profile.WebXMLRoots(h, servletClasses, filterClasses, listenerClasses)
+	if len(webXMLRootsFound) > 0 {
+		log("frameworks: %d web.xml-declared lifecycle methods found (roots under -roots profile)", len(webXMLRootsFound))
+	}
+
 	log("building call graph")
 	g := callgraph.Build(h, nil)
 	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA, %d class-init), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
@@ -531,7 +561,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var engine *reach.Engine
 	if cfg.roots == "profile" {
 		roots := prof.AppRoots(g, h)
-		log("roots: profile %q (%d entry-point methods)", prof.Name, len(roots))
+		// FRAMEWORKS F2: a web.xml-declared servlet/filter/listener's
+		// own lifecycle method(s) become real roots too — previously,
+		// a plain old servlet with no annotation at all (no @WebServlet,
+		// no Spring stereotype) contributed nothing under -roots
+		// profile; only -roots all's own "every application method"
+		// happened to still cover it.
+		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
+		roots = append(roots, webRoots...)
+		log("roots: profile %q (%d entry-point methods, %d from web.xml)", prof.Name, len(roots), len(webRoots))
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	} else {
 		engine = reach.New(g, h, framework)
@@ -649,7 +687,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

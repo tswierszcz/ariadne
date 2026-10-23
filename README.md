@@ -731,7 +731,14 @@ report:
   interfaces, correctly 0/8 resolved; WebGoat gives the positive case,
   7/74 genuinely resolved). No `@Bean` construction modeling, no
   AOP/pointcut model, and no call-graph edges from a resolved
-  injection — it is a wiring fact, not a call.
+  injection — it is a wiring fact, not a call. **Web.xml roots**: a
+  `web.xml`-declared servlet/filter/listener's own lifecycle method(s)
+  (`doGet`, `doFilter`, `contextInitialized`, ... — only the
+  well-known container-callback names, never every public method)
+  become real `-roots profile` entry points (FRAMEWORKS F2 — the
+  report's own "web.xml-declared roots" section); previously a plain
+  servlet with no annotation contributed nothing under `-roots
+  profile`.
   **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
   report's own "ServiceLoader provider registrations" section), every

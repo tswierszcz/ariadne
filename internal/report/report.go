@@ -172,6 +172,13 @@ type Data struct {
 	// than one surviving candidate with nothing to disambiguate them,
 	// is reported Unknown with its own reason, never guessed.
 	Injections []InjectionRow
+
+	// WebXMLRoots is FRAMEWORKS F2's own marked-roots result: every
+	// lifecycle method a web.xml-declared servlet/filter/listener
+	// class actually declares — the set `-roots profile` adds to its
+	// own entry points (shown regardless of which `-roots` mode this
+	// run used, same as every other inventory section).
+	WebXMLRoots []WebXMLRootRow
 }
 
 // InjectionRow is Data's own rendering-friendly form of
@@ -180,6 +187,12 @@ type Data struct {
 // function.
 type InjectionRow struct {
 	FQCN, Member, Type, Qualifier, Resolved, Reason, Candidates string
+}
+
+// WebXMLRootRow is Data's own rendering-friendly form of
+// profile.WebXMLRoot.
+type WebXMLRootRow struct {
+	FQCN, Method, Kind string
 }
 
 // XMLBeanRow is Data's own rendering-friendly form of springxml.Bean,
@@ -255,7 +268,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -288,6 +301,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		WebXML:                    webXML,
 		SpringXMLBeans:            springXMLBeans,
 		Injections:                injectionRows(injections),
+		WebXMLRoots:               webXMLRootRows(webXMLRoots),
 		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
 	}
 
@@ -356,6 +370,14 @@ func sourceLabel(r reach.Result) string {
 // rendering-friendly InjectionRow, joining Candidates — "none" when
 // empty, not a blank cell, so an empty-candidate row reads as a real
 // fact rather than a rendering glitch.
+func webXMLRootRows(roots []profile.WebXMLRoot) []WebXMLRootRow {
+	out := make([]WebXMLRootRow, len(roots))
+	for i, r := range roots {
+		out[i] = WebXMLRootRow{FQCN: r.FQCN, Method: r.Method, Kind: string(r.Kind)}
+	}
+	return out
+}
+
 func injectionRows(injections []profile.ResolvedInjection) []InjectionRow {
 	out := make([]InjectionRow, len(injections))
 	for i, inj := range injections {

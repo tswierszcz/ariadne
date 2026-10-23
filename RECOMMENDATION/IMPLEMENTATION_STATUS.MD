@@ -18,7 +18,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
-| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: pierwszy wycinek (DI) zrobiony, reszta UNASSESSED; F3–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). `@Bean` factory methods, AOP/pointcut, oznaczone korzenie HTTP/servlet/lifecycle, katalog punktów wejścia zewnętrznych — nietknięte. Rejestr B3 wciąż nieodnotowany. |
+| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: dwa wycinki (DI, oznaczone korzenie web.xml) zrobione, reszta UNASSESSED; F3–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). `@Bean` factory methods, AOP/pointcut, katalog punktów wejścia zewnętrznych — nietknięte. Rejestr B3 wciąż nieodnotowany. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
@@ -2423,6 +2423,89 @@ Przy dodawaniu kolejnego wpisu zapisz:
   bo bezpośrednio wpływa na reachability), modelowanie `@Bean` factory
   methods, albo integracja DI z XML beanami. Wymaga propozycji i
   zgody użytkownika przed startem, jak każda następna faza.
+
+### FRAMEWORKS:F2 — Pierwsze DI i model zewnętrznych wejść (wycinek: oznaczone korzenie web.xml) — DONE for this scope; reszta F2 nietknięta (2026-10-23)
+
+- **Zakres zlecenia i zależności:** F2's pierwszy wycinek (DI, gotowy
+  wyżej). Kontynuacja na "kontynuuj" — wybrano (decyzja własna po
+  delegacji "decyduje") "oznaczone korzenie dla HTTP, servlet/filter/
+  lifecycle" jako najwyższej wartości pozostały punkt F2 (bezpośredni
+  wpływ na reachability pod `-roots profile`, w przeciwieństwie do
+  czystego inwentarza).
+- **Nowy plik `internal/profile/webxmlroots.go`:** `WebXMLRoots` —
+  dla każdej klasy servletu/filtru/listenera zadeklarowanej w
+  `web.xml` (z F1's już istniejącego `internal/webxml`/`PreparedApp.WebXMLs`),
+  sprawdza, które ze znanych nazw metod cyklu życia (`init`/`destroy`/
+  `service`/`doGet`/.../`doFilter`/`contextInitialized`/...) klasa
+  faktycznie deklaruje — **nigdy każda publiczna metoda**, zgodnie z
+  planu własnym ostrzeżeniem "nie uznawać każdego publicznego helpera
+  za endpoint". `WebXMLAppRoots` — ta sama logika, ale zwraca węzły
+  grafu wywołań (ten sam wzorzec co istniejący `Profile.overrideRoots`,
+  bez rozszerzania na podtypy — `web.xml` nazywa dokładną konkretną
+  klasę, kontener nie szuka override'u).
+- **`cmd/ariadne`:** zbiera `servletClasses`/`filterClasses`/
+  `listenerClasses` (zdeduplikowane) podczas parsowania `web.xml`
+  (ten sam krok, co F1's własne `webXMLInput`); pod `-roots profile`
+  dołącza `profile.WebXMLAppRoots(...)` do `prof.AppRoots(...)`. Nowa
+  sekcja raportu "web.xml-declared roots", pokazywana **niezależnie**
+  od trybu `-roots` (fakt inwentarzowy, nie decyzja o wyborze korzeni).
+- **Zachowanie dostępne użytkownikowi:** `-roots profile` teraz
+  dołącza metody cyklu życia servletów/filtrów/listenerów zadeklarowanych
+  w `web.xml`, nawet bez żadnej adnotacji — wcześniej taki "goły"
+  serwlet nie dawał żadnego korzenia pod `-roots profile` (tylko
+  `-roots all` go pokrywał przez "każda metoda aplikacji").
+- **Dowód — szczerze, tylko na poziomie testów jednostkowych, nie
+  end-to-end na realnej aplikacji:** ani petclinic, ani WebGoat nie
+  mają `web.xml` (obie to zwykłe jary). Jednorazowy diagnostyczny
+  program (uruchomiony i usunięty) przeszukał **wszystkie** metody w
+  obu app-classes jar pod kątem nazw z listy cyklu życia
+  (`init`/`destroy`/`service`/`doGet`/`doPost`/`doFilter`/
+  `contextInitialized`/`contextDestroyed`) — **zero przypadkowych
+  trafień** na obu aplikacjach, więc nie da się nawet przypadkowo
+  zademonstrować pozytywnej ścieżki na tych dwóch kontrolnych
+  aplikacjach bez kompilacji nowej klasy (niemożliwej bez JDK w tym
+  środowisku — to samo ograniczenie co przy `web.xml`'owym przyroście
+  F1). Potwierdzone: `-roots profile` na petclinic (24 punkty) i
+  WebGoat (40 punktów) — **bez zmian** względem stanu przed tym
+  przyrostem, "0 from web.xml" poprawnie zalogowane na obu. Realny
+  WAR (petclinic's `app-classes.jar` + ręcznie napisany `web.xml`
+  wskazujący na nieistniejącą klasę `demo.MainServlet`) przechodzi
+  przez cały pipeline bez błędu, poprawnie zgłasza "None found" (klasa
+  nazwana w `web.xml`, ale nieobecna w analizowanej hierarchii —
+  szczerze pominięta, nie fabrykowana). Dwa przebiegi dają
+  bajt-identyczny `results.json`.
+- **Spełnione kryteria:** "nie uznawać każdego publicznego helpera za
+  endpoint" — `TestWebXMLRoots_servletLifecycleMethodsFound` (metoda
+  pomocnicza bez nazwy z listy nie staje się korzeniem). "Klasa
+  nieznana w hierarchii nie jest fabrykowana" —
+  `TestWebXMLRoots_classNotInHierarchyIsSkipped` i realny WAR dowyżej.
+  "Metoda abstrakcyjna nie ma ciała do wywołania" —
+  `TestWebXMLRoots_abstractMethodSkipped`. "Realne węzły grafu" —
+  `TestWebXMLAppRoots_resolvesRealGraphNodes` (przez prawdziwy
+  `callgraph.Build`, nie tylko metadane).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/profile`:
+  `TestWebXMLRoots_*` [4], `TestWebXMLAppRoots_resolvesRealGraphNodes`);
+  `go test -race ./...` dla całego projektu (zielone); `bin/ariadne
+  -offline -roots profile` na petclinic (dwa przebiegi) i WebGoat;
+  realny WAR (jeden przebieg, opisany wyżej); jednorazowy diagnostyczny
+  program skanujący oba app-classes jar pod kątem nazw cyklu życia
+  (uruchomiony i usunięty).
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "DI/AOP/
+  configuration execution models" rozszerzony o ten wycinek i szczery
+  opis braku end-to-end dowodu na realnej aplikacji). `README.md`
+  (nowy akapit "Web.xml roots" w "Known limitations").
+- **Niespełnione/odłożone:** `@Bean` factory methods i konstrukcja —
+  nietknięte. AOP/pointcut — nietknięte. Katalog punktów wejścia
+  wskazujących zewnętrzny parser/dispatch poza samym `web.xml` — 
+  nietknięty. Integracja oznaczonych korzeni z DI (np. czy serwlet
+  sam ma wstrzyknięte zależności) — nietknięta. Przekazanie
+  tożsamości parametrów do przyszłych źródeł taint D4 — nietknięte
+  (D4 nie istnieje).
+- **Następny krok:** Pozostały zakres F2 (modelowanie `@Bean`,
+  katalog punktów wejścia zewnętrznych) wymaga decyzji projektowej.
+  Alternatywnie inny obszar. Wymaga propozycji i zgody użytkownika
+  przed startem.
 
 ## Punkt startowy następnej sesji
 
