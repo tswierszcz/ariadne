@@ -271,6 +271,51 @@ None found.
 {{end}}
 {{end}}
 
+## Spring MVC routes
+
+Every HTTP mapping found on an application method (FRAMEWORKS F1), with its real
+declared path(s) and verb(s) sourced from the annotation's own element values — not
+just the bare fact that *a* mapping annotation is present. "any" means the mapping
+declares no verb at all (matches every HTTP method), never guessed as a single one.
+{{if not .SpringRoutes}}
+None found.
+{{else}}
+| Method | Paths | HTTP methods |
+|---|---|---|
+{{range .SpringRoutes}}| `{{.FQCN}}#{{.Method}}` | {{.Paths}} | {{.HTTPMethods}} |
+{{end}}
+{{end}}
+
+## Spring bean names
+
+Every `@Component`/`@Service`/`@Repository`/`@Controller`/`@RestController` stereotype
+found on an application class (FRAMEWORKS F1), with its own explicitly declared bean
+name (if any — an empty name means the container derives a default from the class's
+own simple name, not modeled here) and `@Primary` status.
+{{if not .SpringBeanNames}}
+None found.
+{{else}}
+| Class | Name | Primary |
+|---|---|---|
+{{range .SpringBeanNames}}| `{{.FQCN}}` | {{if .Name}}`{{.Name}}`{{else}}(default){{end}} | {{.Primary}} |
+{{end}}
+{{end}}
+
+## Spring @Profile conditions
+
+Every `@Profile(...)` usage found (FRAMEWORKS F1), with its declared profile name(s)
+and whether it is active. "unknown" (not a guessed "false") means `-active-profiles`
+was not given at all — a real, undecided fact, not an implementation gap.
+{{if .ActiveProfiles}}Active profiles given: `{{.ActiveProfiles}}`.{{else}}No `-active-profiles` given: every condition below is reported `unknown`.{{end}}
+{{if not .SpringProfileConditions}}
+None found.
+{{else}}
+| Class | Method | Profiles | Active |
+|---|---|---|---|
+{{range .SpringProfileConditions}}| `{{.FQCN}}` | {{if .Method}}`{{.Method}}`{{else}}(class-level){{end}} | {{.Names}} | {{.Active}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

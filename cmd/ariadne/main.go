@@ -43,10 +43,11 @@ type config struct {
 	offline     bool
 	showVersion bool
 
-	profile     string
-	profileFile string
-	roots       string
-	targetJava  int
+	profile        string
+	profileFile    string
+	roots          string
+	targetJava     int
+	activeProfiles string
 
 	llm        bool
 	llmModel   string
@@ -70,6 +71,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
 	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default) or "profile" (only the active profile's entry points: annotated methods/classes, main)`)
 	fs.IntVar(&cfg.targetJava, "target-java", 0, "Java feature version (e.g. 11, 17) to resolve multi-release JAR variants against; unset falls back to every jar's base classes, not the highest bytecode version seen (JVM_GRAPH G4)")
+	fs.StringVar(&cfg.activeProfiles, "active-profiles", "", "comma-separated Spring profile names to treat as active when evaluating @Profile conditions (FRAMEWORKS F1); unset reports every @Profile condition as unknown, never a guessed false")
 	fs.StringVar(&cfg.out, "out", "", "report.md output path (required)")
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
@@ -286,6 +288,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("selecting profile: %w", err)
 	}
 	log("profile: %s", prof.Name)
+
+	// FRAMEWORKS F1: real Spring MVC route/bean-name/@Profile values,
+	// sourced from the annotation element values classfile.Annotation
+	// now carries (previously only the bare presence of a mapping/
+	// stereotype/@Profile annotation was visible). -active-profiles
+	// unset means activeProfiles stays nil, so every @Profile condition
+	// reports ConditionUnknown, never a guessed ConditionFalse.
+	var activeProfiles []string
+	if cfg.activeProfiles != "" {
+		activeProfiles = strings.Split(cfg.activeProfiles, ",")
+	}
+	springRoutes := profile.Routes(h)
+	springBeanNames := profile.BeanNames(h)
+	springProfileConditions := profile.ProfileConditions(h, activeProfiles)
+	log("frameworks: %d Spring MVC routes, %d @Component-family bean names, %d @Profile conditions found (active profiles: %s)",
+		len(springRoutes), len(springBeanNames), len(springProfileConditions), cfg.activeProfiles)
 
 	log("building call graph")
 	g := callgraph.Build(h, nil)
@@ -529,7 +547,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

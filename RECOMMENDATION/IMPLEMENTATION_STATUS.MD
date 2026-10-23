@@ -2003,6 +2003,128 @@ Przy dodawaniu kolejnego wpisu zapisz:
   `ASYNC_CALLBACKS:A3`. Wymaga propozycji i zgody użytkownika przed
   startem.
 
+### FRAMEWORKS:F1 — Adnotacje, zasoby i jawna konfiguracja (wycinek: wartości adnotacji + realne wartości Spring MVC) — DONE for this scope; web.xml/XML bean definitions/config priority deferred (2026-10-23)
+
+- **Zakres zlecenia i zależności:** F0 (gotowe wyżej), JVM G1/G4
+  (gotowe, zarchiwizowane). Zgoda użytkownika: "robmy całe" F1 — w
+  praktyce zrealizowano jako trzy skoncentrowane, osobno zweryfikowane
+  przyrosty w jednej sesji (ten sam wzorzec co każda inna "duża" faza w
+  tym repo — JVM_GRAPH G0-G5, SERVICE_LOADING S0-S2, ASYNC_CALLBACKS
+  A0-A2), nie jeden niezweryfikowany diff. **Nie wszystko z F1's
+  własnego planu zostało zrobione** — patrz "Niespełnione" poniżej;
+  to jest szczerze DONE dla zrealizowanego wycinka, nie dla całej
+  fazy F1 jak opisana w planie.
+- **Część 1 — model wartości adnotacji (`internal/classfile`):**
+  `parseAnnotations`/`parseElementValue` (przepisane z
+  `skipAnnotation`/`skipElementValue`, które tylko pomijały bajty)
+  dekodują teraz każdy kształt `element_value` (JVM spec 4.7.16.1):
+  stałe proste, enum, literał klasy, tablicę, zagnieżdżoną adnotację.
+  `cpEntry` zyskał `raw32`/`raw64` do przechowania bajtów
+  Integer/Float/Long/Double (wcześniej odczytywane i odrzucane).
+  `RuntimeInvisibleAnnotations` czytane i scalane z `RuntimeVisible...`
+  (wcześniej całkowicie ignorowane). Pola (`classfile.Field`) zyskały
+  własne adnotacje (wcześniej żadnych). `AnnotationDefault` (JVM spec
+  4.7.22) przechowywane jako `Method.DefaultValue`. Starą listę samych
+  FQCN (`Annotations []string`) zachowano przez adapter
+  (`annotationNames`) — żaden istniejący konsument (`internal/profile`'s
+  own dopasowanie po nazwie) nie wymagał zmiany, potwierdzone pełnym
+  `go test ./...` bez regresji i identycznym przebiegiem na petclinic
+  (3/62/26/51/6, bez zmian).
+- **Część 2 — rozwiązywanie między klasami (`internal/annotation`,
+  nowy pakiet):** `ResolveDefault`/`EffectiveValue` (wartość domyślna
+  elementu, gdy miejsce użycia jej nie podało — czytane z
+  `hierarchy.Method.DefaultValue`, bez I/O na jarze, bo wartość jest
+  już przechowana przy metodzie); `ClassAnnotations` (ponowny odczyt
+  klasy przez `JarClassReader`, ten sam wzorzec co
+  `ResolveStaticField`/`ResolveCallResult`); `RepeatableContainer`/
+  `ExpandRepeatable` — rozpakowanie kontenera repeatable adnotacji
+  (`@Foo` użyte dwa razy kompiluje się do `@Foos({@Foo,@Foo})`), **z
+  weryfikacją, że zagnieżdżony typ faktycznie deklaruje
+  `@Repeatable(ten-kontener)`, nie tylko po kształcie** (tablica
+  jednotypowych zagnieżdżonych adnotacji w elemencie "value") — zwykła
+  adnotacja z niepowiązanym elementem tablicowym adnotacji (np.
+  Springowe `@ComponentScan#excludeFilters`) ma ten sam kształt i nie
+  może być pomylona z kontenerem.
+- **Część 3 — realne wartości Spring MVC (`internal/profile/springvalues.go`):**
+  `Routes` (prawdziwa ścieżka/ścieżki i czasownik(i) HTTP każdego
+  mapowania — `@RequestMapping`/`@GetMapping`/.../`@PatchMapping`,
+  łączenie prefiksu z poziomu klasy z poziomem metody, czasownik
+  nieznany = `nil`, nigdy zgadywany); `BeanNames` (deklarowana nazwa
+  beana z `@Component`/`@Service`/`@Repository`/`@Controller`/
+  `@RestController` + `@Primary`); `ProfileConditions` (deklarowane
+  nazwy `@Profile`, włącznie z negacją `!x`) — **nowa flaga CLI
+  `-active-profiles`**: brak flagi → `ConditionUnknown` dla każdego
+  warunku (F1's own explicit requirement: "brak pliku... daje unknown,
+  nie false"), flaga podana → `ConditionTrue`/`ConditionFalse`
+  rozstrzygane naprawdę. Trzy nowe sekcje raportu ("Spring MVC routes" /
+  "Spring bean names" / "Spring @Profile conditions").
+- **Zachowanie dostępne użytkownikowi:** raport pokazuje teraz
+  prawdziwe trasy HTTP (ścieżka + czasownik), nazwy beanów i warunki
+  `@Profile` — wcześniej widoczna była tylko goła obecność adnotacji
+  (przez `roots.annotations`), nigdy jej wartość.
+- **Dowód na realnym bytecode:** `bin/ariadne -offline` na petclinic:
+  **17 prawdziwych tras** (np.
+  `OwnerController#showOwner` → `/owners/{ownerId}` GET,
+  `VetController#showVetList` → `/vets.html` GET — zgodne z
+  faktycznym zachowaniem tej aplikacji) i **7 stereotypów** (wszystkie
+  bez jawnej nazwy — petclinic nigdy jej nie podaje, poprawnie
+  zgłoszone jako "(default)", nie zgadywane). WebGoat: **19 tras**, **20
+  stereotypów** (również wszystkie bez jawnej nazwy). **Żadna z dwóch
+  aplikacji nie używa `@Profile` w swoim własnym kodzie** (potwierdzone
+  bezpośrednio: zero wystąpień FQCN tej adnotacji w obu app-classes
+  jar) — `ProfileConditions`' pozytywna ścieżka (w tym negacja `!x`,
+  rozstrzygnięcie true/false z `-active-profiles`) zweryfikowana tylko
+  na poziomie testów jednostkowych (`TestProfileConditions_*`), nie na
+  tych dwóch aplikacjach kontrolnych — szczerze odnotowany brak
+  pokrycia na realnej aplikacji, nie przemilczany. **Zero zmian w
+  REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN** na obu aplikacjach
+  (identyczne z bazową wartością); dwa przebiegi na każdej dają
+  bajt-identyczny `results.json` (i `report.md` poza samym
+  znacznikiem czasu).
+- **Spełnione kryteria (z F1's własnego "Gotowe"):** "wartości
+  qualifiera, profilu i trasy mają źródło" — tak, dla Spring MVC's
+  pilotowego zakresu (`Routes`/`BeanNames`/`ProfileConditions`).
+  "Brak pliku lub nieobsługiwany warunek daje unknown, nie false" —
+  tak, `TestProfileConditions_noActiveListIsUnknown` i realny domyślny
+  tryb CLI (brak `-active-profiles`).
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/classfile`:
+  `TestParseAnnotations_fullElementValueShapes`, `TestAnnotationNames`,
+  `TestParseAnnotationDefault`, `TestMergeParameterAnnotations`,
+  `TestClassLiteralFQCN_*`; `internal/annotation` [nowy pakiet]:
+  `TestResolveDefault_*` [3], `TestEffectiveValue_*` [2],
+  `TestRepeatableContainer_*`, `TestExpandRepeatable_*` [3];
+  `internal/profile`: `TestRoutes_*` [3], `TestBeanNames_*` [2],
+  `TestProfileConditions_*` [3]); `go test -race ./...` dla całego
+  projektu (zielone); `bin/ariadne -offline` na petclinic (dwa
+  przebiegi) i WebGoat (dwa przebiegi), opisane wyżej.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "Profiles and
+  selected roots" znacząco rozszerzony o cały F1's zakres i dowody).
+  `README.md` (nowa flaga `-active-profiles` w tabeli, nowy akapit w
+  sekcji 8 o trzech nowych sekcjach raportu).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem tego przyrostu,
+  nie przez przeoczenie — F1's plan ma więcej punktów niż
+  zrealizowano):** `internal/input`'s "zachować zasoby i pochodzenie
+  modułu" + "jawne wejście plików i właściwości scenariusza" —
+  nietknięte (poza nową flagą `-active-profiles`, która adresuje
+  dokładnie jeden z tych punktów: właściwość scenariusza, nie pliki).
+  Ograniczony odczyt `web.xml` — nietknięty; `PrepareAppInput` nawet
+  nie zachowuje `web.xml`'s własnych bajtów dziś (sprawdzone wprost:
+  `extractModule`'s `classesPrefix` filtr nigdy nie obejmuje
+  `WEB-INF/web.xml`, tylko `WEB-INF/classes/`). XML bean definitions —
+  nietknięte. Priorytet/konflikt wielu źródeł konfiguracji —
+  nietknięty (nie ma jeszcze drugiego źródła do konfliktu z
+  adnotacjami). DI/wiring (`@Autowired`/`@Qualifier` na punkcie
+  wstrzyknięcia, konstruktor/pole) — to F2's własny zakres, zależny od
+  DATA_FLOW D0-D2 (gotowe) i rejestru B3 (nieodnotowany), nietknięty
+  tutaj celowo.
+- **Następny krok:** Albo dokończenie F1's pozostałych punktów
+  (`web.xml`, XML bean definitions, jawne wejście plików/właściwości,
+  priorytet konfiguracji) w kolejnym przyroście tej samej fazy, albo
+  przejście do `FRAMEWORKS:F2` (DI, `@Bean`, qualifier/primary
+  wiązanie) korzystając już z tego, co Część 3 tutaj dostarczyła
+  (`BeanNames`). Wymaga propozycji i zgody użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.

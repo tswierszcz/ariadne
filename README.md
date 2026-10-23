@@ -423,7 +423,13 @@ review, the list of unidentified dependency jars, a `META-INF/services`
 provider inventory, every resolved `ServiceLoader.load(...)` call site,
 and which of those providers got a real constructor call-graph edge
 (SERVICE_LOADING S0/S1/S2 — see "Known limitations" below for what these
-do and don't claim), and a fixed Limitations section (see below).
+do and don't claim), every Spring MVC HTTP mapping found with its real
+path(s)/verb(s), every `@Component`-family stereotype's own declared
+bean name and `@Primary` status, and every `@Profile(...)`'s declared
+name(s) with whether it's active (`unknown` unless `-active-profiles`
+was given — FRAMEWORKS F1, sourced from real annotation element values,
+not just the bare presence of the annotation), and a fixed Limitations
+section (see below).
 
 The entry call line also names the call kind, the resolution rule
 (`direct`: the edge is exactly the call site's own symbolic target; `cha`:
@@ -481,6 +487,7 @@ Flags:
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
+| `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |

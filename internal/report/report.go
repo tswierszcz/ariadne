@@ -5,11 +5,13 @@ package report
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"ariadne/internal/callback"
 	"ariadne/internal/cves"
 	"ariadne/internal/methodhandle"
+	"ariadne/internal/profile"
 	"ariadne/internal/reach"
 	"ariadne/internal/serviceload"
 )
@@ -126,13 +128,44 @@ type Data struct {
 	// as a real call-graph edge (or a Gap explaining why not).
 	HandleInvokeSites []methodhandle.ResolvedInvoke
 	HandleEdges       []methodhandle.HandleEdgeResult
+
+	// SpringRoutes/SpringBeanNames/SpringProfileConditions are
+	// FRAMEWORKS F1's own result: real Spring MVC route paths/verbs,
+	// @Component-family bean names, and @Profile conditions, sourced
+	// from annotation element values rather than just the bare
+	// presence of the annotation. Routes/ProfileConditions are the
+	// rendering-friendly form (joined strings) since text/template's
+	// own Parse here registers no custom join function.
+	SpringRoutes            []RouteRow
+	SpringBeanNames         []profile.BeanName
+	SpringProfileConditions []ProfileConditionRow
+	// ActiveProfiles echoes the -active-profiles flag (comma-joined),
+	// "" when unset — the report's own reminder that an unset flag is
+	// why every SpringProfileConditions entry reports "unknown", not a
+	// guessed "false".
+	ActiveProfiles string
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult) Data {
+// RouteRow is Data's own rendering-friendly form of profile.Route —
+// Paths/HTTPMethods joined to plain strings, since this package's own
+// template.Parse registers no custom join function (joinMethods's own
+// precedent).
+type RouteRow struct {
+	FQCN, Method, Paths, HTTPMethods string
+}
+
+// ProfileConditionRow is Data's own rendering-friendly form of
+// profile.ProfileCondition.
+type ProfileConditionRow struct {
+	FQCN, Method, Names string
+	Active              profile.Condition
+}
+
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -158,6 +191,10 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		CallbackEdges:             callbackEdges,
 		HandleInvokeSites:         handleInvokeSites,
 		HandleEdges:               handleEdges,
+		SpringRoutes:              routeRows(springRoutes),
+		SpringBeanNames:           springBeanNames,
+		SpringProfileConditions:   profileConditionRows(springProfileConditions),
+		ActiveProfiles:            activeProfiles,
 	}
 
 	for _, r := range sorted {
@@ -206,6 +243,34 @@ func sourceLabel(r reach.Result) string {
 		return "llm (" + r.Evidence + ")"
 	}
 	return r.Source
+}
+
+// routeRows converts profile.Route into Data's own rendering-friendly
+// RouteRow, joining Paths/HTTPMethods — HTTPMethods nil (unspecified)
+// renders as "any", never a guessed single verb.
+func routeRows(routes []profile.Route) []RouteRow {
+	out := make([]RouteRow, len(routes))
+	for i, r := range routes {
+		methods := "any"
+		if len(r.HTTPMethods) > 0 {
+			methods = strings.Join(r.HTTPMethods, ", ")
+		}
+		out[i] = RouteRow{
+			FQCN:        r.FQCN,
+			Method:      r.Method,
+			Paths:       strings.Join(r.Paths, ", "),
+			HTTPMethods: methods,
+		}
+	}
+	return out
+}
+
+func profileConditionRows(conds []profile.ProfileCondition) []ProfileConditionRow {
+	out := make([]ProfileConditionRow, len(conds))
+	for i, c := range conds {
+		out[i] = ProfileConditionRow{FQCN: c.FQCN, Method: c.Method, Names: strings.Join(c.Names, ", "), Active: c.Active}
+	}
+	return out
 }
 
 func joinMethods(methods []string) string {
