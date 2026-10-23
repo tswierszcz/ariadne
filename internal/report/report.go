@@ -163,6 +163,23 @@ type Data struct {
 	// (allow-bean-definition-overriding) and not modeled here; this is
 	// detection, not resolution.
 	ConfigConflicts []ConfigConflictRow
+
+	// Injections is FRAMEWORKS F2's own first DI result: every
+	// `@Autowired` field/constructor injection point found, resolved
+	// against F1's own BeanNames catalog by type, `@Qualifier`, and
+	// `@Primary` — the same disambiguation order Spring's own container
+	// uses. An injection point with no resolvable candidate, or more
+	// than one surviving candidate with nothing to disambiguate them,
+	// is reported Unknown with its own reason, never guessed.
+	Injections []InjectionRow
+}
+
+// InjectionRow is Data's own rendering-friendly form of
+// profile.ResolvedInjection — Candidates joined to a plain string,
+// since this package's own template.Parse registers no custom join
+// function.
+type InjectionRow struct {
+	FQCN, Member, Type, Qualifier, Resolved, Reason, Candidates string
 }
 
 // XMLBeanRow is Data's own rendering-friendly form of springxml.Bean,
@@ -238,7 +255,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -270,6 +287,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		ActiveProfiles:            activeProfiles,
 		WebXML:                    webXML,
 		SpringXMLBeans:            springXMLBeans,
+		Injections:                injectionRows(injections),
 		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
 	}
 
@@ -334,6 +352,30 @@ func sourceLabel(r reach.Result) string {
 // deterministically ordered by their own callers — never a map
 // iteration, which this codebase's own byte-identical-results.json
 // contract cannot tolerate.
+// injectionRows converts profile.ResolvedInjection into Data's own
+// rendering-friendly InjectionRow, joining Candidates — "none" when
+// empty, not a blank cell, so an empty-candidate row reads as a real
+// fact rather than a rendering glitch.
+func injectionRows(injections []profile.ResolvedInjection) []InjectionRow {
+	out := make([]InjectionRow, len(injections))
+	for i, inj := range injections {
+		candidates := "none"
+		if len(inj.Candidates) > 0 {
+			candidates = strings.Join(inj.Candidates, ", ")
+		}
+		out[i] = InjectionRow{
+			FQCN:       inj.FQCN,
+			Member:     inj.Member,
+			Type:       inj.Type,
+			Qualifier:  inj.Qualifier,
+			Resolved:   inj.Resolved,
+			Reason:     inj.Reason,
+			Candidates: candidates,
+		}
+	}
+	return out
+}
+
 func buildConfigConflicts(annotationBeans []profile.BeanName, xmlBeans []XMLBeanRow) []ConfigConflictRow {
 	byName := map[string][]NamedBeanCandidate{}
 	var order []string

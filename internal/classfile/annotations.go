@@ -259,6 +259,21 @@ func descriptorToFQCN(desc string) string {
 	return binaryNameToFQCN(d)
 }
 
+// FieldTypeFQCN converts a reference-type field descriptor
+// ("Lfoo/Bar;") to its dotted FQCN ("foo.Bar") — for a caller matching
+// a field's or parameter's own declared type against a known class
+// (FRAMEWORKS F2's own DI candidate lookup). ok is false for a
+// primitive or array descriptor ("I", "[Ljava/lang/String;"): a
+// dependency-injection target is always a single object reference,
+// never a primitive or a collection-of-beans injection (the latter is
+// a real Spring feature, deliberately out of this narrow scope).
+func FieldTypeFQCN(desc string) (string, bool) {
+	if strings.HasPrefix(desc, "L") && strings.HasSuffix(desc, ";") {
+		return descriptorToFQCN(desc), true
+	}
+	return "", false
+}
+
 // classLiteralFQCN is ElementClass's own descriptor reader: unlike
 // annotation type_index (always a reference type), a `Foo.class`
 // element_value's class_info_index can name a primitive or array type

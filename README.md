@@ -434,7 +434,9 @@ listeners, context params, with every other element named as unmodeled
 rather than silently dropped — FRAMEWORKS F1), every Spring classic XML
 `<bean>` found on the app's own classpath, every bean name claimed by
 more than one source with a different class (flagged, never
-auto-resolved), and a fixed Limitations section (see below).
+auto-resolved), every `@Autowired` injection point resolved against the
+known beans by type/qualifier/primary where possible (FRAMEWORKS F2),
+and a fixed Limitations section (see below).
 
 The entry call line also names the call kind, the resolution rule
 (`direct`: the edge is exactly the call site's own symbolic target; `cha`:
@@ -717,6 +719,19 @@ report:
   bean-definition-override behavior is configurable and not modeled.
   No call-graph edges come from either reader — it is inventory, not
   wiring, same reasoning as ServiceLoader's own declarations below.
+  **DI**: every `@Autowired` field/constructor injection point is
+  resolved against the known Spring bean names by type, then
+  `@Qualifier`, then `@Primary` (FRAMEWORKS F2 — the report's own
+  "Dependency injection" section), but only against annotation-declared
+  beans — a Spring Data repository interface, an `@Bean` factory
+  method, or a framework-provided bean (`JdbcTemplate`, `DataSource`,
+  ...) is not a known candidate, so those injection points are
+  correctly reported unresolved rather than guessed (confirmed on
+  petclinic: its own 8 injection points are all Spring Data repository
+  interfaces, correctly 0/8 resolved; WebGoat gives the positive case,
+  7/74 genuinely resolved). No `@Bean` construction modeling, no
+  AOP/pointcut model, and no call-graph edges from a resolved
+  injection — it is a wiring fact, not a call.
   **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
   report's own "ServiceLoader provider registrations" section), every

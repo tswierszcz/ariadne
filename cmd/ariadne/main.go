@@ -392,6 +392,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("frameworks: %d Spring MVC routes, %d @Component-family bean names, %d @Profile conditions found (active profiles: %s)",
 		len(springRoutes), len(springBeanNames), len(springProfileConditions), cfg.activeProfiles)
 
+	// FRAMEWORKS F2: first DI — every @Autowired field/constructor
+	// injection point, resolved against springBeanNames by type,
+	// @Qualifier, then @Primary (the same order Spring's own container
+	// uses). Unresolved means no candidate or an undisambiguated one,
+	// never a guess.
+	injectionPoints := profile.InjectionPoints(h)
+	resolvedInjections := profile.ResolveInjections(h, injectionPoints, springBeanNames)
+	resolvedInjectionCount := 0
+	for _, inj := range resolvedInjections {
+		if inj.Resolved != "" {
+			resolvedInjectionCount++
+		}
+	}
+	log("frameworks: %d DI injection points found, %d resolved to exactly one bean", len(injectionPoints), resolvedInjectionCount)
+
 	log("building call graph")
 	g := callgraph.Build(h, nil)
 	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA, %d class-init), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
@@ -634,7 +649,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

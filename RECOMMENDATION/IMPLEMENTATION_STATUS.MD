@@ -18,7 +18,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
-| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu i ustala (bez wdrożenia) kontrakt `Condition`/`FrameworkScenario`/`BeanDefinition`/`ConditionalBinding`/`ExternalEntry`. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie (nie rozstrzyganie) konfliktów nazw beanów — priorytet wielu źródeł i jawne wejście plików/właściwości poza `-active-profiles` pozostają nietknięte. Rejestr B3 wciąż nieodnotowany. |
+| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: pierwszy wycinek (DI) zrobiony, reszta UNASSESSED; F3–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). `@Bean` factory methods, AOP/pointcut, oznaczone korzenie HTTP/servlet/lifecycle, katalog punktów wejścia zewnętrznych — nietknięte. Rejestr B3 wciąż nieodnotowany. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
@@ -2327,6 +2327,102 @@ Przy dodawaniu kolejnego wpisu zapisz:
   `FRAMEWORKS:F2` (DI, `@Bean`, wiązanie qualifier/primary), które
   może już korzystać z `BeanNames` i XML beanów jako dodatkowych
   źródeł. Wymaga propozycji i zgody użytkownika przed startem.
+
+### FRAMEWORKS:F2 — Pierwsze DI i model zewnętrznych wejść (wycinek: rozwiązywanie `@Autowired`) — DONE for this scope; reszta F2 nietknięta (2026-10-23)
+
+- **Zakres zlecenia i zależności:** F1 (gotowe, zarchiwizowane).
+  DATA_FLOW D0–D2 (gotowe) dla "prostych fabryk" nie zostało tu użyte —
+  ten wycinek nie modeluje konstrukcji `@Bean`, tylko rozwiązanie
+  istniejącego katalogu beanów (F1's `BeanNames`) wobec punktów
+  wstrzyknięcia. Rejestr B3 (nieodnotowany) nie był wymagany.
+  Zgoda użytkownika: "decyduje" (delegacja wyboru) po pytaniu czy
+  dokończyć resztę F1 czy przejść do F2 — wybrano F2, pierwszy,
+  najwęższy wykonalny wycinek.
+- **Nowy plik `internal/profile/di.go`:** `InjectionPoints` — znajduje
+  każde pole z `@Autowired` i każdy parametr **jednego** konstruktora,
+  którego Spring faktycznie użyłby (jawnie `@Autowired`, albo — reguła
+  Springa 4.3 — jedyny zadeklarowany konstruktor, jeśli żaden nie jest
+  oznaczony). Klasa z wieloma konstruktorami, z których żaden nie jest
+  `@Autowired`, **nie dostaje żadnego** punktu wstrzyknięcia
+  konstruktora — brak podstawy do wyboru, nigdy zgadywane.
+  `ResolveInjections` — rozwiązuje każdy punkt wobec katalogu beanów
+  po typie (dopasowanie dokładne albo jakikolwiek znany podtyp, przez
+  `hierarchy.Subtypes`), potem `@Qualifier` (dopasowanie do jawnej
+  nazwy kandydata), potem `@Primary` — **ten sam porządek, co
+  prawdziwy kontener Springa**. Więcej niż jeden kandydat, który
+  przetrwa wszystkie trzy kroki, to `Unknown` z własnym powodem, nigdy
+  wybór arbitralny. Nowy eksportowany `classfile.FieldTypeFQCN` —
+  konwersja deskryptora typu referencyjnego na FQCN (false dla
+  prymitywu/tablicy — iniekcja kolekcji beanów to inna, nietknięta
+  funkcja Springa).
+- **Zachowanie dostępne użytkownikowi:** nowa sekcja raportu
+  "Dependency injection" — każdy punkt wstrzyknięcia z typem,
+  qualifierem (jeśli podany) i rozwiązanym beanem albo powodem
+  nierozwiązania.
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych —
+  szczery, zmierzony wynik w obu kierunkach:** `bin/ariadne -offline`
+  na petclinic: **8 punktów wstrzyknięcia, 0 rozwiązanych** — ale to
+  nie porażka mechanizmu: wszystkie 8 to interfejsy repozytoriów
+  Spring Data (`OwnerRepository`, `VisitRepository`, `PetRepository`,
+  `VetRepository`) — ich prawdziwe beany to syntetyczne proxy Spring
+  Data, obsługiwane przez **inny, już istniejący mechanizm**
+  (`synthetic_edges` w profilu YAML), z którym ten wycinek świadomie
+  nie integruje się. WebGoat: **74 punkty, 7 naprawdę rozwiązanych**
+  przez dokładne dopasowanie typu (np. `WebSecurityConfig`'s własny
+  parametr konstruktora typu `UserService` rozwiązuje się do
+  konkretnego `org.owasp.webgoat.users.UserService`) — realny,
+  deterministyczny, zmierzony sukces, nie fabrykowany. Pozostałe
+  67/74 na WebGoat nierozwiązane z jasnym powodem — sprawdzone wprost
+  (nie założone), że to głównie typy JDK (`java.lang.String`,
+  `java.util.List`), beany dostarczane przez framework
+  (`JdbcTemplate`, `DataSource`, `AuthenticationManager`) i interfejsy
+  repozytoriów — żadne z nich nie są w katalogu `BeanNames` z
+  definicji tego wycinka. **Zero zmian w
+  REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN** na obu aplikacjach
+  (identyczne z bazową wartością). Dwa przebiegi na każdej aplikacji
+  dają bajt-identyczny `results.json`.
+- **Spełnione kryteria (z F2's własnego "Gotowe", częściowo — tylko
+  fragment "jeden bean/qualifier"):** "jeden bean" —
+  `TestResolveInjections_singleCandidateResolves` i realny dowód
+  WebGoat (7 rozwiązań przez dokładny typ). "Qualifier" —
+  `TestResolveInjections_qualifierDisambiguates`. Dodatkowo (nie
+  jawnie wymagane, ale ten sam duch) "primary" —
+  `TestResolveInjections_primaryDisambiguates`, i "brak podstawy do
+  wyboru konstruktora nie jest zgadywane" —
+  `TestInjectionPoints_multipleConstructorsWithoutAutowiredIsSkipped`.
+  "Konflikt" i "nieznany profil" — to F1's własne kryteria, już
+  spełnione tam, nie powtórzone tutaj.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/profile`:
+  `TestInjectionPoints_*` [4], `TestResolveInjections_*` [5]); `go
+  test -race ./...` dla całego projektu (zielone); `bin/ariadne
+  -offline` na petclinic (dwa przebiegi) i WebGoat (dwa przebiegi),
+  opisane wyżej.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "DI/AOP/
+  configuration execution models": Not implemented → Partial, z
+  pełnym opisem i dowodami w obie strony — zero na petclinic, 7/74 na
+  WebGoat). `README.md` (nowy akapit o DI w "Known limitations" i w
+  sekcji 8 o nowej sekcji raportu).
+- **Niespełnione/odłożone (zgodnie z własnym, bardzo wąskim zakresem
+  tego przyrostu — F2's plan ma dużo więcej punktów niż ten wycinek
+  realizuje):** setter injection — nietknięty (rzadki w nowoczesnym
+  Springu). Iniekcja kolekcji beanów (`List<Bean>`/`Map<String,Bean>`)
+  — nietknięta. Integracja z `BeanNames` + XML beanów (F1's
+  `internal/springxml`) jako jeden wspólny katalog — nietknięta
+  (osobne pakiety, świadomie nie połączone w tym przyroście).
+  Modelowanie `@Bean` factory methods, konstrukcji i alokacji
+  (DATA_FLOW D0–D2's "znane fabryki") — nietknięte. Oznaczone korzenie
+  HTTP/servlet/filter/lifecycle/scenariusz kontenera — nietknięte.
+  Katalog punktów wejścia wskazujących zewnętrzny parser/dispatch —
+  nietknięty. Przekazanie tożsamości parametrów do przyszłych źródeł
+  taint D4 — nietknięte (D4 nie istnieje). **Żadna nowa krawędź grafu
+  wywołań** — rozwiązana iniekcja to fakt o wiązaniu, nie wywołanie,
+  ten sam rygor co SERVICE_LOADING S0/S1.
+- **Następny krok:** Pozostały zakres F2 jest duży i heterogeniczny —
+  oznaczone korzenie HTTP/servlet (prawdopodobnie najwyższa wartość,
+  bo bezpośrednio wpływa na reachability), modelowanie `@Bean` factory
+  methods, albo integracja DI z XML beanami. Wymaga propozycji i
+  zgody użytkownika przed startem, jak każda następna faza.
 
 ## Punkt startowy następnej sesji
 
