@@ -804,7 +804,17 @@ report:
   `java.lang.reflect`, a `MethodHandle` lookup outside a recognized
   `LambdaMetafactory` call, or dependency injection wiring beans by
   name/type at runtime is invisible, and can produce false negatives (a
-  real path exists that ariadne cannot see).
+  real path exists that ariadne cannot see). One exception, new: a
+  `Class.forName("literal")`/`forName("literal", bool, loader)` call
+  whose class-name argument is a provable string literal (directly or
+  through a local variable) resolves to the same Class fact a `.class`
+  literal already gives (REFLECTION R0/R1's own first slice) — so any
+  existing consumer reading a Class-typed value (e.g. `ServiceLoader.
+  load(Class)`'s own argument) now also sees one reached via
+  `forName`. A runtime-computed name still resolves to nothing, never
+  guessed. This is value-knowledge only — no call-graph edge comes
+  from it; `Method.invoke`/`Constructor.newInstance` (REFLECTION R2)
+  remain unmodeled, so the rest of this limitation stands.
 - **Six profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus` and `generic`** — every framework PLAN.md section 4 originally
   named for Phase 7, plus the `spring`/`generic` pair from the base plan.

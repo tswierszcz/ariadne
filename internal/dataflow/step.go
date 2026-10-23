@@ -334,6 +334,14 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		st.push(valueflow.Handle(hv), op.Width)
 		return ""
 	}
+	if cv, ok := classForNameValue(op, args); ok {
+		// REFLECTION R1: a Class.forName call whose class-name argument
+		// is a provable literal resolves straight to the same
+		// KindConst/"java.lang.Class" shape a `Foo.class` literal
+		// already produces, not a generic Unknown.
+		st.push(cv, op.Width)
+		return ""
+	}
 	if op.Width > 0 {
 		if op.CallKind == classfile.CallStatic || op.CallKind == classfile.CallSpecial {
 			// DATA_FLOW D3's second interprocedural summary: an
@@ -353,6 +361,8 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 			reason = fmt.Sprintf("invokedynamic bootstrap for %s#%s could not be resolved to a LambdaMetafactory implementation", op.SamInterface, op.SamMethod)
 		case op.CallOwner == lookupOwner:
 			reason = fmt.Sprintf("MethodHandles.Lookup#%s target is not statically known (Class/name argument not a literal)", op.CallName)
+		case op.CallOwner == classOwner && op.CallName == "forName":
+			reason = "Class.forName target is not statically known (class-name argument not a literal)"
 		}
 		st.push(valueflow.Unknown(reason), op.Width)
 	}
