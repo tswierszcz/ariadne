@@ -65,25 +65,27 @@ const (
 	// values (bindTo/asType adaptation is DYNAMIC_LINKAGE L3's own
 	// scope, not modeled here).
 	KindHandle Kind = "handle"
-	// KindField identifies a value read straight off a static field
-	// (DATA_FLOW D3) — see FieldRef. D2 itself never resolves what was
-	// actually stored there (that needs looking at every method that
-	// writes the field, a genuinely interprocedural question); D2 only
-	// records *which* field was read, so a consumer with hierarchy
-	// access (internal/dataflow's own ResolveStaticField) can go find
-	// out. Distinct from KindTyped: "this came from field X, unexamined"
-	// is a strictly more useful fact than "this is some instance of the
-	// field's declared type", even before anyone resolves it further.
+	// KindField identifies a value read straight off a static *or*
+	// instance field (DATA_FLOW D3) — see FieldRef. D2 itself never
+	// resolves what was actually stored there (that needs looking at
+	// every method that writes the field, a genuinely interprocedural
+	// question); D2 only records *which* field was read, so a consumer
+	// with hierarchy access (internal/dataflow's own ResolveStaticField/
+	// ResolveInstanceField) can go find out. Distinct from KindTyped:
+	// "this came from field X, unexamined" is a strictly more useful
+	// fact than "this is some instance of the field's declared type",
+	// even before anyone resolves it further.
 	KindField Kind = "field"
 )
 
-// FieldRef identifies one static field a getstatic read — the Fieldref
+// FieldRef identifies one field a getstatic/getfield read — the Fieldref
 // exactly as the bytecode names it, before any inheritance resolution
 // (hierarchy.ResolveField, same as every other owner-as-named-in-bytecode
-// convention elsewhere in ariadne). Instance fields (getfield) are
-// deliberately out of this phase's scope — see
-// internal/dataflow.ResolveStaticField's own doc comment for why static
-// was chosen first.
+// convention elsewhere in ariadne). Nothing here says whether the field
+// is static or instance — a consumer with hierarchy access resolves that
+// before picking internal/dataflow.ResolveStaticField or
+// ResolveInstanceField (the latter scoped, for now, to a final field
+// written only in a constructor — see its own doc comment).
 type FieldRef struct {
 	Owner, Name, Desc string
 }

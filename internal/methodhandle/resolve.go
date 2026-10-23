@@ -87,11 +87,11 @@ func ResolveInvokes(h *hierarchy.Hierarchy, sites []InvokeSite) ([]ResolvedInvok
 }
 
 // resolveOne reads back one InvokeSite's receiver. A KindField receiver
-// (DATA_FLOW D3: a static field read whose own writer wasn't resolved
-// within this same method) gets one more chance via
-// dataflow.ResolveStaticField, which looks at every write of that field
-// in its own declaring class — the "find a handle once, cache it in a
-// field, invoke from elsewhere" pattern DYNAMIC_LINKAGE L2's own
+// (DATA_FLOW D3: a field read whose own writer wasn't resolved within
+// this same method) gets one more chance via dataflow.ResolveField,
+// which picks ResolveStaticField or ResolveInstanceField once it knows
+// the field's real access flags — the "find a handle once, cache it in
+// a field, invoke from elsewhere" pattern DYNAMIC_LINKAGE L2's own
 // same-method-only resolution could not reach by itself.
 func resolveOne(h *hierarchy.Hierarchy, fqcn string, s InvokeSite, facts *dataflow.MethodFacts) (ResolvedInvoke, []string) {
 	ri := ResolvedInvoke{Site: s}
@@ -105,7 +105,7 @@ func resolveOne(h *hierarchy.Hierarchy, fqcn string, s InvokeSite, facts *datafl
 
 	var warnings []string
 	if val.Kind == valueflow.KindField {
-		resolved, fieldWarnings := dataflow.ResolveStaticField(h, *val.Field)
+		resolved, fieldWarnings := dataflow.ResolveField(h, *val.Field)
 		warnings = fieldWarnings
 		val = resolved
 	}

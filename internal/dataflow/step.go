@@ -67,18 +67,12 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 				return "stack underflow at a field-get instruction"
 			}
 		}
-		if op.IsStatic {
-			// DATA_FLOW D3: identify *which* static field this is,
-			// rather than discarding to a bare Typed(desc) — a consumer
-			// with hierarchy access (internal/dataflow.ResolveStaticField)
-			// can go find out what every writer actually stored there.
-			// Instance fields (getfield) stay Typed for now — see
-			// ResolveStaticField's own doc comment for why static came
-			// first.
-			st.push(valueflow.Field(valueflow.FieldRef{Owner: op.FieldOwner, Name: op.FieldName, Desc: op.FieldDesc}), op.Width)
-		} else {
-			st.push(valueflow.Typed(op.FieldDesc), op.Width)
-		}
+		// DATA_FLOW D3: identify *which* field this is (static or
+		// instance), rather than discarding to a bare Typed(desc) — a
+		// consumer with hierarchy access (ResolveStaticField/
+		// ResolveInstanceField) can go find out what every writer
+		// actually stored there.
+		st.push(valueflow.Field(valueflow.FieldRef{Owner: op.FieldOwner, Name: op.FieldName, Desc: op.FieldDesc}), op.Width)
 		return ""
 
 	case classfile.LocalOpFieldPut:
@@ -95,6 +89,20 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 			// Facts.FieldValueAt — the other half of ResolveStaticField's
 			// own cross-method summary.
 			it.facts.fieldWrites[it.site(op.PC, bytecodeir.OpFieldPut)] = entries[0].v
+		} else if it.m.Name == "<init>" && entries[0].v.Kind == valueflow.KindTyped && entries[0].v.Type == it.fqcn {
+			// DATA_FLOW D3's instance-field increment: only a provable
+			// `this.field = ...` write inside a constructor is recorded
+			// — entries[0] is the objectref, and slot 0 in a constructor
+			// is always `this` (Typed(it.fqcn), set once at method entry
+			// in analyze.go's run and never reassigned by valid
+			// bytecode). A write through any other receiver (a different
+			// instance, a supertype constructor's own copy of a field)
+			// is left unrecorded — ResolveInstanceField's own merge
+			// treats an unrecorded site as "no usable writer here",
+			// never fabricating a value. See ResolveInstanceField's doc
+			// comment for why this narrow shape is safe without real
+			// points-to.
+			it.facts.fieldWrites[it.site(op.PC, bytecodeir.OpFieldPut)] = entries[1].v
 		}
 		return ""
 

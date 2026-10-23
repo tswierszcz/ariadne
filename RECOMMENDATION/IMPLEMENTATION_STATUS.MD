@@ -1750,6 +1750,138 @@ Przy dodawaniu kolejnego wpisu zapisz:
   Alternatywnie `FRAMEWORKS:F1` albo `ASYNC_CALLBACKS:A3`. Wymaga
   propozycji i zgody użytkownika przed startem.
 
+### DATA_FLOW:D3 — Przepływ między metodami i streszczenia (wycinek: pola instancyjne, final, konstruktor) — DONE for this narrow shape; measured effect on real apps is zero (2026-10-23)
+
+- **Zakres zlecenia i zależności:** D3's poprzedni wpis (pola statyczne,
+  gotowy wyżej). Zgoda użytkownika na konkretny, wąski wycinek: tylko
+  pole **final**, ustawiane wyłącznie przez `this.field = ...` w
+  konstruktorze (`<init>`) własnej deklarującej klasy — nie pełne
+  points-to, nie każdy `putfield` w klasie (druga, szersza opcja była
+  przedstawiona i odrzucona przez użytkownika na rzecz tej węższej).
+- **Zmienione pliki:** `internal/valueflow/value.go` (doc comments
+  `KindField`/`FieldRef` rozszerzone: "field" obejmuje teraz zarówno
+  static jak i instance, nic w samej wartości nie mówi które — to
+  decyduje konsument z dostępem do hierarchii); `internal/dataflow/step.go`
+  (`LocalOpFieldGet` ujednolicony: `getfield` produkuje teraz
+  `valueflow.Field(...)` tak jak `getstatic`, bez rozróżnienia na
+  static/instance w tym miejscu; `LocalOpFieldPut` dla instancji
+  zapisuje wartość do `fieldWrites` **tylko** gdy metoda to `<init>` i
+  objectref to dokładnie `this` — `entries[0].v` równe
+  `valueflow.Typed(it.fqcn)`, jedynej wartości jaką slot 0 może mieć w
+  konstruktorze, nigdy nieprzypisywanej ponownie przez poprawny
+  bytecode); nowy `internal/dataflow/fields.go`'s `ResolveInstanceField`
+  (sprawdza `AccessFlags&AccFinal` przez `ClassInfo.FieldByNameAndDesc`
+  przed czymkolwiek innym, potem skanuje wyłącznie metody `<init>`),
+  `mergeConstructorFieldWriters` (ten sam merge co pola statyczne, ale
+  czyta `facts.fieldWrites` **bezpośrednio** z pakietu, nie przez
+  eksportowane, panikujące `FieldValueAt` — miejsce nieznalezione tu
+  oznacza "nie self-write", nie błąd wołającego), `fieldPutPCs`
+  (dekoduje `LocalOps` konstruktora, bo `putfield`/`getfield` nigdy nie
+  wyzwalają inicjalizacji klasy — JVM_GRAPH G3's `InitRef` nigdy ich nie
+  wyodrębnił, więc nie ma gotowej listy kandydatów do ponownego użycia,
+  w odróżnieniu od pól statycznych); nowy `ResolveField` — **jedyny
+  publiczny punkt wejścia** dla odbiornika `KindField`: rozwiązuje
+  deklarującą klasę i realne flagi dostępu **raz**, potem woła
+  `ResolveStaticField` albo `ResolveInstanceField` — nigdy obu po
+  kolei; `internal/methodhandle/resolve.go` (`resolveOne` woła teraz
+  `dataflow.ResolveField` zamiast wcześniejszego samego
+  `ResolveStaticField`).
+- **Błąd złapany i naprawiony w trakcie pracy, nie przemilczany:**
+  pierwsza wersja `resolveOne` próbowała `ResolveStaticField`, a przy
+  `KindUnknown` **zawsze** próbowała `ResolveInstanceField` jako "drugą
+  szansę" — na realnym przebiegu petclinic to ujawniło się jako
+  realny, mylący wynik: pole `io.micrometer...HazelcastIMapAdapter#GET_NAME`
+  jest w rzeczywistości **statyczne i final**, ale jego `invoke`'owy
+  odbiornik i tak zostaje nierozwiązany (bo wartość uchwytu gubi się w
+  nieśledzonym wywołaniu między `getstatic` a `invoke`) — przez "próbuj
+  oba" raport pokazywał błędny powód "nie znaleziono zapisu w
+  konstruktorze", sugerujący pole instancyjne, dla pola które w ogóle
+  nie jest instancyjne. Naprawione jednym dispatcherem (`ResolveField`)
+  decydującym raz, po realnych `AccessFlags`, zamiast prób/błędów —
+  teraz ten sam przypadek poprawnie zgłasza "the receiver is unknown:
+  call return value is not tracked by this analysis increment".
+- **Zachowanie dostępne użytkownikowi:** mechanizm istnieje i działa
+  (testy z realnym scalaniem, w tym wielu konstruktorów), ale **nie
+  zmienia niczego widocznego na petclinic/WebGoat** w sensie nowych
+  krawędzi — patrz "Dowód". Zmienia natomiast **dokładność powodu**
+  zgłaszanego w raporcie dla nierozwiązanych odbiorników (patrz błąd
+  wyżej) — to jest realna, pozytywna zmiana zachowania, nawet bez
+  nowych krawędzi.
+- **Spełnione kryteria:** "fabryka/pole zwraca właściwą wartość" —
+  `TestMergeConstructorFieldWriters_singleWriterResolves`. "Dwa call
+  sites nie tworzą nieuzasadnionej ścieżki" —
+  `TestMergeConstructorFieldWriters_noWriterIsHonestUnknown`,
+  `TestMergeConstructorFieldWriters_nonConstructorWriterIgnored`
+  (zapis poza konstruktorem jawnie ignorowany, nie scalany).
+  "Nie zgadywać nie-final" — `TestResolveInstanceField_nonFinalFieldIsUnknown`.
+  "Dispatcher nie maskuje prawdziwego powodu" —
+  `TestResolveField_dispatchesByAccessFlagsNotTrialAndError` (pole
+  statyczne i instancyjne dają **różne** powody `Unknown`, dowodząc że
+  faktycznie różne gałęzie się wykonały, nie jedna zamaskowana drugą).
+  "Self-receiver, nie dowolny obiekt" —
+  `TestAnalyze_instanceFieldSelfWriteInConstructorRecordsFieldValueAt`
+  (zapis przez `this` w konstruktorze) i
+  `TestAnalyze_instanceFieldWriteOutsideConstructorNotRecorded` (ten
+  sam zapis, ale poza konstruktorem — nie zapisany).
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych —
+  szczery, zmierzony wynik:** `bin/ariadne -offline` na petclinic i
+  WebGoat po tej fazie daje **identyczne 0 z 10/46** rozwiązanych
+  tożsamości `MethodHandle.invoke` jak przed tym przyrostem. Ale
+  dzięki naprawie dispatchera, powód jest teraz precyzyjny dla każdego
+  z 10/46 miejsc:
+  - **petclinic (10):** 6 "call return value not tracked" (zwykła
+    propagacja wyniku wywołania — D3's własny, wciąż nieukończony drugi
+    punkt), 1 "typed", 1 pole statyczne (`GET_NAME`) którego uchwyt
+    gubi się w nieśledzonym wywołaniu między odczytem pola i `invoke`
+    (poprzednio błędnie zgłaszane jako problem pola instancyjnego —
+    patrz "błąd naprawiony" wyżej), 2 inne nierozwiązane lookupy.
+    **Zero realnych pól instancyjnych final+konstruktor w tym zbiorze.**
+  - **WebGoat (46):** 30 "call return value not tracked", **10
+    prawdziwych pól instancyjnych** (`org.jruby.internal.runtime.methods.CompiledIRMethod#specific`,
+    `DynamicMethod#handle`) — poprawnie zidentyfikowanych jako pola
+    instancyjne, ale **nie-final** (JRuby cache'uje uchwyty leniwie,
+    nadpisując pole) — ten przyrost **poprawnie odmawia** ich
+    rozwiązania, zamiast zgadywać; to jest właściwość bezpieczeństwa
+    tej fazy działająca jak zaprojektowano, nie niedociągnięcie. 6
+    "typed".
+  - **Zero zmian w REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN** na obu
+    aplikacjach (petclinic 3/62/26/51/6, WebGoat 42/44/18/56/0 —
+    identyczne z bazową wartością przed tą fazą). Dwa przebiegi
+    petclinic i dwa przebiegi WebGoat dają bajt-identyczny
+    `results.json`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy w `internal/dataflow`:
+  `instance_fields_test.go` — `TestAnalyze_instanceFieldReadProducesKindField`,
+  `TestAnalyze_instanceFieldSelfWriteInConstructorRecordsFieldValueAt`,
+  `TestAnalyze_instanceFieldWriteOutsideConstructorNotRecorded`,
+  `TestMergeConstructorFieldWriters_*` [3], `TestResolveInstanceField_*` [2],
+  `TestResolveField_dispatchesByAccessFlagsNotTrialAndError`); `go test
+  -race ./...` dla całego projektu (zielone); `bin/ariadne -offline` na
+  petclinic (dwa przebiegi) i WebGoat (dwa przebiegi), opisane wyżej;
+  jednorazowy diagnostyczny program (`tmp_diag`, w katalogu repo bo
+  pakiety `internal/*` tego wymagają — uruchomiony i usunięty)
+  potwierdzający realne flagi dostępu i miejsca zapisu pola
+  `HazelcastIMapAdapter#GET_NAME` przed naprawą dispatchera.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersze "Data flow and
+  taint" i "General reflection, MethodHandle invocation..." oba
+  rozszerzone o ten wycinek, naprawiony błąd dispatchera, i pełny,
+  precyzyjny rozkład 10/46 miejsc). `README.md` (akapit o `MethodHandle`
+  w "Known limitations" rozszerzony o pola instancyjne final+konstruktor
+  i zmierzony wynik).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem fazy, nie przez
+  przeoczenie):** pola instancyjne nie-final (prawdziwy points-to,
+  potrzebny dla WebGoat's JRuby 10/46) — nietknięte, zgodnie z tym co
+  faza explicite wyłączyła. Propagacja wyniku zwykłego wywołania
+  ("parametr → wynik") — wciąż **dominujący** pozostały brak na obu
+  aplikacjach (6/10, 30/46) — nietknięta. Klucz kontekstu/instancji,
+  wersjonowanie streszczeń (CVE F3) — nietknięte. Rejestr B3 — wciąż
+  nieodnotowany.
+- **Następny krok:** Propagacja wyniku zwykłego wywołania metody
+  (adresuje bezpośrednio największy zmierzony pozostały brak: 6/10 i
+  30/46) — naturalny kolejny krok tego samego wątku DATA_FLOW/DYNAMIC_LINKAGE.
+  Alternatywnie `FRAMEWORKS:F1` albo `ASYNC_CALLBACKS:A3`. Wymaga
+  propozycji i zgody użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.

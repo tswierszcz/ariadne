@@ -659,15 +659,18 @@ report:
 - **`MethodHandle`**: a `MethodHandles.Lookup#findStatic/findVirtual/
   findSpecial/findConstructor` call with a literal target, and an
   `invoke()`/`invokeExact()` call whose receiver is that same handle —
-  found *earlier in the same method*, or cached in a *static* field and
-  read from a different method (DATA_FLOW D3's own first slice) — gets
-  a real call-graph edge (DYNAMIC_LINKAGE L2 — "MethodHandle call-graph
-  edges" section). Measured honestly on real petclinic/WebGoat: every
-  real `invoke`/`invokeExact` receiver found in either app's own
-  dependencies loads from an *instance* field or another method's own
-  return value, neither modeled yet — so this capability currently adds
-  zero edges on these two specific apps, even though the mechanism
-  itself is real and tested.
+  found *earlier in the same method*, cached in a *static* field and
+  read from a different method, or cached in a *final instance* field
+  set only by a `this.field = ...` store in a constructor (DATA_FLOW
+  D3's two field slices) — gets a real call-graph edge (DYNAMIC_LINKAGE
+  L2 — "MethodHandle call-graph edges" section). Measured honestly on
+  real petclinic/WebGoat: this still adds zero edges on these two
+  specific apps. The dominant reason on both is an ordinary method call
+  result flowing into the receiver (plain interprocedural return-value
+  propagation, not modeled); WebGoat's dependencies also use real
+  instance-field handle caches, but they are lazily-reassigned
+  (non-final) fields — exactly the shape the instance-field slice
+  correctly declines to resolve rather than guess at.
 - **Callbacks and async execution** (`Thread`, `Executor`/
   `ExecutorService`): every call site registering one is inventoried
   (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),
