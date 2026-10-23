@@ -409,3 +409,173 @@ func TestReflectiveMethodValue_nonLiteralNameIsNotFabricated(t *testing.T) {
 		t.Fatalf("ArgumentAt = %+v, want KindUnknown (not fabricated)", val)
 	}
 }
+
+// TestReflectiveConstructorValue_literalGetConstructorResolves is
+// REFLECTION R2's own second-half counterpart to
+// TestReflectiveMethodValue_literalGetMethodResolves — no name
+// argument to recognize, a constructor is always "<init>":
+//
+//	pc0:  ldc #8  (test.Foo.class)        -- receiver
+//	pc2:  iconst_1                        -- array length 1
+//	pc3:  anewarray #10 (java/lang/Class)
+//	pc6:  dup
+//	pc7:  iconst_0
+//	pc8:  ldc #12 (java.lang.String.class)
+//	pc10: aastore
+//	pc11: invokevirtual #16 (Class#getConstructor)
+//	pc14: invokestatic #6 (Sink#accept(Constructor)V)
+//	pc17: return
+func TestReflectiveConstructorValue_literalGetConstructorResolves(t *testing.T) {
+	pool := []classfile.PoolEntry{
+		{Tag: classfile.TagUtf8, Str: "test/Sink"},                                           // 1
+		{Tag: classfile.TagClass, NameIndex: 1},                                              // 2
+		{Tag: classfile.TagUtf8, Str: "accept"},                                              // 3
+		{Tag: classfile.TagUtf8, Str: "(Ljava/lang/reflect/Constructor;)V"},                  // 4
+		{Tag: classfile.TagNameAndType, NameIndex: 3, DescriptorIndex: 4},                    // 5
+		{Tag: classfile.TagMethodref, ClassIndex: 2, NameAndTypeIndex: 5},                    // 6: Sink#accept(Constructor)V
+		{Tag: classfile.TagUtf8, Str: "test/Foo"},                                            // 7
+		{Tag: classfile.TagClass, NameIndex: 7},                                              // 8: test.Foo.class
+		{Tag: classfile.TagUtf8, Str: "java/lang/Class"},                                     // 9
+		{Tag: classfile.TagClass, NameIndex: 9},                                              // 10
+		{Tag: classfile.TagUtf8, Str: "java/lang/String"},                                    // 11
+		{Tag: classfile.TagClass, NameIndex: 11},                                             // 12: java.lang.String.class
+		{Tag: classfile.TagUtf8, Str: "getConstructor"},                                      // 13
+		{Tag: classfile.TagUtf8, Str: "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;"}, // 14
+		{Tag: classfile.TagNameAndType, NameIndex: 13, DescriptorIndex: 14},                  // 15
+		{Tag: classfile.TagMethodref, ClassIndex: 10, NameAndTypeIndex: 15},                  // 16: Class#getConstructor
+	}
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	code := []byte{
+		0x12, 0x08, // pc0  ldc #8  (test.Foo.class)
+		0x04,             // pc2  iconst_1
+		0xbd, 0x00, 0x0a, // pc3  anewarray #10 (java/lang/Class)
+		0x59,       // pc6  dup
+		0x03,       // pc7  iconst_0
+		0x12, 0x0c, // pc8  ldc #12 (java.lang.String.class)
+		0x53,             // pc10 aastore
+		0xb6, 0x00, 0x10, // pc11 invokevirtual #16 (Class#getConstructor)
+		0xb8, 0x00, 0x06, // pc14 invokestatic #6 (Sink#accept)
+		0xb1, // pc17 return
+	}
+	m := classfile.Method{Name: "m", Descriptor: "()V", AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 0}
+
+	val := argAt(t, cf, "test.Caller", m, 14)
+	if val.Kind != valueflow.KindReflectiveConstructor {
+		t.Fatalf("ArgumentAt = %+v, want KindReflectiveConstructor", val)
+	}
+	rc := val.ReflectiveConstructor
+	if rc.OwnerFQCN != "test.Foo" || rc.Declared {
+		t.Errorf("OwnerFQCN/Declared = %q/%v, want test.Foo/false", rc.OwnerFQCN, rc.Declared)
+	}
+	if len(rc.ParamTypes) != 1 || rc.ParamTypes[0] != "java.lang.String" {
+		t.Errorf("ParamTypes = %v, want [java.lang.String]", rc.ParamTypes)
+	}
+}
+
+// TestReflectiveConstructorValue_zeroArgDeclaredResolves confirms a
+// no-parameter lookup (`getDeclaredConstructor()`, compiled as a
+// literal zero-length `Class[]`) resolves with an empty ParamTypes and
+// Declared=true, TestReflectiveMethodValue_zeroArgArrayResolves's own
+// counterpart.
+//
+//	pc0: ldc #8  (test.Foo.class)
+//	pc2: iconst_0
+//	pc3: anewarray #10 (java/lang/Class)
+//	pc6: invokevirtual #14 (Class#getDeclaredConstructor)
+//	pc9: invokestatic #6 (Sink#accept)
+//	pc12: return
+func TestReflectiveConstructorValue_zeroArgDeclaredResolves(t *testing.T) {
+	pool := []classfile.PoolEntry{
+		{Tag: classfile.TagUtf8, Str: "test/Sink"},                                           // 1
+		{Tag: classfile.TagClass, NameIndex: 1},                                              // 2
+		{Tag: classfile.TagUtf8, Str: "accept"},                                              // 3
+		{Tag: classfile.TagUtf8, Str: "(Ljava/lang/reflect/Constructor;)V"},                  // 4
+		{Tag: classfile.TagNameAndType, NameIndex: 3, DescriptorIndex: 4},                    // 5
+		{Tag: classfile.TagMethodref, ClassIndex: 2, NameAndTypeIndex: 5},                    // 6
+		{Tag: classfile.TagUtf8, Str: "test/Foo"},                                            // 7
+		{Tag: classfile.TagClass, NameIndex: 7},                                              // 8
+		{Tag: classfile.TagUtf8, Str: "java/lang/Class"},                                     // 9
+		{Tag: classfile.TagClass, NameIndex: 9},                                              // 10
+		{Tag: classfile.TagUtf8, Str: "getDeclaredConstructor"},                              // 11
+		{Tag: classfile.TagUtf8, Str: "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;"}, // 12
+		{Tag: classfile.TagNameAndType, NameIndex: 11, DescriptorIndex: 12},                  // 13
+		{Tag: classfile.TagMethodref, ClassIndex: 10, NameAndTypeIndex: 13},                  // 14
+	}
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	code := []byte{
+		0x12, 0x08, // pc0 ldc #8 (test.Foo.class)
+		0x03,             // pc2 iconst_0
+		0xbd, 0x00, 0x0a, // pc3 anewarray #10 (java/lang/Class)
+		0xb6, 0x00, 0x0e, // pc6 invokevirtual #14 (Class#getDeclaredConstructor)
+		0xb8, 0x00, 0x06, // pc9 invokestatic #6 (Sink#accept)
+		0xb1, // pc12 return
+	}
+	m := classfile.Method{Name: "m", Descriptor: "()V", AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 0}
+
+	val := argAt(t, cf, "test.Caller", m, 9)
+	if val.Kind != valueflow.KindReflectiveConstructor {
+		t.Fatalf("ArgumentAt = %+v, want KindReflectiveConstructor", val)
+	}
+	rc := val.ReflectiveConstructor
+	if rc.OwnerFQCN != "test.Foo" || !rc.Declared {
+		t.Errorf("OwnerFQCN/Declared = %q/%v, want test.Foo/true", rc.OwnerFQCN, rc.Declared)
+	}
+	if len(rc.ParamTypes) != 0 {
+		t.Errorf("ParamTypes = %v, want empty", rc.ParamTypes)
+	}
+}
+
+// TestReflectiveConstructorValue_nonLiteralParamIsNotFabricated
+// confirms a parameter-types array holding a non-literal element (here,
+// a Class passed in as a parameter rather than a `.class` literal)
+// falls through to the generic KindUnknown, never fabricated —
+// reflectiveMethodValue's own "nie dopasowywać... jako dokładnego
+// wyniku" rigor applied to the constructor case.
+//
+//	pc0:  ldc #8  (test.Foo.class)        -- receiver
+//	pc2:  iconst_1
+//	pc3:  anewarray #10 (java/lang/Class)
+//	pc6:  dup
+//	pc7:  iconst_0
+//	pc8:  aload_0 (Class parameter, not a literal)
+//	pc9:  aastore
+//	pc10: invokevirtual #14 (Class#getConstructor)
+//	pc13: invokestatic #6 (Sink#accept)
+//	pc16: return
+func TestReflectiveConstructorValue_nonLiteralParamIsNotFabricated(t *testing.T) {
+	pool := []classfile.PoolEntry{
+		{Tag: classfile.TagUtf8, Str: "test/Sink"},                                           // 1
+		{Tag: classfile.TagClass, NameIndex: 1},                                              // 2
+		{Tag: classfile.TagUtf8, Str: "accept"},                                              // 3
+		{Tag: classfile.TagUtf8, Str: "(Ljava/lang/reflect/Constructor;)V"},                  // 4
+		{Tag: classfile.TagNameAndType, NameIndex: 3, DescriptorIndex: 4},                    // 5
+		{Tag: classfile.TagMethodref, ClassIndex: 2, NameAndTypeIndex: 5},                    // 6
+		{Tag: classfile.TagUtf8, Str: "test/Foo"},                                            // 7
+		{Tag: classfile.TagClass, NameIndex: 7},                                              // 8
+		{Tag: classfile.TagUtf8, Str: "java/lang/Class"},                                     // 9
+		{Tag: classfile.TagClass, NameIndex: 9},                                              // 10
+		{Tag: classfile.TagUtf8, Str: "getConstructor"},                                      // 11
+		{Tag: classfile.TagUtf8, Str: "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;"}, // 12
+		{Tag: classfile.TagNameAndType, NameIndex: 11, DescriptorIndex: 12},                  // 13
+		{Tag: classfile.TagMethodref, ClassIndex: 10, NameAndTypeIndex: 13},                  // 14
+	}
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	code := []byte{
+		0x12, 0x08, // pc0  ldc #8 (test.Foo.class)
+		0x04,             // pc2  iconst_1
+		0xbd, 0x00, 0x0a, // pc3  anewarray #10 (java/lang/Class)
+		0x59,             // pc6  dup
+		0x03,             // pc7  iconst_0
+		0x2a,             // pc8  aload_0 (Class parameter)
+		0x53,             // pc9  aastore
+		0xb6, 0x00, 0x0e, // pc10 invokevirtual #14 (Class#getConstructor)
+		0xb8, 0x00, 0x06, // pc13 invokestatic #6 (Sink#accept)
+		0xb1, // pc16 return
+	}
+	m := classfile.Method{Name: "m", Descriptor: "(Ljava/lang/Class;)V", AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 1}
+
+	val := argAt(t, cf, "test.Caller", m, 13)
+	if val.Kind != valueflow.KindUnknown {
+		t.Fatalf("ArgumentAt = %+v, want KindUnknown (not fabricated)", val)
+	}
+}

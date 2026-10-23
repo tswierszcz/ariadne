@@ -144,3 +144,67 @@ func reflectiveMethodValue(site bytecodeir.Site, op classfile.LocalOp, receiver 
 		Declared:   declared,
 	}, true
 }
+
+// getConstructorDesc is `getConstructor`/`getDeclaredConstructor`'s own
+// shared descriptor — like getMethodDesc, a `Class<?>...` varargs
+// parameter always compiles to a literal `Class[]`, but there is no
+// name argument at all (a constructor is always named "<init>", never
+// looked up by name).
+const getConstructorDesc = "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;"
+
+// reflectiveConstructorValue recognizes a `Class#getConstructor`/
+// `getDeclaredConstructor` call whose receiver is a known Class and
+// whose parameter-types argument is a `Class[]` array every element of
+// which is itself a provable Class literal — REFLECTION R2's own
+// second-half prerequisite, reflectiveMethodValue's own counterpart
+// with no name argument to recognize.
+//
+// ok is false for any other call, including one on an unresolved
+// receiver or a parameter-types array this analysis couldn't fully
+// track — left for the caller to fall through to the generic
+// KindCallResult, never guessed at.
+func reflectiveConstructorValue(site bytecodeir.Site, op classfile.LocalOp, receiver valueflow.Value, args []valueflow.Value) (valueflow.ReflectiveConstructorValue, bool) {
+	if op.CallOwner != classOwner || op.CallDesc != getConstructorDesc {
+		return valueflow.ReflectiveConstructorValue{}, false
+	}
+	var declared bool
+	switch op.CallName {
+	case "getConstructor":
+		declared = false
+	case "getDeclaredConstructor":
+		declared = true
+	default:
+		return valueflow.ReflectiveConstructorValue{}, false
+	}
+	if receiver.Kind != valueflow.KindConst || receiver.Type != "java.lang.Class" {
+		return valueflow.ReflectiveConstructorValue{}, false
+	}
+	ownerFQCN, ok := receiver.Const.(string)
+	if !ok {
+		return valueflow.ReflectiveConstructorValue{}, false
+	}
+	if len(args) != 1 {
+		return valueflow.ReflectiveConstructorValue{}, false
+	}
+	paramTypesVal := args[0]
+	if paramTypesVal.Kind != valueflow.KindArray || paramTypesVal.Array.ElementType != "java.lang.Class" {
+		return valueflow.ReflectiveConstructorValue{}, false
+	}
+	paramTypes := make([]string, len(paramTypesVal.Array.Elements))
+	for i, e := range paramTypesVal.Array.Elements {
+		if e.Kind != valueflow.KindConst || e.Type != "java.lang.Class" {
+			return valueflow.ReflectiveConstructorValue{}, false
+		}
+		t, ok := e.Const.(string)
+		if !ok {
+			return valueflow.ReflectiveConstructorValue{}, false
+		}
+		paramTypes[i] = t
+	}
+	return valueflow.ReflectiveConstructorValue{
+		Site:       site,
+		OwnerFQCN:  ownerFQCN,
+		ParamTypes: paramTypes,
+		Declared:   declared,
+	}, true
+}

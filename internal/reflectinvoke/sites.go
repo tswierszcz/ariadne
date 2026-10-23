@@ -1,13 +1,16 @@
 // Package reflectinvoke is REFLECTION R2's own consumer: it finds every
-// `java.lang.reflect.Method#invoke` call site, reads back the Method
-// receiver DATA_FLOW D2/REFLECTION R1 already resolved
-// (valueflow.KindReflectiveMethod, from a `Class#getMethod`/
-// `getDeclaredMethod` call — see internal/dataflow's own reflectapi.go),
-// and — like DYNAMIC_LINKAGE L2's internal/methodhandle before it —
-// turns a resolved identity into a real call-graph edge, never a
-// fabricated one. `Constructor#newInstance` is this phase's own next
-// slice, not built here (REFLECTION R1 never resolved a
-// getConstructor/getDeclaredConstructor receiver in the first place).
+// `java.lang.reflect.Method#invoke` and `Constructor#newInstance` call
+// site, reads back the Method/Constructor receiver DATA_FLOW D2/
+// REFLECTION R1/R2 already resolved (valueflow.KindReflectiveMethod/
+// KindReflectiveConstructor, from a `Class#getMethod`/
+// `getDeclaredMethod`/`getConstructor`/`getDeclaredConstructor` call —
+// see internal/dataflow's own reflectapi.go), and — like
+// DYNAMIC_LINKAGE L2's internal/methodhandle before it — turns a
+// resolved identity into a real call-graph edge, never a fabricated
+// one. sites.go/resolve.go/edges.go are the Method#invoke half;
+// newinstance_sites.go/newinstance_resolve.go/newinstance_edges.go are
+// the Constructor#newInstance half, mirroring the same three-stage
+// split.
 package reflectinvoke
 
 import "ariadne/internal/hierarchy"

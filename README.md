@@ -830,9 +830,18 @@ report:
   edge or `MethodHandle.invoke`'s own `BasisMethodHandle`. A receiver
   that isn't one of those resolved facts (a parameter, a field read, an
   unresolved call result) is correctly left with no edge, not guessed.
-  `Constructor.newInstance`, `getDeclared*`'s access-check bypass, and
-  any runtime-computed class/method name remain unmodeled, so the rest
-  of this limitation still stands.
+  A fourth slice, REFLECTION R2's own other half: `Constructor#
+  newInstance` whose Constructor receiver resolves back to a
+  `getConstructor`/`getDeclaredConstructor` fact gets a real
+  call-graph edge too — but exact, not "every overload": a constructor
+  is never inherited, so the resolved parameter types pick exactly one
+  `<init>` on the resolved class, with a related class-initialization
+  edge alongside it if that class has a `<clinit>` (the same pairing
+  a `new` instruction itself already gets). `getDeclared*`'s own
+  access-check bypass/`setAccessible` (R3), a Method/Constructor
+  receiver that arrives as a method parameter rather than a field or a
+  helper-method return value, and any runtime-computed class/method
+  name remain unmodeled, so the rest of this limitation still stands.
 - **Six profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus` and `generic`** — every framework PLAN.md section 4 originally
   named for Phase 7, plus the `spring`/`generic` pair from the base plan.

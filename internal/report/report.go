@@ -209,6 +209,14 @@ type Data struct {
 	// proven argument-count mismatch).
 	ReflectInvokeSites []reflectinvoke.ResolvedInvoke
 	ReflectInvokeEdges []reflectinvoke.InvokeEdgeResult
+
+	// ReflectNewInstanceSites/ReflectNewInstanceEdges are REFLECTION
+	// R2's own second half: every java.lang.reflect.Constructor#
+	// newInstance call site found, and each one's resolved Constructor
+	// receiver connected to the exact "<init>" its resolved parameter
+	// types declared (or a Gap explaining why not).
+	ReflectNewInstanceSites []reflectinvoke.ResolvedNewInstance
+	ReflectNewInstanceEdges []reflectinvoke.NewInstanceEdgeResult
 }
 
 // ProxyHandlerRow is Data's own rendering-friendly form of
@@ -311,7 +319,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler, reflectInvokeSites []reflectinvoke.ResolvedInvoke, reflectInvokeEdges []reflectinvoke.InvokeEdgeResult) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler, reflectInvokeSites []reflectinvoke.ResolvedInvoke, reflectInvokeEdges []reflectinvoke.InvokeEdgeResult, reflectNewInstanceSites []reflectinvoke.ResolvedNewInstance, reflectNewInstanceEdges []reflectinvoke.NewInstanceEdgeResult) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -350,6 +358,8 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
 		ReflectInvokeSites:        reflectInvokeSites,
 		ReflectInvokeEdges:        reflectInvokeEdges,
+		ReflectNewInstanceSites:   reflectNewInstanceSites,
+		ReflectNewInstanceEdges:   reflectNewInstanceEdges,
 	}
 
 	for _, r := range sorted {

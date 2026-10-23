@@ -112,6 +112,16 @@ const (
 	// obtaining this value never means the method ran — that is R2's
 	// own scope, not built here.
 	KindReflectiveMethod Kind = "reflectivemethod"
+	// KindReflectiveConstructor identifies a `java.lang.reflect.
+	// Constructor` obtained from `Class#getConstructor`/
+	// `getDeclaredConstructor` with a fully-literal `Class[]`
+	// parameter-types array — REFLECTION R2's own second half
+	// prerequisite, KindReflectiveMethod's own counterpart. No method
+	// name to track: a constructor is always named "<init>" — see
+	// ReflectiveConstructorValue. Same "possession is not invocation/
+	// allocation" stance KindReflectiveMethod already takes: obtaining
+	// this value never means `newInstance` ran.
+	KindReflectiveConstructor Kind = "reflectiveconstructor"
 )
 
 // FieldRef identifies one field a getstatic/getfield read — the Fieldref
@@ -245,6 +255,25 @@ type ReflectiveMethodValue struct {
 	Declared   bool
 }
 
+// ReflectiveConstructorValue is KindReflectiveConstructor's own
+// payload: which `getConstructor`/`getDeclaredConstructor` call
+// produced it, and its parameter types, resolved the same way
+// ReflectiveMethodValue's own ParamTypes is — literal element types of
+// the `Class[]` argument. No Name field: a constructor has no
+// separate name argument to recognize, unlike getMethod. Declared
+// tells `getConstructor` (false, public only) apart from
+// `getDeclaredConstructor` (true, every declared constructor
+// regardless of access) — same split ReflectiveMethodValue's own
+// Declared already makes. A consumer with hierarchy access resolves
+// OwnerFQCN/ParamTypes against the real class — this package never
+// does, same "identify here, resolve there" split.
+type ReflectiveConstructorValue struct {
+	Site       bytecodeir.Site
+	OwnerFQCN  string
+	ParamTypes []string
+	Declared   bool
+}
+
 // Value is one fact's abstract value in DATA_FLOW's domain. Exactly one
 // of Const/Type/AllocSite/Candidates/Reason is meaningful, selected by
 // Kind — see each field's own comment for which.
@@ -298,6 +327,10 @@ type Value struct {
 
 	// ReflectiveMethod is set only when Kind == KindReflectiveMethod.
 	ReflectiveMethod *ReflectiveMethodValue
+
+	// ReflectiveConstructor is set only when Kind ==
+	// KindReflectiveConstructor.
+	ReflectiveConstructor *ReflectiveConstructorValue
 }
 
 // Const returns an exact known constant of the given runtime type.
@@ -342,6 +375,13 @@ func Array(av *ArrayValue) Value { return Value{Kind: KindArray, Array: av} }
 // Method` obtained from `getMethod`/`getDeclaredMethod`.
 func ReflectiveMethod(rm ReflectiveMethodValue) Value {
 	return Value{Kind: KindReflectiveMethod, ReflectiveMethod: &rm}
+}
+
+// ReflectiveConstructor returns a value identified as a
+// `java.lang.reflect.Constructor` obtained from `getConstructor`/
+// `getDeclaredConstructor`.
+func ReflectiveConstructor(rc ReflectiveConstructorValue) Value {
+	return Value{Kind: KindReflectiveConstructor, ReflectiveConstructor: &rc}
 }
 
 // Null returns the null value.
@@ -392,6 +432,8 @@ func (v Value) Equal(other Value) bool {
 		return v.Array != nil && other.Array != nil && v.Array.Site == other.Array.Site
 	case KindReflectiveMethod:
 		return v.ReflectiveMethod != nil && other.ReflectiveMethod != nil && v.ReflectiveMethod.Site == other.ReflectiveMethod.Site
+	case KindReflectiveConstructor:
+		return v.ReflectiveConstructor != nil && other.ReflectiveConstructor != nil && v.ReflectiveConstructor.Site == other.ReflectiveConstructor.Site
 	default: // KindSet, KindUnknown
 		return false
 	}

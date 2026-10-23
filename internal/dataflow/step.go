@@ -395,6 +395,14 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 			st.push(valueflow.ReflectiveMethod(rm), op.Width)
 			return ""
 		}
+		if rc, ok := reflectiveConstructorValue(it.site(op.PC, bytecodeir.OpCall), op, entries[0].v, args); ok {
+			// REFLECTION R2: a getConstructor/getDeclaredConstructor
+			// call on a known Class, with a fully-literal Class[]
+			// parameter-types array, produces a real
+			// ReflectiveConstructorValue instead of a generic Unknown.
+			st.push(valueflow.ReflectiveConstructor(rc), op.Width)
+			return ""
+		}
 	}
 	if op.Width > 0 {
 		if op.CallKind == classfile.CallStatic || op.CallKind == classfile.CallSpecial {

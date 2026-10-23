@@ -307,6 +307,43 @@ None found.
 {{end}}
 {{end}}
 
+## Reflective Constructor#newInstance call sites
+
+Every `java.lang.reflect.Constructor#newInstance` call site found, with its
+Constructor receiver resolved back to the `Class#getConstructor`/
+`getDeclaredConstructor` call that produced it, where possible (REFLECTION R2's
+second half). A receiver that was a parameter, a field read, or an unresolved
+lookup is correctly left unresolved, not guessed at.
+{{if not .ReflectNewInstanceSites}}
+None found.
+{{else}}
+| Caller | Constructor |
+|---|---|
+{{range .ReflectNewInstanceSites}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}{{.Site.CallerDesc}}` (pc={{.Site.PC}}) | {{if .OwnerFQCN}}`{{.OwnerFQCN}}#<init>` ({{len .ParamTypes}} param(s)){{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{end}}
+{{end}}
+
+## Reflective newInstance call-graph edges
+
+For every resolved Constructor above, a real call-graph edge (REFLECTION R2) from the
+`newInstance` call site to the exact `<init>` its resolved parameter types declared on
+the resolved class, plus a related class-initialization edge when that class has a
+`<clinit>`. A constructor is never inherited (JVMS 5.4.3.3), so this is exact by
+construction, not a dispatch choice the way the `Method#invoke` edges above are.
+"Gap" means either the receiver never resolved, a parameter type isn't a plain class
+literal this phase can turn back into a descriptor, the resolved class declares no
+constructor matching those parameter types, or the literal argument array's own
+length proves an argument-count mismatch with the resolved Constructor — never a
+fabricated edge once that is proven.
+{{if not .ReflectNewInstanceEdges}}
+None found.
+{{else}}
+| Caller | Target |
+|---|---|
+{{range .ReflectNewInstanceEdges}}| `{{.ResolvedNewInstance.Site.CallerFQCN}}#{{.ResolvedNewInstance.Site.CallerName}}{{.ResolvedNewInstance.Site.CallerDesc}}` (pc={{.ResolvedNewInstance.Site.PC}}) | {{if .TargetDesc}}`{{.ResolvedNewInstance.OwnerFQCN}}#<init>{{.TargetDesc}}`{{else}}**gap:** {{.Gap}}{{end}} |
+{{end}}
+{{end}}
+
 ## Spring MVC routes
 
 Every HTTP mapping found on an application method (FRAMEWORKS F1), with its real

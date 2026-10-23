@@ -547,6 +547,28 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("reflection: %d Method#invoke call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
 		len(reflectInvokeSites), len(reflectEdgeTargets), reflectEdgesAdded)
 
+	// REFLECTION R2's own second half: the same reasoning for
+	// java.lang.reflect.Constructor#newInstance, resolving its
+	// Constructor receiver via REFLECTION R2's own
+	// KindReflectiveConstructor and connecting it to the exact "<init>"
+	// its resolved parameter types declared — never every overload,
+	// since a constructor is never inherited.
+	reflectNewInstanceSites := reflectinvoke.FindNewInstanceSites(h)
+	resolvedReflectNewInstances, reflectNewInstanceResolveWarnings := reflectinvoke.ResolveNewInstances(h, reflectNewInstanceSites)
+	warnings = append(warnings, reflectNewInstanceResolveWarnings...)
+	reflectNewInstanceEdgeResults := reflectinvoke.FindNewInstanceEdges(h, resolvedReflectNewInstances)
+	reflectNewInstanceEdgeTargets := reflectinvoke.NewInstanceEdgeTargets(reflectNewInstanceEdgeResults)
+	var reflectNewInstanceGraphEdges []callgraph.ReflectNewInstanceEdge
+	for _, e := range reflectNewInstanceEdgeTargets {
+		reflectNewInstanceGraphEdges = append(reflectNewInstanceGraphEdges, callgraph.ReflectNewInstanceEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetDesc: e.TargetDesc,
+		})
+	}
+	reflectNewInstanceEdgesAdded := callgraph.ApplyReflectNewInstanceEdges(g, reflectNewInstanceGraphEdges)
+	log("reflection: %d Constructor#newInstance call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
+		len(reflectNewInstanceSites), len(reflectNewInstanceEdgeTargets), reflectNewInstanceEdgesAdded)
+
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
@@ -729,7 +751,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)
