@@ -19,6 +19,12 @@ type PreparedApp struct {
 	AppClassesJar string // always a real jar on disk, ready for hierarchy.Build
 	ExtractedLibs string // a directory of dependency jars extracted from the archive's own lib entries, or "" if appPath was a plain jar
 	Cleanup       func() error
+	// WebXMLs is every WEB-INF/web.xml found (FRAMEWORKS F1), keyed by
+	// its own module name: "" for a standalone WAR, or the nested *.war
+	// entry's own name for an EAR's module(s). Empty for every other
+	// input shape (a plain jar, a directory, a Spring Boot fat jar —
+	// none of those have a WEB-INF/web.xml to begin with).
+	WebXMLs map[string][]byte
 }
 
 // PrepareAppInput accepts any of the application inputs section 3.1
@@ -58,6 +64,40 @@ func PrepareAppInput(appPath string) (PreparedApp, error) {
 
 func noopCleanup() error { return nil }
 
+// webInfClassesPrefix/webXMLEntryName are a WAR's own zip paths
+// (FRAMEWORKS F1) — kept as named constants since prepareFromFatArchive
+// needs to tell a WAR's classesPrefix apart from a Spring Boot fat
+// jar's ("BOOT-INF/classes/") to know whether a web.xml capture even
+// applies.
+const (
+	webInfClassesPrefix = "WEB-INF/classes/"
+	webXMLEntryName     = "WEB-INF/web.xml"
+)
+
+// readZipEntryBytes reads one zip entry's full bytes by exact name
+// (FRAMEWORKS F1's own WEB-INF/web.xml capture). ok is false, with no
+// error, when no entry with that name exists — most archives simply
+// have no web.xml (a Spring Boot fat jar never does), which is not a
+// failure.
+func readZipEntryBytes(files []*zip.File, name string) ([]byte, bool, error) {
+	for _, f := range files {
+		if f.Name != name {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return nil, false, err
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			return nil, false, err
+		}
+		return data, true, nil
+	}
+	return nil, false, nil
+}
+
 func prepareFromDir(dir string) (PreparedApp, error) {
 	tmp, err := os.CreateTemp("", "ariadne-app-classes-*.jar")
 	if err != nil {
@@ -96,7 +136,7 @@ func prepareFromJar(jarPath string) (PreparedApp, error) {
 	case archiveEAR:
 		return prepareFromEar(zr.File)
 	case archiveWAR:
-		return prepareFromFatArchive(zr.File, "WEB-INF/classes/", "WEB-INF/lib/")
+		return prepareFromFatArchive(zr.File, webInfClassesPrefix, "WEB-INF/lib/")
 	case archiveBootJar:
 		return prepareFromFatArchive(zr.File, "BOOT-INF/classes/", "BOOT-INF/lib/")
 	default:
@@ -145,9 +185,27 @@ func detectArchiveKind(files []*zip.File) archiveKind {
 // which the original internal/input design (see PLAN.md Phase 6 status)
 // wanted to avoid.
 func prepareFromFatArchive(files []*zip.File, classesPrefix, libPrefix string) (PreparedApp, error) {
-	return buildPreparedApp("ariadne-fat-archive-*", func(zw *zip.Writer, written map[string]bool, libDir string) error {
+	prepared, err := buildPreparedApp("ariadne-fat-archive-*", func(zw *zip.Writer, written map[string]bool, libDir string) error {
 		return extractModule(files, classesPrefix, libPrefix, zw, written, libDir)
 	})
+	if err != nil {
+		return PreparedApp{}, err
+	}
+	// FRAMEWORKS F1: a WAR's own WEB-INF/web.xml (classesPrefix ==
+	// "WEB-INF/classes/") is captured for later parsing — a Spring Boot
+	// fat jar (BOOT-INF/classes/) never has one, so this is a no-op for
+	// that case.
+	if classesPrefix == webInfClassesPrefix {
+		data, ok, err := readZipEntryBytes(files, webXMLEntryName)
+		if err != nil {
+			prepared.Cleanup()
+			return PreparedApp{}, fmt.Errorf("reading %s: %w", webXMLEntryName, err)
+		}
+		if ok {
+			prepared.WebXMLs = map[string][]byte{"": data}
+		}
+	}
+	return prepared, nil
 }
 
 // prepareFromEar merges every nested WAR module's WEB-INF/classes +
@@ -161,7 +219,12 @@ func prepareFromFatArchive(files []*zip.File, classesPrefix, libPrefix string) (
 // META-INF/application.xml (which, since Java EE 5, is itself optional)
 // — see Known limitations.
 func prepareFromEar(files []*zip.File) (PreparedApp, error) {
-	return buildPreparedApp("ariadne-ear-*", func(zw *zip.Writer, written map[string]bool, libDir string) error {
+	// FRAMEWORKS F1: each nested WAR module can carry its own
+	// WEB-INF/web.xml, keyed here by that module's own *.war entry name
+	// — unlike a standalone WAR (always key ""), an EAR can genuinely
+	// have more than one.
+	webXMLs := map[string][]byte{}
+	prepared, err := buildPreparedApp("ariadne-ear-*", func(zw *zip.Writer, written map[string]bool, libDir string) error {
 		for _, f := range files {
 			switch {
 			case !f.FileInfo().IsDir() && strings.HasSuffix(f.Name, ".war"):
@@ -169,8 +232,13 @@ func prepareFromEar(files []*zip.File) (PreparedApp, error) {
 				if err != nil {
 					return fmt.Errorf("opening nested WAR %s: %w", f.Name, err)
 				}
-				if err := extractModule(nested, "WEB-INF/classes/", "WEB-INF/lib/", zw, written, libDir); err != nil {
+				if err := extractModule(nested, webInfClassesPrefix, "WEB-INF/lib/", zw, written, libDir); err != nil {
 					return err
+				}
+				if data, ok, err := readZipEntryBytes(nested, webXMLEntryName); err != nil {
+					return fmt.Errorf("reading %s's own %s: %w", f.Name, webXMLEntryName, err)
+				} else if ok {
+					webXMLs[f.Name] = data
 				}
 
 			case !f.FileInfo().IsDir() && strings.HasSuffix(f.Name, ".jar"):
@@ -185,6 +253,13 @@ func prepareFromEar(files []*zip.File) (PreparedApp, error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return PreparedApp{}, err
+	}
+	if len(webXMLs) > 0 {
+		prepared.WebXMLs = webXMLs
+	}
+	return prepared, nil
 }
 
 // buildPreparedApp creates a temp dir with a lib/ subdirectory and an

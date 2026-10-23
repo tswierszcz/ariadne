@@ -2125,6 +2125,104 @@ Przy dodawaniu kolejnego wpisu zapisz:
   wiązanie) korzystając już z tego, co Część 3 tutaj dostarczyła
   (`BeanNames`). Wymaga propozycji i zgody użytkownika przed startem.
 
+### FRAMEWORKS:F1 — Adnotacje, zasoby i jawna konfiguracja (wycinek: ograniczony odczyt web.xml) — DONE for this scope; XML bean definitions/priorytet konfiguracji wciąż odłożone (2026-10-23)
+
+- **Zakres zlecenia i zależności:** F1's poprzednie trzy części
+  (wartości adnotacji, rozwiązywanie między klasami, realne wartości
+  Spring MVC — gotowe wyżej). Kontynuacja tej samej fazy na życzenie
+  użytkownika ("Kontynuuj" po pytaniu czy robić dalej F1 czy przejść do
+  F2).
+- **Nowy pakiet `internal/webxml`:** `Parse` dekoduje ograniczony,
+  bezpieczny podzbiór `web.xml` — `<servlet>`/`<servlet-mapping>`/
+  `<filter>`/`<filter-mapping>`/`<listener>`/`<context-param>`, z
+  każdym innym elementem obecnym w dokumencie zgłaszanym w `Skipped`
+  (zdeduplikowane, w kolejności pierwszego wystąpienia) — nigdy
+  po prostu odrzucanym bez śladu, zgodnie z F1's own "odnotować
+  pominięte elementy". **Bezpieczne z konstrukcji, nie przez flagę**:
+  `encoding/xml` z pakietu standardowego Go nigdy nie pobiera
+  zewnętrznego DTD ani nie rozwiązuje zewnętrznej encji — potwierdzone
+  testem (`TestParse_undefinedEntityIsError`), że dokument z
+  niezdefiniowaną encją (`<!ENTITY xxe SYSTEM "file:///etc/passwd">`)
+  daje błąd dekodowania, nie cichą podmianę.
+- **`internal/input`:** `PreparedApp` zyskał `WebXMLs map[string][]byte`
+  (klucz `""` dla samodzielnego WAR, nazwa zagnieżdżonego `*.war` dla
+  modułu EAR) — **wcześniej `web.xml` nie był w ogóle zachowywany**
+  poza `PrepareAppInput` (sprawdzone wprost: filtr `classesPrefix` w
+  `extractModule` nigdy nie obejmował `WEB-INF/web.xml`, tylko
+  `WEB-INF/classes/`). Nowy `readZipEntryBytes` czyta bajty jednego
+  wpisu zip po nazwie; `prepareFromFatArchive` wywołuje go tylko dla
+  prawdziwego WAR (`classesPrefix == "WEB-INF/classes/"`, nigdy dla
+  Boot fat-jara); `prepareFromEar` czyta `web.xml` z każdego
+  zagnieżdżonego modułu WAR osobno, więc EAR z wieloma modułami
+  zachowuje każdy swój własny `web.xml`, nie tylko pierwszy znaleziony.
+- **`cmd/ariadne`/`internal/report`:** nowy typ `report.WebXMLInput`
+  (jeden parametr `Build`, nie sześć kolejnych pozycyjnych) scala
+  wyniki z każdego modułu, w deterministycznej kolejności (sortowanie
+  kluczy mapy `WebXMLs` przed iteracją — iteracja po mapie w Go jest
+  losowa). Nowa sekcja raportu "web.xml".
+- **Zachowanie dostępne użytkownikowi:** raport pokazuje teraz
+  zawartość `web.xml`'a dla wejścia WAR/EAR (wcześniej: nic, bo bajty
+  nawet nie docierały poza `PrepareAppInput`). Wciąż tylko
+  inwentarz/deklaracje — **żadna nowa krawędź grafu wywołań**,
+  świadomie: serwlet nazwany w `web.xml` nie staje się rootem (to
+  osobny krok, nie tej fazy, ten sam rygor co SERVICE_LOADING S0's
+  własne "rejestracja nie jest wywołaniem").
+- **Dowód na realnym bytecode, nie tylko testach jednostkowych:**
+  środowisko nie ma JDK (bez `javac`), więc nie da się skompilować
+  świeżej aplikacji WAR do testu — ten sam ograniczenie co G2/G4.
+  Zamiast tego: realny, już skompilowany `app-classes.jar` petclinic
+  przepakowany pod `WEB-INF/classes/` plus ręcznie napisany `web.xml`
+  (ten sam wzorzec co G4's własny fixture multi-release — "użyj
+  realnego skompilowanego bytecode, dopisz ręcznie tylko to, co nie
+  wymaga kompilacji"). `bin/ariadne -offline` na tym WAR: **poprawnie
+  wykryty jako WAR, `web.xml` przechwycony i poprawnie sparsowany** —
+  1 serwlet, 1 mapowanie, 1 filtr, 1 mapowanie filtra, 1 listener, 1
+  context-param, 2 nieznane elementy (`<display-name>`,
+  `<session-config>`) poprawnie nazwane w "Skipped", nie ukryte. Dwa
+  przebiegi dają bajt-identyczny `results.json`. Dodatkowo:
+  petclinic/WebGoat jako zwykłe jary (nie WAR) — zero zmian w
+  zachowaniu, `WebXMLs` poprawnie puste.
+- **Spełnione kryteria:** "XML nie pobiera zewnętrznych definicji ani
+  nie uruchamia kodu" — `TestParse_undefinedEntityIsError`. "Odnotować
+  pominięte elementy" — `TestParse_fullShape`'s `Skipped` assertion.
+  "Dokument zepsuty to błąd, element nierozpoznany to nie błąd" —
+  `TestParse_malformedDocumentIsError` vs. resztę testów.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet ./...`,
+  `go test ./...` (zielone, nowe testy: `internal/webxml`:
+  `TestParse_fullShape`, `TestParse_filterMappingByServletName`,
+  `TestParse_malformedDocumentIsError`,
+  `TestParse_undefinedEntityIsError`, `TestParse_emptyWebApp`;
+  `internal/input`: `TestPrepareAppInput_war_capturesWebXML`,
+  `TestPrepareAppInput_war_noWebXMLIsEmpty`,
+  `TestPrepareAppInput_springBootFatJar_noWebXML`,
+  `TestPrepareAppInput_ear_capturesPerModuleWebXML`); `go test -race
+  ./...` dla całego projektu (zielone); realny WAR zbudowany z
+  istniejącego skompilowanego `app-classes.jar` petclinic +
+  ręcznie napisany `web.xml`, dwa przebiegi `bin/ariadne -offline`
+  (opisane wyżej); petclinic/WebGoat jako zwykłe jary bez zmian.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (nowy wiersz
+  "Configuration (web.xml, XML bean definitions)": Not implemented →
+  Partial, z pełnym opisem i dowodami; wiersz "Profiles and selected
+  roots" poprawiony, żeby nie twierdzić już, że `web.xml` jest
+  nietknięty). `README.md` (akapit o `web.xml` w "Known limitations"
+  przepisany z "not modeled" na opis realnego, ograniczonego zakresu;
+  nowy akapit w sekcji 8 o nowej sekcji raportu).
+- **Niespełnione/odłożone (zgodnie z własnym zakresem tego przyrostu):**
+  XML bean definitions (`<bean id="..." class="...">`) — nietknięte.
+  Priorytet/konflikt wielu źródeł konfiguracji — wciąż nietknięty (jest
+  teraz DRUGIE źródło, `web.xml`, obok adnotacji, ale nic nie łączy ich
+  w jeden scenariusz z priorytetem). Krawędzie grafu z deklaracji
+  `web.xml` (serwlet jako root) — celowo nietknięte, osobny,
+  świadomy krok. Jawne wejście plików/właściwości scenariusza poza
+  `-active-profiles` — nietknięte.
+- **Następny krok:** Tak jak poprzedni wpis zauważył — pozostałe punkty
+  F1 (XML bean definitions, priorytet konfiguracji) nie są już małymi,
+  mechanicznymi krokami w tym samym stylu. Dobry moment na
+  `FRAMEWORKS:F2` (DI, `@Bean`, wiązanie qualifier/primary), które może
+  już korzystać z `BeanNames` (Część 3) i `web.xml`'s inwentarza
+  serwletów (ta faza) jako dodatkowego źródła. Wymaga propozycji i
+  zgody użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.

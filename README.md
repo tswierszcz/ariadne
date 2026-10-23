@@ -428,7 +428,10 @@ path(s)/verb(s), every `@Component`-family stereotype's own declared
 bean name and `@Primary` status, and every `@Profile(...)`'s declared
 name(s) with whether it's active (`unknown` unless `-active-profiles`
 was given — FRAMEWORKS F1, sourced from real annotation element values,
-not just the bare presence of the annotation), and a fixed Limitations
+not just the bare presence of the annotation), a limited, safe reading
+of every `WEB-INF/web.xml` found in a WAR/EAR input (servlets, filters,
+listeners, context params, with every other element named as unmodeled
+rather than silently dropped — FRAMEWORKS F1), and a fixed Limitations
 section (see below).
 
 The entry call line also names the call kind, the resolution rule
@@ -695,8 +698,16 @@ report:
   (`CompletionStage`, listeners, reactive operators), and a lambda whose
   own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
   left unresolved rather than guessed at.
-- **Serialization gadgets and config-driven behavior** (XML wiring,
-  `web.xml`) are not modeled. **ServiceLoader** provider *declarations*
+- **Serialization gadgets** are not modeled. **`web.xml`** (a WAR's own
+  deployment descriptor, and an EAR's per-module ones) is read in a
+  limited, safe way (FRAMEWORKS F1 — the report's own "web.xml"
+  section): `<servlet>`/`<servlet-mapping>`/`<filter>`/
+  `<filter-mapping>`/`<listener>`/`<context-param>`, with every other
+  element named as unmodeled rather than silently dropped. No call-graph
+  edges come from this yet — it is inventory, not wiring, same
+  reasoning as ServiceLoader's own declarations below. Spring XML bean
+  definitions (`<bean id="..." class="...">`) are not modeled at all.
+  **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
   report's own "ServiceLoader provider registrations" section), every
   `ServiceLoader.load(...)`/`loadInstalled(...)` call site is found with

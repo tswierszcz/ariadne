@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"ariadne/internal/report"
 	"ariadne/internal/serviceload"
 	"ariadne/internal/vulnmap"
+	"ariadne/internal/webxml"
 )
 
 func main() {
@@ -56,6 +59,16 @@ type config struct {
 
 	exploitCheck   bool
 	frameworkCheck bool
+}
+
+// moduleLabel names a PreparedApp.WebXMLs key for an error message —
+// "" (a standalone WAR, the common case) reads as "the app" rather
+// than an empty, confusing string.
+func moduleLabel(module string) string {
+	if module == "" {
+		return "the app"
+	}
+	return module
 }
 
 func run(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -151,6 +164,53 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	depsDir := cfg.deps
 	if prepared.ExtractedLibs != "" {
 		depsDir = prepared.ExtractedLibs // a Spring Boot fat jar carries its own BOOT-INF/lib
+	}
+
+	// FRAMEWORKS F1: parse every captured WEB-INF/web.xml (a WAR has
+	// one keyed "", an EAR can have one per nested WAR module) — sorted
+	// by module name, since map iteration order is random and this
+	// codebase's own byte-identical-results.json determinism contract
+	// does not tolerate that.
+	var webXMLInput report.WebXMLInput
+	if len(prepared.WebXMLs) > 0 {
+		modules := make([]string, 0, len(prepared.WebXMLs))
+		for module := range prepared.WebXMLs {
+			modules = append(modules, module)
+		}
+		sort.Strings(modules)
+		skippedSeen := map[string]bool{}
+		for _, module := range modules {
+			parsed, err := webxml.Parse(bytes.NewReader(prepared.WebXMLs[module]))
+			if err != nil {
+				return fmt.Errorf("parsing %s's web.xml: %w", moduleLabel(module), err)
+			}
+			for _, s := range parsed.Servlets {
+				webXMLInput.Servlets = append(webXMLInput.Servlets, report.ServletRow{Module: module, Name: s.Name, Class: s.Class})
+			}
+			for _, m := range parsed.ServletMappings {
+				webXMLInput.ServletMappings = append(webXMLInput.ServletMappings, report.ServletMappingRow{Module: module, Name: m.Name, URLPattern: m.URLPattern})
+			}
+			for _, f := range parsed.Filters {
+				webXMLInput.Filters = append(webXMLInput.Filters, report.FilterRow{Module: module, Name: f.Name, Class: f.Class})
+			}
+			for _, m := range parsed.FilterMappings {
+				webXMLInput.FilterMappings = append(webXMLInput.FilterMappings, report.FilterMappingRow{Module: module, Name: m.Name, URLPattern: m.URLPattern, ServletName: m.ServletName})
+			}
+			for _, l := range parsed.Listeners {
+				webXMLInput.Listeners = append(webXMLInput.Listeners, report.ListenerRow{Module: module, Class: l.Class})
+			}
+			for _, p := range parsed.ContextParams {
+				webXMLInput.ContextParams = append(webXMLInput.ContextParams, report.ContextParamRow{Module: module, Name: p.Name, Value: p.Value})
+			}
+			for _, elem := range parsed.Skipped {
+				if !skippedSeen[elem] {
+					skippedSeen[elem] = true
+					webXMLInput.Skipped = append(webXMLInput.Skipped, elem)
+				}
+			}
+		}
+		log("web.xml: %d module(s), %d servlets, %d filters, %d listeners, %d context-params found (%d unmodeled element kinds)",
+			len(modules), len(webXMLInput.Servlets), len(webXMLInput.Filters), len(webXMLInput.Listeners), len(webXMLInput.ContextParams), len(webXMLInput.Skipped))
 	}
 
 	var depsList []input.GAV
@@ -547,7 +607,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

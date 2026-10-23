@@ -316,6 +316,55 @@ None found.
 {{end}}
 {{end}}
 
+## web.xml
+
+A limited, safe reading of every `WEB-INF/web.xml` found (FRAMEWORKS F1) — one WAR
+module per row's "Module" column ("(app)" for a standalone WAR; a module name for
+one of an EAR's several nested WAR modules). An element present in the document but
+not modeled below (e.g. `<session-config>`, `<error-page>`, `<security-constraint>`)
+is named under "Unmodeled elements found", never silently dropped without a trace.
+{{if not .WebXML.Servlets}}
+No servlets found.
+{{else}}
+| Module | Servlet | Class |
+|---|---|---|
+{{range .WebXML.Servlets}}| {{if .Module}}`{{.Module}}`{{else}}(app){{end}} | `{{.Name}}` | `{{.Class}}` |
+{{end}}
+{{end}}
+{{if .WebXML.ServletMappings}}
+| Module | Servlet | URL pattern |
+|---|---|---|
+{{range .WebXML.ServletMappings}}| {{if .Module}}`{{.Module}}`{{else}}(app){{end}} | `{{.Name}}` | `{{.URLPattern}}` |
+{{end}}
+{{end}}
+{{if .WebXML.Filters}}
+| Module | Filter | Class |
+|---|---|---|
+{{range .WebXML.Filters}}| {{if .Module}}`{{.Module}}`{{else}}(app){{end}} | `{{.Name}}` | `{{.Class}}` |
+{{end}}
+{{end}}
+{{if .WebXML.FilterMappings}}
+| Module | Filter | URL pattern | Servlet |
+|---|---|---|---|
+{{range .WebXML.FilterMappings}}| {{if .Module}}`{{.Module}}`{{else}}(app){{end}} | `{{.Name}}` | {{if .URLPattern}}`{{.URLPattern}}`{{else}}—{{end}} | {{if .ServletName}}`{{.ServletName}}`{{else}}—{{end}} |
+{{end}}
+{{end}}
+{{if .WebXML.Listeners}}
+| Module | Listener class |
+|---|---|
+{{range .WebXML.Listeners}}| {{if .Module}}`{{.Module}}`{{else}}(app){{end}} | `{{.Class}}` |
+{{end}}
+{{end}}
+{{if .WebXML.ContextParams}}
+| Module | Param | Value |
+|---|---|---|
+{{range .WebXML.ContextParams}}| {{if .Module}}`{{.Module}}`{{else}}(app){{end}} | `{{.Name}}` | `{{.Value}}` |
+{{end}}
+{{end}}
+{{if .WebXML.Skipped}}
+Unmodeled elements found: {{range $i, $e := .WebXML.Skipped}}{{if $i}}, {{end}}`<{{$e}}>`{{end}}.
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

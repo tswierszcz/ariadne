@@ -144,12 +144,45 @@ type Data struct {
 	// why every SpringProfileConditions entry reports "unknown", not a
 	// guessed "false".
 	ActiveProfiles string
+
+	// WebXML is FRAMEWORKS F1's own ograniczony odczyt web.xml result.
+	WebXML WebXMLInput
 }
 
 // Build assembles Data from a finished run's pieces. severityOf/packageOf
 // come from the matching cves.CVE (Analyze's Result doesn't carry them,
 // since internal/reach only needs the vulnerable methods, not the
 // advisory metadata).
+// ServletRow/ServletMappingRow/FilterRow/FilterMappingRow/ListenerRow/
+// ContextParamRow are webxml's own types plus Module — "" for a
+// standalone WAR, or the owning nested WAR's own entry name for an
+// EAR's module(s) — since webxml.Parse itself has no notion of which
+// archive module it was reading (that's PreparedApp.WebXMLs' own
+// concern, one layer up).
+type ServletRow struct{ Module, Name, Class string }
+type ServletMappingRow struct{ Module, Name, URLPattern string }
+type FilterRow struct{ Module, Name, Class string }
+type FilterMappingRow struct {
+	Module, Name, URLPattern, ServletName string
+}
+type ListenerRow struct{ Module, Class string }
+type ContextParamRow struct{ Module, Name, Value string }
+
+// WebXMLInput is FRAMEWORKS F1's own "ograniczony odczyt web.xml"
+// result, bundled into one Build parameter rather than six more
+// positional ones — every row across every module (PreparedApp.WebXMLs
+// can hold more than one for an EAR), plus every unmodeled element
+// name seen in any of them (deduplicated).
+type WebXMLInput struct {
+	Servlets        []ServletRow
+	ServletMappings []ServletMappingRow
+	Filters         []FilterRow
+	FilterMappings  []FilterMappingRow
+	Listeners       []ListenerRow
+	ContextParams   []ContextParamRow
+	Skipped         []string
+}
+
 // RouteRow is Data's own rendering-friendly form of profile.Route —
 // Paths/HTTPMethods joined to plain strings, since this package's own
 // template.Parse registers no custom join function (joinMethods's own
@@ -165,7 +198,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -195,6 +228,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		SpringBeanNames:           springBeanNames,
 		SpringProfileConditions:   profileConditionRows(springProfileConditions),
 		ActiveProfiles:            activeProfiles,
+		WebXML:                    webXML,
 	}
 
 	for _, r := range sorted {

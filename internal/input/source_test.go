@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -167,6 +168,109 @@ func TestPrepareAppInput_ear(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(p.ExtractedLibs, want)); err != nil {
 			t.Errorf("extracted lib jar %s not found: %v", want, err)
 		}
+	}
+}
+
+// TestPrepareAppInput_war_capturesWebXML confirms FRAMEWORKS F1's own
+// WEB-INF/web.xml capture: a WAR's own deployment descriptor is kept
+// (keyed "" — a standalone WAR has exactly one module, itself), not
+// just its compiled classes.
+func TestPrepareAppInput_war_capturesWebXML(t *testing.T) {
+	webXML := []byte("<web-app><servlet-name>main</servlet-name></web-app>")
+	war := filepath.Join(t.TempDir(), "app.war")
+	writeZip(t, war, map[string][]byte{
+		"WEB-INF/classes/com/example/App.class": []byte("fake app class bytes"),
+		"WEB-INF/web.xml":                       webXML,
+	})
+
+	p, err := PrepareAppInput(war)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	got, ok := p.WebXMLs[""]
+	if !ok {
+		t.Fatalf("WebXMLs = %v, want an entry keyed \"\"", p.WebXMLs)
+	}
+	if string(got) != string(webXML) {
+		t.Errorf("WebXMLs[\"\"] = %q, want %q", got, webXML)
+	}
+}
+
+// TestPrepareAppInput_war_noWebXMLIsEmpty confirms a WAR with no
+// WEB-INF/web.xml at all (valid per the servlet spec since 3.0, with
+// purely annotation-driven registration) leaves WebXMLs empty, not an
+// error.
+func TestPrepareAppInput_war_noWebXMLIsEmpty(t *testing.T) {
+	war := filepath.Join(t.TempDir(), "app.war")
+	writeZip(t, war, map[string][]byte{
+		"WEB-INF/classes/com/example/App.class": []byte("fake app class bytes"),
+	})
+
+	p, err := PrepareAppInput(war)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	if len(p.WebXMLs) != 0 {
+		t.Errorf("WebXMLs = %v, want empty (no WEB-INF/web.xml in this WAR)", p.WebXMLs)
+	}
+}
+
+// TestPrepareAppInput_springBootFatJar_noWebXML confirms a Spring Boot
+// fat jar (BOOT-INF/classes, never WEB-INF) never gets a spurious
+// WebXMLs entry.
+func TestPrepareAppInput_springBootFatJar_noWebXML(t *testing.T) {
+	fat := filepath.Join(t.TempDir(), "app.jar")
+	writeFatJar(t, fat)
+
+	p, err := PrepareAppInput(fat)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	if len(p.WebXMLs) != 0 {
+		t.Errorf("WebXMLs = %v, want empty (a fat jar is never a WAR)", p.WebXMLs)
+	}
+}
+
+// TestPrepareAppInput_ear_capturesPerModuleWebXML confirms an EAR with
+// two nested WAR modules keeps each one's own web.xml, keyed by that
+// module's own *.war entry name — not merged or dropped.
+func TestPrepareAppInput_ear_capturesPerModuleWebXML(t *testing.T) {
+	war1 := zipBytes(t, map[string][]byte{
+		"WEB-INF/classes/com/example/App1.class": []byte("fake app1 class bytes"),
+		"WEB-INF/web.xml":                        []byte("<web-app><servlet-name>one</servlet-name></web-app>"),
+	})
+	war2 := zipBytes(t, map[string][]byte{
+		"WEB-INF/classes/com/example/App2.class": []byte("fake app2 class bytes"),
+		"WEB-INF/web.xml":                        []byte("<web-app><servlet-name>two</servlet-name></web-app>"),
+	})
+
+	ear := filepath.Join(t.TempDir(), "app.ear")
+	writeZip(t, ear, map[string][]byte{
+		"META-INF/application.xml": []byte("<application/>"),
+		"one.war":                  war1,
+		"two.war":                  war2,
+	})
+
+	p, err := PrepareAppInput(ear)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+
+	if len(p.WebXMLs) != 2 {
+		t.Fatalf("WebXMLs = %v, want 2 entries (one per module)", p.WebXMLs)
+	}
+	if !strings.Contains(string(p.WebXMLs["one.war"]), "<servlet-name>one</servlet-name>") {
+		t.Errorf("WebXMLs[one.war] = %q, want it to contain module one's own web.xml", p.WebXMLs["one.war"])
+	}
+	if !strings.Contains(string(p.WebXMLs["two.war"]), "<servlet-name>two</servlet-name>") {
+		t.Errorf("WebXMLs[two.war] = %q, want it to contain module two's own web.xml", p.WebXMLs["two.war"])
 	}
 }
 
