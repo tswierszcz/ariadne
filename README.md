@@ -745,6 +745,16 @@ report:
   report's own "web.xml-declared roots" section); previously a plain
   servlet with no annotation contributed nothing under `-roots
   profile`.
+  **Entry point catalog**: a single labeled inventory combining the
+  HTTP routes above with the web.xml lifecycle methods, each tagged
+  with its own basis (`http-mapping`/`servlet`/`filter`/`listener`)
+  and activation condition — cross-referenced against the `@Profile`
+  conditions above, never a second condition model (FRAMEWORKS F2 —
+  the report's own "Entry point catalog" section). Purely a labeling
+  pass over facts already computed elsewhere: it adds no new
+  `-roots profile` entry point and no new call-graph edge, since an
+  external parser/dispatcher's own call into application code is
+  never fabricated, only shown to exist ahead of the listed method.
   **ServiceLoader** provider *declarations*
   are inventoried (`META-INF/services/*`, SERVICE_LOADING S0 — see the
   report's own "ServiceLoader provider registrations" section), every

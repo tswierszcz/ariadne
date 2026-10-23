@@ -82,13 +82,5 @@ type ConditionalBinding struct {
 	Active      Condition
 }
 
-// ExternalEntry is FRAMEWORKS F0's own proposed contract for an entry
-// point reached through framework/container dispatch before any
-// application code runs (PLAN.md's own "roots"), carrying its own basis
-// and activation condition instead of being silently folded into the
-// same Roots.Annotations/Overrides list every match already uses.
-type ExternalEntry struct {
-	FQCN, Method string
-	Basis        string
-	Active       Condition
-}
+// ExternalEntry (F0's own proposed contract for this) is now actually
+// built — see externalentries.go's own ExternalEntries (FRAMEWORKS F2).

@@ -430,6 +430,25 @@ None found.
 {{end}}
 {{end}}
 
+## Entry point catalog
+
+Every entry point already known to be reached through framework/container
+dispatch before any application code runs — Spring MVC HTTP mappings and
+web.xml-declared servlet/filter/listener lifecycle methods, each labeled with
+its own basis and activation condition (cross-referenced against the
+`@Profile` conditions above). Purely a labeling pass over the sections above:
+it adds no new call-graph edge — an external parser/dispatcher's own call
+into application code is never fabricated, only shown to exist ahead of the
+listed method.
+{{if not .ExternalEntries}}
+None found.
+{{else}}
+| Class | Method | Basis | Active |
+|---|---|---|---|
+{{range .ExternalEntries}}| `{{.FQCN}}` | `{{.Method}}` | {{.Basis}} | {{.Active}} |
+{{end}}
+{{end}}
+
 ## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

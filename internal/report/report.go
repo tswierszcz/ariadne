@@ -179,6 +179,17 @@ type Data struct {
 	// own entry points (shown regardless of which `-roots` mode this
 	// run used, same as every other inventory section).
 	WebXMLRoots []WebXMLRootRow
+
+	// ExternalEntries is FRAMEWORKS F2's own entry-point catalog: every
+	// known Spring MVC HTTP mapping and web.xml-declared servlet/
+	// filter/listener lifecycle method, labeled with its own basis
+	// (what kind of framework/container dispatch reaches it) and
+	// activation condition (cross-referenced against
+	// SpringProfileConditions, never a second, separate condition
+	// model). Purely a labeling/reporting pass over facts the sections
+	// above already compute — adds no new call-graph edge and no new
+	// `-roots profile` entry point of its own.
+	ExternalEntries []ExternalEntryRow
 }
 
 // InjectionRow is Data's own rendering-friendly form of
@@ -193,6 +204,13 @@ type InjectionRow struct {
 // profile.WebXMLRoot.
 type WebXMLRootRow struct {
 	FQCN, Method, Kind string
+}
+
+// ExternalEntryRow is Data's own rendering-friendly form of
+// profile.ExternalEntry.
+type ExternalEntryRow struct {
+	FQCN, Method, Basis string
+	Active              profile.Condition
 }
 
 // XMLBeanRow is Data's own rendering-friendly form of springxml.Bean,
@@ -268,7 +286,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -302,6 +320,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		SpringXMLBeans:            springXMLBeans,
 		Injections:                injectionRows(injections),
 		WebXMLRoots:               webXMLRootRows(webXMLRoots),
+		ExternalEntries:           externalEntryRows(externalEntries),
 		ConfigConflicts:           buildConfigConflicts(springBeanNames, springXMLBeans),
 	}
 
@@ -374,6 +393,14 @@ func webXMLRootRows(roots []profile.WebXMLRoot) []WebXMLRootRow {
 	out := make([]WebXMLRootRow, len(roots))
 	for i, r := range roots {
 		out[i] = WebXMLRootRow{FQCN: r.FQCN, Method: r.Method, Kind: string(r.Kind)}
+	}
+	return out
+}
+
+func externalEntryRows(entries []profile.ExternalEntry) []ExternalEntryRow {
+	out := make([]ExternalEntryRow, len(entries))
+	for i, e := range entries {
+		out[i] = ExternalEntryRow{FQCN: e.FQCN, Method: e.Method, Basis: string(e.Basis), Active: e.Active}
 	}
 	return out
 }

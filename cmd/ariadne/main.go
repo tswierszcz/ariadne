@@ -441,6 +441,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("frameworks: %d web.xml-declared lifecycle methods found (roots under -roots profile)", len(webXMLRootsFound))
 	}
 
+	// FRAMEWORKS F2: entry point catalog — the above HTTP/web.xml
+	// entry points, labeled with basis and activation condition.
+	// Purely a reporting pass; no new root or call-graph edge.
+	externalEntries := profile.ExternalEntries(h, activeProfiles, servletClasses, filterClasses, listenerClasses)
+	log("frameworks: %d external entries cataloged (http/servlet/filter/listener)", len(externalEntries))
+
 	log("building call graph")
 	g := callgraph.Build(h, nil)
 	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA, %d class-init), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
@@ -691,7 +697,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

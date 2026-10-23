@@ -18,7 +18,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1, S2: DONE; S3–S4: UNASSESSED | S2 dodaje realną krawędź do konstruktora providera dla każdego rozwiązanego interfejsu (8/147 providerów, 10/158 krawędzi na petclinic/WebGoat), ale tylko sam konstruktor — iterator/`Provider.get` nietknięte, JPMS (S3) nietknięte. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Wspólne wartości DATA_FLOW i reguły rozwiązywania JVM. |
-| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: trzy wycinki (DI, oznaczone korzenie web.xml, `@Bean` factory methods) zrobione, reszta UNASSESSED; F3–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do **40/74** rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). AOP/pointcut, katalog punktów wejścia zewnętrznych, framework-provided beans/Spring Data proxy integracja — nietknięte. Rejestr B3 wciąż nieodnotowany. |
+| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: cztery wycinki (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia) zrobione, reszta UNASSESSED; F3–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do **40/74** rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów, zgodne z już zweryfikowanymi liczbami. AOP/pointcut, framework-provided beans/Spring Data proxy integracja — nietknięte. Rejestr B3 wciąż nieodnotowany. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
@@ -2572,6 +2572,66 @@ Przy dodawaniu kolejnego wpisu zapisz:
   punktów wejścia, integracja DI z XML beanami/framework-provided
   beans) wymaga propozycji i zgody użytkownika przed startem.
 
+### FRAMEWORKS:F2 — Pierwsze DI i model zewnętrznych wejść (wycinek: katalog zewnętrznych punktów wejścia) — DONE for this scope; reszta F2 nietknięta (2026-10-23)
+
+- **Zakres zlecenia i zależności:** F1 (`Routes`, `ProfileConditions`),
+  F2's drugi wycinek (`WebXMLRoots`), F0's nieużywany dotąd kontrakt
+  `ExternalEntry` (`internal/profile/scenario.go`). Zgoda użytkownika:
+  wybrano ten wycinek jako rekomendowany z trzech przedstawionych opcji
+  (katalog wejść, rejestr B3, przejście do F3).
+- **Nowy plik `internal/profile/externalentries.go`:** `ExternalEntries`
+  łączy `Routes(h)` (Basis `http-mapping`) i `WebXMLRoots(h, ...)`
+  (Basis `servlet`/`filter`/`listener`) w jeden katalog; dla każdego
+  wpisu `Active` ustawiane przez `activeCondition`, które sprawdza
+  `ProfileConditions` metody, potem klasy, a gdy nic nie gatuje —
+  `ConditionTrue` (nigdy zgadywane jako `unknown`, gdy naprawdę nic nie
+  warunkuje). `ExternalEntry` (typ) przeniesiony z `scenario.go`'s
+  nieużywanego kontraktu F0 do tego pliku jako realna implementacja —
+  usunięta duplikacja deklaracji. **Celowo żadnej zmiany w
+  `AppRoots`/root-selection** — zgodnie z FRAMEWORKS.MD scenario 4,
+  to czysto etykietujący, raportowy przebieg, nie fabrykujący krawędzi
+  parser→kontroler.
+- **`cmd/ariadne`/`internal/report`:** nowy parametr `Build`, nowa
+  sekcja raportu "Entry point catalog" (klasa/metoda/basis/active),
+  nowa linia logu "N external entries cataloged".
+- **Dowód na realnym bytecode:** `bin/ariadne -offline -profile spring`
+  na petclinic: 17 wpisów katalogu (17 routes + 0 web.xml, zgodnie z
+  już zweryfikowanymi liczbami), wszystkie `Active: true` (żadna z
+  aplikacji nie używa `@Profile`). WebGoat: 19 wpisów (19 routes + 0
+  web.xml), też wszystkie `true`. Liczby katalogu zgadzają się 1:1 z
+  już zweryfikowanymi `Routes`/`WebXMLRoots` — brak podwójnego liczenia
+  czy utraty wpisów. `REACHABLE=42 FRAMEWORK=44 NOT_REACHABLE=18
+  UNKNOWN=56` na WebGoat i odpowiadające liczby na petclinic
+  niezmienione względem stanu przed tym przyrostem. Dwa przebiegi na
+  obu aplikacjach dają bajt-identyczny `results.json`.
+- **Spełnione kryteria:** nowe testy jednostkowe w `internal/profile`:
+  `TestExternalEntries_httpMappingUnconditionallyActive`,
+  `TestExternalEntries_profileGatedRouteUnknownWithoutActiveList`,
+  `TestExternalEntries_profileGatedRouteResolvesWithActiveList` (oba
+  kierunki: `@Profile` aktywny i nieaktywny), `TestExternalEntries_
+  webXMLServletIncluded`, `TestExternalEntries_noEntriesIsEmptyNotNil
+  Panic`.
+- **Polecenia rzeczywiście wykonane:** `go build ./...`, `go vet
+  ./...`, `go test ./...` (zielone); `bin/ariadne -offline` na
+  petclinic (dwa przebiegi) i WebGoat (dwa przebiegi), opisane wyżej.
+- **Zmiany w dokumentacji:** `docs/SUPPORT.MD` (wiersz "DI/AOP/
+  configuration execution models": czwarty wycinek opisany z
+  liczbami; wiersz "Profiles and selected roots": `ExternalEntry`
+  odnotowany jako już zbudowany, nie tylko zaprojektowany).
+  `README.md` (nowy akapit "Entry point catalog" w "Known
+  limitations").
+- **Niespełnione/odłożone:** żadna zmiana w `-roots profile`'s własnym
+  zestawie korzeni — to osobna decyzja, nietknięta tutaj. `@Scheduled`/
+  `@EventListener` jako osobny `Basis` — nietknięte (tylko HTTP i
+  web.xml). Deduplikacja `httpMappingVerbs` (springvalues.go) vs
+  `spring.yaml`'s `roots.annotations` — nietknięta (osobny refaktor).
+  `@Profile`-owa aktywacja sprawdzona tylko na testach jednostkowych —
+  żadna z kontrolnych aplikacji nie używa `@Profile` (ten sam, już
+  odnotowany gap co F1's `ProfileConditions`). Rejestr B3 — nietknięty.
+- **Następny krok:** rejestr B3, integracja DI z XML beanami/
+  framework-provided beans, albo przejście do F3 (proxy/AOP) — wymaga
+  propozycji i zgody użytkownika przed startem.
+
 ## Punkt startowy następnej sesji
 
 1. Porównaj ten stan z bieżącym kodem i zmianami w checkoutcie.
@@ -2582,10 +2642,11 @@ Przy dodawaniu kolejnego wpisu zapisz:
    zostanie potraktowane jako w pełni odblokowane. FRAMEWORKS:F1 jest
    zarchiwizowane jako DONE dla swojego faktycznego zakresu — zob.
    [archive/2026-10-23/frameworks/FRAMEWORKS_F1.md](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md).
-   FRAMEWORKS:F2 ma trzy wycinki gotowe (`@Autowired`, web.xml roots,
-   `@Bean` factory methods) — zob. wpisy wyżej. Naturalny następny
-   krok w tym obszarze to rejestr B3, katalog zewnętrznych punktów
-   wejścia, albo przejście do F3 (proxy/AOP).
+   FRAMEWORKS:F2 ma cztery wycinki gotowe (`@Autowired`, web.xml
+   roots, `@Bean` factory methods, katalog zewnętrznych punktów
+   wejścia) — zob. wpisy wyżej. Naturalny następny krok w tym obszarze
+   to rejestr B3, integracja DI z XML/framework-provided beans, albo
+   przejście do F3 (proxy/AOP).
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 
