@@ -55,9 +55,62 @@ func TestAnalyze_staticCallResultProducesKindCallResult(t *testing.T) {
 	if val.Kind != valueflow.KindCallResult {
 		t.Fatalf("ArgumentAt = %+v, want KindCallResult", val)
 	}
-	want := valueflow.CallResultRef{Owner: "test.Caller", Name: "target", Desc: "()Ljava/lang/String;"}
+	want := valueflow.CallResultRef{
+		Owner: "test.Caller", Name: "target", Desc: "()Ljava/lang/String;",
+		Site: bytecodeir.Site{Method: "test.Caller#m", Descriptor: "()V", PC: 0, Op: bytecodeir.OpCall},
+	}
 	if *val.Call != want {
 		t.Errorf("Call = %+v, want %+v", *val.Call, want)
+	}
+}
+
+func TestAnalyze_preservesBoundedVirtualReceiverTrace(t *testing.T) {
+	pool := []classfile.PoolEntry{
+		{Tag: classfile.TagUtf8, Str: "java/util/stream/Stream"},            // 1
+		{Tag: classfile.TagClass, NameIndex: 1},                             // 2
+		{Tag: classfile.TagUtf8, Str: "first"},                              // 3
+		{Tag: classfile.TagUtf8, Str: "()Ljava/util/stream/Stream;"},        // 4
+		{Tag: classfile.TagNameAndType, NameIndex: 3, DescriptorIndex: 4},   // 5
+		{Tag: classfile.TagMethodref, ClassIndex: 2, NameAndTypeIndex: 5},   // 6
+		{Tag: classfile.TagUtf8, Str: "second"},                             // 7
+		{Tag: classfile.TagNameAndType, NameIndex: 7, DescriptorIndex: 4},   // 8
+		{Tag: classfile.TagMethodref, ClassIndex: 2, NameAndTypeIndex: 8},   // 9
+		{Tag: classfile.TagUtf8, Str: "test/Sink"},                          // 10
+		{Tag: classfile.TagClass, NameIndex: 10},                            // 11
+		{Tag: classfile.TagUtf8, Str: "accept"},                             // 12
+		{Tag: classfile.TagUtf8, Str: "(Ljava/util/stream/Stream;)V"},       // 13
+		{Tag: classfile.TagNameAndType, NameIndex: 12, DescriptorIndex: 13}, // 14
+		{Tag: classfile.TagMethodref, ClassIndex: 11, NameAndTypeIndex: 14}, // 15
+	}
+	cf := classfile.NewClassFileForTesting("test.Caller", pool)
+	code := []byte{
+		0x01,             // pc0 aconst_null
+		0xb6, 0x00, 0x06, // pc1 invokevirtual Fluent#first
+		0x4b,             // pc4 astore_0
+		0x2a,             // pc5 aload_0
+		0xb6, 0x00, 0x09, // pc6 invokevirtual Fluent#second
+		0x4c,             // pc9 astore_1
+		0x2b,             // pc10 aload_1
+		0xb8, 0x00, 0x0f, // pc11 invokestatic Sink#accept
+		0xb1, // pc14 return
+	}
+	m := classfile.Method{Name: "m", Descriptor: "()V", AccessFlags: classfile.AccStatic, Code: code, MaxLocals: 2}
+	facts, err := Analyze(cf, "test.Caller", m)
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if aborted, reason := facts.Aborted(); aborted {
+		t.Fatalf("Analyze aborted: %s", reason)
+	}
+	arg := facts.ArgumentAt(bytecodeir.Site{Method: "test.Caller#m", Descriptor: "()V", PC: 11, Op: bytecodeir.OpCall}, 0)
+	if arg.Kind != valueflow.KindCallTrace || arg.CallTrace == nil {
+		t.Fatalf("sink argument=%+v, want virtual-call trace", arg)
+	}
+	if arg.CallTrace.Site.PC != 6 || arg.CallTrace.Receiver == nil || arg.CallTrace.Receiver.Kind != valueflow.KindCallTrace || arg.CallTrace.Receiver.CallTrace.Site.PC != 1 {
+		t.Fatalf("trace=%+v, want second@6 -> first@1", arg.CallTrace)
+	}
+	if got := valueflow.CallTraceDepth(arg); got != 2 {
+		t.Fatalf("trace depth=%d, want 2", got)
 	}
 }
 

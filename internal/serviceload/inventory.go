@@ -14,9 +14,9 @@ import (
 // analyzed app ever calls ServiceLoader.load for this interface, and
 // whether or not the provider is ever actually instantiated. Those are
 // SERVICE_LOADING S1 (FindLoadSites — which call sites name this
-// interface) and S2 (does the provider's constructor/factory actually
-// get modeled as reachable, not yet implemented) respectively, neither
-// of which this phase (S0) attempts.
+// interface) and S2 (whether a supported, linked consumption can reach
+// a constructible provider) respectively, neither of which this phase
+// (S0) attempts.
 type ServiceRegistration struct {
 	Interface     string // the service interface FQCN
 	ProviderClass string // the FQCN this registration names
@@ -60,7 +60,7 @@ type ServiceLoadSite struct {
 	// provably exact Class literal (valueflow.KindConst). "" otherwise;
 	// see UnresolvedReason for why.
 	Interface    string
-	CallerMethod string // "fqcn#name(desc)", for display — see CallerFQCN/CallerName/CallerDesc for the same identity split for programmatic use (SERVICE_LOADING S2's own graph-edge lookup needs the parts, not the joined string)
+	CallerMethod string // "fqcn#name(desc)", for display — see CallerFQCN/CallerName/CallerDesc for the same identity split for programmatic use (SERVICE_LOADING S2's exact call-site lookup needs the parts, not the joined string)
 	CallerFQCN   string
 	CallerName   string
 	CallerDesc   string
@@ -77,11 +77,25 @@ type ServiceLoadSite struct {
 	UnresolvedReason string
 }
 
-// ProviderMaterialization is SERVICE_LOADING S2's own concept: a
-// provider's constructor modeled as an actual call-graph target reachable
-// from a ServiceLoadSite that names its interface. S0 defined this type
-// as a stable contract; FindMaterializations (S2) is what actually
-// constructs it.
+// ServiceConsumptionSite is one exact iterator/stream/provider API call
+// with the load-site identity recovered from bounded local call provenance.
+// Multiple interfaces are possible at a control-flow join and are retained
+// as a union; an empty set with UnresolvedReason is an explicit gap.
+type ServiceConsumptionSite struct {
+	CallerFQCN, CallerName, CallerDesc string
+	PC                                 int
+	CallOwner, CallName, CallDesc      string
+	ProviderMethodCall                 bool
+	Interfaces                         []string
+	LoaderKinds                        []LoaderKind
+	UnresolvedReason                   string
+}
+
+// ProviderMaterialization is SERVICE_LOADING S2's resolved candidate:
+// it records whether a provider can be constructed for a service
+// interface. It becomes a call-graph target only when a supported
+// consumption site is linked to a load site for that interface. S0
+// defined this type as a stable contract; FindMaterializations builds it.
 type ProviderMaterialization struct {
 	Registration ServiceRegistration
 	// ConstructorMethod is "fqcn#<init>()V" when the provider has a

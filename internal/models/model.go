@@ -1,29 +1,16 @@
-// Package models is ROADMAP.MD's own B3 contract: "Wprowadzić rejestr
-// modeli z identyfikatorem, obsługiwanymi sygnaturami, zakresem wersji
-// i źródłem semantyki." This file is that contract alone — a Model's
-// own shape, a Registry to look models up by the exact call site they
-// claim to know, and the Fact shape a future model evaluation would
-// report. It is deliberately NOT the rest of B3: no iteration
-// coordinator, no work queue, no fixed-point convergence with the
-// call graph, no invalidation of dependent results when a model is
-// corrected. Building those needs a design decision of their own
-// (how internal/analysis, internal/callgraph and internal/profile
-// relate) and is this phase's own explicit next step, not done here.
-// "Gotowe, gdy model usługi może wprowadzić typ, który uruchamia
-// kolejne poprawne rozwinięcie grafu, a limit zatrzymania jest
-// widoczny" is NOT satisfied by this file alone — that needs the
-// coordinator.
+// Package models defines ROADMAP B3's registered model, exact call-site,
+// fact, and evaluator contracts. internal/analysis consumes these to
+// coordinate model-derived call edges with the call graph. Model
+// semantics remain supplied by evaluator implementations; this package
+// does not load executable code from profiles.
 //
 // Package-dependency decision (ROADMAP.MD's own explicit prerequisite,
 // "ustalić kierunek zależności pakietów przed refaktorem, aby uniknąć
 // cyklu profile → callgraph → models → profile"): this package may
 // depend only on leaf domain packages that have no dependency back on
-// internal/profile or internal/callgraph — internal/classfile,
-// internal/input (for input.GAV, already a leaf: it imports no other
-// internal/ package), and internal/bytecodeir. It must never import
-// internal/profile or internal/callgraph itself. The future
-// internal/analysis coordinator (not built here) is the one package
-// allowed to depend on both internal/models and internal/callgraph;
+// internal/profile or internal/callgraph — internal/input is such a
+// leaf. It must never import internal/profile or internal/callgraph.
+// internal/analysis depends on both this package and internal/callgraph;
 // internal/profile may depend on internal/models (to select which
 // model IDs apply to the active profile) but never the other way, and
 // never on internal/analysis — profile stays "a configuration/model-
@@ -33,7 +20,10 @@
 // profile.
 package models
 
-import "ariadne/internal/input"
+import (
+	"ariadne/internal/classfile"
+	"ariadne/internal/input"
+)
 
 // Signature identifies one library API call a Model knows how to
 // model — the exact Owner/Name/Desc a Methodref names in the bytecode
@@ -91,17 +81,20 @@ type Model struct {
 	Source string
 }
 
-// Fact is the shape a future model evaluation (internal/analysis, not
-// built here) would report for one call site it matched — B3's own
+// Fact is the shape an evaluator reports for one matched call site — B3's own
 // "budżety i stan incomplete z przyczyną": a model that could not
 // fully resolve something (a budget exceeded, an argument this
 // package's own value domain couldn't prove) reports why, rather than
-// silently guessing or silently doing nothing. This type exists now so
-// a future coordinator and this contract agree on the shape before
-// either is built against the other; nothing in this package produces
-// a Fact yet.
+// silently guessing or silently doing nothing.
 type Fact struct {
 	ModelID string
+	// Caller and PC identify the exact bytecode call site that produced
+	// this fact. The coordinator fills these from the evaluated site.
+	Caller Signature
+	PC     int
+	// Targets are exact method identities that may be invoked from this
+	// site according to the model; they do not imply runtime execution.
+	Targets []Target
 	// Incomplete is true when this Model could not fully resolve this
 	// call site — Reason is then required, non-empty, and specific
 	// (ROADMAP.MD's own B0: "Każdy limit zbioru, głębokości lub czasu
@@ -109,6 +102,27 @@ type Fact struct {
 	// wolno po prostu odrzucać nadmiarowych kandydatów.").
 	Incomplete bool
 	Reason     string
+}
+
+// Target is an exact method target and the call-graph edge kind needed
+// to represent the relationship. Zero Kind defaults to a modeled call.
+type Target struct {
+	Method Signature
+	Kind   classfile.CallKind
+}
+
+// CallSite is an exact call instruction offered to a model evaluator.
+type CallSite struct {
+	Caller Signature
+	Call   Signature
+	PC     int
+	GAV    *input.GAV
+}
+
+// Evaluator applies one registered model at one matched call site.
+// Unresolved relevant cases should be returned as incomplete Facts.
+type Evaluator interface {
+	Evaluate(model *Model, site CallSite) Fact
 }
 
 // Registry is a Model-by-Signature lookup — the one place a future
@@ -127,10 +141,8 @@ func NewRegistry() *Registry {
 
 // Register adds m under every one of its own Signatures. A second
 // Model registered under a Signature another Model already claims is
-// kept alongside it, not replacing it — Lookup returns every match;
-// which one a future coordinator actually applies (first-registered,
-// most-specific version range, ...) is that coordinator's own policy
-// decision, not this package's.
+// kept alongside it, not replacing it — Lookup returns every match.
+// Consumers decide whether and how to apply multiple matching models.
 func (r *Registry) Register(m *Model) {
 	for _, s := range m.Signatures {
 		r.byKey[s] = append(r.byKey[s], m)

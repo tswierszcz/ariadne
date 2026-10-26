@@ -421,9 +421,14 @@ summary, the full CVE table, every `REACHABLE` CVE's full call path with
 its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
 review, the list of unidentified dependency jars, a `META-INF/services`
 provider inventory, every resolved `ServiceLoader.load(...)` call site,
-and which of those providers got a real constructor call-graph edge
-(SERVICE_LOADING S0/S1/S2 — see "Known limitations" below for what these
-do and don't claim), every Spring MVC HTTP mapping found with its real
+and recognized ServiceLoader consumption/dispatch sites with their linked
+load interface or gap; the registered providers with constructible no-argument
+constructors are also listed (the B3 model adds graph edges only when a reachable
+`Iterator.next()` or `Provider.get()` can be traced through a bounded same-method receiver chain
+to the exact `ServiceLoader.load(...)` call; `load()` itself is lazy, while
+unlinked calls and stream terminal operations remain explicit model gaps;
+SERVICE_LOADING S0/S1/S2 — see "Known limitations" below for the limits),
+every Spring MVC HTTP mapping found with its real
 path(s)/verb(s), every `@Component`-family stereotype's own declared
 bean name and `@Primary` status, and every `@Profile(...)`'s declared
 name(s) with whether it's active (`unknown` unless `-active-profiles`
@@ -442,8 +447,8 @@ The entry call line also names the call kind, the resolution rule
 (`direct`: the edge is exactly the call site's own symbolic target; `cha`:
 class-hierarchy-analysis expanded it to a subtype, so trust it less;
 `synthetic`: a profile's `synthetic_edges`, with no real call site at
-all; `serviceloader`: a resolved `ServiceLoader.load(...)` call site
-connected to a registered provider's constructor, SERVICE_LOADING S2;
+all; `model`: a reachable call site connected to a modeled target
+(currently the ServiceLoader classpath provider model, ROADMAP B3);
 `callback`: a resolved `Thread`/`Executor` registration connected to the
 callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
 a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,
@@ -798,11 +803,21 @@ report:
   `ServiceLoader.load(...)`/`loadInstalled(...)` call site is found with
   its service-interface argument resolved where possible (SERVICE_LOADING
   S1 — "ServiceLoader.load call sites" section), and each resolved
-  interface's registered providers get a real call-graph edge to their
-  public no-argument constructor (SERVICE_LOADING S2 — "ServiceLoader
-  provider constructors modeled" section). Still not modeled: any
-  iterator/`Provider.get` method call on the resulting provider instance,
-  and JPMS `module-info`'s `uses`/`provides`.
+  interface's registered providers can add model-derived call-graph edges
+  to their public no-argument constructors at a linked `Iterator.next()` or
+  `Provider.get()` call. `Iterator.hasNext()` is recognized but does not
+  materialize an instance. The link is limited to bounded,
+  same-method receiver provenance from that consumption call to the exact
+  `load()` site. A subsequent call through that exact service interface can
+  add descriptor-exact edges to the registered provider implementations;
+  existing CHA edges remain as their broader conservative result. The
+  `load()` call alone stays lazy and adds no constructor edge. The report's
+  provider table lists materializable candidates; it
+  does not claim every listed provider was instantiated. Unsupported
+  receiver flows produce an explicit incomplete-model warning rather than
+  a guessed edge. `stream()` terminal operations, receiver flows through
+  fields/parameters/helper methods, custom loaders, and JPMS `module-info`
+  `uses`/`provides` remain unsupported or incomplete.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

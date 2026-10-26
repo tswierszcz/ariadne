@@ -6,7 +6,7 @@
 - **Profile:** {{.Profile}}
 - **Frameworks detected:** {{.FrameworksDetected}} — FRAMEWORKS F0: which profiles' own marker classes were actually found, independent of which one(s) got merged into the active Profile above (e.g. both `spring` and `jakarta` can be detected while only `spring` ends up selected by `-profile`)
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}
-- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init)
+- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model)
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
 - **Calls resolved outside the analyzed input:** {{.UnresolvedOwner}} (informational — expected to be a few thousand on a real app; dominated by methods actually inherited from the JDK or another class outside `-app`/`-deps`, not evidence of a bug on its own)
 - **Dependencies:** {{.DepsTotal}} total, {{.DepsIdentified}} identified{{if .UnidentifiedJar}}, {{len .UnidentifiedJar}} unidentified{{end}}
@@ -120,8 +120,9 @@ None.
 A declarative inventory of `META-INF/services/<Interface>` files across the app and
 its dependencies (SERVICE_LOADING S0) — **not call-graph edges**: a registration here
 says a jar *declares* a provider, not that anything in the app ever calls
-`ServiceLoader.load` for it, or that the provider is ever actually instantiated (that
-needs SERVICE_LOADING S2, not yet implemented). "found" means the provider class
+`ServiceLoader.load` for it, or that the provider is reachable from this run's roots.
+Reachable load sites can produce model-derived provider-constructor edges (S2), but
+the registration alone never does. "found" means the provider class
 exists somewhere in the analyzed classes/dependencies, not that it is reachable.
 {{if not .ServiceRegistrations}}
 None found.
@@ -137,8 +138,9 @@ None found.
 Every `ServiceLoader.load(...)`/`loadInstalled(...)` call site found in the app or its
 dependencies (SERVICE_LOADING S1), with its service-interface argument resolved by
 DATA_FLOW D0-D2's local-value analysis where possible. This step itself is not a
-call-graph edge — see "ServiceLoader provider constructors modeled" below for which of
-these actually got one. "Loader" distinguishes the thread context class loader
+call-graph edge — see "ServiceLoader provider constructor candidates" below for the
+provider inventory and model-derived reachable edges.
+"Loader" distinguishes the thread context class loader
 (`classpath`) from a caller-named `ClassLoader`/`ModuleLayer`
 (`explicit`/`module-layer`) or the extension class loader (`installed`) — different
 loaders are not guaranteed to see the same providers as a `META-INF/services`
@@ -152,24 +154,47 @@ None found.
 {{end}}
 {{end}}
 
-## ServiceLoader provider constructors modeled
+## ServiceLoader consumption and dispatch sites
 
-For every interface actually resolved above, the registered providers for it
-(SERVICE_LOADING S2) — each one's public no-argument constructor is added as a
-call-graph target from the resolving call site, plus a related edge to the provider's
-own class-initializer if it has one. A registration whose interface nothing resolved
-to calls for is correctly left out (not a gap — nothing asks for it). "Gap" explains
-why a found, used provider still got no constructor target (e.g. no public
-no-argument constructor) — a missing implementation, not evidence the provider is
-unreachable. This still only covers the constructor itself: no iterator/`Provider.get`
-method call on the resulting instance is modeled (SERVICE_LOADING S2's own remaining
-scope).
+Recognized `iterator()`, `stream()`, `Iterator.hasNext()/next()` and
+`Provider.get()` calls, plus interface method calls whose receiver is traced to a
+provider returned by `Iterator.next()`/`Provider.get()`. The table inventories
+bytecode sites with bounded same-method load-site provenance; it does not imply every site is reachable.
+Only linked `Iterator.next()` and `Provider.get()` sites can materialize a provider.
+When a later call through that exact service interface is traceable to the returned
+object, the model also adds a descriptor-exact edge to each matching registered
+provider implementation; the pre-existing CHA edges remain as conservative
+over-approximations.
+{{if not .ServiceConsumptionSites}}
+None found.
+{{else}}
+| Caller | Operation | Linked service interface(s) or gap |
+|---|---|---|
+{{range .ServiceConsumptionSites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}) | `{{.CallOwner}}#{{.CallName}}{{.CallDesc}}` | {{if .Interfaces}}{{range $i, $iface := .Interfaces}}{{if $i}}, {{end}}`{{$iface}}`{{end}}{{if .UnresolvedReason}}; gap: {{.UnresolvedReason}}{{end}}{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{end}}
+{{end}}
+
+## ServiceLoader provider constructor candidates
+
+For every interface actually resolved above, this table lists registered providers
+with a public no-argument constructor (SERVICE_LOADING S0-S2). The B3 coordinator adds
+a model-derived edge only when a reachable `Iterator.next()` or
+`ServiceLoader.Provider.get()` call has bounded same-method receiver provenance to the
+exact `ServiceLoader.load()` site. `load()` itself is lazy and does not add a
+constructor edge. This table is the provider inventory, not proof that every row
+produced an edge. A registration whose interface no resolved call site requests is
+left out. "Gap" explains why a found provider has no constructor target (for example,
+no public no-argument constructor). Receiver flows through fields, parameters and
+helper-method boundaries are not resolved; stream terminal operations and visibility
+through caller-supplied/module/installed loaders remain incomplete. `Iterator.hasNext()`
+is recognized as a non-materializing check. Unlinked consumption calls produce an
+explicit model gap rather than a guessed provider edge.
 {{if not .ServiceMaterializations}}
 None found.
 {{else}}
-| Interface | Provider | Constructor target |
-|---|---|---|
-{{range .ServiceMaterializations}}| `{{.Registration.Interface}}` | `{{.Registration.ProviderClass}}` | {{if .ConstructorMethod}}`{{.ConstructorMethod}}`{{else}}**gap:** {{.Gap}}{{end}} |
+| Interface | Provider | Registration source | Constructor target |
+|---|---|---|---|
+{{range .ServiceMaterializations}}| `{{.Registration.Interface}}` | `{{.Registration.ProviderClass}}` | `{{.Registration.SourceJar}}` | {{if .ConstructorMethod}}`{{.ConstructorMethod}}`{{else}}**gap:** {{.Gap}}{{end}} |
 {{end}}
 {{end}}
 
@@ -556,7 +581,11 @@ None found.
   modeled; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only reflects direct and
   virtual/interface (CHA-expanded) method calls found in bytecode. **ServiceLoader**
   provider *declarations* are inventoried (see the section above, SERVICE_LOADING S0),
-  but materialization/execution is not — a registration is not a reachability verdict.
+  and reachable `Iterator.next()` or `Provider.get()` calls can add conditional
+  provider-constructor edges when a bounded same-method receiver chain links them to
+  the exact load site. `load()` alone remains lazy; unlinked receiver flows and stream
+  terminal operations produce incomplete-model warnings. A registration alone is not
+  a reachability verdict.
 - **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
   package than its own Maven coordinates is not detected as such.
 - **CHA over-approximates**: a virtual/interface call is treated as reaching every

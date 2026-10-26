@@ -5,7 +5,8 @@
 // exposed to any consumer via valueflow.Facts.
 //
 // Scope, per D2's own plan: local values only (no interprocedural
-// summaries — a call's return value is always KindUnknown; that is D3).
+// summaries). A virtual call may carry a bounded opaque receiver trace
+// for identity provenance, but its runtime return value is not resolved.
 // Arithmetic results are deliberately not tracked (D2's own "stałe
 // napisowe/klasowe" — string/class literals, not numeric constants);
 // every arithmetic/conversion/comparison op still gets a real,

@@ -9,6 +9,11 @@ package valueflow
 
 import "ariadne/internal/bytecodeir"
 
+// MaxCallTraceDepth bounds opaque virtual-call receiver provenance. A
+// result beyond this depth widens to Unknown rather than retaining an
+// unbounded chain through loops or fluent APIs.
+const MaxCallTraceDepth = 12
+
 // Kind is the value domain DATA_FLOW D0 must settle before any real
 // analysis (D1/D2) can produce or consume a Value: an exact statically
 // known constant, an upper-bound type with no known constant, a
@@ -122,6 +127,12 @@ const (
 	// allocation" stance KindReflectiveMethod already takes: obtaining
 	// this value never means `newInstance` ran.
 	KindReflectiveConstructor Kind = "reflectiveconstructor"
+	// KindCallTrace identifies the opaque object result of an instance
+	// invocation together with the receiver through which it was produced.
+	// It carries identity provenance only; it does not summarize or claim
+	// the returned object's runtime value. Consumers such as ServiceLoader
+	// can follow fluent/local aliases without resolving virtual dispatch.
+	KindCallTrace Kind = "calltrace"
 )
 
 // FieldRef identifies one field a getstatic/getfield read — the Fieldref
@@ -144,6 +155,16 @@ type FieldRef struct {
 // that method's own body.
 type CallResultRef struct {
 	Owner, Name, Desc string
+	Site              bytecodeir.Site
+}
+
+// CallTraceValue is an opaque instance-call result and its receiver chain.
+// The chain is bounded by DATA_FLOW's producer and may be widened when a
+// control-flow merge or loop cannot preserve one precise origin.
+type CallTraceValue struct {
+	Site              bytecodeir.Site
+	Owner, Name, Desc string
+	Receiver          *Value
 }
 
 // HandleValue is DYNAMIC_LINKAGE L2's own model for a method handle
@@ -331,6 +352,9 @@ type Value struct {
 	// ReflectiveConstructor is set only when Kind ==
 	// KindReflectiveConstructor.
 	ReflectiveConstructor *ReflectiveConstructorValue
+
+	// CallTrace is set only when Kind == KindCallTrace.
+	CallTrace *CallTraceValue
 }
 
 // Const returns an exact known constant of the given runtime type.
@@ -362,6 +386,34 @@ func Field(ref FieldRef) Value { return Value{Kind: KindField, Field: &ref} }
 // call's return value, not yet resolved to what the callee actually
 // returns.
 func CallResult(ref CallResultRef) Value { return Value{Kind: KindCallResult, Call: &ref} }
+
+// TracedCall returns an opaque virtual-call result whose receiver provenance
+// can be followed by a consumer. Receiver is copied and retained as identity
+// evidence; the call body and returned value are not analyzed here.
+func TracedCall(trace CallTraceValue) Value {
+	return Value{Kind: KindCallTrace, CallTrace: &trace}
+}
+
+// CallTraceDepth returns the deepest receiver-chain depth represented by v.
+func CallTraceDepth(v Value) int {
+	switch v.Kind {
+	case KindCallTrace:
+		if v.CallTrace == nil || v.CallTrace.Receiver == nil {
+			return 1
+		}
+		return 1 + CallTraceDepth(*v.CallTrace.Receiver)
+	case KindSet:
+		depth := 0
+		for _, candidate := range v.Candidates {
+			if d := CallTraceDepth(candidate); d > depth {
+				depth = d
+			}
+		}
+		return depth
+	default:
+		return 0
+	}
+}
 
 // Array returns a value identified as an object array under
 // construction. Callers that want later `aastore` writes through any
@@ -422,6 +474,14 @@ func (v Value) Equal(other Value) bool {
 		return v.Field != nil && other.Field != nil && *v.Field == *other.Field
 	case KindCallResult:
 		return v.Call != nil && other.Call != nil && *v.Call == *other.Call
+	case KindCallTrace:
+		if v.CallTrace == nil || other.CallTrace == nil || v.CallTrace.Site != other.CallTrace.Site || v.CallTrace.Owner != other.CallTrace.Owner || v.CallTrace.Name != other.CallTrace.Name || v.CallTrace.Desc != other.CallTrace.Desc {
+			return false
+		}
+		if v.CallTrace.Receiver == nil || other.CallTrace.Receiver == nil {
+			return v.CallTrace.Receiver == nil && other.CallTrace.Receiver == nil
+		}
+		return v.CallTrace.Receiver.Equal(*other.CallTrace.Receiver)
 	case KindArray:
 		// Identity by Site, same reasoning as KindAlloc/KindFunctional/
 		// KindHandle — two arrays from different `anewarray` sites are

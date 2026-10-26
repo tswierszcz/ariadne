@@ -8,6 +8,7 @@ import (
 
 	"ariadne/internal/cves"
 	"ariadne/internal/reach"
+	"ariadne/internal/serviceload"
 )
 
 func TestBuildAndRenderMarkdown(t *testing.T) {
@@ -155,5 +156,31 @@ func TestNotApplicableRowAndExplanation(t *testing.T) {
 	md, _ = RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", WebXMLInput{}, nil, nil, nil, nil, nil, nil, nil, nil, nil))
 	if !strings.Contains(md, "| NOT_APPLICABLE | 0 |") || strings.Contains(md, "not** a verdict") {
 		t.Errorf("with no NOT_APPLICABLE results the row should read 0 and the explanation be absent")
+	}
+}
+
+func TestRenderServiceLoaderConsumptionProvenance(t *testing.T) {
+	consumptions := []serviceload.ServiceConsumptionSite{
+		{
+			CallerFQCN: "app.Entry", CallerName: "run", CallerDesc: "()V", PC: 42,
+			CallOwner: "java.util.Iterator", CallName: "next", CallDesc: "()Ljava/lang/Object;",
+			Interfaces: []string{"api.Service"},
+		},
+		{
+			CallerFQCN: "app.Other", CallerName: "run", CallerDesc: "()V", PC: 9,
+			CallOwner: "java.util.ServiceLoader", CallName: "iterator", CallDesc: "()Ljava/util/Iterator;",
+			UnresolvedReason: "receiver is not traceably derived from a ServiceLoader.load() call in this method",
+		},
+	}
+	md, err := RenderMarkdown(Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", WebXMLInput{}, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, consumptions))
+	if err != nil {
+		t.Fatalf("RenderMarkdown: %v", err)
+	}
+	for _, want := range []string{"## ServiceLoader consumption and dispatch sites", "`app.Entry#run()V` (pc=42)", "`api.Service`", "receiver is not traceably derived"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("report is missing %q", want)
+		}
 	}
 }

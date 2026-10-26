@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"ariadne/internal/analysis"
 	"ariadne/internal/aop"
 	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
@@ -24,6 +25,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
 	"ariadne/internal/methodhandle"
+	"ariadne/internal/models"
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
@@ -342,6 +344,18 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 	}
 	log("ServiceLoader: %d load() call sites found, %d resolved to a service interface", len(svcLoadSites), resolvedLoadSites)
+	svcConsumptionSites, svcConsumptionWarnings, err := serviceload.FindConsumptionSites(h, svcLoadSites)
+	if err != nil {
+		return fmt.Errorf("finding ServiceLoader consumption call sites: %w", err)
+	}
+	warnings = append(warnings, svcConsumptionWarnings...)
+	linkedConsumptionSites := 0
+	for _, site := range svcConsumptionSites {
+		if len(site.Interfaces) > 0 && site.UnresolvedReason == "" {
+			linkedConsumptionSites++
+		}
+	}
+	log("ServiceLoader: %d consumption/dispatch sites found, %d linked to a load site", len(svcConsumptionSites), linkedConsumptionSites)
 
 	// ASYNC_CALLBACKS A0: an inventory of callback-registration call
 	// sites (Thread/Executor so far) — not yet a call-graph edge, and
@@ -472,22 +486,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("applied %d synthetic edges from profile %q (e.g. Spring Data repository proxies)", added, prof.Name)
 	}
 
-	// SERVICE_LOADING S2: connect each resolved ServiceLoadSite to its
-	// registered providers' public no-argument constructors (plus their
-	// own <clinit>, if any) — still never claiming a provider nobody's
-	// resolved code actually asks for (see serviceload.FindMaterializations's
-	// own doc comment).
+	// SERVICE_LOADING S2: connect a load site to its registered providers
+	// only at a linked lazy-consumption operation (Iterator.hasNext/next or
+	// Provider.get), plus the provider's own <clinit>, if any.
 	svcMaterializations := serviceload.FindMaterializations(h, svcLoadSites, svcRegs)
-	svcEdgeTargets := serviceload.EdgeTargets(svcLoadSites, svcMaterializations)
-	var svcGraphEdges []callgraph.ServiceLoaderEdge
-	for _, e := range svcEdgeTargets {
-		svcGraphEdges = append(svcGraphEdges, callgraph.ServiceLoaderEdge{
-			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
-			PC: e.PC, ProviderFQCN: e.ProviderFQCN,
-		})
-	}
-	svcEdgesAdded := callgraph.ApplyServiceLoaderEdges(g, svcGraphEdges)
-	log("ServiceLoader: %d provider constructors modeled as call-graph targets (%d edges added)", len(svcEdgeTargets), svcEdgesAdded)
+	serviceModelEvaluator := serviceload.NewModelEvaluator(h, svcLoadSites, svcMaterializations, svcConsumptionSites)
 
 	// ASYNC_CALLBACKS A2: connect each resolved callback identity (A1)
 	// to the class that actually declares its run()/call() method — a
@@ -622,21 +625,34 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	log("analyzing reachability")
 	framework := reach.NewFrameworkMatcher(prof.ResolvePatterns(h))
+	var roots []uint32
+	webXMLRootCount := 0
+	if cfg.roots == "profile" {
+		roots = prof.AppRoots(g, h)
+		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
+		webXMLRootCount = len(webRoots)
+		roots = append(roots, webRoots...)
+	} else {
+		roots = reach.AppRoots(g, h)
+	}
+	registry := models.NewRegistry()
+	serviceload.RegisterModel(registry)
+	serviceload.RegisterDispatchModels(registry, svcConsumptionSites)
+	modelBudget := len(svcLoadSites) + 1
+	modelResult, err := analysis.Run(h, g, registry, serviceModelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
+	if err != nil {
+		return fmt.Errorf("coordinating library models: %w", err)
+	}
+	log("models: %d facts, %d edges added, %d iterations (incomplete=%t)", len(modelResult.Facts), modelResult.AddedEdges, modelResult.Iterations, modelResult.Incomplete)
+	for _, reason := range modelResult.Reasons {
+		warnings = append(warnings, "model analysis: "+reason)
+	}
 	var engine *reach.Engine
 	if cfg.roots == "profile" {
-		roots := prof.AppRoots(g, h)
-		// FRAMEWORKS F2: a web.xml-declared servlet/filter/listener's
-		// own lifecycle method(s) become real roots too — previously,
-		// a plain old servlet with no annotation at all (no @WebServlet,
-		// no Spring stereotype) contributed nothing under -roots
-		// profile; only -roots all's own "every application method"
-		// happened to still cover it.
-		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
-		roots = append(roots, webRoots...)
-		log("roots: profile %q (%d entry-point methods, %d from web.xml)", prof.Name, len(roots), len(webRoots))
+		log("roots: profile %q (%d entry-point methods, %d from web.xml)", prof.Name, len(roots), webXMLRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	} else {
-		engine = reach.New(g, h, framework)
+		engine = reach.NewWithRoots(g, h, framework, roots)
 	}
 	webAssets := map[string]bool{}
 	for _, dj := range depJars {
@@ -729,6 +745,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		PreCHAEdges:        g.PreCHAEdgeCount(),
 		CHAEdges:           g.CHAEdgeCount(),
 		InitEdges:          g.InitEdgeCount(),
+		ModelEdges:         g.ModelEdgeCount(),
 		UnresolvedDyn:      g.UnresolvedDynamicCount(),
 		UnresolvedOwner:    g.UnresolvedOwnerCount(),
 		DepsTotal:          len(depJars),
@@ -751,7 +768,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults)
+	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

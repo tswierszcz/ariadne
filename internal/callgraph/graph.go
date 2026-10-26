@@ -42,11 +42,11 @@ const (
 	// directly (the JVM runs it implicitly), which is also why Kind is
 	// CallInit rather than one of the ordinary invoke kinds.
 	BasisInit EdgeBasis = "init"
-	// BasisServiceLoader is a SERVICE_LOADING S2 edge: a
-	// ServiceLoader.load(...)/loadInstalled(...) call site whose service
-	// interface S1 resolved, connected to a registered provider's public
-	// no-argument constructor (or, for the related class-initialization
-	// edge, that provider's own <clinit>). Distinct from BasisSynthetic:
+	// BasisServiceLoader is the dedicated edge basis used by the older
+	// ApplyServiceLoaderEdges helper for a resolved ServiceLoader load site
+	// connected to a registered provider's public no-argument constructor
+	// (or its related <clinit>). The active B3 coordinator represents
+	// registry-evaluated targets with BasisModel. Distinct from BasisSynthetic:
 	// both stand in for something with no single bytecode call site, but
 	// a reader needs to tell a profile's proxy guess apart from a
 	// resolved ServiceLoader registration — different evidence, different
@@ -85,6 +85,8 @@ const (
 	// runtime (a caught ReflectiveOperationException, a branch that
 	// never executes).
 	BasisReflection EdgeBasis = "reflection"
+	// BasisModel is an edge supplied by a registered library model.
+	BasisModel EdgeBasis = "model"
 )
 
 // CallSite is one piece of evidence for why an edge exists: the bytecode
@@ -93,6 +95,62 @@ const (
 // the CHA expansion to this edge's actual target).
 type CallSite struct {
 	PC int
+}
+
+// ModelEdge is a model-derived call relationship. The caller and target
+// must already be nodes in the graph built from the analyzed hierarchy.
+type ModelEdge struct {
+	CallerFQCN, CallerName, CallerDesc string
+	TargetFQCN, TargetName, TargetDesc string
+	Kind                               classfile.CallKind
+	PC                                 int
+}
+
+// ApplyModelEdges adds unique model-derived edges and preserves their
+// originating bytecode offset. Unknown nodes are skipped and counted by
+// the caller as incomplete model output, rather than fabricated here.
+func ApplyModelEdges(g *Graph, edges []ModelEdge) int {
+	added := 0
+	for _, e := range edges {
+		from, ok := g.ID(e.CallerFQCN, e.CallerName, e.CallerDesc)
+		if !ok {
+			continue
+		}
+		to, ok := g.ID(e.TargetFQCN, e.TargetName, e.TargetDesc)
+		if !ok {
+			continue
+		}
+		kind := e.Kind
+		if kind == "" {
+			kind = classfile.CallSynthetic
+		}
+		merged := false
+		for i := range g.adjacency[from] {
+			existing := &g.adjacency[from][i]
+			if existing.To != to || existing.Kind != kind || existing.Basis != BasisModel {
+				continue
+			}
+			seenPC := false
+			for _, site := range existing.Sites {
+				if site.PC == e.PC {
+					seenPC = true
+					break
+				}
+			}
+			if !seenPC {
+				existing.Sites = append(existing.Sites, CallSite{PC: e.PC})
+			}
+			merged = true
+			break
+		}
+		if merged {
+			continue
+		}
+		g.addEdge(from, to, kind, BasisModel, &CallSite{PC: e.PC})
+		g.modelEdges++
+		added++
+	}
+	return added
 }
 
 // Edge is one call-site edge, naming its target, how the call was made
@@ -133,6 +191,7 @@ type Graph struct {
 	preCHAEdges       int
 	chaEdges          int
 	initEdges         int
+	modelEdges        int
 	unresolvedDynamic int
 	// unresolvedOwner counts direct calls whose declared receiver type is
 	// itself part of the analyzed universe, but whose method could not
@@ -176,6 +235,10 @@ func (g *Graph) CHAEdgeCount() int { return g.chaEdges }
 // requiring some class's <clinit> to run first, or a class's own
 // <clinit> requiring its superclass's <clinit> first.
 func (g *Graph) InitEdgeCount() int { return g.initEdges }
+
+// ModelEdgeCount counts distinct edges supplied by library models,
+// separately from direct, CHA, and initialization edges.
+func (g *Graph) ModelEdgeCount() int { return g.modelEdges }
 
 // UnresolvedDynamicCount is how many invokedynamic call sites across the
 // whole graph had a bootstrap method ariadne couldn't resolve to a real

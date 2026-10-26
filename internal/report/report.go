@@ -37,6 +37,7 @@ type Header struct {
 	PreCHAEdges        int
 	CHAEdges           int
 	InitEdges          int
+	ModelEdges         int
 	UnresolvedDyn      int
 	UnresolvedOwner    int
 	DepsTotal          int
@@ -104,6 +105,13 @@ type Data struct {
 	// implementacji daje lukę, nie brak podatności", never silently
 	// dropped.
 	ServiceMaterializations []serviceload.ProviderMaterialization
+
+	// ServiceConsumptionSites records recognized ServiceLoader iterator,
+	// stream, Provider calls and linked service-method dispatches plus any
+	// bounded local load-site link.
+	// Discovery alone does not claim that a site is reachable or that it
+	// materialized a provider.
+	ServiceConsumptionSites []serviceload.ServiceConsumptionSite
 
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
 	// every call site matching (or nearly matching) a cataloged
@@ -319,7 +327,7 @@ type ProfileConditionRow struct {
 	Active              profile.Condition
 }
 
-func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler, reflectInvokeSites []reflectinvoke.ResolvedInvoke, reflectInvokeEdges []reflectinvoke.InvokeEdgeResult, reflectNewInstanceSites []reflectinvoke.ResolvedNewInstance, reflectNewInstanceEdges []reflectinvoke.NewInstanceEdgeResult) Data {
+func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string, svcRegs []serviceload.ServiceRegistration, svcLoadSites []serviceload.ServiceLoadSite, svcMaterializations []serviceload.ProviderMaterialization, callbackSites []callback.RegistrationSite, resolvedCallbacks []callback.ResolvedCallback, callbackEdges []callback.CallbackEdgeResult, handleInvokeSites []methodhandle.ResolvedInvoke, handleEdges []methodhandle.HandleEdgeResult, springRoutes []profile.Route, springBeanNames []profile.BeanName, springProfileConditions []profile.ProfileCondition, activeProfiles string, webXML WebXMLInput, springXMLBeans []XMLBeanRow, injections []profile.ResolvedInjection, webXMLRoots []profile.WebXMLRoot, externalEntries []profile.ExternalEntry, proxyHandlers []aop.ProxyHandler, reflectInvokeSites []reflectinvoke.ResolvedInvoke, reflectInvokeEdges []reflectinvoke.InvokeEdgeResult, reflectNewInstanceSites []reflectinvoke.ResolvedNewInstance, reflectNewInstanceEdges []reflectinvoke.NewInstanceEdgeResult, serviceConsumptionSets ...[]serviceload.ServiceConsumptionSite) Data {
 	byID := make(map[string]cves.CVE, len(list))
 	for _, c := range list {
 		byID[c.ID] = c
@@ -360,6 +368,9 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		ReflectInvokeEdges:        reflectInvokeEdges,
 		ReflectNewInstanceSites:   reflectNewInstanceSites,
 		ReflectNewInstanceEdges:   reflectNewInstanceEdges,
+	}
+	for _, set := range serviceConsumptionSets {
+		data.ServiceConsumptionSites = append(data.ServiceConsumptionSites, set...)
 	}
 
 	for _, r := range sorted {

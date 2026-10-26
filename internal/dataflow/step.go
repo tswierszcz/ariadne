@@ -2,6 +2,7 @@ package dataflow
 
 import (
 	"fmt"
+	"strings"
 
 	"ariadne/internal/bytecodeir"
 	"ariadne/internal/classfile"
@@ -414,7 +415,19 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 			// (internal/dataflow.ResolveCallResult) can go analyze that
 			// one method's own return value(s), the same
 			// identify-here/resolve-there split KindField already uses.
-			st.push(valueflow.CallResult(valueflow.CallResultRef{Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc}), op.Width)
+			st.push(valueflow.CallResult(valueflow.CallResultRef{Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc, Site: it.site(op.PC, bytecodeir.OpCall)}), op.Width)
+			return ""
+		}
+		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && isServiceLoaderTraceOwner(op.CallOwner) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
+			receiver := entries[0].v
+			if valueflow.CallTraceDepth(receiver) < valueflow.MaxCallTraceDepth {
+				st.push(valueflow.TracedCall(valueflow.CallTraceValue{
+					Site: it.site(op.PC, bytecodeir.OpCall), Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc,
+					Receiver: &receiver,
+				}), op.Width)
+				return ""
+			}
+			st.push(valueflow.Unknown("virtual-call receiver provenance exceeded the call-trace depth limit"), op.Width)
 			return ""
 		}
 		reason := "call return value is not tracked by this analysis increment"
@@ -429,4 +442,13 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		st.push(valueflow.Unknown(reason), op.Width)
 	}
 	return ""
+}
+
+func isReferenceReturn(desc string) bool {
+	close := strings.LastIndexByte(desc, ')')
+	return close >= 0 && close+1 < len(desc) && (desc[close+1] == 'L' || desc[close+1] == '[')
+}
+
+func isServiceLoaderTraceOwner(owner string) bool {
+	return owner == "java.util.ServiceLoader" || owner == "java.util.ServiceLoader$Provider" || owner == "java.util.Iterator" || owner == "java.util.Optional" || owner == "java.util.Spliterator" || owner == "java.util.stream.BaseStream" || strings.HasPrefix(owner, "java.util.stream.")
 }
