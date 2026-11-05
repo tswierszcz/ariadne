@@ -136,6 +136,25 @@ func (e *ModelEvaluator) bootLayerOnly(c ServiceConsumptionSite) bool {
 	return found
 }
 
+// explicitLoaderRecognized reports whether every load site linked to c
+// that passes an explicit ClassLoader passes a recognized one
+// (LoaderIdentity), so the class-path registrations are the providers
+// it sees under the single application class loader model.
+func (e *ModelEvaluator) explicitLoaderRecognized(c ServiceConsumptionSite) bool {
+	found := false
+	for _, key := range c.streamLoadSites {
+		load, ok := e.sites[key]
+		if !ok || load.LoaderKind != LoaderExplicit {
+			continue
+		}
+		if load.LoaderIdentity == "" {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
 // visibleProviders narrows the providers for iface by the linked load
 // sites' layer (SERVICE_LOADING S3): load(ModuleLayer.boot(), S) sees
 // only providers in named modules on the module path, never the class
@@ -355,9 +374,13 @@ func (e *ModelEvaluator) evaluateConsumption(model *models.Model, site models.Ca
 		return fact
 	}
 	bootOnly := e.bootLayerOnly(consumption)
+	explicitKnown := e.explicitLoaderRecognized(consumption)
 	for _, loader := range consumption.LoaderKinds {
 		if loader == LoaderModuleLayer && bootOnly {
 			continue // ModuleLayer.boot() is modeled exactly below
+		}
+		if loader == LoaderExplicit && explicitKnown {
+			continue // context/system/defining loader: the modeled class path
 		}
 		if loader != LoaderClasspath {
 			fact.Incomplete = true

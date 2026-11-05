@@ -97,7 +97,28 @@ type ServiceLoadSite struct {
 	// ModuleLayer.boot(), LayerUnknown otherwise (LayerReason says why).
 	Layer       LayerKind
 	LayerReason string
+	// LoaderIdentity is set only for LoaderExplicit when the ClassLoader
+	// argument's provenance is recognized (see LoaderIdentity's
+	// constants); "" leaves the explicit-loader visibility gap.
+	// LoaderDetail names the specifics (e.g. the class whose defining
+	// loader is used).
+	LoaderIdentity LoaderIdentity
+	LoaderDetail   string
 }
+
+// LoaderIdentity is a recognized ClassLoader argument of
+// load(Class, ClassLoader). LoaderContext is exactly what load(Class)
+// itself uses. The others equal it only under ariadne's own model of a
+// single application class loader over every input jar (the same
+// assumption S0-S2's flat META-INF/services inventory already makes);
+// containers and nested-jar launchers that use several loaders break it.
+type LoaderIdentity string
+
+const (
+	LoaderIdentContext  LoaderIdentity = "context"  // Thread#getContextClassLoader()
+	LoaderIdentSystem   LoaderIdentity = "system"   // ClassLoader.getSystemClassLoader(), or null (ServiceLoader's documented fallback)
+	LoaderIdentDefining LoaderIdentity = "defining" // SomeClass#getClassLoader()
+)
 
 // LayerKind identifies the ModuleLayer a load(ModuleLayer, Class) call
 // names, as far as local values can prove it.

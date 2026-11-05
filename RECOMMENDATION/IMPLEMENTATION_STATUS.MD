@@ -1488,6 +1488,43 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - **Następny krok (wymaga zgody), kandydatury: rozpoznawanie jawnych `ClassLoader` (19/29 load sites
   petclinic, 32/48 WebGoat), SERVICE_LOADING:S4, dalsze modele B3.
 
+### SERVICE_LOADING — korekta po S2 (nie nowa faza): rozpoznawanie jawnego `ClassLoader` w `load(Class, ClassLoader)` — DONE for this scope (2026-11-05)
+
+- **Zakres zatwierdzony:** rozpoznać typowe postacie argumentu loadera
+  i traktować je jak modelowany classpath, usuwając lukę widoczności;
+  nierozpoznane zostają luką. Wymóg S1 "odróżnić classpath, system loader
+  i jawnie podany loader" — doprecyzowanie, nie zmiana kontraktu.
+- **Zrealizowane:** `dataflow`: `isClassLoaderTraceCall` — dokładne
+  `Thread#getContextClassLoader()` i `Class#getClassLoader()` dają
+  `KindCallTrace` (jak wcześniej wywołania JDK ServiceLoader/stream), nie
+  `Unknown`. `serviceload`: `ServiceLoadSite.LoaderIdentity`/`LoaderDetail`
+  (`context`, `system` dla `getSystemClassLoader()` i `null`, `defining`
+  dla `X.class.getClassLoader()` lub nieznanej klasy); ewaluator
+  (`explicitLoaderRecognized`) pomija lukę "explicit loader", gdy każdy
+  powiązany load site z jawnym loaderem ma rozpoznaną tożsamość.
+  Raport: tożsamość w kolumnie Loader i opis założenia jednego loadera
+  aplikacji. Krawędzie modelu bez zmian (już wcześniej były dodawane jako
+  możliwość) — zmienia się wyłącznie luka.
+- **Weryfikacja:** fixture `fixture.jpms.app.Loaders` (context, system,
+  null, defining, parametr). `TestLoadSites_explicitLoaderIdentity`;
+  mutacje (wyłączenie pominięcia luki; wyłączenie śledzenia wywołań
+  loadera) — test pada. `go vet ./...`, `go test ./...`, `make build` —
+  PASS. Offline `-profile spring`, po dwa przebiegi: petclinic 1/19
+  jawnych loaderów rozpoznanych, WebGoat 5/32 (wszystkie
+  `X.class.getClassLoader()`: asciidoctor, xnio); pozostałe to parametry
+  metod (Jackson `secureGetServiceLoader`, Undertow, Hibernate, log4j,
+  validation) i pola klas anonimowych (`ObjectMapper$2`, `Xnio$2`).
+  `results.json` bajtowo identyczny z baseline'em i stabilny; statusy bez
+  zmian. Ostrzeżenie zbiorcze o luce zostaje (pozostałe miejsca).
+- **Dokumentacja:** `docs/SUPPORT.MD`, README (ograniczenia), szablon
+  raportu, ten rejestr. FAQ bez zmian (nie opisuje loaderów).
+- **Ograniczenia / następny krok:** efekt mały i zmierzony uczciwie.
+  Większość realnych luk to loader jako parametr — wymagałoby to
+  propagacji argumentów od wywołujących (DATA_FLOW D3 dla parametrów,
+  dziś tylko zwrot parametru) albo pól klas anonimowych zapisywanych w
+  konstruktorze z parametru. Założenie jednego loadera aplikacji jest
+  jawne w raporcie.
+
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
 - **Zakres zlecenia i zależności:** B0–B3 (wspólne — rejestr modeli B3
@@ -3924,8 +3961,10 @@ Przy dodawaniu kolejnego wpisu zapisz:
    REACHABLE), a wycinek 3 dodał `mixed`/`-jpms-module-path` i
    `ModuleLayer.boot()`; S3 zamknięte i zarchiwizowane
    (`archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md`).
-   Najbliższe kandydatury: rozpoznawanie jawnych `ClassLoader` przy `load(Class, ClassLoader)`
-   (największa liczba realnych luk), SERVICE_LOADING:S4, dalsze modele
+   Rozpoznawanie jawnych `ClassLoader` (korekta po S2) zrobione: 1/19
+   i 5/32 miejsc, reszta to parametry/pola. Najbliższe kandydatury:
+   SERVICE_LOADING:S4, propagacja parametrów (DATA_FLOW D3 — odblokowałaby
+   też REFLECTION:R3 i większość pozostałych luk loadera), dalsze modele
    B3, albo FRAMEWORKS:F3.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.

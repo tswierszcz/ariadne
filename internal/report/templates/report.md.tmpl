@@ -145,13 +145,18 @@ provider inventory and model-derived reachable edges.
 (`classpath`) from a caller-named `ClassLoader`/`ModuleLayer`
 (`explicit`/`module-layer`) or the extension class loader (`installed`) — different
 loaders are not guaranteed to see the same providers as a `META-INF/services`
-registration above.
+registration above. A caller-named loader recognized from the calling method's own
+bytecode — `Thread#getContextClassLoader()` (what `load(Class)` itself uses),
+`ClassLoader.getSystemClassLoader()` or `null`, or some class's `getClassLoader()` — is
+shown in parentheses and treated as the modeled class path, assuming one application
+class loader over every input jar (not true inside servlet containers or nested-jar
+launchers); any other loader keeps the visibility gap.
 {{if not .ServiceLoadSites}}
 None found.
 {{else}}
 | Caller | Loader | Interface |
 |---|---|---|
-{{range .ServiceLoadSites}}| `{{.CallerMethod}}` (pc={{.PC}}) | {{.LoaderKind}} | {{if .Interface}}`{{.Interface}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{range .ServiceLoadSites}}| `{{.CallerMethod}}` (pc={{.PC}}) | {{.LoaderKind}}{{if .LoaderIdentity}} ({{.LoaderIdentity}}: {{.LoaderDetail}}){{end}}{{if .Layer}} (layer: {{.Layer}}){{end}} | {{if .Interface}}`{{.Interface}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
 {{end}}
 {{end}}
 
@@ -192,8 +197,9 @@ exact direct helper returning one of its parameters (substituted from that call
 site's argument) are followed using DATA_FLOW D3; arbitrary mutable fields,
 parameters from unknown callers, virtual helper returns and unresolved helper
 results are not resolved; stream
-terminal operations and visibility through caller-supplied/module/installed loaders
-remain incomplete. `Iterator.hasNext()`
+terminal operations and visibility through caller-supplied loaders not recognized
+above (parameters, fields), installed loaders and non-boot module layers remain
+incomplete. `Iterator.hasNext()`
 is recognized as a non-materializing check. Unlinked consumption calls produce an
 explicit model gap rather than a guessed provider edge.
 {{if not .ServiceMaterializations}}

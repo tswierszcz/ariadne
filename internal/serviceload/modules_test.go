@@ -562,3 +562,57 @@ func TestApplyScenario_mixedWarnings(t *testing.T) {
 		}
 	}
 }
+
+// TestLoadSites_explicitLoaderIdentity: load(Class, ClassLoader) with a
+// loader recognized from the method's own bytecode has no visibility
+// gap and keeps its class-path provider edges; a parameter loader keeps
+// both the edges and the gap.
+func TestLoadSites_explicitLoaderIdentity(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	h, _, err := hierarchy.Build(j.app, j.deps())
+	if err != nil {
+		t.Fatal(err)
+	}
+	loads, _, err := FindLoadSites(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]LoaderIdentity{"context": LoaderIdentContext, "system": LoaderIdentSystem, "nullLoader": LoaderIdentSystem, "defining": LoaderIdentDefining, "given": ""}
+	seen := 0
+	for _, l := range loads {
+		if l.CallerFQCN != "fixture.jpms.app.Loaders" {
+			continue
+		}
+		seen++
+		if l.LoaderKind != LoaderExplicit || l.LoaderIdentity != want[l.CallerName] {
+			t.Errorf("%s: kind=%s identity=%q detail=%q, want explicit/%q", l.CallerName, l.LoaderKind, l.LoaderIdentity, l.LoaderDetail, want[l.CallerName])
+		}
+		if l.CallerName == "context" && l.LoaderDetail != "Thread.currentThread().getContextClassLoader()" {
+			t.Errorf("context detail = %q", l.LoaderDetail)
+		}
+		if l.CallerName == "defining" && l.LoaderDetail != "fixture.jpms.app.Loaders.class.getClassLoader()" {
+			t.Errorf("defining detail = %q", l.LoaderDetail)
+		}
+	}
+	if seen != 5 {
+		t.Fatalf("Loaders load sites = %d, want 5", seen)
+	}
+
+	for name, desc := range map[string]string{"context": "()V", "system": "()V", "nullLoader": "()V", "defining": "()V"} {
+		g, root, res, _ := runJPMS(t, j, nouses, ScenarioConfig{Scenario: ScenarioClasspath, AppJar: j.app}, "fixture.jpms.app.Loaders", name, desc)
+		if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+			t.Errorf("%s: missing class-path provider edge", name)
+		}
+		if strings.Contains(strings.Join(res.Reasons, "\n"), "explicit loader") {
+			t.Errorf("%s: recognized loader must not keep the visibility gap: %v", name, res.Reasons)
+		}
+	}
+	g, root, res, _ := runJPMS(t, j, nouses, ScenarioConfig{Scenario: ScenarioClasspath, AppJar: j.app}, "fixture.jpms.app.Loaders", "given", "(Ljava/lang/ClassLoader;)V")
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("given: candidate edge must remain")
+	}
+	if !strings.Contains(strings.Join(res.Reasons, "\n"), "provider visibility for explicit loader") {
+		t.Errorf("given: want the explicit-loader gap, got %v", res.Reasons)
+	}
+}

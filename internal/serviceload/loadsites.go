@@ -101,6 +101,41 @@ func anyServiceLoaderCall(methods []hierarchy.Method) bool {
 	return false
 }
 
+// classLoaderArgument recognizes the ClassLoader argument shapes whose
+// provenance is exact in the calling method: the current/another
+// thread's context loader, the system loader (explicitly or as null),
+// or some class's defining loader. Anything else — a parameter, a field,
+// a constructed loader — returns "" and keeps the visibility gap.
+func classLoaderArgument(v valueflow.Value) (LoaderIdentity, string) {
+	switch v.Kind {
+	case valueflow.KindNull:
+		return LoaderIdentSystem, "null (ServiceLoader uses the system class loader)"
+	case valueflow.KindCallResult:
+		if v.Call != nil && v.Call.Owner == "java.lang.ClassLoader" && v.Call.Name == "getSystemClassLoader" && v.Call.Desc == "()Ljava/lang/ClassLoader;" {
+			return LoaderIdentSystem, "ClassLoader.getSystemClassLoader()"
+		}
+	case valueflow.KindCallTrace:
+		t := v.CallTrace
+		if t == nil {
+			break
+		}
+		if t.Owner == "java.lang.Thread" && t.Name == "getContextClassLoader" {
+			if t.Receiver != nil && t.Receiver.Kind == valueflow.KindCallResult && t.Receiver.Call != nil &&
+				t.Receiver.Call.Owner == "java.lang.Thread" && t.Receiver.Call.Name == "currentThread" {
+				return LoaderIdentContext, "Thread.currentThread().getContextClassLoader()"
+			}
+			return LoaderIdentContext, "a thread's getContextClassLoader() (receiver not provably the current thread)"
+		}
+		if t.Owner == "java.lang.Class" && t.Name == "getClassLoader" {
+			if t.Receiver != nil && t.Receiver.Kind == valueflow.KindConst && t.Receiver.Type == "java.lang.Class" {
+				return LoaderIdentDefining, fmt.Sprintf("%s.class.getClassLoader()", t.Receiver.Const)
+			}
+			return LoaderIdentDefining, "getClassLoader() of a class not known statically"
+		}
+	}
+	return "", ""
+}
+
 // moduleLayerArgument recognizes the one layer a static analysis can
 // name exactly: the result of invokestatic java.lang.ModuleLayer#boot().
 // Any other value — a parameter, a field, a layer built at run time —
@@ -152,6 +187,9 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method)
 			site.UnresolvedReason = "the argument is unknown: " + val.Reason
 		default:
 			site.UnresolvedReason = fmt.Sprintf("the argument is %s, not a resolvable Class literal", val.Kind)
+		}
+		if ov.kind == LoaderExplicit && !aborted {
+			site.LoaderIdentity, site.LoaderDetail = classLoaderArgument(facts.ArgumentAt(argSite, 1))
 		}
 		if ov.kind == LoaderModuleLayer {
 			site.Layer, site.LayerReason = moduleLayerArgument(facts.ArgumentAt(argSite, 0), aborted)

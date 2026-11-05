@@ -825,7 +825,13 @@ report:
   a guessed edge. Callback-based stream pipelines and unsupported terminal flows, receiver
   flows through arbitrary mutable fields, parameter values supplied by unknown callers,
   virtual helper returns and other unresolved results,
-  and custom loaders remain unsupported or incomplete.
+  and caller-supplied loaders remain unsupported or incomplete, except a
+  `load(Class, ClassLoader)` loader recognized in the calling method itself —
+  `Thread#getContextClassLoader()`, `ClassLoader.getSystemClassLoader()`,
+  `null`, or any `Class#getClassLoader()` — which is treated as the modeled
+  class path (one application class loader over every input jar; not true in
+  servlet containers or nested-jar launchers) and shown in the load-site
+  table. Loaders passed as parameters or held in fields keep the gap.
   JPMS (SERVICE_LOADING S3): `-jpms-scenario` picks the launch the
   ServiceLoader model assumes. The default `classpath` matches the JVM's
   class-path behavior (every `module-info.class` ignored). The report's

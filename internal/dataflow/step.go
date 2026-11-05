@@ -418,7 +418,7 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 			st.push(valueflow.CallResult(valueflow.CallResultRef{Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc, Site: it.site(op.PC, bytecodeir.OpCall)}), op.Width)
 			return ""
 		}
-		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && isServiceLoaderTraceOwner(op.CallOwner) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
+		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && (isServiceLoaderTraceOwner(op.CallOwner) || isClassLoaderTraceCall(op.CallOwner, op.CallName, op.CallDesc)) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
 			receiver := entries[0].v
 			if valueflow.CallTraceDepth(receiver) < valueflow.MaxCallTraceDepth {
 				st.push(valueflow.TracedCall(valueflow.CallTraceValue{
@@ -447,6 +447,16 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 func isReferenceReturn(desc string) bool {
 	close := strings.LastIndexByte(desc, ')')
 	return close >= 0 && close+1 < len(desc) && (desc[close+1] == 'L' || desc[close+1] == '[')
+}
+
+// isClassLoaderTraceCall names the two exact JDK instance methods whose
+// result identifies a ClassLoader by provenance, for SERVICE_LOADING's
+// load(Class, ClassLoader) argument: Thread#getContextClassLoader and
+// Class#getClassLoader. Tracing records only which call produced the
+// value, never a claim about the loader's runtime identity.
+func isClassLoaderTraceCall(owner, name, desc string) bool {
+	return (owner == "java.lang.Thread" && name == "getContextClassLoader" && desc == "()Ljava/lang/ClassLoader;") ||
+		(owner == "java.lang.Class" && name == "getClassLoader" && desc == "()Ljava/lang/ClassLoader;")
 }
 
 func isServiceLoaderTraceOwner(owner string) bool {
