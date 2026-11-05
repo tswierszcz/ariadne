@@ -524,7 +524,15 @@ vulnerabilities — falling back to the CVSS vector only when that label
 is missing.
 
 Every request goes through `internal/httpcache`; with `-offline`, a
-cache miss is a clear error, not a silent skip.
+cache miss is a clear error, not a silent skip. Why does a cached OSV answer
+expire (CVE:F2)? Because an *empty* answer ("no advisories for this
+version") is the one that goes wrong silently: a week-old empty answer
+hides every advisory published since. OSV responses are fetched again
+after `-data-ttl` (24h); content pinned to a full commit SHA never
+changes and never expires; LLM answers are paid results and are never
+re-asked because of a refresh. On the reference apps the first online
+refresh added 5 (petclinic) and 4 (WebGoat) advisories that the old
+cache did not have.
 
 Numbers: petclinic — 148 CVEs for 87 dependencies; WebGoat — 160 CVEs
 for 126 dependencies (including 34 for `xstream:1.4.5` alone).

@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. Następny krok: F2 (cache i świeżość). |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2: DONE (2026-11-05); F3–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. Następny krok: F3 (snapshoty). |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -1977,6 +1977,78 @@ Przy dodawaniu kolejnego wpisu zapisz:
   Markdown nadal na v1 z sekcją per instancja.
 - **Następny krok (wymaga zgody):** CVE:F2 — cache z metadanymi i
   polityką świeżości.
+
+### CVE:F2 — cache z metadanymi i polityką świeżości — DONE (2026-11-05)
+
+- **Zakres zatwierdzony:** zadania F2.1–F2.11 planu CVE.
+- **Decyzja projektowa:** metadane w osobnym pliku `<klucz>.meta.json`
+  obok niezmienionego `<klucz>.json`, związane z treścią przez SHA-256
+  (niezgodny lub brakujący plik = wiek nieznany). Dzięki temu hashe
+  odpowiedzi baseline'u F0 (`responses.tsv`) i eksport pozostają ważne;
+  spójność "jednej jednostki" zapewnia hash, nie wspólny plik.
+- **Zrealizowane:**
+  1. `internal/httpcache`: `Meta` (rodzaj, metoda, URL, `fetched_at`,
+     `validated_at`, SHA-256, rozmiar, ETag/Last-Modified — bez nagłówków
+     żądania), zapis atomowy treści i metadanych; rodzaje `osv`, `pinned`
+     (pełny 40-znakowy SHA commita — nie wygasa), `mutable`, `llm`
+     (nigdy nie odświeżane); `Policy` (TTL domyślnie 24h, `MaxAge` jako
+     twardy limit, `Refresh`, `AllowStale`), wstrzykiwany zegar, żądania
+     warunkowe i 304, statystyki per rodzaj (`Freshness`, z najstarszym
+     czasem walidacji zamiast wieku, by v2 był deterministyczny).
+  2. `internal/cves`: `published`/`modified`, `Sources` (każdy rekord z
+     datami, `withdrawn`, zakresami), `ResolveAll` z `Withdrawn`;
+     wycofany rekord łączy aliasy i wersje, ale nie wnosi treści; gdy
+     grupa nie ma aktywnego rekordu, pobierane są rekordy aliasów (404 =
+     brak); grupa w całości wycofana — lista, bez analizy. Aliasy liczone
+     od nowa przy każdym rozwiązaniu.
+  3. CLI: `-data-ttl`, `-refresh`, `-allow-stale`, `-max-data-age`
+     (`-refresh` + `-offline` = błąd walidacji), log `data freshness:`.
+     Raport: nagłówek "Data freshness" z banerem dla stale/unknown,
+     ostrzeżenia, sekcja "Withdrawn advisories"; v2:
+     `coverage.data_freshness`, `coverage.withdrawn_advisories`.
+  4. `vulnmap` LLM: indeks ostatniej odpowiedzi per (model, wersja
+     promptu, CVE); zmieniony tekst advisory po odświeżeniu nie wysyła
+     nowego zapytania — poprzednia odpowiedź użyta z ostrzeżeniem
+     (`Reused`), `-llm-reask-changed` pyta ponownie.
+- **Weryfikacja:** testy `internal/httpcache` (TTL i granica, pinned/LLM
+  bez wygasania, ETag/304, nieudane odświeżenie z/bez `-allow-stale`,
+  `-max-data-age` twardy także z `-allow-stale` i offline, wpisy bez
+  metadanych i z niezgodnym hashem, `-refresh`, brak sekretów w
+  metadanych; `-race`), `internal/cves` (0401 przez prawdziwego klienta,
+  0402, wszystkie źródła wycofane), `internal/vulnmap`
+  (`TestLLM_changedAdvisoryReusesPreviousAnswer`), `internal/report`,
+  `internal/resultsv2`, `cmd/ariadne` (`TestFreshnessFlags`). `go vet
+  ./...`, `go test ./...` — PASS. Na prawdziwych danych:
+  - offline na `.cache` baseline'u: v1 obu aplikacji bajtowo identyczny z
+    F1c, `.cache` nietknięty (1680 plików), stan "unknown" (149/161
+    odpowiedzi OSV bez metadanych), `-offline -max-data-age 24h` kończy
+    się jednoznacznym błędem;
+  - online na kopii cache: petclinic 148 → **153** advisory (4 ×
+    tomcat-embed-core 9.0.45, 1 × jackson-databind 2.11.4, wszystkie
+    FRAMEWORK), WebGoat 160 → **164**; żaden istniejący werdykt się nie
+    zmienił; drugi przebieg — wszystko z cache, ustalenia identyczne;
+    `-refresh` — 154 odświeżone; potem `-offline -max-data-age 1h` —
+    przechodzi; OSV nie wysyła ETag (rewalidacja = pełne pobranie);
+  - `-llm` online z fikcyjnym kluczem na odświeżonych danych: 0 zapytań
+    (0 skipped), 0 ponownych użyć (teksty się nie zmieniły), wyniki
+    offline `-llm` bajtowo identyczne, `.cache/llm` nietknięty.
+- **Kryteria F2:** nowe CVE po odświeżeniu pustej odpowiedzi — tak (test i
+  dane rzeczywiste); wiek danych i awaria odświeżenia widoczne,
+  jednoznaczne — tak; wycofane źródło i aktywny alias — tak (test; brak
+  wycofanego rekordu w aplikacjach referencyjnych, OSV-WITHDRAWN-REAL
+  nadal bez konkretnego rekordu); odświeżenie CVE bez automatycznych
+  płatnych zapytań LLM — tak.
+- **Dokumentacja:** README (krok OSV, cache, flagi, LLM), FAQ,
+  `docs/SUPPORT.MD`, kontrakt §5 (pokrycie v2),
+  `testdata/cve-control/cases.yaml` (`v1` dla 0401–0403 i
+  OSV-WITHDRAWN-REAL), ten rejestr, nagłówek F2 w planie.
+- **Ograniczenia:** brak `SOURCE_UNAVAILABLE` per ustalenie (świeżość jest
+  per przebieg); zakresy przechowywane, nieoceniane (F4); brak snapshotu
+  danych (F3); wpisy `pinned` sprzed F2 pozostają bez metadanych (nie
+  wygasają, więc nie są pobierane); kontrole exploit/framework-check
+  (LLM) nie mają reguły ponownego użycia — klucz zależy od ścieżki.
+- **Następny krok (wymaga zgody):** CVE:F3 — snapshoty, odtwarzanie i
+  unieważnianie wyników pochodnych.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4430,7 +4502,8 @@ Przy dodawaniu kolejnego wpisu zapisz:
    REFLECTION:R3). **CVE:F0 zrobione 2026-11-05 (kontrakt)**, CVE:F1a (model
    komponentów) i CVE:F1b (kody powodów, ustalenia per instancja, reguła
    luk report-only) oraz CVE:F1c (`-json-format v2`) zrobione — CVE:F1
-   zamknięte; następny krok w tym obszarze: CVE:F2.
+   zamknięte; CVE:F2 (świeżość danych) zrobione 2026-11-05 — następny krok
+   w tym obszarze: CVE:F3.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

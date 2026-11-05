@@ -598,3 +598,28 @@ func TestLLMConfig(t *testing.T) {
 		t.Errorf("offline should not need a key: %v", err)
 	}
 }
+
+// CVE:F2: a refreshed advisory whose text changed must not trigger a new
+// paid LLM request by itself; -llm-reask-changed asks again.
+func TestLLM_changedAdvisoryReusesPreviousAnswer(t *testing.T) {
+	llm := newFakeLLM(t, func(n int, req chatRequest) (int, string, http.Header) {
+		return 200, completion(goodAnswer, "stop"), nil
+	})
+	r, src := llmFixture(t, fakeDiff, llm)
+	cve := testCVE()
+	if _, ok, err := r.Resolve(context.Background(), cve); err != nil || !ok {
+		t.Fatalf("first: %v %v", ok, err)
+	}
+	cve.Details += " (edited upstream)"
+	entry, ok, err := r.Resolve(context.Background(), cve)
+	if err != nil || !ok || len(entry.Methods) != 1 || llm.callCount() != 1 {
+		t.Fatalf("changed advisory: %+v %v %v, calls %d", entry, ok, err, llm.callCount())
+	}
+	if st := src.Stats(); st.Reused != 1 || len(src.Warnings()) != 1 || !strings.Contains(src.Warnings()[0], "-llm-reask-changed") {
+		t.Errorf("stats %+v warnings %v", st, src.Warnings())
+	}
+	src.ReaskChanged = true
+	if _, _, err := r.Resolve(context.Background(), cve); err != nil || llm.callCount() != 2 {
+		t.Errorf("reask: calls %d err %v", llm.callCount(), err)
+	}
+}

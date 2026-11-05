@@ -18,6 +18,7 @@ import (
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
 	"ariadne/internal/findings"
+	"ariadne/internal/httpcache"
 	"ariadne/internal/reach"
 	"ariadne/internal/vulnmap"
 )
@@ -137,8 +138,11 @@ type Coverage struct {
 	// AdvisoriesWithoutInstance were reported for a package/version no
 	// component instance carries; their verdict is the engine's
 	// whole-graph one (the v1 row).
-	AdvisoriesWithoutInstance []V1Row `json:"advisories_without_instance,omitempty"`
-	Counts                    Counts  `json:"counts"`
+	AdvisoriesWithoutInstance []V1Row       `json:"advisories_without_instance,omitempty"`
+	Counts                    Counts        `json:"counts"`
+	DataFreshness             DataFreshness `json:"data_freshness"`
+	// WithdrawnAdvisories are not analyzed: no finding is made for them.
+	WithdrawnAdvisories []WithdrawnAdvisory `json:"withdrawn_advisories,omitempty"`
 }
 
 // GlobalGaps are the run's model gaps (contract §4), reported once.
@@ -174,6 +178,26 @@ type Inputs struct {
 	Mappings    map[string]vulnmap.Entry
 	Results     []reach.Result
 	Gaps        GlobalGaps
+	Freshness   DataFreshness
+	Withdrawn   []cves.CVE
+}
+
+// DataFreshness is the run's data-freshness state (CVE:F2): State is
+// report.Freshness* ("complete", "stale", "unknown"), Kinds the per-kind
+// counts of what the cache served.
+type DataFreshness struct {
+	State  string                `json:"state"`
+	TTL    string                `json:"ttl"`
+	MaxAge string                `json:"max_data_age,omitempty"`
+	Kinds  []httpcache.Freshness `json:"kinds"`
+}
+
+// WithdrawnAdvisory is an advisory whose every source record is withdrawn.
+type WithdrawnAdvisory struct {
+	ID       string            `json:"id"`
+	Aliases  []string          `json:"aliases,omitempty"`
+	Affected []AffectedPackage `json:"affected"`
+	Sources  []cves.Source     `json:"sources"`
 }
 
 // Build assembles the document. Components keep inventory order;
@@ -188,6 +212,17 @@ func Build(in Inputs) Document {
 		Findings:      []Finding{},
 	}
 	doc.Coverage.GlobalGaps = in.Gaps
+	doc.Coverage.DataFreshness = in.Freshness
+	if doc.Coverage.DataFreshness.Kinds == nil {
+		doc.Coverage.DataFreshness.Kinds = []httpcache.Freshness{}
+	}
+	for _, w := range in.Withdrawn {
+		wa := WithdrawnAdvisory{ID: w.ID, Aliases: w.Aliases, Affected: []AffectedPackage{}, Sources: w.Sources}
+		for _, a := range w.Affected {
+			wa.Affected = append(wa.Affected, AffectedPackage{Package: a.Package, Version: a.Version})
+		}
+		doc.Coverage.WithdrawnAdvisories = append(doc.Coverage.WithdrawnAdvisories, wa)
+	}
 
 	identity := map[string]string{}
 	if inv := in.Inventory; inv != nil {

@@ -24,6 +24,10 @@ type LLMStats struct {
 	Skipped int // the request failed; no answer was obtained
 	Invalid int // the model's reply failed validation twice
 	Dropped int // individual methods discarded as absent from the bytecode
+	// Reused counts CVEs whose advisory text (or fix diff) changed since
+	// the cached answer — after a CVE:F2 data refresh — and whose previous
+	// answer was reused instead of a new paid request (ReaskChanged off).
+	Reused int
 }
 
 // LLMSource is source 3: an LLM asked to name the vulnerable methods from
@@ -33,6 +37,11 @@ type LLMSource struct {
 	// Cache holds one entry per (model, prompt); it is separate from the
 	// OSV/GitHub cache so the key and its contents stay easy to inspect.
 	Cache *httpcache.Cache
+	// ReaskChanged sends a new request when the prompt for a CVE changed
+	// since its cached answer; off, the previous answer is reused with a
+	// warning, so refreshing CVE data never triggers paid requests by
+	// itself (CVE:F2).
+	ReaskChanged bool
 
 	client *llmClient
 	sem    chan struct{}
@@ -175,14 +184,33 @@ func reasoningTokens(usage json.RawMessage) string {
 // next run reproduces the same outcome without another request.
 func (s *LLMSource) exchange(ctx context.Context, cveID, system, user string) (llmRecord, error) {
 	key := httpcache.Key("llm", s.Config.Model, strconv.Itoa(promptVersion), system, user)
-	if b, hit, err := s.Cache.Get(key); err != nil {
-		return llmRecord{}, fmt.Errorf("%s: %w", cveID, err)
-	} else if hit {
+	// latest indexes the last answer for this CVE under this model and
+	// prompt version, whatever the advisory text was.
+	latest := httpcache.Key("llm-latest", s.Config.Model, strconv.Itoa(promptVersion), cveID)
+	decode := func(b []byte, k string) (llmRecord, error) {
 		var rec llmRecord
 		if err := json.Unmarshal(b, &rec); err != nil {
-			return llmRecord{}, fmt.Errorf("decoding cached LLM answer %s: %w", key, err)
+			return llmRecord{}, fmt.Errorf("decoding cached LLM answer %s: %w", k, err)
 		}
 		return rec, nil
+	}
+	if b, hit, err := s.Cache.Get(key); err != nil && !errors.Is(err, httpcache.ErrOffline) {
+		return llmRecord{}, fmt.Errorf("%s: %w", cveID, err)
+	} else if hit {
+		if _, indexed, _ := s.Cache.Get(latest); !indexed && !s.Cache.Offline() {
+			s.Cache.Set(latest, b) // answers cached before the index existed
+		}
+		return decode(b, key)
+	}
+	if !s.ReaskChanged {
+		if b, hit, _ := s.Cache.Get(latest); hit {
+			s.record(func(st *LLMStats) { st.Reused++ },
+				cveID+": advisory data changed since the cached LLM answer; previous answer reused (pass -llm-reask-changed to ask again)")
+			return decode(b, latest)
+		}
+	}
+	if s.Cache.Offline() {
+		return llmRecord{}, fmt.Errorf("%s: %w: %s", cveID, httpcache.ErrOffline, key)
 	}
 
 	select {
@@ -227,6 +255,9 @@ func (s *LLMSource) exchange(ctx context.Context, cveID, system, user string) (l
 	}
 
 	if err := s.Cache.Set(key, mustJSON(rec)); err != nil {
+		return llmRecord{}, err
+	}
+	if err := s.Cache.Set(latest, mustJSON(rec)); err != nil {
 		return llmRecord{}, err
 	}
 	return rec, nil

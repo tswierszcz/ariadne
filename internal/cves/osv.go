@@ -45,6 +45,11 @@ type osvVuln struct {
 	Affected         []osvAffected       `json:"affected"`
 	References       []osvReference      `json:"references"`
 	DatabaseSpecific osvDatabaseSpecific `json:"database_specific"`
+	// Published/Modified/Withdrawn are OSV's RFC 3339 timestamps;
+	// Withdrawn is set when the record was retracted (CVE:F2).
+	Published string `json:"published"`
+	Modified  string `json:"modified"`
+	Withdrawn string `json:"withdrawn"`
 }
 
 // osvDatabaseSpecific carries OSV's own (non-schema-standard) extra

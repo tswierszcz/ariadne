@@ -49,9 +49,14 @@ type Header struct {
 	// Model gaps (contract §4): unresolved dynamic sites, those reachable
 	// from the roots, and those of them with no bounded candidate set.
 	GapSites, GapsReachable, GapsUnbounded int
-	DepsTotal                              int
-	DepsIdentified                         int
-	UnidentifiedJar                        []string
+	// DataFreshness is the run's freshness state (FreshnessComplete,
+	// FreshnessStale, FreshnessUnknown) and FreshnessLines its per-kind
+	// detail (CVE:F2).
+	DataFreshness   string
+	FreshnessLines  []string
+	DepsTotal       int
+	DepsIdentified  int
+	UnidentifiedJar []string
 
 	// LLM* are set only when -llm was used.
 	LLMModel   string
@@ -91,7 +96,10 @@ type Data struct {
 	Notes          []reach.Result // results carrying a Note, e.g. downgraded LLM verdicts
 	// PerInstance are results whose advisory affects several component
 	// instances or whose instance findings carry reasons/notes (CVE:F1b).
-	PerInstance     []reach.Result
+	PerInstance []reach.Result
+	// Withdrawn are advisories whose every OSV record is withdrawn: listed,
+	// not analyzed (CVE:F2).
+	Withdrawn       []cves.CVE
 	Reachable       []reach.Result
 	Framework       []reach.Result
 	TotalCVEs       int

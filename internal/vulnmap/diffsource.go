@@ -105,5 +105,5 @@ func (r *Resolver) fetch(ctx context.Context, url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return httpcache.Fetch(r.HTTPClient, r.Cache, httpcache.Key("GET", url), req)
+	return httpcache.Fetch(r.HTTPClient, r.Cache, httpcache.Key("GET", url), httpcache.KindForURL(url), req)
 }

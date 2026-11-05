@@ -51,6 +51,37 @@ type CVE struct {
 	Severity   string      `json:"severity,omitempty"` // CVSS vector/score, verbatim from OSV, if present
 	Affected   []Affected  `json:"affected"`
 	References []Reference `json:"references"`
+	// Published is the earliest and Modified the latest timestamp among
+	// the active source records (CVE:F2).
+	Published string `json:"published,omitempty"`
+	Modified  string `json:"modified,omitempty"`
+	// Sources are every OSV record merged into this advisory, withdrawn
+	// ones included: alias merging never loses where a fact came from.
+	Sources []Source `json:"sources,omitempty"`
+}
+
+// Source is one OSV record behind an advisory.
+type Source struct {
+	ID        string          `json:"id"`
+	Published string          `json:"published,omitempty"`
+	Modified  string          `json:"modified,omitempty"`
+	Withdrawn string          `json:"withdrawn,omitempty"`
+	Ranges    []AffectedRange `json:"ranges,omitempty"`
+}
+
+// AffectedRange is one OSV affected range of a Maven package, verbatim
+// (evaluated by CVE:F4).
+type AffectedRange struct {
+	Package string              `json:"package"`
+	Type    string              `json:"type"`
+	Events  []map[string]string `json:"events"`
+}
+
+// Resolution is Resolve's full answer: the active advisories, and those
+// whose every source record is withdrawn (reported, never analyzed).
+type Resolution struct {
+	CVEs      []CVE
+	Withdrawn []CVE
 }
 
 // Client queries OSV, with every request going through a disk cache.
@@ -67,16 +98,25 @@ func NewClient(cache *httpcache.Cache) *Client {
 }
 
 // Resolve looks up every unique package:version in gavs against OSV and
-// returns the deduplicated, sorted CVE list.
+// returns the deduplicated, sorted list of active advisories.
 func (c *Client) Resolve(ctx context.Context, gavs []input.GAV) ([]CVE, error) {
+	r, err := c.ResolveAll(ctx, gavs)
+	return r.CVEs, err
+}
+
+// ResolveAll is Resolve plus the withdrawn advisories. A withdrawn record
+// still links its aliases; when no active record of its group was among
+// the query results, the aliases' own records are fetched, so a withdrawn
+// GHSA whose CVE alias is active stays an active advisory (CVE:F2).
+func (c *Client) ResolveAll(ctx context.Context, gavs []input.GAV) (Resolution, error) {
 	unique := uniquePackageVersions(gavs)
 	if len(unique) == 0 {
-		return nil, nil
+		return Resolution{}, nil
 	}
 
 	vulnIDsByPV, err := c.queryBatch(ctx, unique)
 	if err != nil {
-		return nil, err
+		return Resolution{}, err
 	}
 
 	// Collect the set of distinct vuln ids, and which package:versions
@@ -88,7 +128,7 @@ func (c *Client) Resolve(ctx context.Context, gavs []input.GAV) ([]CVE, error) {
 		}
 	}
 	if len(affectedBy) == 0 {
-		return nil, nil
+		return Resolution{}, nil
 	}
 
 	ids := make([]string, 0, len(affectedBy))
@@ -97,10 +137,43 @@ func (c *Client) Resolve(ctx context.Context, gavs []input.GAV) ([]CVE, error) {
 	}
 	vulns, err := c.fetchDetails(ctx, ids)
 	if err != nil {
-		return nil, err
+		return Resolution{}, err
 	}
 
+	// Aliases of withdrawn records whose group has no active record yet.
+	fetched := map[string]bool{}
+	for _, v := range vulns {
+		fetched[v.ID] = true
+	}
+	var extra []string
+	for _, w := range dedupe(vulns, affectedBy).Withdrawn {
+		for _, a := range append([]string{w.ID}, w.Aliases...) {
+			if !fetched[a] {
+				fetched[a] = true
+				extra = append(extra, a)
+			}
+		}
+	}
+	for _, id := range extra {
+		v, found, err := c.fetchOptional(ctx, id)
+		if err != nil {
+			return Resolution{}, err
+		}
+		if found {
+			vulns = append(vulns, v)
+		}
+	}
 	return dedupe(vulns, affectedBy), nil
+}
+
+// fetchOptional is fetchOne for an alias that may have no OSV record of
+// its own (HTTP 404 → not found, not an error).
+func (c *Client) fetchOptional(ctx context.Context, id string) (osvVuln, bool, error) {
+	v, err := c.fetchOne(ctx, id)
+	if err != nil && strings.Contains(err.Error(), "HTTP 404") {
+		return osvVuln{}, false, nil
+	}
+	return v, err == nil, err
 }
 
 type pkgVersion struct {
@@ -146,7 +219,7 @@ func (c *Client) queryBatch(ctx context.Context, pvs []pkgVersion) (map[pkgVersi
 		}
 
 		key := httpcache.Key("POST", c.BaseURL+"/v1/querybatch", string(body))
-		respBody, err := httpcache.Fetch(c.HTTPClient, c.Cache, key, c.jsonRequest(ctx, "POST", "/v1/querybatch", body))
+		respBody, err := httpcache.Fetch(c.HTTPClient, c.Cache, key, httpcache.KindOSV, c.jsonRequest(ctx, "POST", "/v1/querybatch", body))
 		if err != nil {
 			return nil, fmt.Errorf("OSV querybatch: %w", err)
 		}
@@ -192,7 +265,7 @@ func (c *Client) queryOnePage(ctx context.Context, pv pkgVersion, pageToken stri
 		return nil, "", fmt.Errorf("marshaling OSV query request: %w", err)
 	}
 	key := httpcache.Key("POST", c.BaseURL+"/v1/query", string(body))
-	respBody, err := httpcache.Fetch(c.HTTPClient, c.Cache, key, c.jsonRequest(ctx, "POST", "/v1/query", body))
+	respBody, err := httpcache.Fetch(c.HTTPClient, c.Cache, key, httpcache.KindOSV, c.jsonRequest(ctx, "POST", "/v1/query", body))
 	if err != nil {
 		return nil, "", fmt.Errorf("OSV query (page): %w", err)
 	}
@@ -266,7 +339,7 @@ func (c *Client) fetchOne(ctx context.Context, id string) (osvVuln, error) {
 	if err != nil {
 		return osvVuln{}, fmt.Errorf("building request for %s: %w", id, err)
 	}
-	body, err := httpcache.Fetch(c.HTTPClient, c.Cache, key, req)
+	body, err := httpcache.Fetch(c.HTTPClient, c.Cache, key, httpcache.KindOSV, req)
 	if err != nil {
 		return osvVuln{}, fmt.Errorf("fetching OSV vuln %s: %w", id, err)
 	}
@@ -291,7 +364,11 @@ func (c *Client) jsonRequest(ctx context.Context, method, path string, body []by
 // dedupe merges vulnerabilities that alias each other (a GHSA id and its
 // CVE alias, say) into one CVE entry, preferring a CVE id as the primary
 // id when the group has one.
-func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
+//
+// Withdrawn records (CVE:F2) keep linking their aliases and their
+// affected versions, but contribute no summary, severity or references; a
+// group with no active record goes to Resolution.Withdrawn.
+func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) Resolution {
 	// Union-find over ids: every vuln's own id and all its aliases belong
 	// to the same group.
 	parent := make(map[string]string)
@@ -341,7 +418,7 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 		allIDs[root] = append(allIDs[root], id)
 	}
 
-	var out []CVE
+	var out, withdrawn []CVE
 	for root, memberIDs := range recordIDs {
 		full := allIDs[root]
 		sort.Strings(full)
@@ -358,8 +435,47 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 		seenAffected := map[Affected]bool{}
 		seenRef := map[Reference]bool{}
 
+		sort.Strings(memberIDs)
+		var sources []Source
+		var published, modified string
+		active := false
 		for _, id := range memberIDs {
 			v := byID[id]
+			src := Source{ID: v.ID, Published: v.Published, Modified: v.Modified, Withdrawn: v.Withdrawn}
+			for _, a := range v.Affected {
+				for _, r := range a.Ranges {
+					src.Ranges = append(src.Ranges, AffectedRange{Package: a.Package.Name, Type: r.Type, Events: r.Events})
+				}
+			}
+			sources = append(sources, src)
+			if v.Withdrawn == "" {
+				active = true
+				if v.Published != "" && (published == "" || v.Published < published) {
+					published = v.Published
+				}
+				if v.Modified > modified {
+					modified = v.Modified
+				}
+			}
+		}
+		for _, id := range memberIDs {
+			v := byID[id]
+			for _, pv := range affectedBy[v.ID] {
+				a := Affected{Package: pv.Package, Version: pv.Version}
+				if !seenAffected[a] {
+					seenAffected[a] = true
+					affected = append(affected, a)
+				}
+			}
+			for _, a := range append([]string{v.ID}, v.Aliases...) {
+				if a != primary && !seenAlias[a] {
+					seenAlias[a] = true
+					allAliases = append(allAliases, a)
+				}
+			}
+			if v.Withdrawn != "" && active {
+				continue // a retracted record's text never describes an active advisory
+			}
 			if summary == "" {
 				summary = v.Summary
 			}
@@ -375,19 +491,6 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 			}
 			if severity == "" && len(v.Severity) > 0 {
 				severity = v.Severity[0].Type + ":" + v.Severity[0].Score
-			}
-			for _, a := range append([]string{v.ID}, v.Aliases...) {
-				if a != primary && !seenAlias[a] {
-					seenAlias[a] = true
-					allAliases = append(allAliases, a)
-				}
-			}
-			for _, pv := range affectedBy[v.ID] {
-				a := Affected{Package: pv.Package, Version: pv.Version}
-				if !seenAffected[a] {
-					seenAffected[a] = true
-					affected = append(affected, a)
-				}
 			}
 			for _, r := range v.References {
 				ref := Reference{Type: r.Type, URL: r.URL}
@@ -407,7 +510,7 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 		})
 		sort.Slice(refs, func(i, j int) bool { return refs[i].URL < refs[j].URL })
 
-		out = append(out, CVE{
+		cve := CVE{
 			ID:         primary,
 			Aliases:    allAliases,
 			Summary:    summary,
@@ -415,11 +518,20 @@ func dedupe(vulns []osvVuln, affectedBy map[string][]pkgVersion) []CVE {
 			Severity:   severity,
 			Affected:   affected,
 			References: refs,
-		})
+			Published:  published,
+			Modified:   modified,
+			Sources:    sources,
+		}
+		if active {
+			out = append(out, cve)
+		} else {
+			withdrawn = append(withdrawn, cve)
+		}
 	}
 
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
+	sort.Slice(withdrawn, func(i, j int) bool { return withdrawn[i].ID < withdrawn[j].ID })
+	return Resolution{CVEs: out, Withdrawn: withdrawn}
 }
 
 // pickPrimaryID prefers a CVE id over a bare GHSA/other id, since CVE ids

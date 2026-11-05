@@ -43,16 +43,21 @@ func main() {
 }
 
 type config struct {
-	app         string
-	deps        string
-	depsList    string
-	vulnMethods string
-	out         string
-	jsonOut     string
-	jsonFormat  string
-	cacheDir    string
-	offline     bool
-	showVersion bool
+	app             string
+	deps            string
+	depsList        string
+	vulnMethods     string
+	out             string
+	jsonOut         string
+	jsonFormat      string
+	llmReaskChanged bool
+	refresh         bool
+	allowStale      bool
+	dataTTL         time.Duration
+	maxDataAge      time.Duration
+	cacheDir        string
+	offline         bool
+	showVersion     bool
 
 	profile        string
 	profileFile    string
@@ -101,8 +106,13 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.jsonFormat, "json-format", "v1", `results.json schema: "v1" (default: one row per advisory) or "v2" (CVE:F1c: components, findings per advisory × component instance, coverage, inputs reference; docs/RESULTS_CONTRACT.MD §5)`)
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
+	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
+	fs.BoolVar(&cfg.allowStale, "allow-stale", false, "when an online refresh fails, use the cached copy and mark the report as built on stale data (never past -max-data-age)")
+	fs.DurationVar(&cfg.dataTTL, "data-ttl", httpcache.DefaultTTL, "how long a fetched OSV/advisory response counts as fresh before it is fetched again (CVE:F2)")
+	fs.DurationVar(&cfg.maxDataAge, "max-data-age", 0, "hard limit on the age of any OSV/advisory data used, offline included; data of unknown age (cached before CVE:F2) fails it. 0 = no limit")
 	fs.BoolVar(&cfg.offline, "offline", false, "serve only from the cache; fail clearly on a miss instead of touching the network")
 	fs.BoolVar(&cfg.llm, "llm", false, "also map CVEs no other source could to vulnerable methods by asking an LLM (needs ARIADNE_LLM_API_KEY and a model)")
+	fs.BoolVar(&cfg.llmReaskChanged, "llm-reask-changed", false, "with -llm: ask again when a CVE's advisory text or fix diff changed since its cached answer (default: reuse the previous answer, with a warning, so a data refresh never triggers paid requests by itself)")
 	fs.StringVar(&cfg.llmModel, "llm-model", "", "LLM model id; overrides ARIADNE_LLM_MODEL")
 	fs.StringVar(&cfg.llmBaseURL, "llm-base-url", "", "OpenAI-compatible base URL; overrides ARIADNE_LLM_BASE_URL (default "+vulnmap.DefaultLLMBaseURL+")")
 	fs.BoolVar(&cfg.exploitCheck, "exploit-check", false, "ask an LLM, for each REACHABLE CVE, whether its call path plausibly carries attacker-controlled input (PLAN.md Phase 8; needs the same ARIADNE_LLM_* settings as -llm, and makes one extra LLM request per REACHABLE CVE)")
@@ -154,6 +164,15 @@ func validate(cfg config) error {
 		if err := cfg.llmConfig.Validate(cfg.offline); err != nil {
 			return err
 		}
+	}
+	if cfg.refresh && cfg.offline {
+		return fmt.Errorf("-refresh and -offline cannot be combined: a refresh needs the network")
+	}
+	if cfg.dataTTL <= 0 {
+		return fmt.Errorf("-data-ttl must be positive, got %s", cfg.dataTTL)
+	}
+	if cfg.maxDataAge < 0 {
+		return fmt.Errorf("-max-data-age must not be negative, got %s", cfg.maxDataAge)
 	}
 	if cfg.jsonFormat != "v1" && cfg.jsonFormat != "v2" {
 		return fmt.Errorf("-json-format must be %q or %q, got %q", "v1", "v2", cfg.jsonFormat)
@@ -637,6 +656,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
 	}
+	cache.SetPolicy(httpcache.Policy{TTL: cfg.dataTTL, MaxAge: cfg.maxDataAge, Refresh: cfg.refresh, AllowStale: cfg.allowStale})
 
 	var gavs []input.GAV
 	for _, dj := range depJars {
@@ -645,11 +665,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 	}
 	log("querying OSV for %d resolved dependencies", len(gavs))
-	cveList, err := cves.NewClient(cache).Resolve(ctx, gavs)
+	resolution, err := cves.NewClient(cache).ResolveAll(ctx, gavs)
 	if err != nil {
 		return fmt.Errorf("resolving CVEs: %w", err)
 	}
-	log("found %d CVEs", len(cveList))
+	cveList := resolution.CVEs
+	log("found %d CVEs (%d withdrawn advisories not analyzed)", len(cveList), len(resolution.Withdrawn))
 
 	manual, err := vulnmap.LoadManual(cfg.vulnMethods)
 	if err != nil {
@@ -666,6 +687,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			return fmt.Errorf("opening LLM cache dir: %w", err)
 		}
 		llmSrc = vulnmap.NewLLMSource(cfg.llmConfig, llmCache, nil)
+		llmSrc.ReaskChanged = cfg.llmReaskChanged
 		resolver.LLM = llmSrc
 		resolver.MethodExists = methodExists(h)
 		log("LLM source enabled: model %s", cfg.llmConfig.Model)
@@ -682,8 +704,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		len(vm), len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM])
 	if llmSrc != nil {
 		st := llmSrc.Stats()
-		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode",
-			st.Mapped, st.Empty, st.Skipped, st.Invalid, st.Dropped)
+		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode, %d previous answers reused for changed advisories",
+			st.Mapped, st.Empty, st.Skipped, st.Invalid, st.Dropped, st.Reused)
 		warnings = append(warnings, llmSrc.Warnings()...)
 	}
 
@@ -804,6 +826,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		warnings = append(warnings, checker.Warnings()...)
 	}
 
+	// Every network fetch of the run is done by now (OSV, fix diffs).
+	freshness := cache.Freshness()
+	freshnessState, freshnessLines, freshnessWarnings := report.DescribeFreshness(freshness, cfg.dataTTL)
+	warnings = append(warnings, freshnessWarnings...)
+	log("data freshness: %s (%s)", freshnessState, strings.Join(freshnessLines, "; "))
 	profileLabel := prof.Name
 	if cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
@@ -812,6 +839,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		App:                cfg.app,
 		GeneratedAt:        time.Now(),
 		AriadneVersion:     version(),
+		DataFreshness:      freshnessState,
+		FreshnessLines:     freshnessLines,
 		Profile:            profileLabel,
 		FrameworksDetected: strings.Join(detected, ", "),
 		MaxBytecodeVer:     maxBytecode,
@@ -850,6 +879,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
 	data.Modules = moduleInventory
 	data.Components = components
+	data.Withdrawn = resolution.Withdrawn
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)
@@ -860,7 +890,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// checked against the engine's v1 rows (contract §5) either way.
 	doc := resultsv2.Build(resultsv2.Inputs{
 		ToolVersion: version(), Offline: cfg.offline, Inventory: components, CVEs: cveList, Mappings: vm, Results: results,
-		Gaps: resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
+		Freshness: resultsv2.DataFreshness{State: freshnessState, TTL: cfg.dataTTL.String(), MaxAge: maxAgeString(cfg.maxDataAge), Kinds: freshness},
+		Withdrawn: resolution.Withdrawn,
+		Gaps:      resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
@@ -925,4 +957,11 @@ func version() string {
 		rev += "-dirty"
 	}
 	return "devel+" + rev
+}
+
+func maxAgeString(d time.Duration) string {
+	if d == 0 {
+		return ""
+	}
+	return d.String()
 }

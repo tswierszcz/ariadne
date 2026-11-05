@@ -12,24 +12,30 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // ErrOffline is returned by Get when the cache is offline and the key is
 // not present.
 var ErrOffline = errors.New("httpcache: offline and not in cache")
 
-// Cache is a directory of files, one per key.
+// Cache is a directory of files, one body per key (<key>.json) with an
+// optional metadata sidecar (<key>.meta.json, CVE:F2).
 type Cache struct {
 	dir     string
 	offline bool
+	policy  Policy
+	now     func() time.Time
+	stats   stats
 }
 
-// New returns a Cache rooted at dir, creating it if necessary.
+// New returns a Cache rooted at dir, creating it if necessary, with the
+// default freshness policy (DefaultTTL).
 func New(dir string, offline bool) (*Cache, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating cache dir %s: %w", dir, err)
 	}
-	return &Cache{dir: dir, offline: offline}, nil
+	return &Cache{dir: dir, offline: offline, policy: Policy{TTL: DefaultTTL}, now: time.Now}, nil
 }
 
 // Key hashes an arbitrary set of strings (e.g. method, URL, body, model id)
@@ -48,7 +54,9 @@ func (c *Cache) path(key string) string {
 }
 
 // Get returns the cached bytes for key, (nil, false, nil) on a plain miss
-// while online, or (nil, false, ErrOffline) on a miss while offline.
+// while online, or (nil, false, ErrOffline) on a miss while offline. It
+// applies no freshness policy: it is for results that never expire (LLM
+// answers); network resources go through Fetch.
 func (c *Cache) Get(key string) ([]byte, bool, error) {
 	b, err := os.ReadFile(c.path(key))
 	if errors.Is(err, os.ErrNotExist) {
@@ -81,32 +89,47 @@ func traceHit(key string) {
 	fmt.Fprintln(f, key)
 }
 
-// Set writes b under key. It writes to a uniquely-named temp file first
-// and renames it into place, so a crash mid-write never leaves a corrupt
-// cache entry. The temp name must be unique per call, not just per key:
-// two different CVEs sharing the same fix-commit URL (a single commit
-// fixing more than one CVE) legitimately race to cache the same key from
-// two goroutines, and a shared "key+.tmp" name would let one call's
-// rename steal the other's temp file out from under it.
+// Set writes b under key as a never-expiring result (KindLLM), with its
+// metadata sidecar.
 func (c *Cache) Set(key string, b []byte) error {
-	final := c.path(key)
-	tmp, err := os.CreateTemp(c.dir, key+".*.tmp")
+	now := c.now().UTC()
+	return c.store(Meta{Key: key, Kind: KindLLM, FetchedAt: now, ValidatedAt: now}, b)
+}
+
+// store writes the body, then its metadata, each atomically.
+func (c *Cache) store(m Meta, b []byte) error {
+	if err := c.writeAtomic(c.path(m.Key), m.Key, b); err != nil {
+		return err
+	}
+	m.SHA256, m.Bytes = sha256Hex(b), len(b)
+	return c.writeMeta(m)
+}
+
+// writeAtomic writes to a uniquely-named temp file first and renames it
+// into place, so a crash mid-write never leaves a corrupt cache entry.
+// The temp name must be unique per call, not just per key: two different
+// CVEs sharing the same fix-commit URL (a single commit fixing more than
+// one CVE) legitimately race to cache the same key from two goroutines,
+// and a shared "key+.tmp" name would let one call's rename steal the
+// other's temp file out from under it.
+func (c *Cache) writeAtomic(final, name string, b []byte) error {
+	tmp, err := os.CreateTemp(c.dir, name+".*.tmp")
 	if err != nil {
-		return fmt.Errorf("creating temp file for cache entry %s: %w", key, err)
+		return fmt.Errorf("creating temp file for cache entry %s: %w", name, err)
 	}
 	tmpName := tmp.Name()
 	_, writeErr := tmp.Write(b)
 	closeErr := tmp.Close()
 	if writeErr != nil {
 		os.Remove(tmpName)
-		return fmt.Errorf("writing cache entry %s: %w", key, writeErr)
+		return fmt.Errorf("writing cache entry %s: %w", name, writeErr)
 	}
 	if closeErr != nil {
 		os.Remove(tmpName)
-		return fmt.Errorf("writing cache entry %s: %w", key, closeErr)
+		return fmt.Errorf("writing cache entry %s: %w", name, closeErr)
 	}
 	if err := os.Rename(tmpName, final); err != nil {
-		return fmt.Errorf("committing cache entry %s: %w", key, err)
+		return fmt.Errorf("committing cache entry %s: %w", name, err)
 	}
 	return nil
 }

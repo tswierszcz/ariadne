@@ -138,3 +138,23 @@ func TestJSONFormatFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestFreshnessFlags(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		msg  string
+	}{
+		{[]string{"-refresh", "-offline"}, "-refresh and -offline cannot be combined"},
+		{[]string{"-data-ttl", "0s"}, "-data-ttl must be positive"},
+		{[]string{"-max-data-age", "-1h"}, "-max-data-age must not be negative"},
+	} {
+		if code, stderr := runWithEnv(append(c.args, baseArgs...), nil); code != 2 || !strings.Contains(stderr, c.msg) {
+			t.Errorf("%v: code=%d stderr=%q", c.args, code, stderr)
+		}
+	}
+	for _, args := range [][]string{{"-refresh"}, {"-allow-stale", "-max-data-age", "48h"}, {"-offline", "-max-data-age", "1h"}} {
+		if code, stderr := runWithEnv(append(args, baseArgs...), nil); code == 2 {
+			t.Errorf("%v rejected: %q", args, stderr)
+		}
+	}
+}

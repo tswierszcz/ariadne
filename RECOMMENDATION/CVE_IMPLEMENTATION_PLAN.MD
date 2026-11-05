@@ -102,7 +102,7 @@ Przestać przypisywać jedną listę metod do CVE niezależnie od artefaktu i we
 - Wyjście v2 nie miesza niepewności mapowania z osiągalnością; dokumentacja opisuje ograniczenia eksportu v1.
 - Dotychczasowe polecenia pozostają poprawne składniowo; uzasadnione zmiany werdyktów są opisane.
 
-## F2. Cache z metadanymi i polityką świeżości
+## F2. Cache z metadanymi i polityką świeżości — DONE (2026-11-05; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

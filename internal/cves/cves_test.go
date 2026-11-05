@@ -145,7 +145,7 @@ func TestDedupe_mergesMultipleRecordsSharingAnAlias(t *testing.T) {
 		"GHSA-aaaa":     {{Package: "a:b", Version: "1.0"}},
 		"CVE-2099-0001": {{Package: "a:b", Version: "1.0"}},
 	}
-	got := dedupe(vulns, affectedBy)
+	got := dedupe(vulns, affectedBy).CVEs
 	if len(got) != 1 {
 		t.Fatalf("got %d CVEs, want 1: %+v", len(got), got)
 	}
@@ -166,7 +166,7 @@ func TestDedupe_carriesDetailsFromFirstNonEmptyRecord(t *testing.T) {
 		"GHSA-aaaa":     {{Package: "a:b", Version: "1.0"}},
 		"CVE-2099-0001": {{Package: "a:b", Version: "1.0"}},
 	}
-	got := dedupe(vulns, affectedBy)
+	got := dedupe(vulns, affectedBy).CVEs
 	if len(got) != 1 || got[0].Details != "long advisory text" {
 		t.Fatalf("Details = %+v, want the non-empty one from the second record", got)
 	}

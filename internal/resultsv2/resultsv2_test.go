@@ -51,7 +51,9 @@ func testInputs() Inputs {
 			"CVE-B": {Methods: []string{"g.A#vuln"}, Source: vulnmap.SourceManual, Role: vulnmap.RoleEntrypoint},
 			"CVE-A": {Methods: []string{"g.A#gone"}, Source: vulnmap.SourceDiff},
 		},
-		Gaps: GlobalGaps{UnresolvedSites: 3, Reachable: 2, Unbounded: 1},
+		Gaps:      GlobalGaps{UnresolvedSites: 3, Reachable: 2, Unbounded: 1},
+		Freshness: DataFreshness{State: "unknown", TTL: "24h0m0s"},
+		Withdrawn: []cves.CVE{{ID: "CVE-W", Affected: []cves.Affected{{Package: "g:lib", Version: "1"}}, Sources: []cves.Source{{ID: "GHSA-w", Withdrawn: "2026-10-01T00:00:00Z"}}}},
 	}
 }
 
@@ -94,6 +96,17 @@ func TestBuild(t *testing.T) {
 	c := doc.Coverage.Counts
 	if c.Advisories != 3 || c.Findings != 3 || c.FindingsByReachability["UNKNOWN"] != 2 || c.AdvisoriesByV1Status["NOT_REACHABLE"] != 1 {
 		t.Errorf("counts = %+v", c)
+	}
+	if w := doc.Coverage.WithdrawnAdvisories; len(w) != 1 || w[0].ID != "CVE-W" || w[0].Sources[0].Withdrawn == "" {
+		t.Errorf("withdrawn = %+v", w)
+	}
+	for _, a := range doc.Advisories {
+		if a.ID == "CVE-W" {
+			t.Error("withdrawn advisory analyzed")
+		}
+	}
+	if f := doc.Coverage.DataFreshness; f.State != "unknown" || f.Kinds == nil {
+		t.Errorf("freshness = %+v", f)
 	}
 	if !reflect.DeepEqual(doc.Coverage.UnidentifiedComponents, []string{"c-x"}) {
 		t.Errorf("unidentified = %v", doc.Coverage.UnidentifiedComponents)

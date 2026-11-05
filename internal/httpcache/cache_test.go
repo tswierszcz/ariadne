@@ -64,7 +64,7 @@ func TestFetchCachesResponse(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-		b, err := Fetch(srv.Client(), c, key, req)
+		b, err := Fetch(srv.Client(), c, key, KindOSV, req)
 		if err != nil {
 			t.Fatalf("Fetch[%d]: %v", i, err)
 		}
@@ -89,7 +89,7 @@ func TestFetchOfflineMissFailsWithoutNetworkCall(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-	_, err = Fetch(srv.Client(), c, Key("GET", srv.URL), req)
+	_, err = Fetch(srv.Client(), c, Key("GET", srv.URL), KindOSV, req)
 	if !errors.Is(err, ErrOffline) {
 		t.Fatalf("got err=%v, want ErrOffline", err)
 	}
@@ -112,8 +112,8 @@ func TestCacheSetWritesUnderDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Name() != key+".json" {
-		t.Fatalf("dir entries = %v, want exactly %q", entries, key+".json")
+	if len(entries) != 2 || entries[0].Name() != key+".json" || entries[1].Name() != key+".meta.json" {
+		t.Fatalf("dir entries = %v, want exactly the body and its metadata sidecar", entries)
 	}
 }
 

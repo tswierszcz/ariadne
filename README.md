@@ -248,11 +248,30 @@ to, say — OSV cross-links these in each record's own `aliases` field)
 are merged into one entry via union-find, preferring a `CVE-*` id as the
 primary key when the group has one. Each entry keeps: id, aliases,
 summary, a severity label, which of the app's dependencies it affects,
-and its references (particularly `FIX` links to a commit).
+and its references (particularly `FIX` links to a commit), plus (CVE:F2)
+`published`/`modified` and every merged OSV source record with its own
+dates, `withdrawn` time and affected ranges. A withdrawn record still links
+its aliases: if any record of the group is active (OSV's alias records are
+fetched when the query returned only the withdrawn one), the advisory stays
+active; if every record is withdrawn, it is listed in the report's
+"Withdrawn advisories" and not analyzed.
 
 Every HTTP request goes through `internal/httpcache`, a disk cache keyed
 by a hash of the request. `-offline` makes a cache miss a hard, clear
-error instead of silently reaching the network.
+error instead of silently reaching the network. **Data freshness
+(CVE:F2):** each body has a sidecar `<key>.meta.json` (kind, method, URL,
+fetch and validation time, body SHA-256, HTTP validators — never request
+headers). OSV responses, empty answers included, are fetched again once
+older than `-data-ttl` (default 24h; conditionally when the server sent an
+ETag/Last-Modified); GitHub content addressed by a full 40-hex commit SHA
+never expires; LLM answers are never refreshed. Offline, old data is used
+with a warning; online, a failed refresh is an error unless `-allow-stale`;
+`-max-data-age` is a hard limit everywhere. Entries cached before F2 (no
+sidecar, or one whose hash does not match) are of **unknown age**: never
+given a made-up date, revalidated online, flagged offline, refused by
+`-max-data-age`. The report header says `Data freshness: complete | stale |
+unknown` (with a banner for the last two) and v2 carries it in
+`coverage.data_freshness`.
 
 ### 6. CVE → vulnerable methods (`internal/vulnmap`)
 
@@ -528,7 +547,12 @@ Flags:
 | `-json` | yes | `results.json` output path. |
 | `-json-format` | no | `v1` (default: one row per advisory) or `v2` (CVE:F1c: components, one finding per advisory × component instance, coverage, inputs reference — schema in [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §5). |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
-| `-offline` | no | Serve only from the cache; a miss is a clear, immediate error. |
+| `-offline` | no | Serve only from the cache; a miss is a clear, immediate error. Old data is used with a warning (see `-max-data-age`). |
+| `-data-ttl` | no | How long an OSV/advisory response counts as fresh before it is fetched again (default `24h`). |
+| `-refresh` | no | Revalidate every cached OSV/advisory response now, whatever its age; never re-asks an LLM. Not with `-offline`. |
+| `-allow-stale` | no | When an online refresh fails, use the cached copy and mark the report "stale" (never past `-max-data-age`). |
+| `-max-data-age` | no | Hard limit on the age of any OSV/advisory data used, offline included; data of unknown age fails it. |
+| `-llm-reask-changed` | no | With `-llm`: ask again when a CVE's advisory text or fix diff changed since its cached answer. Default: reuse the previous answer with a warning, so a data refresh never triggers paid requests by itself. |
 | `-llm` | no | Enable the LLM source for CVEs the manual table and fix-commit diffs could not map. Needs a model and `ARIADNE_LLM_API_KEY`. |
 | `-llm-model` | no | LLM model id; overrides `ARIADNE_LLM_MODEL` (e.g. `z-ai/glm-5.3`). |
 | `-llm-base-url` | no | OpenAI-compatible base URL; overrides `ARIADNE_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`). |
@@ -564,7 +588,9 @@ bin/ariadne -app ... -deps ... -out report.md -json results.json -llm
 
 With `-offline`, `-llm` needs no key: every answer must already be in
 `<cache-dir>/llm/`. To discard cached LLM answers and ask again, delete
-that directory.
+that directory. After a data refresh changes a CVE's advisory text, the
+previous answer for that CVE is reused (counted in the `llm:` log line,
+with a warning) unless `-llm-reask-changed` is given.
 
 ### Exploit-check (PLAN.md Phase 8)
 
