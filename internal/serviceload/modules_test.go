@@ -8,8 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"ariadne/internal/analysis"
+	"ariadne/internal/callgraph"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
+	"ariadne/internal/models"
 )
 
 const jpmsClasses = "../../testdata/jpms/classes"
@@ -263,5 +266,175 @@ func TestAutomaticModuleName(t *testing.T) {
 		if tc.name == "" && reason == "" {
 			t.Errorf("%s: invalid name without a reason", tc.file)
 		}
+	}
+}
+
+// runJPMSScenario runs the real pipeline (hierarchy → S0 inventory →
+// module inventory → scenario view → load/consumption sites → B3
+// coordinator) from rootFQCN.main for one scenario.
+func runJPMSScenario(t *testing.T, j jpmsJars, nousesJar string, scenario ModuleScenario, rootFQCN string) (*callgraph.Graph, uint32, analysis.Result, []string) {
+	t.Helper()
+	deps := append(j.deps(), input.DepJar{Path: nousesJar})
+	h, _, err := hierarchy.Build(j.app, deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	regs, _, err := Inventory(h, j.app, deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv, warnings, err := InventoryModules(h, j.app, deps, 0, regs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, scenarioWarnings := ApplyScenario(scenario, regs, &inv, h)
+	warnings = append(warnings, scenarioWarnings...)
+	if inv.Scenario != scenario {
+		t.Fatalf("inventory scenario = %q, want %q", inv.Scenario, scenario)
+	}
+	loads, _, err := FindLoadSites(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumptions, _, err := FindConsumptionSites(h, loads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mats := FindMaterializations(h, loads, view.Registrations)
+	eval := NewModelEvaluator(h, loads, mats, consumptions)
+	eval.SetScenario(view)
+	g := callgraph.Build(h, nil)
+	root, ok := g.ID(rootFQCN, "main", "([Ljava/lang/String;)V")
+	if !ok {
+		t.Fatalf("no %s.main in graph", rootFQCN)
+	}
+	registry := models.NewRegistry()
+	RegisterModel(registry)
+	RegisterDispatchModels(registry, consumptions)
+	res, err := analysis.Run(h, g, registry, eval, []uint32{root}, analysis.Options{MaxIterations: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return g, root, res, warnings
+}
+
+func hasModelEdgeFrom(g *callgraph.Graph, from uint32, owner, name, desc string) bool {
+	to, ok := g.ID(owner, name, desc)
+	if !ok {
+		return false
+	}
+	for _, e := range g.Edges(from) {
+		if e.To == to && e.Basis == callgraph.BasisModel {
+			return true
+		}
+	}
+	return false
+}
+
+// TestScenario_providerSetsDiffer is SERVICE_LOADING S3 slice 2's core
+// case: the same bytecode materializes different providers on the class
+// path and on the module path.
+func TestScenario_providerSetsDiffer(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	const app = "fixture.jpms.app.Main"
+	const encode = "(Ljava/lang/String;)Ljava/lang/String;"
+	const providerDesc = "()Lfixture/jpms/api/Codec;"
+
+	g, root, _, warnings := runJPMSScenario(t, j, nouses, ScenarioClasspath, app)
+	if len(warnings) != 0 {
+		t.Errorf("classpath warnings: %v", warnings)
+	}
+	for _, c := range []string{"fixture.jpms.impl.ModuleCodec", "fixture.jpms.impl.LegacyCodec", "fixture.jpms.auto.AutoCodec"} {
+		if !hasModelEdgeFrom(g, root, c, "<init>", "()V") {
+			t.Errorf("classpath: missing constructor edge to %s", c)
+		}
+	}
+	if hasModelEdgeFrom(g, root, "fixture.jpms.impl.FactoryCodec", "provider", providerDesc) {
+		t.Error("classpath: provides-only FactoryCodec must not be materialized")
+	}
+
+	g, root, res, warnings := runJPMSScenario(t, j, nouses, ScenarioModulePath, app)
+	if len(warnings) != 0 {
+		t.Errorf("module-path warnings: %v", warnings)
+	}
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("module-path: missing ModuleCodec constructor (declared in provides)")
+	}
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.FactoryCodec", "provider", providerDesc) {
+		t.Error("module-path: missing FactoryCodec.provider() edge")
+	}
+	if hasModelEdgeFrom(g, root, "fixture.jpms.impl.FactoryCodec", "<init>", "()V") {
+		t.Error("module-path: FactoryCodec must be created by provider(), not its private constructor")
+	}
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.auto.AutoCodec", "<init>", "()V") {
+		t.Error("module-path: missing automatic-module AutoCodec constructor")
+	}
+	if hasModelEdgeFrom(g, root, "fixture.jpms.impl.LegacyCodec", "<init>", "()V") {
+		t.Error("module-path: LegacyCodec (explicit module's META-INF/services only) must be ignored")
+	}
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "encode", encode) {
+		t.Error("module-path: missing exact dispatch to ModuleCodec.encode")
+	}
+	if hasModelEdgeFrom(g, root, "fixture.jpms.impl.FactoryCodec", "encode", encode) || hasModelEdgeFrom(g, root, "fixture.jpms.impl.LegacyCodec", "encode", encode) {
+		t.Error("module-path: no exact model dispatch to a provider()-created or ignored provider")
+	}
+	if !res.Incomplete || !strings.Contains(strings.Join(res.Reasons, "\n"), "provider() method") {
+		t.Errorf("module-path: want an explicit provider() dispatch gap, got incomplete=%v reasons=%v", res.Incomplete, res.Reasons)
+	}
+}
+
+func TestScenario_missingUsesBlocksProviders(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	const caller = "fixture.jpms.nouses.NoUses"
+
+	g, root, res, _ := runJPMSScenario(t, j, nouses, ScenarioModulePath, caller)
+	for _, c := range []string{"fixture.jpms.impl.ModuleCodec", "fixture.jpms.auto.AutoCodec"} {
+		if hasModelEdgeFrom(g, root, c, "<init>", "()V") {
+			t.Errorf("module-path without `uses`: unexpected edge to %s", c)
+		}
+	}
+	if !res.Incomplete || !strings.Contains(strings.Join(res.Reasons, "\n"), "does not declare `uses fixture.jpms.api.Codec`") {
+		t.Errorf("want an explicit missing-uses reason, got %v", res.Reasons)
+	}
+
+	// The class path has no `uses` rule: the same caller loads providers.
+	g, root, _, _ = runJPMSScenario(t, j, nouses, ScenarioClasspath, caller)
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("classpath: NoUses should still materialize ModuleCodec")
+	}
+}
+
+func TestApplyScenario_missingRequiresWarns(t *testing.T) {
+	j := buildJPMSJars(t)
+	deps := []input.DepJar{{Path: j.impl}} // fixture.jpms.api deliberately absent
+	h, _, err := hierarchy.Build(j.app, deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	regs, _, _ := Inventory(h, j.app, deps)
+	inv, _, err := InventoryModules(h, j.app, deps, 0, regs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, warnings := ApplyScenario(ScenarioModulePath, regs, &inv, h)
+	joined := strings.Join(warnings, "\n")
+	if !strings.Contains(joined, "requires fixture.jpms.api") {
+		t.Errorf("warnings = %v, want a missing-requires warning", warnings)
+	}
+	if _, cpWarnings := ApplyScenario(ScenarioClasspath, regs, &inv, h); len(cpWarnings) != 0 {
+		t.Errorf("classpath scenario must not check requires: %v", cpWarnings)
+	}
+}
+
+func TestParseScenario(t *testing.T) {
+	for _, ok := range []string{"classpath", "module-path"} {
+		if _, err := ParseScenario(ok); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+	}
+	if _, err := ParseScenario("modulepath"); err == nil {
+		t.Error("want an error for an unknown scenario")
 	}
 }

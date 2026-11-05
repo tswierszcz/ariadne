@@ -56,6 +56,7 @@ type config struct {
 	roots          string
 	targetJava     int
 	activeProfiles string
+	jpmsScenario   string
 
 	llm        bool
 	llmModel   string
@@ -90,6 +91,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default) or "profile" (only the active profile's entry points: annotated methods/classes, main)`)
 	fs.IntVar(&cfg.targetJava, "target-java", 0, "Java feature version (e.g. 11, 17) to resolve multi-release JAR variants against; unset falls back to every jar's base classes, not the highest bytecode version seen (JVM_GRAPH G4)")
 	fs.StringVar(&cfg.activeProfiles, "active-profiles", "", "comma-separated Spring profile names to treat as active when evaluating @Profile conditions (FRAMEWORKS F1); unset reports every @Profile condition as unknown, never a guessed false")
+	fs.StringVar(&cfg.jpmsScenario, "jpms-scenario", "classpath", `JPMS launch scenario for ServiceLoader providers (SERVICE_LOADING S3): "classpath" (every jar in the unnamed module; module-info ignored) or "module-path" (every jar, the app included, on the module path: explicit modules provide only through "provides", automatic modules through META-INF/services, explicit callers need "uses")`)
 	fs.StringVar(&cfg.out, "out", "", "report.md output path (required)")
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
@@ -152,6 +154,9 @@ func validate(cfg config) error {
 	}
 	if cfg.targetJava < 0 {
 		return fmt.Errorf("-target-java must be a positive Java feature version, got %d", cfg.targetJava)
+	}
+	if _, err := serviceload.ParseScenario(cfg.jpmsScenario); err != nil {
+		return fmt.Errorf("-jpms-scenario: %w", err)
 	}
 	return nil
 }
@@ -366,9 +371,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("inventorying JPMS module descriptors: %w", err)
 	}
 	warnings = append(warnings, moduleWarnings...)
+	jpmsScenario, _ := serviceload.ParseScenario(cfg.jpmsScenario) // validated in parseFlags
+	scenarioView, scenarioWarnings := serviceload.ApplyScenario(jpmsScenario, svcRegs, &moduleInventory, h)
+	warnings = append(warnings, scenarioWarnings...)
+	scenarioNote := "module-info ignored"
+	if jpmsScenario == serviceload.ScenarioModulePath {
+		scenarioNote = fmt.Sprintf("%d provider registrations in effect", len(scenarioView.Registrations))
+	}
 	explicitModules, automaticModules, moduleProvides, moduleMismatches := moduleInventory.Counts()
-	log("JPMS: scenario %s (module-info ignored); %d explicit module descriptors, %d jars without one, %d provides declarations, %d module-info/META-INF/services mismatches",
-		moduleInventory.Scenario, explicitModules, automaticModules, moduleProvides, moduleMismatches)
+	log("JPMS: scenario %s (%s); %d explicit module descriptors, %d jars without one, %d provides declarations, %d module-info/META-INF/services mismatches",
+		moduleInventory.Scenario, scenarioNote, explicitModules, automaticModules, moduleProvides, moduleMismatches)
 
 	// ASYNC_CALLBACKS A0: an inventory of callback-registration call
 	// sites (Thread/Executor so far) — not yet a call-graph edge, and
@@ -502,8 +514,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// SERVICE_LOADING S2: connect a load site to its registered providers
 	// only at a linked lazy-consumption operation (Iterator.hasNext/next or
 	// Provider.get), plus the provider's own <clinit>, if any.
-	svcMaterializations := serviceload.FindMaterializations(h, svcLoadSites, svcRegs)
+	svcMaterializations := serviceload.FindMaterializations(h, svcLoadSites, scenarioView.Registrations)
 	serviceModelEvaluator := serviceload.NewModelEvaluator(h, svcLoadSites, svcMaterializations, svcConsumptionSites)
+	serviceModelEvaluator.SetScenario(scenarioView)
 
 	// ASYNC_CALLBACKS A2: connect each resolved callback identity (A1)
 	// to the class that actually declares its run()/call() method — a
@@ -753,6 +766,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Profile:            profileLabel,
 		FrameworksDetected: strings.Join(detected, ", "),
 		MaxBytecodeVer:     maxBytecode,
+		JPMSScenario:       string(jpmsScenario),
 		GraphNodes:         g.NodeCount(),
 		GraphEdges:         g.EdgeCount(),
 		PreCHAEdges:        g.PreCHAEdgeCount(),

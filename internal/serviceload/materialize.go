@@ -1,6 +1,8 @@
 package serviceload
 
 import (
+	"strings"
+
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 )
@@ -53,6 +55,10 @@ func materialize(h *hierarchy.Hierarchy, reg ServiceRegistration) ProviderMateri
 		// should not happen — recorded as a gap rather than assumed
 		// impossible.
 		m.Gap = "provider class not found in the analyzed hierarchy"
+	case reg.Mechanism == MechanismModuleProvides && providerFactoryDesc(ci) != "":
+		// java.util.ServiceLoader, "Deploying service providers as
+		// modules": a provider method takes precedence over a constructor.
+		m.FactoryDesc = providerFactoryDesc(ci)
 	case ci.IsInterface() || ci.AccessFlags&classfile.AccAbstract != 0:
 		m.Gap = "provider class is an interface or abstract and cannot be instantiated directly"
 	default:
@@ -67,6 +73,17 @@ func materialize(h *hierarchy.Hierarchy, reg ServiceRegistration) ProviderMateri
 		}
 	}
 	return m
+}
+
+// providerFactoryDesc returns the descriptor of a `public static
+// provider()` with no parameters, or "".
+func providerFactoryDesc(ci *hierarchy.ClassInfo) string {
+	for _, m := range ci.MethodsByName("provider") {
+		if m.IsPublic() && m.IsStatic() && strings.HasPrefix(m.Descriptor, "()") {
+			return m.Descriptor
+		}
+	}
+	return ""
 }
 
 // MaterializedEdge is one (caller, provider constructor) pair

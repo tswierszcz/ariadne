@@ -32,17 +32,20 @@ type Header struct {
 	// "spring+jakarta").
 	FrameworksDetected string
 	MaxBytecodeVer     int
-	GraphNodes         int
-	GraphEdges         int
-	PreCHAEdges        int
-	CHAEdges           int
-	InitEdges          int
-	ModelEdges         int
-	UnresolvedDyn      int
-	UnresolvedOwner    int
-	DepsTotal          int
-	DepsIdentified     int
-	UnidentifiedJar    []string
+	// JPMSScenario is the -jpms-scenario the ServiceLoader model used
+	// (SERVICE_LOADING S3); "" renders as the classpath default.
+	JPMSScenario    string
+	GraphNodes      int
+	GraphEdges      int
+	PreCHAEdges     int
+	CHAEdges        int
+	InitEdges       int
+	ModelEdges      int
+	UnresolvedDyn   int
+	UnresolvedOwner int
+	DepsTotal       int
+	DepsIdentified  int
+	UnidentifiedJar []string
 
 	// LLM* are set only when -llm was used.
 	LLMModel   string

@@ -500,6 +500,7 @@ Flags:
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
+| `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
@@ -631,6 +632,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/prepare-jakarta-demo.sh     /path/to/jdk11-or-later/JAVA_HOME # JAX-RS+EJB+CDI, control case
 ./scripts/prepare-micronaut-demo.sh   /path/to/jdk11-or-later/JAVA_HOME # Micronaut, control case
 ./scripts/prepare-quarkus-demo.sh     /path/to/jdk17-or-later/JAVA_HOME # Quarkus, control case
+./scripts/prepare-jpms-demo.sh        /path/to/jdk11-or-later/JAVA_HOME # JPMS provides/provider(), -jpms-scenario control case
 ```
 
 ## Project layout
@@ -654,7 +656,7 @@ internal/
   report/                 Markdown/JSON rendering
     templates/
 scripts/                 prepare-{petclinic,webgoat,petclinic-gradle,servlet-demo,
-                         jakarta-demo,micronaut-demo,quarkus-demo}.sh, build-*fixture*.sh,
+                         jakarta-demo,micronaut-demo,quarkus-demo,jpms-demo}.sh, build-*fixture*.sh,
                          gradle-copy-deps.init.gradle (Gradle equivalent of
                          mvn dependency:copy-dependencies/dependency:list)
 testdata/
@@ -822,17 +824,27 @@ report:
   a guessed edge. Callback-based stream pipelines and unsupported terminal flows, receiver
   flows through arbitrary mutable fields, parameter values supplied by unknown callers,
   virtual helper returns and other unresolved results,
-  custom loaders and a module-path launch remain unsupported or incomplete.
-  JPMS (SERVICE_LOADING S3, first slice) is inventory only: the run always
-  assumes a class-path launch, where the JVM ignores `module-info.class`.
-  The report's "JPMS module descriptors" section lists, per input jar, how it
-  would be treated on a module path (explicit module from `module-info.class`,
-  including a multi-release `META-INF/versions/N/` descriptor selected by
-  `-target-java`, or an automatic module), every `provides` pair (provider
-  found, `public static provider()` present, also in `META-INF/services`), and
-  providers declared by only one of the two mechanisms. It never adds
-  registrations or edges; `provides`-only providers, the `provider()` factory,
-  readability and layers are not modeled.
+  and custom loaders remain unsupported or incomplete.
+  JPMS (SERVICE_LOADING S3): `-jpms-scenario` picks the launch the
+  ServiceLoader model assumes. The default `classpath` matches the JVM's
+  class-path behavior (every `module-info.class` ignored). The report's
+  "JPMS module descriptors" section lists, per input jar, how it is treated on
+  a module path (explicit module from `module-info.class`, including a
+  multi-release `META-INF/versions/N/` descriptor selected by `-target-java`,
+  or an automatic module), every `provides` pair (provider found,
+  `public static provider()` present, also in `META-INF/services`), and
+  providers declared by only one of the two mechanisms. With
+  `-jpms-scenario module-path` every input jar is on the module path: an
+  explicit module's providers are its `provides` entries (its
+  `META-INF/services` is ignored), a `provider()` method is the model target
+  instead of a constructor, automatic modules keep their `META-INF/services`
+  providers (constructor only), and a caller in an explicit module without
+  `uses` for the service gets no provider edge and an incomplete-model
+  warning. A `requires` on a module absent from the input is a warning (the
+  JVM would refuse to start). No exact dispatch edge follows a
+  `provider()`-created object (its runtime type is not tracked; CHA edges
+  remain). A mixed class path/module path launch, full module resolution,
+  qualified exports and module layers are not modeled.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

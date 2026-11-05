@@ -6,6 +6,7 @@
 - **Profile:** {{.Profile}}
 - **Frameworks detected:** {{.FrameworksDetected}} — FRAMEWORKS F0: which profiles' own marker classes were actually found, independent of which one(s) got merged into the active Profile above (e.g. both `spring` and `jakarta` can be detected while only `spring` ends up selected by `-profile`)
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}
+- **JPMS scenario:** {{if .JPMSScenario}}{{.JPMSScenario}}{{else}}classpath{{end}} (see "JPMS module descriptors")
 - **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model)
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
 - **Calls resolved outside the analyzed input:** {{.UnresolvedOwner}} (informational — expected to be a few thousand on a real app; dominated by methods actually inherited from the JDK or another class outside `-app`/`-deps`, not evidence of a bug on its own)
@@ -200,19 +201,29 @@ None found.
 {{else}}
 | Interface | Provider | Registration source | Constructor target |
 |---|---|---|---|
-{{range .ServiceMaterializations}}| `{{.Registration.Interface}}` | `{{.Registration.ProviderClass}}` | `{{.Registration.SourceJar}}` | {{if .ConstructorMethod}}`{{.ConstructorMethod}}`{{else}}**gap:** {{.Gap}}{{end}} |
+{{range .ServiceMaterializations}}| `{{.Registration.Interface}}` | `{{.Registration.ProviderClass}}` | `{{.Registration.SourceJar}}`{{if eq .Registration.Mechanism "module-info provides"}} (module `{{.Registration.Module}}`, `provides`){{end}} | {{if .ConstructorMethod}}`{{.ConstructorMethod}}`{{else if .FactoryDesc}}`{{.Registration.ProviderClass}}#provider{{.FactoryDesc}}` (provider method){{else}}**gap:** {{.Gap}}{{end}} |
 {{end}}
 {{end}}
 
 ## JPMS module descriptors
 
-SERVICE_LOADING S3 (first slice). Scenario: **{{.Modules.Scenario}}** — every input jar
+SERVICE_LOADING S3. Scenario: **{{.Modules.Scenario}}** (`-jpms-scenario`).
+{{- if eq (print .Modules.Scenario) "module-path"}} Every input jar, the app included, is
+treated as on the application module path: an explicit module's providers are its
+`provides` entries (its `META-INF/services` is ignored), an automatic module's are its
+`META-INF/services` entries (constructor only), a provider with `public static
+provider()` is created through that method, and a ServiceLoader caller in an explicit
+module must declare `uses` for the service or no provider is modeled. The constructor
+candidates above follow this scenario. A mixed class path/module path launch, module
+resolution beyond a missing-`requires` warning, qualified exports and module layers are
+**not modeled**.
+{{- else}} Every input jar
 is analyzed on the class path, so each one belongs to the unnamed module and the JVM
 ignores every `module-info.class`; ServiceLoader then sees exactly the
 `META-INF/services` registrations above. The descriptors below are inventoried to show
-what would differ on a module path. They never add registrations or call-graph edges,
-and a module path, readability, layers and the `provider()` factory rule are **not
-modeled** in this run. "Kind" is how the jar would be treated on a module path.
+what would differ on a module path (`-jpms-scenario module-path`); in this run they add
+no registrations or call-graph edges.
+{{- end}} "Kind" is how the jar is treated on a module path.
 {{with .Modules}}
 {{if not .Descriptors}}
 No jars inventoried.
@@ -638,9 +649,10 @@ None found.
   the exact load site. The linear `stream().findFirst().get().get()` path is supported
   at `Provider.get()`; a stream without a terminal operation remains lazy. Unlinked
   receiver flows and unsupported stream callback/terminal flows produce incomplete-model warnings. A registration alone is not
-  a reachability verdict. JPMS: the run assumes a class-path launch; `module-info.class`
-  descriptors are inventoried (see "JPMS module descriptors") but no module path,
-  `provides`-only provider, `provider()` factory or layer is modeled.
+  a reachability verdict. JPMS: provider sets follow `-jpms-scenario` (see "JPMS module
+  descriptors"); a mixed class path/module path launch, full module resolution and
+  module layers are not modeled, and no exact dispatch edge follows an object created
+  by a `provider()` method.
 - **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
   package than its own Maven coordinates is not detected as such.
 - **CHA over-approximates**: a virtual/interface call is treated as reaching every

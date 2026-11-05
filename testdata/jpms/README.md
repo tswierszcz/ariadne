@@ -20,7 +20,7 @@ Regenerate from the repository root (this JDK has no `ct.sym`, so
 J="java --module jdk.compiler/com.sun.tools.javac.Main"
 cd testdata/jpms && rm -rf classes
 $J -source 11 -target 11 -nowarn -d classes/mods --module-source-path src \
-  --module fixture.jpms.api,fixture.jpms.impl,fixture.jpms.app
+  --module fixture.jpms.api,fixture.jpms.impl,fixture.jpms.app,fixture.jpms.nouses
 $J -source 8 -target 8 -nowarn -cp classes/mods/fixture.jpms.api -d classes/auto \
   src/auto/fixture/jpms/auto/AutoCodec.java
 $J -source 8 -target 8 -nowarn -d classes/mr src/mr/base/fixture/jpms/mr/Util.java
@@ -30,3 +30,7 @@ cp -R src/fixture.jpms.impl/META-INF classes/mods/fixture.jpms.impl/
 cp -R src/auto/META-INF classes/auto/
 cp -R src/mr/META-INF classes/mr/
 ```
+
+`classes/mods/fixture.jpms.nouses` (added for `-jpms-scenario module-path`)
+calls `ServiceLoader.load(Codec.class)` from a module without `uses`; compile
+it with the same module command, `--module fixture.jpms.nouses`.

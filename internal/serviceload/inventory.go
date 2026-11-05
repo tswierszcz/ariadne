@@ -31,7 +31,23 @@ type ServiceRegistration struct {
 	// claim that it's reachable or ever instantiated, just that the
 	// class the file names is part of what ariadne read at all.
 	ProviderFound bool
+	// Mechanism is how the provider was declared: MechanismServicesFile
+	// (S0, every Inventory result) or MechanismModuleProvides (an explicit
+	// module's `provides`, added only by ApplyScenario for the module-path
+	// scenario, SERVICE_LOADING S3).
+	Mechanism RegistrationMechanism
+	// Module is the declaring module's name when the scenario puts
+	// SourceJar on the module path; "" on the class path.
+	Module string
 }
+
+// RegistrationMechanism names a provider-declaration mechanism.
+type RegistrationMechanism string
+
+const (
+	MechanismServicesFile   RegistrationMechanism = "META-INF/services"
+	MechanismModuleProvides RegistrationMechanism = "module-info provides"
+)
 
 // LoaderKind distinguishes which java.util.ServiceLoader factory a call
 // site used — SERVICE_LOADING S1's own explicit requirement ("odróżnić
@@ -110,6 +126,12 @@ type ProviderMaterialization struct {
 	// different mechanism, SERVICE_LOADING S3's own JPMS scope, not
 	// this one). "" when Gap explains why no target could be modeled.
 	ConstructorMethod string
+	// FactoryDesc is set (with ConstructorMethod "") when the provider is
+	// instantiated through `public static provider()` instead: the
+	// method's descriptor, e.g. "()Lfixture/jpms/api/Codec;". Only a
+	// module-path `provides` registration uses this rule (SERVICE_LOADING
+	// S3); automatic modules and META-INF/services never do.
+	FactoryDesc string
 	// Gap explains why ConstructorMethod is "" — never a silent drop
 	// (S2's own requirement: "brak implementacji daje lukę, nie brak
 	// podatności").
@@ -170,6 +192,7 @@ func Inventory(h *hierarchy.Hierarchy, appJarPath string, depJars []input.DepJar
 					SourceSHA256:  f.SHA256,
 					Line:          e.Line,
 					ProviderFound: found,
+					Mechanism:     MechanismServicesFile,
 				})
 			}
 		}

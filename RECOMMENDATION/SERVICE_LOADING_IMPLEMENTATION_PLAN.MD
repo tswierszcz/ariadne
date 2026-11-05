@@ -29,7 +29,7 @@ Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md](../ar
 
 ## S3. JPMS i warstwy
 
-Stan: IN_PROGRESS — wycinek 1 (deskryptory i inwentarz `provides`, scenariusz classpath) zrobiony 2026-11-05; zob. IMPLEMENTATION_STATUS.
+Stan: IN_PROGRESS — wycinek 1 (deskryptory i inwentarz `provides`, scenariusz classpath) i wycinek 2 (`-jpms-scenario module-path`) zrobione 2026-11-05; zob. IMPLEMENTATION_STATUS.
 
 Zależności: S2, JVM G4; zaawansowane wartości mogą korzystać z DATA_FLOW D3.
 

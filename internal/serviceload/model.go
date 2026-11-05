@@ -91,6 +91,45 @@ type ModelEvaluator struct {
 	consumptions         map[siteKey]ServiceConsumptionSite
 	dispatches           map[siteKey]ServiceConsumptionSite
 	providersByInterface map[string][]ProviderMaterialization
+	scenario             ScenarioView
+}
+
+// SetScenario selects the JPMS launch scenario (SERVICE_LOADING S3).
+// The materializations passed to NewModelEvaluator must already come
+// from the same view's Registrations; this adds the scenario's
+// per-caller `uses` check. The zero value is the class-path scenario.
+func (e *ModelEvaluator) SetScenario(view ScenarioView) { e.scenario = view }
+
+func (e *ModelEvaluator) noProviderReason(iface string) string {
+	if e.scenario.Scenario == ScenarioModulePath {
+		return fmt.Sprintf("no module-path provider is modeled for service %s (explicit modules' provides, automatic modules' META-INF/services)", iface)
+	}
+	return fmt.Sprintf("no classpath provider is modeled for service %s; JPMS providers are outside this model", iface)
+}
+
+// usesAllowed applies the scenario's `uses` check to the load sites a
+// consumption is linked to: the service is loadable if any linked load
+// site for it passes. With no recorded load site the consumption's own
+// caller is checked.
+func (e *ModelEvaluator) usesAllowed(consumption ServiceConsumptionSite, iface string) (bool, string) {
+	var reason string
+	checked := false
+	for _, key := range consumption.streamLoadSites {
+		load, ok := e.sites[key]
+		if !ok || load.Interface != iface {
+			continue
+		}
+		checked = true
+		ok, why := e.scenario.usesCheck(e.h, load.CallerFQCN, iface)
+		if ok {
+			return true, ""
+		}
+		reason = why
+	}
+	if !checked {
+		return e.scenario.usesCheck(e.h, consumption.CallerFQCN, iface)
+	}
+	return false, reason
 }
 
 type siteKey struct {
@@ -169,13 +208,25 @@ func (e *ModelEvaluator) evaluateDispatch(model *models.Model, site models.CallS
 		mats := e.providersByInterface[iface]
 		if len(mats) == 0 {
 			fact.Incomplete = true
-			fact.Reason = joinReasons(fact.Reason, fmt.Sprintf("no classpath provider is modeled for service %s; JPMS providers are outside this model", iface))
+			fact.Reason = joinReasons(fact.Reason, e.noProviderReason(iface))
+			continue
+		}
+		if ok, why := e.usesAllowed(dispatch, iface); !ok {
+			fact.Incomplete = true
+			fact.Reason = joinReasons(fact.Reason, why)
 			continue
 		}
 		for _, m := range mats {
 			if m.Gap != "" {
 				fact.Incomplete = true
 				fact.Reason = joinReasons(fact.Reason, m.Gap)
+				continue
+			}
+			if m.FactoryDesc != "" {
+				// provider() may return any implementation; its runtime
+				// type is not tracked, so only the CHA edges remain.
+				fact.Incomplete = true
+				fact.Reason = joinReasons(fact.Reason, fmt.Sprintf("provider %s is created by its provider() method; the returned object's type is not tracked, so no exact dispatch edge is modeled", m.Registration.ProviderClass))
 				continue
 			}
 			if _, knownInterface := e.h.Lookup(iface); !knownInterface {
@@ -250,7 +301,12 @@ func (e *ModelEvaluator) evaluateConsumption(model *models.Model, site models.Ca
 		mats := e.providersByInterface[iface]
 		if len(mats) == 0 {
 			fact.Incomplete = true
-			fact.Reason = joinReasons(fact.Reason, fmt.Sprintf("no classpath provider is modeled for service %s; JPMS providers are outside this model", iface))
+			fact.Reason = joinReasons(fact.Reason, e.noProviderReason(iface))
+			continue
+		}
+		if ok, why := e.usesAllowed(consumption, iface); !ok {
+			fact.Incomplete = true
+			fact.Reason = joinReasons(fact.Reason, why)
 			continue
 		}
 		for _, m := range mats {
@@ -260,7 +316,11 @@ func (e *ModelEvaluator) evaluateConsumption(model *models.Model, site models.Ca
 				continue
 			}
 			owner := m.Registration.ProviderClass
-			fact.Targets = appendModelTarget(fact.Targets, models.Target{Method: models.Signature{Owner: owner, Name: "<init>", Desc: "()V"}})
+			if m.FactoryDesc != "" {
+				fact.Targets = appendModelTarget(fact.Targets, models.Target{Method: models.Signature{Owner: owner, Name: "provider", Desc: m.FactoryDesc}, Kind: classfile.CallStatic})
+			} else {
+				fact.Targets = appendModelTarget(fact.Targets, models.Target{Method: models.Signature{Owner: owner, Name: "<init>", Desc: "()V"}})
+			}
 			if ci, found := e.h.Lookup(owner); found {
 				if _, hasInit := ci.MethodByNameAndDesc("<clinit>", "()V"); hasInit {
 					fact.Targets = appendModelTarget(fact.Targets, models.Target{Method: models.Signature{Owner: owner, Name: "<clinit>", Desc: "()V"}, Kind: classfile.CallInit})

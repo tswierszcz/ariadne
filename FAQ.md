@@ -116,6 +116,14 @@ seven builds have actually been tested and verified**:
   `io.quarkus.scheduler` `@Scheduled` job, and a MicroProfile Reactive
   Messaging `@Incoming` consumer, all three calling the same vulnerable
   SnakeYAML — the control case for the `quarkus` profile. Needs JDK 17+.
+- a tiny hand-written **JPMS** app (`scripts/prepare-jpms-demo.sh`): one
+  module whose only ServiceLoader provider is declared in `module-info`
+  `provides` and created through `public static provider()`, which calls
+  commons-text 1.9's `StringSubstitutor#replace` (CVE-2022-42889). It is
+  the control case for `-jpms-scenario`: with `-profile generic -roots
+  profile`, `classpath` gives NOT_REACHABLE (the JVM ignores module-info
+  there) and `module-path` gives REACHABLE through `provider()`; the script
+  also launches it both ways with the real JVM (0 vs 1 provider found).
 
 Everything else (Kotlin, Scala, Groovy) **should work mechanically**,
 but has never been run or tested.
