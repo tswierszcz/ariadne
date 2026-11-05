@@ -113,6 +113,11 @@ type Data struct {
 	// materialized a provider.
 	ServiceConsumptionSites []serviceload.ServiceConsumptionSite
 
+	// Modules is SERVICE_LOADING S3's first slice: module descriptors and
+	// `provides` declarations under an explicit launch scenario
+	// (class path only) — facts, never registrations or edges.
+	Modules serviceload.ModuleInventory
+
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
 	// every call site matching (or nearly matching) a cataloged
 	// callback-registration API (Thread/Executor so far) — not yet a

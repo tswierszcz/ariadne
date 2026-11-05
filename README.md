@@ -822,8 +822,17 @@ report:
   a guessed edge. Callback-based stream pipelines and unsupported terminal flows, receiver
   flows through arbitrary mutable fields, parameter values supplied by unknown callers,
   virtual helper returns and other unresolved results,
-  custom loaders, and JPMS `module-info`
-  `uses`/`provides` remain unsupported or incomplete.
+  custom loaders and a module-path launch remain unsupported or incomplete.
+  JPMS (SERVICE_LOADING S3, first slice) is inventory only: the run always
+  assumes a class-path launch, where the JVM ignores `module-info.class`.
+  The report's "JPMS module descriptors" section lists, per input jar, how it
+  would be treated on a module path (explicit module from `module-info.class`,
+  including a multi-release `META-INF/versions/N/` descriptor selected by
+  `-target-java`, or an automatic module), every `provides` pair (provider
+  found, `public static provider()` present, also in `META-INF/services`), and
+  providers declared by only one of the two mechanisms. It never adds
+  registrations or edges; `provides`-only providers, the `provider()` factory,
+  readability and layers are not modeled.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

@@ -204,6 +204,52 @@ None found.
 {{end}}
 {{end}}
 
+## JPMS module descriptors
+
+SERVICE_LOADING S3 (first slice). Scenario: **{{.Modules.Scenario}}** — every input jar
+is analyzed on the class path, so each one belongs to the unnamed module and the JVM
+ignores every `module-info.class`; ServiceLoader then sees exactly the
+`META-INF/services` registrations above. The descriptors below are inventoried to show
+what would differ on a module path. They never add registrations or call-graph edges,
+and a module path, readability, layers and the `provider()` factory rule are **not
+modeled** in this run. "Kind" is how the jar would be treated on a module path.
+{{with .Modules}}
+{{if not .Descriptors}}
+No jars inventoried.
+{{else}}
+| Module | Kind | Name source | Jar | uses | provides |
+|---|---|---|---|---|---|
+{{range .Descriptors}}{{if eq .Kind "explicit"}}| `{{.Name}}`{{if .Info.IsOpen}} (open){{end}} | explicit | `{{.NameSource}}`{{if .DescriptorNote}} — {{.DescriptorNote}}{{end}} | `{{.Jar}}` | {{len .Info.Uses}} | {{len .Info.Provides}} |
+{{end}}{{end}}
+Jars without a descriptor (automatic modules on a module path; name from
+`Automatic-Module-Name` or the file name): {{.AutomaticCount}}.
+{{end}}
+
+### `provides` declarations
+
+{{if not .Provides}}
+None found.
+{{else}}
+| Module | Service | Provider | Found | `provider()` method | Also in `META-INF/services` |
+|---|---|---|---|---|---|
+{{range .Provides}}| `{{.Module}}` | `{{.Service}}` | `{{.Provider}}` | {{if .ProviderFound}}yes{{else}}**no**{{end}} | {{if .HasProviderMethod}}yes{{else}}no{{end}} | {{if .InServicesFile}}yes{{else}}**no**{{end}} |
+{{end}}
+{{end}}
+
+### Declaration mismatches (explicit modules)
+
+A provider named by only one of an explicit module's two mechanisms: which providers
+ServiceLoader sees then depends on the launch scenario.
+{{if not .Mismatches}}
+None found.
+{{else}}
+| Module | Service | Provider | Declared in | Effect |
+|---|---|---|---|---|
+{{range .Mismatches}}| `{{.Module}}` | `{{.Service}}` | `{{.Provider}}` | {{.Side}} | {{.Effect}} |
+{{end}}
+{{end}}
+{{end}}
+
 ## Callback registration call sites
 
 Every call site found matching, or nearly matching, a cataloged callback-registration
@@ -592,7 +638,9 @@ None found.
   the exact load site. The linear `stream().findFirst().get().get()` path is supported
   at `Provider.get()`; a stream without a terminal operation remains lazy. Unlinked
   receiver flows and unsupported stream callback/terminal flows produce incomplete-model warnings. A registration alone is not
-  a reachability verdict.
+  a reachability verdict. JPMS: the run assumes a class-path launch; `module-info.class`
+  descriptors are inventoried (see "JPMS module descriptors") but no module path,
+  `provides`-only provider, `provider()` factory or layer is modeled.
 - **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
   package than its own Maven coordinates is not detected as such.
 - **CHA over-approximates**: a virtual/interface call is treated as reaching every

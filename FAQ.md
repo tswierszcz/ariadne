@@ -402,7 +402,9 @@ Input: the app jar + `[]input.DepJar` from step 1. Output: a `Hierarchy`
 structure that knows every class read, from the app and from the
 dependencies.
 
-For every jar, for every `.class` entry (skipping `module-info.class` and
+For every jar, for every `.class` entry (skipping `module-info.class` — module
+descriptors are read separately, as an inventory only, by
+`serviceload.InventoryModules` — and
 `META-INF/versions/**` — multi-release jars): parse via
 `classfile.Parse`, and **right there** call `ExtractCalls` for every
 method — because `classfile.ClassFile` deliberately doesn't expose the

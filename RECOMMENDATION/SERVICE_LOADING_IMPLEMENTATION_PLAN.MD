@@ -23,19 +23,13 @@ Zależności: S0, DATA_FLOW D0–D2, JVM G2.
 
 Gotowe: dwa loadery dla różnych usług nie mieszają dostawców; niewykorzystany loader nie uruchamia konstruktora.
 
-## S2. Materializacja i krawędzie dispatch
+## S2. Materializacja i krawędzie dispatch — DONE (2026-11-05)
 
-Zależności: S1, JVM G3, rejestr B3.
-
-- Dodać cele konstruktora/dopuszczalnej fabryki w odpowiednim miejscu użycia oraz związane inicjalizacje.
-- Powiązać obiekt dostawcy z alokacją modelowaną. Jego wywołania metod rozwiązywać zgodnie z typem i deskryptorem.
-- Typy przekazać do późniejszego RTA; nie tworzyć oddzielnej prywatnej listy instancji tylko dla ServiceLoader.
-- Obsłużyć część iterator API i `Provider.get` z jawną listą wspieranych operacji; nieobsługiwany stream terminal zgłasza lukę.
-- W raportach rekonstruować krok modelowany i źródło rejestracji. Brak implementacji daje lukę, nie brak podatności.
-
-Gotowe: pozytywna ścieżka do `decode`, ujemny przypadek deklaracji bez użycia, brak celu i powtórzony wpis mają oczekiwane wyniki. To pierwszy zakres wydania usług classpath.
+Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md](../archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md).
 
 ## S3. JPMS i warstwy
+
+Stan: IN_PROGRESS — wycinek 1 (deskryptory i inwentarz `provides`, scenariusz classpath) zrobiony 2026-11-05; zob. IMPLEMENTATION_STATUS.
 
 Zależności: S2, JVM G4; zaawansowane wartości mogą korzystać z DATA_FLOW D3.
 

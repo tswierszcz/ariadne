@@ -161,6 +161,9 @@ type ClassFile struct {
 	// name-list/richer-form split.
 	AnnotationDetails []Annotation
 	Bootstrap         []BootstrapMethod
+	// Module is the decoded Module attribute (SERVICE_LOADING S3), set
+	// only on a module-info.class (IsModule); nil for every ordinary class.
+	Module *ModuleInfo
 
 	pool pool // kept only so resolveInvokeDynamic (calls.go) can look up the CONSTANT_InvokeDynamic entry for each invokedynamic instruction
 }
@@ -231,6 +234,7 @@ func Parse(r io.Reader) (*ClassFile, error) {
 
 	var classAnnotations []Annotation
 	var bootstrap []BootstrapMethod
+	var module *ModuleInfo
 	classAttrCount := rd.u2()
 	for i := uint16(0); i < classAttrCount && rd.err == nil; i++ {
 		name, data, err := readAttribute(rd, p)
@@ -248,6 +252,11 @@ func Parse(r io.Reader) (*ClassFile, error) {
 			bootstrap, err = parseBootstrapMethods(data, p)
 			if err != nil {
 				return nil, fmt.Errorf("BootstrapMethods: %w", err)
+			}
+		case "Module":
+			module, err = parseModuleAttribute(data, p)
+			if err != nil {
+				return nil, fmt.Errorf("Module: %w", err)
 			}
 		}
 	}
@@ -280,6 +289,7 @@ func Parse(r io.Reader) (*ClassFile, error) {
 		Annotations:       annotationNames(classAnnotations),
 		AnnotationDetails: classAnnotations,
 		Bootstrap:         bootstrap,
+		Module:            module,
 		pool:              p,
 	}, nil
 }

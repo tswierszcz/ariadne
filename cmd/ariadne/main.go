@@ -357,6 +357,19 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("ServiceLoader: %d consumption/dispatch sites found, %d linked to a load site", len(svcConsumptionSites), linkedConsumptionSites)
 
+	// SERVICE_LOADING S3 (first slice): module descriptors and `provides`
+	// declarations, interpreted under the class-path scenario only —
+	// inventory and diagnostics, never registrations or edges (see
+	// serviceload.ScenarioClasspath's own doc comment).
+	moduleInventory, moduleWarnings, err := serviceload.InventoryModules(h, prepared.AppClassesJar, depJars, cfg.targetJava, svcRegs)
+	if err != nil {
+		return fmt.Errorf("inventorying JPMS module descriptors: %w", err)
+	}
+	warnings = append(warnings, moduleWarnings...)
+	explicitModules, automaticModules, moduleProvides, moduleMismatches := moduleInventory.Counts()
+	log("JPMS: scenario %s (module-info ignored); %d explicit module descriptors, %d jars without one, %d provides declarations, %d module-info/META-INF/services mismatches",
+		moduleInventory.Scenario, explicitModules, automaticModules, moduleProvides, moduleMismatches)
+
 	// ASYNC_CALLBACKS A0: an inventory of callback-registration call
 	// sites (Thread/Executor so far) — not yet a call-graph edge, and
 	// not yet resolving which concrete object the callback is (see
@@ -769,6 +782,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
 	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
+	data.Modules = moduleInventory
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

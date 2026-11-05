@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"ariadne/internal/classfile"
 	"ariadne/internal/cves"
 	"ariadne/internal/reach"
 	"ariadne/internal/serviceload"
@@ -179,6 +180,38 @@ func TestRenderServiceLoaderConsumptionProvenance(t *testing.T) {
 		t.Fatalf("RenderMarkdown: %v", err)
 	}
 	for _, want := range []string{"## ServiceLoader consumption and dispatch sites", "`app.Entry#run()V` (pc=42)", "`api.Service`", "receiver is not traceably derived"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("report is missing %q", want)
+		}
+	}
+}
+
+func TestRenderJPMSModuleInventory(t *testing.T) {
+	data := Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", WebXMLInput{}, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil)
+	data.Modules = serviceload.ModuleInventory{
+		Scenario: serviceload.ScenarioClasspath,
+		Descriptors: []serviceload.ModuleDescriptor{
+			{Jar: "impl.jar", Kind: serviceload.ModuleExplicit, Name: "m.impl", NameSource: "module-info.class",
+				Info: &classfile.ModuleInfo{Name: "m.impl", Provides: []classfile.ModuleProvides{{Service: "api.S", With: []string{"impl.P"}}}}},
+			{Jar: "lib-1.0.jar", Kind: serviceload.ModuleAutomatic, Name: "lib", NameSource: "file name"},
+		},
+		Provides: []serviceload.ModuleProviderDecl{{Module: "m.impl", Jar: "impl.jar", Service: "api.S", Provider: "impl.P", ProviderFound: true, HasProviderMethod: true}},
+		Mismatches: []serviceload.DeclarationMismatch{{Module: "m.impl", Jar: "impl.jar", Service: "api.S", Provider: "impl.P",
+			Side: "module-info only", Effect: "seen by ServiceLoader only when this jar is on the module path"}},
+	}
+	md, err := RenderMarkdown(data)
+	if err != nil {
+		t.Fatalf("RenderMarkdown: %v", err)
+	}
+	for _, want := range []string{
+		"## JPMS module descriptors", "Scenario: **classpath**",
+		"| `m.impl` | explicit | `module-info.class` | `impl.jar` | 0 | 1 |",
+		"Automatic-Module-Name` or the file name): 1.",
+		"| `m.impl` | `api.S` | `impl.P` | yes | yes | **no** |",
+		"| `m.impl` | `api.S` | `impl.P` | module-info only |",
+	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("report is missing %q", want)
 		}
