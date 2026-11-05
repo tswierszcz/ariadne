@@ -103,6 +103,9 @@ func resolveCallResultOnce(h *hierarchy.Hierarchy, ref valueflow.CallResultRef) 
 }
 
 func resolveCallResultOnceMode(h *hierarchy.Hierarchy, ref valueflow.CallResultRef, parameterRefs bool) (valueflow.Value, []string) {
+	if isDoPrivileged(ref) {
+		return resolvePrivileged(h, ref, parameterRefs)
+	}
 	var warnings []string
 	declaring, ok := h.ResolveExact(ref.Owner, ref.Name, ref.Desc)
 	if !ok {
@@ -217,4 +220,84 @@ func mergeReturnsMode(cf *classfile.ClassFile, declaring string, m hierarchy.Met
 		}
 	}
 	return result, warnings
+}
+
+// isDoPrivileged names every java.security.AccessController.doPrivileged
+// overload: each runs its action's run() on the calling thread and
+// returns that result (the ASYNC_CALLBACKS catalog models the edge).
+func isDoPrivileged(ref valueflow.CallResultRef) bool {
+	return ref.Owner == "java.security.AccessController" && ref.Name == "doPrivileged" &&
+		(strings.HasPrefix(ref.Desc, "(Ljava/security/PrivilegedAction;") || strings.HasPrefix(ref.Desc, "(Ljava/security/PrivilegedExceptionAction;")) &&
+		strings.HasSuffix(ref.Desc, ")Ljava/lang/Object;")
+}
+
+const accBridge = 0x0040
+
+// resolvePrivileged is DATA_FLOW D3's library summary for doPrivileged:
+// its result is whatever the action's run() returns. The action must be
+// provable at the call site — an allocation of a known class (its own
+// non-bridge, no-argument run()), or a lambda/method reference whose
+// implementation takes no arguments (nothing captured). Anything else is
+// an explicit unknown.
+func resolvePrivileged(h *hierarchy.Hierarchy, ref valueflow.CallResultRef, parameterRefs bool) (valueflow.Value, []string) {
+	action, warnings := ResolveCallArgumentAtCall(h, ref, 0)
+	if action.Kind == valueflow.KindField || action.Kind == valueflow.KindCallResult {
+		visited := map[string]bool{}
+		var more []string
+		action, more = chaseFieldOrCall(h, action, visited)
+		warnings = append(warnings, more...)
+	}
+	switch action.Kind {
+	case valueflow.KindAlloc:
+		ci, ok := h.Lookup(action.Type)
+		if !ok {
+			return valueflow.Unknown(fmt.Sprintf("doPrivileged action class %s is outside the analyzed hierarchy", action.Type)), warnings
+		}
+		var run *hierarchy.Method
+		for i := range ci.Methods {
+			m := &ci.Methods[i]
+			if m.Name == "run" && strings.HasPrefix(m.Descriptor, "()") && !m.IsStatic() && m.AccessFlags&accBridge == 0 {
+				if run != nil {
+					return valueflow.Unknown(fmt.Sprintf("doPrivileged action %s declares several run() methods", action.Type)), warnings
+				}
+				run = m
+			}
+		}
+		if run == nil {
+			return valueflow.Unknown(fmt.Sprintf("doPrivileged action %s does not declare its own run()", action.Type)), warnings
+		}
+		return mergeReturnsOf(h, ci, *run, parameterRefs, warnings)
+	case valueflow.KindFunctional:
+		f := action.Func
+		if f == nil || f.ImplOwner == "" {
+			return valueflow.Unknown("doPrivileged action is a lambda whose implementation was not resolved"), warnings
+		}
+		if !strings.HasPrefix(f.ImplDesc, "()") {
+			return valueflow.Unknown(fmt.Sprintf("doPrivileged action lambda %s#%s%s takes captured or bound arguments, which are not tracked", f.ImplOwner, f.ImplName, f.ImplDesc)), warnings
+		}
+		ci, ok := h.Lookup(f.ImplOwner)
+		if !ok {
+			return valueflow.Unknown(fmt.Sprintf("lambda implementation class %s is outside the analyzed hierarchy", f.ImplOwner)), warnings
+		}
+		m, ok := ci.MethodByNameAndDesc(f.ImplName, f.ImplDesc)
+		if !ok || !m.IsStatic() {
+			return valueflow.Unknown(fmt.Sprintf("lambda implementation %s#%s%s is not a static method in the analyzed input", f.ImplOwner, f.ImplName, f.ImplDesc)), warnings
+		}
+		return mergeReturnsOf(h, ci, m, parameterRefs, warnings)
+	case valueflow.KindUnknown:
+		return valueflow.Unknown("doPrivileged action is unknown: " + action.Reason), warnings
+	default:
+		return valueflow.Unknown(fmt.Sprintf("doPrivileged action is %s, not a provable allocation or lambda", action.Kind)), warnings
+	}
+}
+
+func mergeReturnsOf(h *hierarchy.Hierarchy, ci *hierarchy.ClassInfo, m hierarchy.Method, parameterRefs bool, warnings []string) (valueflow.Value, []string) {
+	var jarReader classfile.JarClassReader
+	defer jarReader.Close()
+	cf, err := jarReader.ReadClass(ci.SourceJar, ci.SourceEntry)
+	if err != nil {
+		return valueflow.Unknown(fmt.Sprintf("could not re-read %s: %v", ci.FQCN, err)), warnings
+	}
+	v, more := mergeReturnsMode(cf, ci.FQCN, m, parameterRefs)
+	return v, append(warnings, more...)
 }

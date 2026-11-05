@@ -450,7 +450,7 @@ class-hierarchy-analysis expanded it to a subtype, so trust it less;
 `synthetic`: a profile's `synthetic_edges`, with no real call site at
 all; `model`: a reachable call site connected to a modeled target
 (currently the ServiceLoader classpath provider model, ROADMAP B3);
-`callback`: a resolved `Thread`/`Executor` registration connected to the
+`callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged` registration connected to the
 callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
 a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,
 DYNAMIC_LINKAGE L2) and, when there
@@ -699,7 +699,10 @@ report:
   slice correctly declines them), and calls into JDK-internal classes
   outside the analyzed hierarchy.
 - **Callbacks and async execution** (`Thread`, `Executor`/
-  `ExecutorService`): every call site registering one is inventoried
+  `ExecutorService`, and `AccessController.doPrivileged` — all six
+  `PrivilegedAction`/`PrivilegedExceptionAction` overloads, modeled as
+  running `run()` synchronously and returning its result): every call
+  site registering one is inventoried
   (ASYNC_CALLBACKS A0 — "Callback registration call sites" section),
   the concrete `Runnable`/`Callable` class or lambda/method reference
   passed directly is resolved where possible — a lambda resolves

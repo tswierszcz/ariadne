@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"ariadne/internal/analysis"
+	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/dataflow"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
 	"ariadne/internal/models"
+	"ariadne/internal/reflectinvoke"
 )
 
 const jpmsClasses = "../../testdata/jpms/classes"
@@ -730,5 +732,75 @@ func TestLoadSites_finalFieldsFromConstructorParameters(t *testing.T) {
 	}
 	if l := by["fixture.jpms.app.Captures$Mutable"]; len(l.Candidates()) != 0 || !strings.Contains(l.UnresolvedReason, "not a final instance field") {
 		t.Errorf("Mutable: %+v, want unresolved (not final)", l)
+	}
+}
+
+// TestDoPrivileged covers the AccessController.doPrivileged model: the
+// ASYNC_CALLBACKS catalog edge to the action's run() and the DATA_FLOW
+// D3 summary "result = what run() returns", seen by the ServiceLoader
+// consumption linking and by reflection.
+func TestDoPrivileged(t *testing.T) {
+	j := buildJPMSJars(t)
+	h, _, err := hierarchy.Build(j.app, j.deps())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const p = "fixture.jpms.app.Privileged"
+
+	// Callback edges to run().
+	sites := callback.FindRegistrationSites(h)
+	resolved, _ := callback.ResolveCallbacks(h, sites)
+	edges := callback.EdgeTargets(callback.FindCallbackEdges(h, resolved))
+	targets := map[string]string{}
+	for _, e := range edges {
+		if e.CallerFQCN == p {
+			targets[e.CallerName] = e.TargetFQCN + "#" + e.TargetMethod + e.TargetMethodDesc
+		}
+	}
+	if targets["anon"] != p+"$1#run()Ljava/lang/Object;" || !strings.HasPrefix(targets["lambda"], p+"#lambda$") || !strings.HasPrefix(targets["exception"], p+"#lambda$") || targets["reflective"] != p+"$2#run()Ljava/lang/Object;" {
+		t.Errorf("callback edges = %v", targets)
+	}
+	if _, ok := targets["given"]; ok {
+		t.Errorf("given: an unknown action must not get a callback edge: %v", targets)
+	}
+
+	// ServiceLoader consumption linking through the doPrivileged result.
+	loads, _, _ := FindLoadSites(h)
+	consumptions, _, err := FindConsumptionSites(h, loads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linked := map[string]ServiceConsumptionSite{}
+	for _, c := range consumptions {
+		if c.CallerFQCN == p && c.CallOwner == "java.util.Iterator" && c.CallName == "next" {
+			linked[c.CallerName] = c
+		}
+	}
+	for _, name := range []string{"anon", "lambda", "exception"} {
+		c := linked[name]
+		if strings.Join(c.Interfaces, ",") != "fixture.jpms.api.Codec" || c.UnresolvedReason != "" {
+			t.Errorf("%s: next() = %+v, want linked to Codec through doPrivileged", name, c)
+		}
+	}
+	var givenIterator *ServiceConsumptionSite
+	for i, c := range consumptions {
+		if c.CallerFQCN == p && c.CallerName == "given" && c.CallOwner == serviceLoaderOwner && c.CallName == "iterator" {
+			givenIterator = &consumptions[i]
+		}
+	}
+	if givenIterator == nil || len(givenIterator.Interfaces) != 0 || !strings.Contains(givenIterator.UnresolvedReason, "doPrivileged action is") {
+		t.Errorf("given: iterator() = %+v, want an explicit doPrivileged gap", givenIterator)
+	}
+
+	// Reflection: a getDeclaredMethod performed inside the action.
+	var site reflectinvoke.InvokeSite
+	for _, s := range reflectinvoke.FindInvokeSites(h) {
+		if s.CallerFQCN == p && s.CallerName == "reflective" {
+			site = s
+		}
+	}
+	ri, _ := reflectinvoke.ResolveInvokes(h, []reflectinvoke.InvokeSite{site})
+	if len(ri) != 1 || ri[0].OwnerFQCN != p+"$Target" || ri[0].MethodName != "hit" {
+		t.Errorf("reflective invoke = %+v, want Target#hit via doPrivileged", ri)
 	}
 }

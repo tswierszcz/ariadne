@@ -284,7 +284,9 @@ None found.
 
 Every call site found matching, or nearly matching, a cataloged callback-registration
 API (`java.lang.Thread`'s Runnable-taking constructors, `Executor`/`ExecutorService`'s
-`execute`/`submit`; ASYNC_CALLBACKS A0). **Not a call-graph edge** — this says a method
+`execute`/`submit`, `AccessController.doPrivileged`'s six `PrivilegedAction`/
+`PrivilegedExceptionAction` overloads — the last run `run()` synchronously and return its
+result, which DATA_FLOW uses as the call's value; ASYNC_CALLBACKS A0). **Not a call-graph edge** — this says a method
 *registers* a callback with an API that will eventually invoke it, not what the
 callback actually is or that it ever runs (resolving the callback argument's concrete
 type is ASYNC_CALLBACKS A1; turning that into a call-graph edge is A2, neither

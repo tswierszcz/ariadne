@@ -1666,6 +1666,49 @@ Przy dodawaniu kolejnego wpisu zapisz:
   model B3) — jedyny brakujący element, żeby te rozwiązane miejsca
   dały krawędzie; albo SERVICE_LOADING:S4.
 
+### ASYNC_CALLBACKS + DATA_FLOW:D3 — model `AccessController.doPrivileged` — DONE for this scope (2026-11-05)
+
+- **Zakres zatwierdzony:** (1) katalog ASYNC_CALLBACKS: sześć przeciążeń
+  `doPrivileged`, nowy rodzaj wykonania `synchronous`, krawędź do
+  `run()` istniejącą ścieżką A1/A2; (2) streszczenie biblioteczne D3:
+  wynik `doPrivileged` = wartości zwracane przez `run()` akcji; reguła
+  stopu przy zerowym efekcie (nie zadziałała).
+- **Zrealizowane:** `internal/callback/catalog.go`
+  (`ExecutionSynchronous`, wpisy dla `PrivilegedAction`/
+  `PrivilegedExceptionAction` × {sam, z `AccessControlContext`, z
+  kontekstem i `Permission...`}). `internal/dataflow/callresults.go`:
+  `isDoPrivileged`, `resolvePrivileged` w `resolveCallResultOnceMode` —
+  akcja z argumentu wywołania (po jednym kroku pola/wyniku wywołania):
+  alokacja → własna, niemostkowa, bezargumentowa `run()` (więcej niż
+  jedna → nieznane); lambda/referencja → implementacja bez argumentów
+  (przechwycone wartości → nieznane); inne → nieznane z powodem.
+  Wspólne miejsce, więc korzystają wszyscy odbiorcy wyników wywołań.
+- **Weryfikacja:** fixture `fixture.jpms.app.Privileged` (klasa
+  anonimowa, lambda, `PrivilegedExceptionAction`, akcja z parametru,
+  `getDeclaredMethod` wewnątrz akcji). `TestDoPrivileged` (krawędzie do
+  `run()`, brak krawędzi dla akcji z parametru, powiązanie konsumpcji
+  z Codec, jawna luka dla parametru, refleksja → `Target#hit`).
+  Mutacje: wyłączenie streszczenia, usunięcie filtra metod mostkowych,
+  usunięcie wpisu katalogu — test pada w każdym przypadku. `go vet
+  ./...`, `go test ./...`, `make build` — PASS. Offline `-profile
+  spring`, po dwa stabilne przebiegi: krawędzie callbacków petclinic
+  62→288, WebGoat 44→284 (rozwiązane identyczności 67→302 / 44→291);
+  powiązane konsumpcje ServiceLoadera 46→52 / 100→106; krawędzie
+  modelu 7→9 / 79; luki "does not resolve method doPrivileged" 13→0 /
+  14→0, 2 akcje WebGoat nadal nie do udowodnienia; krawędzie refleksji
+  bez zmian. Statusy CVE bez zmian, `results.json` bajtowo identyczny
+  z baseline'em, czas bez zmian (~9,8 s / ~15 s).
+- **Dokumentacja:** `docs/SUPPORT.MD` (ASYNC, DATA_FLOW), README,
+  szablon raportu, ten rejestr.
+- **Ograniczenia:** `doPrivilegedWithCombiner` i inne API
+  uprzywilejowane poza katalogiem; akcja z parametru/pola bez kroku
+  przez wywołujących (nie używa jeszcze `ResolveParameter`); lambdy z
+  przechwyconymi wartościami; refleksja wewnątrz akcji z
+  `try/catch` daje zbiór z `null` (nierozwiązany receiver).
+- **Następny krok (wymaga zgody):** SERVICE_LOADING:S4 (ostatnia otwarta
+  faza obszaru), dalsze modele B3, FRAMEWORKS:F3, albo ASYNC_CALLBACKS:A3
+  (continuations/listenery).
+
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
 - **Zakres zlecenia i zależności:** B0–B3 (wspólne — rejestr modeli B3
@@ -4109,10 +4152,10 @@ Przy dodawaniu kolejnego wpisu zapisz:
    na petclinic/WebGoat, reguła stopu — nie budowany (zob. wpis).
    DATA_FLOW:D3 pola `final` z parametru konstruktora zrobione
    (load sites z usługą 20→25 / 38→43, krawędzie bez zmian).
-   Najbliższe kandydatury: model `AccessController.doPrivileged`
-   (odblokowuje krawędzie dla Jacksona/xnio), SERVICE_LOADING:S4,
-   dalsze modele B3, albo FRAMEWORKS:F3; R3 dopiero z RTA albo nową
-   aplikacją kontrolną.
+   Model `AccessController.doPrivileged` zrobiony (krawędzie callbacków
+   62→288 / 44→284, statusy CVE bez zmian). Najbliższe kandydatury:
+   SERVICE_LOADING:S4, dalsze modele B3, FRAMEWORKS:F3,
+   ASYNC_CALLBACKS:A3; R3 dopiero z RTA albo nową aplikacją kontrolną.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

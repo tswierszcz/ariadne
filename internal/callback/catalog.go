@@ -32,6 +32,10 @@ const (
 	// synchronously inside the registration call itself, so "possibly
 	// immediate" must stay part of the model, not just "possibly later".
 	ExecutionImmediateOrAsync ExecutionKind = "immediate-or-async"
+	// ExecutionSynchronous: the API runs the callback on the calling
+	// thread before it returns, and returns the callback's own result
+	// (AccessController.doPrivileged and its run() action).
+	ExecutionSynchronous ExecutionKind = "synchronous"
 )
 
 // RegistrationModel is one callback-registration API ariadne knows
@@ -63,6 +67,9 @@ const (
 	fqcnExecutorService = "java.util.concurrent.ExecutorService"
 	fqcnRunnable        = "java.lang.Runnable"
 	fqcnCallable        = "java.util.concurrent.Callable"
+	fqcnAccessCtl       = "java.security.AccessController"
+	fqcnPrivAction      = "java.security.PrivilegedAction"
+	fqcnPrivExcAction   = "java.security.PrivilegedExceptionAction"
 )
 
 // DefaultCatalog is ASYNC_CALLBACKS A0's own initial JDK catalog: the
@@ -95,6 +102,26 @@ var DefaultCatalog = []RegistrationModel{
 	{Owner: fqcnExecutorService, Name: "submit", Desc: "(Ljava/util/concurrent/Callable;)Ljava/util/concurrent/Future;",
 		CallbackArgIndex: 0, CallbackInterface: fqcnCallable, CallbackMethod: "call", CallbackMethodDesc: "()Ljava/lang/Object;",
 		Execution: ExecutionAsyncMaybe},
+	// java.security.AccessController: every doPrivileged overload runs
+	// action.run() synchronously and returns its result.
+	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
+		CallbackArgIndex: 0, CallbackInterface: fqcnPrivAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
+		Execution: ExecutionSynchronous},
+	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;",
+		CallbackArgIndex: 0, CallbackInterface: fqcnPrivAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
+		Execution: ExecutionSynchronous},
+	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;[Ljava/security/Permission;)Ljava/lang/Object;",
+		CallbackArgIndex: 0, CallbackInterface: fqcnPrivAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
+		Execution: ExecutionSynchronous},
+	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
+		CallbackArgIndex: 0, CallbackInterface: fqcnPrivExcAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
+		Execution: ExecutionSynchronous},
+	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;",
+		CallbackArgIndex: 0, CallbackInterface: fqcnPrivExcAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
+		Execution: ExecutionSynchronous},
+	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;[Ljava/security/Permission;)Ljava/lang/Object;",
+		CallbackArgIndex: 0, CallbackInterface: fqcnPrivExcAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
+		Execution: ExecutionSynchronous},
 }
 
 var byKey = func() map[[3]string]RegistrationModel {
