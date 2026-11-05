@@ -183,9 +183,27 @@ func (l *lazyCallers) resolveParameterArg(v valueflow.Value, fqcn string, m hier
 	return l.get().ResolveParameter(dataflow.MethodID{Owner: fqcn, Name: m.Name, Desc: m.Descriptor}, v.Parameter.Index), true
 }
 
+// resolveFieldArg resolves a field argument: DATA_FLOW D3's existing
+// summaries first (static fields, final fields set to a constant), then
+// a final field set from a constructor parameter, through that
+// constructor's callers.
+func (l *lazyCallers) resolveFieldArg(v valueflow.Value) (valueflow.Value, dataflow.ParameterValues, bool) {
+	if v.Kind != valueflow.KindField || v.Field == nil {
+		return v, dataflow.ParameterValues{}, false
+	}
+	if resolved, _ := dataflow.ResolveField(l.h, *v.Field); resolved.Kind == valueflow.KindConst || resolved.Kind == valueflow.KindNull {
+		return resolved, dataflow.ParameterValues{}, false
+	}
+	return v, l.get().ResolveFinalField(*v.Field), true
+}
+
 // applyParameterInterfaces fills the site's service interface(s) from
 // the caller-derived values of its Class parameter.
 func applyParameterInterfaces(site *ServiceLoadSite, pv dataflow.ParameterValues) {
+	applyDerivedInterfaces(site, pv, "Class parameter resolved through callers (DATA_FLOW D3)")
+}
+
+func applyDerivedInterfaces(site *ServiceLoadSite, pv dataflow.ParameterValues, label string) {
 	var ifaces, other []string
 	for _, v := range pv.Values {
 		if v.Kind == valueflow.KindConst && v.Type == "java.lang.Class" {
@@ -195,7 +213,7 @@ func applyParameterInterfaces(site *ServiceLoadSite, pv dataflow.ParameterValues
 		}
 	}
 	missing := append(append([]string{}, pv.Unknown...), other...)
-	site.ParamSource = "Class parameter resolved through callers (DATA_FLOW D3): " + pv.Describe()
+	site.ParamSource = label + ": " + pv.Describe()
 	switch {
 	case len(ifaces) == 1 && len(missing) == 0:
 		site.Interface = ifaces[0]
@@ -269,12 +287,19 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method,
 		argSite := bytecodeir.Site{Method: fqcn + "#" + m.Name, Descriptor: m.Descriptor, PC: c.PC, Op: bytecodeir.OpCall}
 		val := facts.ArgumentAt(argSite, ov.argIndex)
 		pv, isParam := callers.resolveParameterArg(val, fqcn, m)
+		var fpv dataflow.ParameterValues
+		isField := false
+		if !aborted {
+			val, fpv, isField = callers.resolveFieldArg(val)
+		}
 		switch {
 		case val.Kind == valueflow.KindConst && val.Type == "java.lang.Class":
 			site.Interface = val.Const.(string)
 		case !aborted && isParam:
 			site.ClassParamSet, site.ClassParamIndex = true, val.Parameter.Index
 			applyParameterInterfaces(&site, pv)
+		case isField:
+			applyDerivedInterfaces(&site, fpv, "final field set from a constructor parameter, resolved through the constructor's callers (DATA_FLOW D3)")
 		case aborted:
 			site.UnresolvedReason = "local-value analysis for this method aborted: " + abortReason
 		case val.Kind == valueflow.KindUnknown:
@@ -287,6 +312,15 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method,
 			site.LoaderIdentity, site.LoaderDetail = classLoaderArgument(loaderArg)
 			if lpv, ok := callers.resolveParameterArg(loaderArg, fqcn, m); ok && site.LoaderIdentity == "" {
 				site.LoaderIdentity, site.LoaderDetail = parameterLoaderIdentity(lpv)
+			}
+			if resolved, fpv, ok := callers.resolveFieldArg(loaderArg); site.LoaderIdentity == "" {
+				if ok {
+					if id, detail := parameterLoaderIdentity(fpv); id != "" {
+						site.LoaderIdentity, site.LoaderDetail = id, strings.Replace(detail, "parameter;", "final field set from a constructor parameter;", 1)
+					}
+				} else if resolved.Kind != valueflow.KindField {
+					site.LoaderIdentity, site.LoaderDetail = classLoaderArgument(resolved)
+				}
 			}
 		}
 		if ov.kind == LoaderModuleLayer {

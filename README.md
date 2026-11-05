@@ -827,7 +827,9 @@ report:
   the analyzed callers (DATA_FLOW D3 now resolves a `Class`/`ClassLoader`
   parameter of the method calling `load` from its callers, up to 3 levels and
   16 call sites, for statically exact methods only; a consumption through one
-  helper call uses that call's own argument),
+  helper call uses that call's own argument; a `final` field set from a
+  constructor parameter — e.g. an anonymous class's captured `val$x` — is
+  resolved through that constructor's callers),
   virtual helper returns and other unresolved results,
   and caller-supplied loaders remain unsupported or incomplete, except a
   `load(Class, ClassLoader)` loader recognized in the calling method itself —

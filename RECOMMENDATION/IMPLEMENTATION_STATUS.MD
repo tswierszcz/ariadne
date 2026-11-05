@@ -15,7 +15,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD), [S2](../archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md) i [S3](../archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md) zarchiwizowane | S0, S1, S2, S3: DONE (S2/S3 dla zadeklarowanego zakresu); S4: UNASSESSED | S2 DONE (zarchiwizowane 2026-11-05): bounded provenance od `ServiceLoader.load()` do `Iterator.next()`/`Provider.get()` (lokalnie, przez dokładne helpery `invokestatic`/`invokespecial`, streszczenia D3 pól i liniowy `stream().findFirst()`), krawędzie do konstruktorów/`<clinit>` i descriptor-exact dispatch providerów; reszta przepływów to jawne luki. S3 pierwszy wycinek (2026-11-05): dekodowanie atrybutu `Module`, inwentarz deskryptorów (explicit/automatic, multi-release wg `-target-java`), deklaracje `provides` z flagą `provider()` i niezgodności module-info↔META-INF/services, wszystko w jawnym scenariuszu `classpath` — bez nowych rejestracji ani krawędzi; reachability petclinic/WebGoat bajtowo bez zmian. S3 wycinek 2 (2026-11-05): `-jpms-scenario module-path` — providery z `provides` jawnych modułów (ich `META-INF/services` ignorowane), krawędź do `provider()` zamiast konstruktora, automatic modules przez `META-INF/services`, brak `uses` → brak krawędzi z powodem, brakujące `requires` → ostrzeżenie; aplikacja kontrolna `prepare-jpms-demo.sh`: CVE-2022-42889 NOT_REACHABLE (classpath) vs REACHABLE (module-path), zgodnie z realnym JVM. S3 wycinek 3 (2026-11-05): `-jpms-scenario mixed` z `-jpms-module-path` (wzorce nazw jarów) oraz `load(ModuleLayer.boot(), S)` → tylko providery modułów nazwanych na module path; inna warstwa → kandydaci + luka. Zgodne z realnym JVM w dwóch uruchomieniach mieszanych. Pozostało: pełne rozwiązywanie modułów, warstwy inne niż boot, dispatch po `provider()`, klucz modelu z wariantem modułu / snapshot CVE F3. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
@@ -1619,6 +1619,52 @@ Przy dodawaniu kolejnego wpisu zapisz:
   działania (np. `obj.getClass()` przy znanym typie alokacji — RTA,
   GRAPH_PRECISION). Inne kandydatury: pola zapisywane z parametru
   konstruktora (D3), SERVICE_LOADING:S4, dalsze modele B3, FRAMEWORKS:F3.
+
+### DATA_FLOW:D3 — wycinek: pola `final` zapisywane z parametru konstruktora — DONE for this shape (2026-11-05)
+
+- **Zakres zatwierdzony:** rozszerzyć streszczenie pól `final`
+  zapisywanych przez `this` w konstruktorze o wartość będącą parametrem
+  konstruktora, rozwiązywaną przez wywołujących (`ResolveParameter`,
+  limity jak w poprzednim wycinku); odbiorca: argumenty `Class`/
+  `ClassLoader` przy `ServiceLoader.load`; reguła stopu przy zerze
+  rozwiązanych miejsc (nie zadziałała).
+- **Zrealizowane:** `dataflow.CallerIndex.ResolveFinalField` (pole
+  `final`, niestatyczne; każdy zapis `this.f = …` w `<init>` analizowany
+  z `AnalyzeWithParameterRefs`; parametr → wywołujący tego konstruktora;
+  suma po wszystkich `new`, bez rozróżniania instancji — bezpieczne
+  dzięki `final` i zapisowi przez `this`). `collect` przyjmuje jawną
+  metodę-właściciela parametru. `serviceload`: `resolveFieldArg` —
+  najpierw istniejące `ResolveField` (pole statyczne / `final` ze stałą,
+  co przy okazji rozwiązuje też stałe pola statyczne `Class`), potem
+  `ResolveFinalField`; to samo dla loadera. Raport: źródło "final field
+  set from a constructor parameter…".
+- **Weryfikacja:** fixture `fixture.jpms.app.Captures` (anonimowy
+  `PrivilegedAction` w kształcie Jacksona, `Box` z dwoma `new`,
+  `Mutable` z polem nie-`final`).
+  `TestLoadSites_finalFieldsFromConstructorParameters`; mutacje
+  (pominięcie warunku `final`; wyłączenie odbiorcy) — test pada.
+  `go vet ./...`, `go test ./...`, `make build` — PASS. Offline
+  `-profile spring`, po dwa stabilne przebiegi: petclinic load sites z
+  usługą 20→25, powiązane konsumpcje 45→46; WebGoat 38→43, 99→100.
+  Rozwiązane: Jackson `ObjectMapper$2#run`/`MapperBuilder$1#run`
+  (`databind.Module`; loader `null` dla `MapperBuilder$1`, dla
+  `ObjectMapper$2` łańcuch przekracza 3 poziomy), Hibernate Validator
+  `GetInstancesFromServiceLoader` (`ValueExtractor`,
+  `ConstraintValidator`), xnio `Xnio$2` (`XnioProvider`, loader
+  `Undertow.class.getClassLoader()`). Krawędzie modelu bez zmian
+  (7 / 79): te loadery wracają przez `AccessController.doPrivileged`,
+  którego wynik nie jest modelowany. `results.json` bajtowo
+  identyczny, czas bez zmian.
+- **Dokumentacja:** `docs/SUPPORT.MD`, README, szablon raportu, ten
+  rejestr.
+- **Ograniczenia:** suma po instancjach; tylko odbiorca ServiceLoader
+  (inni użytkownicy `ResolveField` bez zmian); pola nie-`final` i
+  zapisy poza konstruktorem nieznane.
+- **Następny krok (wymaga zgody):** model
+  `AccessController.doPrivileged(PrivilegedAction|
+  PrivilegedExceptionAction)` → wynik `run()` (ASYNC_CALLBACKS lub
+  model B3) — jedyny brakujący element, żeby te rozwiązane miejsca
+  dały krawędzie; albo SERVICE_LOADING:S4.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4061,9 +4107,12 @@ Przy dodawaniu kolejnego wpisu zapisz:
    zrobiony (load sites z usługą 13→20 / 31→38, statusy bez zmian).
    REFLECTION:R3 wycinek 1 zmierzony 2026-11-05: 0 możliwych krawędzi
    na petclinic/WebGoat, reguła stopu — nie budowany (zob. wpis).
-   Najbliższe kandydatury: pola z parametru konstruktora (D3),
-   SERVICE_LOADING:S4, dalsze modele B3, albo FRAMEWORKS:F3; R3 dopiero
-   z RTA albo nową aplikacją kontrolną.
+   DATA_FLOW:D3 pola `final` z parametru konstruktora zrobione
+   (load sites z usługą 20→25 / 38→43, krawędzie bez zmian).
+   Najbliższe kandydatury: model `AccessController.doPrivileged`
+   (odblokowuje krawędzie dla Jacksona/xnio), SERVICE_LOADING:S4,
+   dalsze modele B3, albo FRAMEWORKS:F3; R3 dopiero z RTA albo nową
+   aplikacją kontrolną.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

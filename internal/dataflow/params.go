@@ -148,14 +148,21 @@ func (idx *CallerIndex) resolve(method MethodID, index, depth int, visiting map[
 	}
 }
 
-func (idx *CallerIndex) collect(v valueflow.Value, s callerSite, depth int, visiting map[string]bool, out *ParameterValues) {
+// collect adds one argument value; a formal parameter of the method the
+// value was read in (s, or owner when given) is resolved one caller
+// level up.
+func (idx *CallerIndex) collect(v valueflow.Value, s callerSite, depth int, visiting map[string]bool, out *ParameterValues, owner ...MethodID) {
 	switch {
 	case v.Kind == valueflow.KindSet:
 		for _, c := range v.Candidates {
-			idx.collect(c, s, depth, visiting, out)
+			idx.collect(c, s, depth, visiting, out, owner...)
 		}
 	case v.Kind == valueflow.KindTyped && v.Parameter != nil:
-		idx.resolve(MethodID{s.ci.FQCN, s.m.Name, s.m.Descriptor}, v.Parameter.Index, depth+1, visiting, out)
+		m := MethodID{s.ci.FQCN, s.m.Name, s.m.Descriptor}
+		if len(owner) > 0 {
+			m = owner[0]
+		}
+		idx.resolve(m, v.Parameter.Index, depth+1, visiting, out)
 	case v.Kind == valueflow.KindUnknown:
 		out.Unknown = append(out.Unknown, fmt.Sprintf("caller %s#%s%s: %s", s.ci.FQCN, s.m.Name, s.m.Descriptor, v.Reason))
 	default:
@@ -289,4 +296,74 @@ func (p ParameterValues) Describe() string {
 		parts = append(parts, "incomplete: "+strings.Join(p.Unknown, "; "))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// ResolveFinalField returns what a *final* instance field holds, for the
+// shape ResolveInstanceField already accepts (written only by
+// `this.field = ...` in its declaring class's constructors), extending it
+// to a value that is a constructor parameter: that parameter is resolved
+// through the constructor's callers (ResolveParameter, same limits). The
+// union covers every `new` site — instance-insensitive, which finality
+// and self-receiver writes make safe: each instance holds one of these
+// values. Typical case: the synthetic `val$x` fields of an anonymous or
+// local class capturing its enclosing method's parameters. A non-final
+// field, or no constructor self-write, is an Unknown reason.
+func (idx *CallerIndex) ResolveFinalField(ref valueflow.FieldRef) ParameterValues {
+	var out ParameterValues
+	h := idx.h
+	declaring, ok := h.ResolveField(ref.Owner, ref.Name, ref.Desc)
+	if !ok {
+		out.Unknown = append(out.Unknown, fmt.Sprintf("%s does not resolve field %s:%s", ref.Owner, ref.Name, ref.Desc))
+		return out
+	}
+	ci, ok := h.Lookup(declaring)
+	if !ok {
+		out.Unknown = append(out.Unknown, fmt.Sprintf("declaring class %s is outside the analyzed hierarchy", declaring))
+		return out
+	}
+	field, ok := ci.FieldByNameAndDesc(ref.Name, ref.Desc)
+	if !ok || field.AccessFlags&classfile.AccFinal == 0 || field.AccessFlags&classfile.AccStatic != 0 {
+		out.Unknown = append(out.Unknown, fmt.Sprintf("%s#%s is not a final instance field", declaring, ref.Name))
+		return out
+	}
+	cf, err := idx.reader.ReadClass(ci.SourceJar, ci.SourceEntry)
+	if err != nil {
+		out.Unknown = append(out.Unknown, fmt.Sprintf("re-reading %s failed: %v", declaring, err))
+		return out
+	}
+	writes := 0
+	for _, m := range ci.Methods {
+		if m.Name != "<init>" {
+			continue
+		}
+		pcs, err := fieldPutPCs(cf, m.Method, declaring, ref.Name, ref.Desc)
+		if err != nil || len(pcs) == 0 {
+			continue
+		}
+		facts, err := AnalyzeWithParameterRefs(cf, declaring, m.Method)
+		if err != nil {
+			out.Unknown = append(out.Unknown, fmt.Sprintf("%s#<init>%s: local-value analysis: %v", declaring, m.Descriptor, err))
+			continue
+		}
+		if aborted, why := facts.Aborted(); aborted {
+			out.Unknown = append(out.Unknown, fmt.Sprintf("%s#<init>%s: local-value analysis aborted: %s", declaring, m.Descriptor, why))
+			continue
+		}
+		ctor := MethodID{declaring, "<init>", m.Descriptor}
+		for _, pc := range pcs {
+			site := bytecodeir.Site{Method: declaring + "#" + m.Name, Descriptor: m.Descriptor, PC: pc, Op: bytecodeir.OpFieldPut}
+			v, ok := facts.fieldWrites[site]
+			if !ok {
+				continue // not a self write
+			}
+			writes++
+			idx.collect(v, callerSite{ci: ci, m: m}, -1, map[string]bool{}, &out, ctor)
+		}
+	}
+	if writes == 0 {
+		out.Unknown = append(out.Unknown, fmt.Sprintf("no `this.%s = ...` write in any constructor of %s", ref.Name, declaring))
+	}
+	sort.Strings(out.Unknown)
+	out.Unknown = uniqueSorted(out.Unknown)
+	return out
 }

@@ -199,7 +199,9 @@ argument that is a parameter of the method calling `load` is resolved from that
 method's analyzed callers (D3; up to 3 caller levels and 16 call sites, statically
 exact methods only, assuming the input holds every caller; the load-site table shows
 the caller count), and a consumption through one helper call uses that call's own
-argument. Arbitrary mutable fields, parameters not resolvable from analyzed callers,
+argument. The same applies to a `final` field set from a constructor parameter (for
+example an anonymous class's captured `val$x`), resolved through that constructor's
+callers. Arbitrary mutable fields, parameters not resolvable from analyzed callers,
 virtual helper returns and unresolved helper
 results are not resolved; stream
 terminal operations and visibility through caller-supplied loaders not recognized

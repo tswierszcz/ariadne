@@ -703,3 +703,32 @@ func TestResolveParameter_limits(t *testing.T) {
 		t.Errorf("secure loader param = %+v", pv)
 	}
 }
+
+// TestLoadSites_finalFieldsFromConstructorParameters covers DATA_FLOW
+// D3's "final fields set from constructor parameters" slice.
+func TestLoadSites_finalFieldsFromConstructorParameters(t *testing.T) {
+	j := buildJPMSJars(t)
+	h, _, err := hierarchy.Build(j.app, j.deps())
+	if err != nil {
+		t.Fatal(err)
+	}
+	loads, _, err := FindLoadSites(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]ServiceLoadSite{}
+	for _, l := range loads {
+		if strings.HasPrefix(l.CallerFQCN, "fixture.jpms.app.Captures") {
+			by[l.CallerFQCN] = l
+		}
+	}
+	if l := by["fixture.jpms.app.Captures$1"]; l.Interface != "fixture.jpms.api.Codec" || l.LoaderIdentity != LoaderIdentSystem || !strings.Contains(l.LoaderDetail, "final field") || !strings.Contains(l.ParamSource, "final field") {
+		t.Errorf("anonymous capture (Jackson shape): %+v, want Codec and the system loader from val$ fields", l)
+	}
+	if l := by["fixture.jpms.app.Captures$Box"]; strings.Join(l.Interfaces, ",") != "fixture.jpms.api.Codec,java.lang.Runnable" || l.UnresolvedReason != "" {
+		t.Errorf("Box: %+v, want the set {Codec, Runnable} from two new sites", l)
+	}
+	if l := by["fixture.jpms.app.Captures$Mutable"]; len(l.Candidates()) != 0 || !strings.Contains(l.UnresolvedReason, "not a final instance field") {
+		t.Errorf("Mutable: %+v, want unresolved (not final)", l)
+	}
+}
