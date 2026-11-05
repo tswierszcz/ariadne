@@ -17,8 +17,9 @@
 # Run ariadne with `-profile generic -roots profile` so that main is the
 # only root (with -roots all, provider() is itself a root).
 #
-# The script also launches the app both ways with the real JVM, so the
-# expected difference is observed, not assumed.
+# The script also launches the app with the real JVM — class path, module
+# path, and two mixed launches (-jpms-scenario mixed, -jpms-module-path) —
+# so the expected differences are observed, not assumed.
 #
 # Produces under work/jpms-demo/:
 #   target/classes (with module-info.class), target/dependency/*.jar, deps.txt
@@ -147,5 +148,18 @@ echo "--- class path launch (module-info ignored; expect 0 providers):"
 java -cp "target/classes:target/dependency/*" demo.Main
 echo "--- module path launch (expect 1 provider via provider()):"
 java --module-path "target/classes:target/dependency" -m demo.jpms/demo.Main
+
+# SERVICE_LOADING S3 slice 3 (-jpms-scenario mixed): commons-text is an
+# automatic module, which reads the unnamed module, so commons-lang3 may
+# stay on the class path; demo.jpms is a named module, which cannot read
+# the unnamed module, so commons-text itself may not.
+echo "--- mixed launch, valid (commons-lang3 on the class path; expect 1 provider):"
+java --module-path "target/classes:$(ls target/dependency/commons-text-*.jar)" \
+     --class-path "$(ls target/dependency/commons-lang3-*.jar)" -m demo.jpms/demo.Main
+echo "--- mixed launch, invalid (commons-text on the class path; expect a startup failure):"
+if java --module-path target/classes --class-path "target/dependency/*" -m demo.jpms/demo.Main; then
+    echo "unexpected: the JVM started" >&2
+    exit 1
+fi
 
 echo "done: $work/{target/classes,target/dependency/,deps.txt}"

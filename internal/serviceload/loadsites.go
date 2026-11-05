@@ -101,6 +101,21 @@ func anyServiceLoaderCall(methods []hierarchy.Method) bool {
 	return false
 }
 
+// moduleLayerArgument recognizes the one layer a static analysis can
+// name exactly: the result of invokestatic java.lang.ModuleLayer#boot().
+// Any other value — a parameter, a field, a layer built at run time —
+// stays LayerUnknown and keeps the existing visibility gap.
+func moduleLayerArgument(v valueflow.Value, aborted bool) (LayerKind, string) {
+	if !aborted && v.Kind == valueflow.KindCallResult && v.Call != nil &&
+		v.Call.Owner == "java.lang.ModuleLayer" && v.Call.Name == "boot" && v.Call.Desc == "()Ljava/lang/ModuleLayer;" {
+		return LayerBoot, ""
+	}
+	if aborted {
+		return LayerUnknown, "local-value analysis for this method aborted"
+	}
+	return LayerUnknown, fmt.Sprintf("the ModuleLayer argument is %s, not ModuleLayer.boot()", v.Kind)
+}
+
 func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method) ([]ServiceLoadSite, error) {
 	facts, err := dataflow.Analyze(cf, fqcn, m.Method)
 	if err != nil {
@@ -137,6 +152,9 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method)
 			site.UnresolvedReason = "the argument is unknown: " + val.Reason
 		default:
 			site.UnresolvedReason = fmt.Sprintf("the argument is %s, not a resolvable Class literal", val.Kind)
+		}
+		if ov.kind == LoaderModuleLayer {
+			site.Layer, site.LayerReason = moduleLayerArgument(facts.ArgumentAt(argSite, 0), aborted)
 		}
 		sites = append(sites, site)
 	}

@@ -34,3 +34,8 @@ cp -R src/mr/META-INF classes/mr/
 `classes/mods/fixture.jpms.nouses` (added for `-jpms-scenario module-path`)
 calls `ServiceLoader.load(Codec.class)` from a module without `uses`; compile
 it with the same module command, `--module fixture.jpms.nouses`.
+
+`classes/mods/fixture.jpms.app/fixture/jpms/app/Layers.class` (slice 3) calls
+`ServiceLoader.load(ModuleLayer.boot(), Codec.class)` and
+`ServiceLoader.load(layer, Codec.class)` with a parameter layer; it is part of
+the `fixture.jpms.app` module and is rebuilt by the same module command.

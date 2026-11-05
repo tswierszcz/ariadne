@@ -274,6 +274,12 @@ func TestAutomaticModuleName(t *testing.T) {
 // coordinator) from rootFQCN.main for one scenario.
 func runJPMSScenario(t *testing.T, j jpmsJars, nousesJar string, scenario ModuleScenario, rootFQCN string) (*callgraph.Graph, uint32, analysis.Result, []string) {
 	t.Helper()
+	return runJPMS(t, j, nousesJar, ScenarioConfig{Scenario: scenario, AppJar: j.app}, rootFQCN, "main", "([Ljava/lang/String;)V")
+}
+
+func runJPMS(t *testing.T, j jpmsJars, nousesJar string, cfg ScenarioConfig, rootFQCN, rootName, rootDesc string) (*callgraph.Graph, uint32, analysis.Result, []string) {
+	t.Helper()
+	scenario := cfg.Scenario
 	deps := append(j.deps(), input.DepJar{Path: nousesJar})
 	h, _, err := hierarchy.Build(j.app, deps)
 	if err != nil {
@@ -287,7 +293,7 @@ func runJPMSScenario(t *testing.T, j jpmsJars, nousesJar string, scenario Module
 	if err != nil {
 		t.Fatal(err)
 	}
-	view, scenarioWarnings := ApplyScenario(scenario, regs, &inv, h)
+	view, scenarioWarnings := ApplyScenario(cfg, regs, &inv, h)
 	warnings = append(warnings, scenarioWarnings...)
 	if inv.Scenario != scenario {
 		t.Fatalf("inventory scenario = %q, want %q", inv.Scenario, scenario)
@@ -304,9 +310,9 @@ func runJPMSScenario(t *testing.T, j jpmsJars, nousesJar string, scenario Module
 	eval := NewModelEvaluator(h, loads, mats, consumptions)
 	eval.SetScenario(view)
 	g := callgraph.Build(h, nil)
-	root, ok := g.ID(rootFQCN, "main", "([Ljava/lang/String;)V")
+	root, ok := g.ID(rootFQCN, rootName, rootDesc)
 	if !ok {
-		t.Fatalf("no %s.main in graph", rootFQCN)
+		t.Fatalf("no %s#%s%s in graph", rootFQCN, rootName, rootDesc)
 	}
 	registry := models.NewRegistry()
 	RegisterModel(registry)
@@ -418,12 +424,12 @@ func TestApplyScenario_missingRequiresWarns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, warnings := ApplyScenario(ScenarioModulePath, regs, &inv, h)
+	_, warnings := ApplyScenario(ScenarioConfig{Scenario: ScenarioModulePath}, regs, &inv, h)
 	joined := strings.Join(warnings, "\n")
 	if !strings.Contains(joined, "requires fixture.jpms.api") {
 		t.Errorf("warnings = %v, want a missing-requires warning", warnings)
 	}
-	if _, cpWarnings := ApplyScenario(ScenarioClasspath, regs, &inv, h); len(cpWarnings) != 0 {
+	if _, cpWarnings := ApplyScenario(ScenarioConfig{Scenario: ScenarioClasspath}, regs, &inv, h); len(cpWarnings) != 0 {
 		t.Errorf("classpath scenario must not check requires: %v", cpWarnings)
 	}
 }
@@ -436,5 +442,123 @@ func TestParseScenario(t *testing.T) {
 	}
 	if _, err := ParseScenario("modulepath"); err == nil {
 		t.Error("want an error for an unknown scenario")
+	}
+}
+
+const (
+	layersFQCN   = "fixture.jpms.app.Layers"
+	codecProvide = "()Lfixture/jpms/api/Codec;"
+)
+
+// TestScenario_bootLayer: load(ModuleLayer.boot(), S) sees only named
+// modules on the module path — nothing from the input on the class path,
+// automatic and explicit modules on the module path, and only the
+// module-path part of a mixed launch.
+func TestScenario_bootLayer(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+
+	g, root, res, _ := runJPMS(t, j, nouses, ScenarioConfig{Scenario: ScenarioClasspath, AppJar: j.app}, layersFQCN, "boot", "()V")
+	for _, c := range []string{"fixture.jpms.impl.ModuleCodec", "fixture.jpms.impl.LegacyCodec", "fixture.jpms.auto.AutoCodec"} {
+		if hasModelEdgeFrom(g, root, c, "<init>", "()V") {
+			t.Errorf("classpath boot layer: unexpected edge to %s", c)
+		}
+	}
+	reasons := strings.Join(res.Reasons, "\n")
+	if !strings.Contains(reasons, "boot layer holds only JDK modules") || strings.Contains(reasons, "module-layer loader") {
+		t.Errorf("classpath boot layer reasons = %v", res.Reasons)
+	}
+
+	g, root, res, _ = runJPMS(t, j, nouses, ScenarioConfig{Scenario: ScenarioModulePath, AppJar: j.app}, layersFQCN, "boot", "()V")
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") ||
+		!hasModelEdgeFrom(g, root, "fixture.jpms.impl.FactoryCodec", "provider", codecProvide) ||
+		!hasModelEdgeFrom(g, root, "fixture.jpms.auto.AutoCodec", "<init>", "()V") {
+		t.Error("module-path boot layer: want ModuleCodec, FactoryCodec.provider() and automatic AutoCodec")
+	}
+	if strings.Contains(strings.Join(res.Reasons, "\n"), "module-layer loader") {
+		t.Errorf("boot layer must not keep the generic layer visibility gap: %v", res.Reasons)
+	}
+
+	mixed := ScenarioConfig{Scenario: ScenarioMixed, AppJar: j.app, ModulePathJars: []string{"app", "fixture-api-*.jar", "fixture-impl-*.jar"}}
+	g, root, _, _ = runJPMS(t, j, nouses, mixed, layersFQCN, "boot", "()V")
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("mixed boot layer: missing module-path ModuleCodec")
+	}
+	if hasModelEdgeFrom(g, root, "fixture.jpms.auto.AutoCodec", "<init>", "()V") {
+		t.Error("mixed boot layer: AutoCodec is on the class path, in no layer")
+	}
+}
+
+func TestScenario_unknownLayerKeepsGap(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	g, root, res, _ := runJPMS(t, j, nouses, ScenarioConfig{Scenario: ScenarioClasspath, AppJar: j.app}, layersFQCN, "given", "(Ljava/lang/ModuleLayer;)V")
+	// Never a confident negative: the candidate providers stay, with a gap.
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("unknown layer: candidate provider edge must remain")
+	}
+	if !res.Incomplete || !strings.Contains(strings.Join(res.Reasons, "\n"), "module-layer loader") {
+		t.Errorf("unknown layer: want the visibility gap, got %v", res.Reasons)
+	}
+}
+
+// TestScenario_mixed: module-path explicit modules provide through
+// `provides`, class-path jars through META-INF/services, both visible to
+// ServiceLoader.load(Class).
+func TestScenario_mixed(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	cfg := ScenarioConfig{Scenario: ScenarioMixed, AppJar: j.app, ModulePathJars: []string{"app", "fixture-api-*.jar", "fixture-impl-*.jar"}}
+	g, root, _, warnings := runJPMS(t, j, nouses, cfg, "fixture.jpms.app.Main", "main", "([Ljava/lang/String;)V")
+	if len(warnings) != 0 {
+		t.Errorf("warnings: %v", warnings)
+	}
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.FactoryCodec", "provider", codecProvide) {
+		t.Error("mixed: missing module-path FactoryCodec.provider()")
+	}
+	if hasModelEdgeFrom(g, root, "fixture.jpms.impl.LegacyCodec", "<init>", "()V") {
+		t.Error("mixed: impl is on the module path, its META-INF/services must be ignored")
+	}
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.auto.AutoCodec", "<init>", "()V") {
+		t.Error("mixed: class-path AutoCodec must stay visible")
+	}
+
+	// The class-path half has no `uses` rule; the module-path caller does.
+	cfgNoUses := ScenarioConfig{Scenario: ScenarioMixed, AppJar: j.app, ModulePathJars: []string{"fixture-nouses-*.jar", "fixture-api-*.jar"}}
+	_, _, res, _ := runJPMS(t, j, nouses, cfgNoUses, "fixture.jpms.nouses.NoUses", "main", "([Ljava/lang/String;)V")
+	if !strings.Contains(strings.Join(res.Reasons, "\n"), "mixed scenario: caller module fixture.jpms.nouses does not declare `uses") {
+		t.Errorf("mixed no-uses reasons = %v", res.Reasons)
+	}
+}
+
+func TestApplyScenario_mixedWarnings(t *testing.T) {
+	j := buildJPMSJars(t)
+	h, _, err := hierarchy.Build(j.app, j.deps())
+	if err != nil {
+		t.Fatal(err)
+	}
+	regs, _, _ := Inventory(h, j.app, j.deps())
+	inv, _, err := InventoryModules(h, j.app, j.deps(), 0, regs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := ScenarioConfig{Scenario: ScenarioMixed, AppJar: j.app, ModulePathJars: []string{"fixture-impl-*.jar", "nothing-*.jar"}}
+	view, warnings := ApplyScenario(cfg, regs, &inv, h)
+	joined := strings.Join(warnings, "\n")
+	if !strings.Contains(joined, "requires fixture.jpms.api, which is on the class path") {
+		t.Errorf("want a class-path requires warning, got %v", warnings)
+	}
+	if !strings.Contains(joined, `pattern "nothing-*.jar" matches no input jar`) {
+		t.Errorf("want an unmatched-pattern warning, got %v", warnings)
+	}
+	for _, d := range inv.Descriptors {
+		if d.OnModulePath != (d.Jar == j.impl) {
+			t.Errorf("%s OnModulePath=%v", filepath.Base(d.Jar), d.OnModulePath)
+		}
+	}
+	for _, r := range view.Registrations {
+		if r.SourceJar == j.auto && r.Module != "" {
+			t.Errorf("class-path registration got a module: %+v", r)
+		}
 	}
 }

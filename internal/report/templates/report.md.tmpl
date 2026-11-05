@@ -208,21 +208,27 @@ None found.
 ## JPMS module descriptors
 
 SERVICE_LOADING S3. Scenario: **{{.Modules.Scenario}}** (`-jpms-scenario`).
-{{- if eq (print .Modules.Scenario) "module-path"}} Every input jar, the app included, is
-treated as on the application module path: an explicit module's providers are its
-`provides` entries (its `META-INF/services` is ignored), an automatic module's are its
-`META-INF/services` entries (constructor only), a provider with `public static
-provider()` is created through that method, and a ServiceLoader caller in an explicit
-module must declare `uses` for the service or no provider is modeled. The constructor
-candidates above follow this scenario. A mixed class path/module path launch, module
-resolution beyond a missing-`requires` warning, qualified exports and module layers are
-**not modeled**.
-{{- else}} Every input jar
+{{- if eq (print .Modules.Scenario) "classpath"}} Every input jar
 is analyzed on the class path, so each one belongs to the unnamed module and the JVM
 ignores every `module-info.class`; ServiceLoader then sees exactly the
 `META-INF/services` registrations above. The descriptors below are inventoried to show
-what would differ on a module path (`-jpms-scenario module-path`); in this run they add
-no registrations or call-graph edges.
+what would differ on a module path (`-jpms-scenario module-path` or `mixed`); in this run
+they add no registrations or call-graph edges.
+{{- else}}{{if eq (print .Modules.Scenario) "module-path"}} Every input jar, the app
+included, is treated as on the application module path.{{else}} Only these jars are on
+the module path (`-jpms-module-path`); every other jar stays on the class path, in the
+unnamed module, with its `META-INF/services` providers. Every module-path module is
+assumed resolved, as with `--add-modules ALL-MODULE-PATH`.
+Module path: {{range .Modules.Descriptors}}{{if .OnModulePath}}`{{.Jar}}` {{end}}{{end}}.{{end}}
+On the module path an explicit module's providers are its `provides` entries (its
+`META-INF/services` is ignored), an automatic module's are its `META-INF/services`
+entries (constructor only), a provider with `public static provider()` is created
+through that method, and a ServiceLoader caller in an explicit module must declare
+`uses` for the service or no provider is modeled. `load(ModuleLayer.boot(), S)` sees
+only providers in named modules on the module path; any other `ModuleLayer` argument
+keeps every candidate with a visibility gap. The constructor candidates above follow
+this scenario. Module resolution beyond missing-`requires` warnings, qualified exports
+and layers other than the boot layer are **not modeled**.
 {{- end}} "Kind" is how the jar is treated on a module path.
 {{with .Modules}}
 {{if not .Descriptors}}
@@ -650,9 +656,9 @@ None found.
   at `Provider.get()`; a stream without a terminal operation remains lazy. Unlinked
   receiver flows and unsupported stream callback/terminal flows produce incomplete-model warnings. A registration alone is not
   a reachability verdict. JPMS: provider sets follow `-jpms-scenario` (see "JPMS module
-  descriptors"); a mixed class path/module path launch, full module resolution and
-  module layers are not modeled, and no exact dispatch edge follows an object created
-  by a `provider()` method.
+  descriptors"); full module resolution and layers other than `ModuleLayer.boot()` are
+  not modeled, and no exact dispatch edge follows an object created by a `provider()`
+  method.
 - **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
   package than its own Maven coordinates is not detected as such.
 - **CHA over-approximates**: a virtual/interface call is treated as reaching every

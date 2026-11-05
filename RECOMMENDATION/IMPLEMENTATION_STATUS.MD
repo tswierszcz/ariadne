@@ -16,7 +16,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD), [S2 zarchiwizowane](../archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md) | S0, S1, S2: DONE; S3: IN_PROGRESS; S4: UNASSESSED | S2 DONE (zarchiwizowane 2026-11-05): bounded provenance od `ServiceLoader.load()` do `Iterator.next()`/`Provider.get()` (lokalnie, przez dokładne helpery `invokestatic`/`invokespecial`, streszczenia D3 pól i liniowy `stream().findFirst()`), krawędzie do konstruktorów/`<clinit>` i descriptor-exact dispatch providerów; reszta przepływów to jawne luki. S3 pierwszy wycinek (2026-11-05): dekodowanie atrybutu `Module`, inwentarz deskryptorów (explicit/automatic, multi-release wg `-target-java`), deklaracje `provides` z flagą `provider()` i niezgodności module-info↔META-INF/services, wszystko w jawnym scenariuszu `classpath` — bez nowych rejestracji ani krawędzi; reachability petclinic/WebGoat bajtowo bez zmian. S3 wycinek 2 (2026-11-05): `-jpms-scenario module-path` — providery z `provides` jawnych modułów (ich `META-INF/services` ignorowane), krawędź do `provider()` zamiast konstruktora, automatic modules przez `META-INF/services`, brak `uses` → brak krawędzi z powodem, brakujące `requires` → ostrzeżenie; aplikacja kontrolna `prepare-jpms-demo.sh`: CVE-2022-42889 NOT_REACHABLE (classpath) vs REACHABLE (module-path), zgodnie z realnym JVM. Pozostało: scenariusz mieszany, pełne rozwiązywanie modułów, warstwy, dispatch po `provider()`. |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD), [S2 zarchiwizowane](../archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md) | S0, S1, S2: DONE; S3: IN_PROGRESS; S4: UNASSESSED | S2 DONE (zarchiwizowane 2026-11-05): bounded provenance od `ServiceLoader.load()` do `Iterator.next()`/`Provider.get()` (lokalnie, przez dokładne helpery `invokestatic`/`invokespecial`, streszczenia D3 pól i liniowy `stream().findFirst()`), krawędzie do konstruktorów/`<clinit>` i descriptor-exact dispatch providerów; reszta przepływów to jawne luki. S3 pierwszy wycinek (2026-11-05): dekodowanie atrybutu `Module`, inwentarz deskryptorów (explicit/automatic, multi-release wg `-target-java`), deklaracje `provides` z flagą `provider()` i niezgodności module-info↔META-INF/services, wszystko w jawnym scenariuszu `classpath` — bez nowych rejestracji ani krawędzi; reachability petclinic/WebGoat bajtowo bez zmian. S3 wycinek 2 (2026-11-05): `-jpms-scenario module-path` — providery z `provides` jawnych modułów (ich `META-INF/services` ignorowane), krawędź do `provider()` zamiast konstruktora, automatic modules przez `META-INF/services`, brak `uses` → brak krawędzi z powodem, brakujące `requires` → ostrzeżenie; aplikacja kontrolna `prepare-jpms-demo.sh`: CVE-2022-42889 NOT_REACHABLE (classpath) vs REACHABLE (module-path), zgodnie z realnym JVM. S3 wycinek 3 (2026-11-05): `-jpms-scenario mixed` z `-jpms-module-path` (wzorce nazw jarów) oraz `load(ModuleLayer.boot(), S)` → tylko providery modułów nazwanych na module path; inna warstwa → kandydaci + luka. Zgodne z realnym JVM w dwóch uruchomieniach mieszanych. Pozostało: pełne rozwiązywanie modułów, warstwy inne niż boot, dispatch po `provider()`, klucz modelu z wariantem modułu / snapshot CVE F3. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
@@ -1417,6 +1417,76 @@ Przy dodawaniu kolejnego wpisu zapisz:
   jako jawna luka z nazwaną warstwą), albo przejście do S4 (regresja i
   rozszerzenia stream API) / innego obszaru — efekt wycinka 3 na
   petclinic/WebGoat byłby zerowy (nie są uruchamiane modułowo).
+
+### SERVICE_LOADING:S3 — wycinek 3: scenariusz mieszany i `ModuleLayer.boot()` — wycinek DONE; faza IN_PROGRESS (2026-11-05)
+
+- **Zakres zatwierdzony:** `-jpms-scenario mixed` + `-jpms-module-path`,
+  `load(ModuleLayer.boot(), S)`, nieznana warstwa jako luka bez
+  negatywnego wyniku, trzecie i czwarte uruchomienie demo. Zmierzone przed
+  startem i przyjęte świadomie: petclinic/WebGoat mają 0 wywołań
+  `load(ModuleLayer, …)` i nie startują modułowo, więc efekt na nich zero.
+- **Zrealizowane:**
+  - `ScenarioMixed`, `ScenarioConfig{Scenario, ModulePathJars, AppJar}`,
+    `ParseModulePathJars` (wzorce `filepath.Match` na nazwie pliku, `app`
+    = aplikacja). `ApplyScenario(cfg, …)` liczy zbiór jarów na module
+    path (`module-path` = wszystkie, `classpath` = żaden), ustawia nowe
+    `ModuleDescriptor.OnModulePath`; jary z classpath zachowują
+    rejestracje `META-INF/services` bez modułu, ich `module-info` i
+    `provides` są ignorowane. Ostrzeżenia: wzorzec bez dopasowania,
+    `requires` spełniane tylko przez jar z classpath ("the unnamed
+    module, not readable by named modules"), osobno od modułu zupełnie
+    nieobecnego. `usesCheck` działa tylko dla wywołujących w jawnych
+    modułach na module path. Założenie jawne: moduły z module path są
+    rozwiązane jak przy `--add-modules ALL-MODULE-PATH`.
+  - `ServiceLoadSite.Layer`/`LayerReason` (`LayerBoot`, `LayerUnknown`):
+    argument `ModuleLayer` rozpoznany jako `KindCallResult`
+    `java.lang.ModuleLayer#boot()` w tej samej metodzie. Ewaluator
+    (`visibleProviders`, `bootLayerOnly`): gdy wszystkie powiązane load
+    sites są boot-layer, widoczni są tylko providery z `Module != ""`;
+    w `classpath` — żaden z wejścia, z powodem i `Incomplete` (providerów
+    JDK nie analizujemy); luka "module-layer loader" znika tylko w tym
+    przypadku. Inna warstwa — bez zmian: wszyscy kandydaci + luka.
+  - CLI: `-jpms-module-path`, walidacja (mixed wymaga listy, lista tylko
+    z mixed, zły wzorzec). Raport: tekst sekcji JPMS dla `mixed` z listą
+    jarów na module path i założeniem `ALL-MODULE-PATH`, opis
+    `ModuleLayer.boot()`; Limitations zaktualizowane.
+- **Weryfikacja:** fixture: nowa klasa `fixture.jpms.app.Layers`
+  (`boot()`, `given(ModuleLayer)`), skompilowana jak reszta modułu.
+  Testy: `TestScenario_bootLayer` (classpath: zero providerów z wejścia
+  + powód; module-path: ModuleCodec, `FactoryCodec#provider()`,
+  automatyczny AutoCodec; mixed {app, api, impl}: ModuleCodec tak,
+  AutoCodec z classpath nie), `TestScenario_unknownLayerKeepsGap`,
+  `TestScenario_mixed` (provides z module path + `META-INF/services`
+  z classpath, LegacyCodec z jawnego modułu pominięty, `uses` tylko dla
+  module path), `TestApplyScenario_mixedWarnings`,
+  `TestJPMSScenarioFlags`. Mutacje: wyłączenie filtra warstwy boot i
+  ostrzeżenia o `requires` na classpath — testy padają. `go vet ./...`,
+  `go test ./...`, `git diff --check`, `make build` — PASS.
+  Demo (`prepare-jpms-demo.sh`, realny JVM 25): mixed poprawny
+  (`-p classes:commons-text`, `-cp commons-lang3`) — 1 provider; mixed
+  nieuruchamialny (commons-text na classpath) — `FindException: Module
+  org.apache.commons.text not found, required by demo.jpms`. ariadne
+  offline: `mixed -jpms-module-path 'app,commons-text-*.jar'` — 2×
+  REACHABLE, bez ostrzeżeń; `mixed -jpms-module-path app` — ostrzeżenie
+  "requires org.apache.commons.text, which is on the class path".
+  `classpath`/`module-path` na demo bajtowo jak w wycinku 2. Regresja:
+  petclinic/WebGoat domyślnie bajtowo identyczne z baseline'em,
+  petclinic `module-path` bajtowo jak w wycinku 2; WebGoat `mixed
+  -jpms-module-path 'jackson-*.jar'` — statusy bez zmian, 75 krawędzi.
+- **Dokumentacja:** README (flagi `-jpms-scenario mixed`,
+  `-jpms-module-path`, ograniczenia), FAQ.md (demo), `docs/SUPPORT.MD`,
+  szablon raportu, README fixture, plan fazy, ten rejestr.
+- **Kryteria S3 a stan:** classpath / named / automatic / niedostępny
+  provider rozróżnione w modelu; nieznana warstwa nie daje negatywnego
+  wyniku (test). Otwarte: pełne rozwiązywanie modułów (w tym fakt, że
+  main z classpath bez `--add-modules` nie rozwiązuje modułów z module
+  path), kwalifikowane eksporty, warstwy inne niż boot, dispatch po
+  `provider()`, klucz modelu z wariantem modułu i snapshot CVE F3.
+- **Następny krok (wymaga zgody):** S3 można zamknąć jako DONE dla
+  zadeklarowanego zakresu po decyzji użytkownika, że pozostałe punkty
+  to jawne ograniczenia (analogicznie do S2), albo kontynuować; inne
+  kandydatury: rozpoznawanie jawnych `ClassLoader` (19/29 load sites
+  petclinic, 32/48 WebGoat), SERVICE_LOADING:S4, dalsze modele B3.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -3851,8 +3921,11 @@ Przy dodawaniu kolejnego wpisu zapisz:
    SERVICE_LOADING:S3 ma dwa wycinki: inwentarz deskryptorów JPMS oraz
    `-jpms-scenario module-path` z aplikacją kontrolną
    `scripts/prepare-jpms-demo.sh` (CVE-2022-42889 NOT_REACHABLE vs
-   REACHABLE). Najbliższe kandydatury: S3 wycinek 3 (scenariusz mieszany,
-   warstwy), SERVICE_LOADING:S4, dalsze modele B3, albo FRAMEWORKS:F3.
+   REACHABLE), a wycinek 3 dodał `mixed`/`-jpms-module-path` i
+   `ModuleLayer.boot()`. Najbliższe kandydatury: decyzja o zamknięciu S3,
+   rozpoznawanie jawnych `ClassLoader` przy `load(Class, ClassLoader)`
+   (największa liczba realnych luk), SERVICE_LOADING:S4, dalsze modele
+   B3, albo FRAMEWORKS:F3.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

@@ -123,7 +123,11 @@ seven builds have actually been tested and verified**:
   the control case for `-jpms-scenario`: with `-profile generic -roots
   profile`, `classpath` gives NOT_REACHABLE (the JVM ignores module-info
   there) and `module-path` gives REACHABLE through `provider()`; the script
-  also launches it both ways with the real JVM (0 vs 1 provider found).
+  also launches it with the real JVM (0 vs 1 provider found), plus two mixed
+  launches for `-jpms-scenario mixed`: commons-lang3 alone on the class path
+  starts and finds the provider (REACHABLE in ariadne too), commons-text on
+  the class path fails at startup (`Module org.apache.commons.text not
+  found`), which ariadne reports as a `requires` warning.
 
 Everything else (Kotlin, Scala, Groovy) **should work mechanically**,
 but has never been run or tested.

@@ -500,7 +500,8 @@ Flags:
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
-| `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`). Recorded in the report header; `results.json`'s format is unchanged. |
+| `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
+| `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
@@ -843,8 +844,20 @@ report:
   warning. A `requires` on a module absent from the input is a warning (the
   JVM would refuse to start). No exact dispatch edge follows a
   `provider()`-created object (its runtime type is not tracked; CHA edges
-  remain). A mixed class path/module path launch, full module resolution,
-  qualified exports and module layers are not modeled.
+  remain). `-jpms-scenario mixed` puts only the `-jpms-module-path` jars on
+  the module path: class-path jars keep their `META-INF/services` providers
+  (visible to `ServiceLoader.load(Class)` alongside module-path providers), a
+  class-path jar's `module-info.class` is ignored, the `uses` rule applies only
+  to callers in explicit modules on the module path, and a `requires` satisfied
+  only by a class-path jar is a warning (named modules cannot read the unnamed
+  module). `load(ModuleLayer.boot(), S)` — recognized when the argument is
+  provably `ModuleLayer.boot()` — sees only providers in named modules on the
+  module path (none from the input in the `classpath` scenario, reported as a
+  gap since JDK providers are not analyzed); any other `ModuleLayer` argument
+  keeps every candidate provider with a visibility gap. Full module resolution,
+  qualified exports, a class-path main class not resolving module-path modules
+  without `--add-modules`, and layers other than the boot layer are not
+  modeled.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is
   not detected as such.

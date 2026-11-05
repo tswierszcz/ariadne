@@ -103,3 +103,26 @@ func TestMethodExists(t *testing.T) {
 		}
 	}
 }
+
+func TestJPMSScenarioFlags(t *testing.T) {
+	for _, tc := range []struct {
+		args    []string
+		invalid bool
+		msg     string
+	}{
+		{[]string{"-jpms-scenario", "modulepath"}, true, "unknown JPMS scenario"},
+		{[]string{"-jpms-scenario", "mixed"}, true, "needs -jpms-module-path"},
+		{[]string{"-jpms-module-path", "a.jar"}, true, "only valid with -jpms-scenario mixed"},
+		{[]string{"-jpms-scenario", "mixed", "-jpms-module-path", "[bad"}, true, "bad module-path jar pattern"},
+		{[]string{"-jpms-scenario", "mixed", "-jpms-module-path", "app,commons-*.jar"}, false, ""},
+		{[]string{"-jpms-scenario", "module-path"}, false, ""},
+	} {
+		code, stderr := runWithEnv(append(tc.args, baseArgs...), nil)
+		if tc.invalid && (code != 2 || !strings.Contains(stderr, tc.msg)) {
+			t.Errorf("%v: code=%d stderr=%q, want 2 and %q", tc.args, code, stderr, tc.msg)
+		}
+		if !tc.invalid && code == 2 {
+			t.Errorf("%v: rejected by validation: %q", tc.args, stderr)
+		}
+	}
+}

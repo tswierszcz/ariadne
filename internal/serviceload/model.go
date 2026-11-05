@@ -101,10 +101,70 @@ type ModelEvaluator struct {
 func (e *ModelEvaluator) SetScenario(view ScenarioView) { e.scenario = view }
 
 func (e *ModelEvaluator) noProviderReason(iface string) string {
-	if e.scenario.Scenario == ScenarioModulePath {
-		return fmt.Sprintf("no module-path provider is modeled for service %s (explicit modules' provides, automatic modules' META-INF/services)", iface)
+	if len(e.scenario.moduleByJar) > 0 {
+		return fmt.Sprintf("no provider is modeled for service %s in the %s scenario (module-path explicit modules' provides, automatic modules' and class-path jars' META-INF/services)", iface, e.scenario.Scenario)
 	}
 	return fmt.Sprintf("no classpath provider is modeled for service %s; JPMS providers are outside this model", iface)
+}
+
+// linkedLoadSites returns the load sites a consumption's receiver trace
+// reaches that name iface.
+func (e *ModelEvaluator) linkedLoadSites(c ServiceConsumptionSite, iface string) []ServiceLoadSite {
+	var out []ServiceLoadSite
+	for _, key := range c.streamLoadSites {
+		if load, ok := e.sites[key]; ok && load.Interface == iface {
+			out = append(out, load)
+		}
+	}
+	return out
+}
+
+// bootLayerOnly reports whether every load site linked to c is
+// load(ModuleLayer.boot(), ...) — the only layer modeled exactly.
+func (e *ModelEvaluator) bootLayerOnly(c ServiceConsumptionSite) bool {
+	found := false
+	for _, key := range c.streamLoadSites {
+		load, ok := e.sites[key]
+		if !ok {
+			continue
+		}
+		if load.LoaderKind != LoaderModuleLayer || load.Layer != LayerBoot {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
+// visibleProviders narrows the providers for iface by the linked load
+// sites' layer (SERVICE_LOADING S3): load(ModuleLayer.boot(), S) sees
+// only providers in named modules on the module path, never the class
+// path's unnamed module. Any other linked load site keeps the full set.
+// reason explains an empty result caused by the layer.
+func (e *ModelEvaluator) visibleProviders(c ServiceConsumptionSite, iface string) ([]ProviderMaterialization, string) {
+	all := e.providersByInterface[iface]
+	linked := e.linkedLoadSites(c, iface)
+	if len(linked) == 0 {
+		return all, ""
+	}
+	for _, load := range linked {
+		if load.LoaderKind != LoaderModuleLayer || load.Layer != LayerBoot {
+			return all, ""
+		}
+	}
+	var named []ProviderMaterialization
+	for _, m := range all {
+		if m.Registration.Module != "" {
+			named = append(named, m)
+		}
+	}
+	if len(named) > 0 {
+		return named, ""
+	}
+	if len(e.scenario.moduleByJar) == 0 {
+		return nil, fmt.Sprintf("load(ModuleLayer.boot(), %s) in the %s scenario: the boot layer holds only JDK modules, so no provider from the input jars is visible (JDK providers are not analyzed)", iface, e.scenario.scenarioName())
+	}
+	return nil, fmt.Sprintf("load(ModuleLayer.boot(), %s): no provider in a named module on the module path; class-path providers are in no layer (JDK providers are not analyzed)", iface)
 }
 
 // usesAllowed applies the scenario's `uses` check to the load sites a
@@ -205,10 +265,13 @@ func (e *ModelEvaluator) evaluateDispatch(model *models.Model, site models.CallS
 		if iface != dispatch.CallOwner {
 			continue
 		}
-		mats := e.providersByInterface[iface]
+		mats, layerReason := e.visibleProviders(dispatch, iface)
 		if len(mats) == 0 {
 			fact.Incomplete = true
-			fact.Reason = joinReasons(fact.Reason, e.noProviderReason(iface))
+			if layerReason == "" {
+				layerReason = e.noProviderReason(iface)
+			}
+			fact.Reason = joinReasons(fact.Reason, layerReason)
 			continue
 		}
 		if ok, why := e.usesAllowed(dispatch, iface); !ok {
@@ -291,17 +354,24 @@ func (e *ModelEvaluator) evaluateConsumption(model *models.Model, site models.Ca
 		}
 		return fact
 	}
+	bootOnly := e.bootLayerOnly(consumption)
 	for _, loader := range consumption.LoaderKinds {
+		if loader == LoaderModuleLayer && bootOnly {
+			continue // ModuleLayer.boot() is modeled exactly below
+		}
 		if loader != LoaderClasspath {
 			fact.Incomplete = true
 			fact.Reason = joinReasons(fact.Reason, fmt.Sprintf("provider visibility for %s loader is not verified against classpath registrations", loader))
 		}
 	}
 	for _, iface := range consumption.Interfaces {
-		mats := e.providersByInterface[iface]
+		mats, layerReason := e.visibleProviders(consumption, iface)
 		if len(mats) == 0 {
 			fact.Incomplete = true
-			fact.Reason = joinReasons(fact.Reason, e.noProviderReason(iface))
+			if layerReason == "" {
+				layerReason = e.noProviderReason(iface)
+			}
+			fact.Reason = joinReasons(fact.Reason, layerReason)
 			continue
 		}
 		if ok, why := e.usesAllowed(consumption, iface); !ok {

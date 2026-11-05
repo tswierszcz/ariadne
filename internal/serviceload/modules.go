@@ -39,13 +39,86 @@ const ScenarioClasspath ModuleScenario = "classpath"
 // (service binding resolves provider modules of a used service).
 const ScenarioModulePath ModuleScenario = "module-path"
 
+// ScenarioMixed puts only the jars ScenarioConfig.ModulePathJars selects
+// on the module path (SERVICE_LOADING S3 slice 3); the rest stay on the
+// class path, in the unnamed module, with their META-INF/services
+// providers. Every module-path module is assumed resolved, as with
+// `--add-modules ALL-MODULE-PATH` (a class-path main class does not
+// resolve module-path modules by default); named modules cannot read
+// the unnamed module, so a `requires` satisfied only by a class-path jar
+// is a startup-failure warning.
+const ScenarioMixed ModuleScenario = "mixed"
+
 // ParseScenario validates a -jpms-scenario value.
 func ParseScenario(s string) (ModuleScenario, error) {
 	switch ModuleScenario(s) {
-	case ScenarioClasspath, ScenarioModulePath:
+	case ScenarioClasspath, ScenarioModulePath, ScenarioMixed:
 		return ModuleScenario(s), nil
 	}
-	return "", fmt.Errorf("unknown JPMS scenario %q (want %q or %q)", s, ScenarioClasspath, ScenarioModulePath)
+	return "", fmt.Errorf("unknown JPMS scenario %q (want %q, %q or %q)", s, ScenarioClasspath, ScenarioModulePath, ScenarioMixed)
+}
+
+// ScenarioConfig is a launch scenario plus, for ScenarioMixed, which
+// jars are on the module path: each pattern is matched against a jar's
+// base file name with path.Match semantics (filepath.Match), and the
+// pattern "app" names the analyzed application itself.
+type ScenarioConfig struct {
+	Scenario       ModuleScenario
+	ModulePathJars []string
+	AppJar         string
+}
+
+// ParseModulePathJars splits a -jpms-module-path value and validates
+// each pattern.
+func ParseModulePathJars(s string) ([]string, error) {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, err := filepath.Match(p, ""); err != nil {
+			return nil, fmt.Errorf("bad module-path jar pattern %q: %w", p, err)
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// modulePathSet returns the jars on the module path, and which
+// patterns matched nothing (for ScenarioMixed's warnings).
+func (c ScenarioConfig) modulePathSet(jars []string) (map[string]bool, []string) {
+	set := map[string]bool{}
+	switch c.Scenario {
+	case ScenarioModulePath:
+		for _, j := range jars {
+			set[j] = true
+		}
+		return set, nil
+	case ScenarioMixed:
+	default:
+		return set, nil
+	}
+	var unmatched []string
+	for _, p := range c.ModulePathJars {
+		hit := false
+		for _, j := range jars {
+			ok := false
+			if p == "app" {
+				ok = j == c.AppJar
+			} else {
+				ok, _ = filepath.Match(p, filepath.Base(j))
+			}
+			if ok {
+				set[j] = true
+				hit = true
+			}
+		}
+		if !hit {
+			unmatched = append(unmatched, p)
+		}
+	}
+	return set, unmatched
 }
 
 // ModuleKind is how a jar would be treated if it were placed on the
@@ -76,6 +149,9 @@ type ModuleDescriptor struct {
 	// (multi-release selection with -target-java unset); "" otherwise.
 	DescriptorNote string
 	Info           *classfile.ModuleInfo // explicit modules only
+	// OnModulePath is set by ApplyScenario: whether the run's scenario
+	// places this jar on the module path.
+	OnModulePath bool
 }
 
 // ModuleProviderDecl is one `provides Service with Provider` pair from an
@@ -425,36 +501,60 @@ type ScenarioView struct {
 
 // ApplyScenario derives the scenario's registrations from the S0
 // inventory and the module inventory, and records the scenario on inv.
-// Module-path warnings name configurations the JVM would reject at
-// startup (an unnamed automatic module, a `requires` on a module absent
-// from the input); the analysis still proceeds, as a declared gap.
-func ApplyScenario(scenario ModuleScenario, regs []ServiceRegistration, inv *ModuleInventory, h *hierarchy.Hierarchy) (ScenarioView, []string) {
-	inv.Scenario = scenario
-	view := ScenarioView{Scenario: scenario}
-	if scenario != ScenarioModulePath {
-		view.Registrations = regs
-		return view, nil
-	}
-	var warnings []string
-	view.moduleByJar = map[string]ModuleDescriptor{}
-	names := map[string]bool{}
+// Warnings name configurations the JVM would reject at startup (an
+// automatic module with no legal name, a `requires` on a module absent
+// from the module path) or a -jpms-module-path pattern matching no jar;
+// the analysis still proceeds, as a declared gap.
+func ApplyScenario(cfg ScenarioConfig, regs []ServiceRegistration, inv *ModuleInventory, h *hierarchy.Hierarchy) (ScenarioView, []string) {
+	inv.Scenario = cfg.Scenario
+	view := ScenarioView{Scenario: cfg.Scenario}
+	var jars []string
 	for _, d := range inv.Descriptors {
+		jars = append(jars, d.Jar)
+	}
+	onMP, unmatched := cfg.modulePathSet(jars)
+	var warnings []string
+	for _, p := range unmatched {
+		warnings = append(warnings, fmt.Sprintf("-jpms-module-path pattern %q matches no input jar", p))
+	}
+	for i := range inv.Descriptors {
+		inv.Descriptors[i].OnModulePath = onMP[inv.Descriptors[i].Jar]
+	}
+	if len(onMP) == 0 {
+		view.Registrations = regs
+		return view, warnings
+	}
+
+	view.moduleByJar = map[string]ModuleDescriptor{}
+	names := map[string]bool{}   // modules on the module path
+	cpNames := map[string]bool{} // names class-path jars would have
+	for _, d := range inv.Descriptors {
+		if !d.OnModulePath {
+			if d.Name != "" {
+				cpNames[d.Name] = true
+			}
+			continue
+		}
 		view.moduleByJar[d.Jar] = d
 		if d.Name != "" {
 			names[d.Name] = true
 		} else {
-			warnings = append(warnings, fmt.Sprintf("%s: module-path scenario: no valid automatic module name (%s); the JVM would reject this jar", d.Jar, d.NameSource))
+			warnings = append(warnings, fmt.Sprintf("%s: %s scenario: no valid automatic module name (%s); the JVM would reject this jar", d.Jar, cfg.Scenario, d.NameSource))
 		}
 	}
 	for _, d := range inv.Descriptors {
-		if d.Kind != ModuleExplicit {
+		if !d.OnModulePath || d.Kind != ModuleExplicit {
 			continue
 		}
 		for _, r := range d.Info.Requires {
 			if names[r.Module] || r.Flags&classfile.ModuleAccStaticPh != 0 || strings.HasPrefix(r.Module, "java.") || strings.HasPrefix(r.Module, "jdk.") {
 				continue
 			}
-			warnings = append(warnings, fmt.Sprintf("%s: module-path scenario: module %s requires %s, which is not among the input modules; module resolution would fail at startup", d.Jar, d.Name, r.Module))
+			if cpNames[r.Module] {
+				warnings = append(warnings, fmt.Sprintf("%s: %s scenario: module %s requires %s, which is on the class path (the unnamed module, not readable by named modules); module resolution would fail at startup", d.Jar, cfg.Scenario, d.Name, r.Module))
+				continue
+			}
+			warnings = append(warnings, fmt.Sprintf("%s: %s scenario: module %s requires %s, which is not among the module-path modules; module resolution would fail at startup", d.Jar, cfg.Scenario, d.Name, r.Module))
 		}
 	}
 	for _, r := range regs {
@@ -462,11 +562,14 @@ func ApplyScenario(scenario ModuleScenario, regs []ServiceRegistration, inv *Mod
 		if ok && d.Kind == ModuleExplicit {
 			continue // ignored on the module path; the module's `provides` replaces it
 		}
-		r.Module = d.Name
+		r.Module = d.Name // "" for a class-path jar
 		view.Registrations = append(view.Registrations, r)
 	}
 	for _, p := range inv.Provides {
-		d := view.moduleByJar[p.Jar]
+		d, ok := view.moduleByJar[p.Jar]
+		if !ok {
+			continue // a class-path jar's module-info is ignored
+		}
 		view.Registrations = append(view.Registrations, ServiceRegistration{
 			Interface: p.Service, ProviderClass: p.Provider,
 			SourceJar: p.Jar, GAV: d.GAV, SourceFile: d.NameSource,
@@ -477,13 +580,20 @@ func ApplyScenario(scenario ModuleScenario, regs []ServiceRegistration, inv *Mod
 	return view, warnings
 }
 
+func (v ScenarioView) scenarioName() ModuleScenario {
+	if v.Scenario == "" {
+		return ScenarioClasspath
+	}
+	return v.Scenario
+}
+
 // usesCheck reports whether a ServiceLoader caller class may load
 // service iface in this scenario: always on the class path; on the
 // module path only if the caller's module is automatic or its
 // descriptor declares `uses iface` (otherwise ServiceLoader throws
 // ServiceConfigurationError). The reason explains a refusal.
 func (v ScenarioView) usesCheck(h *hierarchy.Hierarchy, callerFQCN, iface string) (bool, string) {
-	if v.Scenario != ScenarioModulePath {
+	if len(v.moduleByJar) == 0 {
 		return true, ""
 	}
 	ci, ok := h.Lookup(callerFQCN)
@@ -499,5 +609,5 @@ func (v ScenarioView) usesCheck(h *hierarchy.Hierarchy, callerFQCN, iface string
 			return true, ""
 		}
 	}
-	return false, fmt.Sprintf("module-path scenario: caller module %s does not declare `uses %s`; ServiceLoader would throw ServiceConfigurationError", d.Name, iface)
+	return false, fmt.Sprintf("%s scenario: caller module %s does not declare `uses %s`; ServiceLoader would throw ServiceConfigurationError", v.Scenario, d.Name, iface)
 }

@@ -92,7 +92,21 @@ type ServiceLoadSite struct {
 	// local-value analysis gave up, that reason instead. Empty when
 	// Interface is resolved.
 	UnresolvedReason string
+	// Layer is set only for LoaderModuleLayer (SERVICE_LOADING S3):
+	// LayerBoot when the ModuleLayer argument is provably
+	// ModuleLayer.boot(), LayerUnknown otherwise (LayerReason says why).
+	Layer       LayerKind
+	LayerReason string
 }
+
+// LayerKind identifies the ModuleLayer a load(ModuleLayer, Class) call
+// names, as far as local values can prove it.
+type LayerKind string
+
+const (
+	LayerBoot    LayerKind = "boot"
+	LayerUnknown LayerKind = "unknown"
+)
 
 // ServiceConsumptionSite is one exact iterator/stream/provider API call
 // with the load-site identity recovered from bounded local call provenance.
