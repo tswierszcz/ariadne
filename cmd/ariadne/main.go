@@ -357,7 +357,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	warnings = append(warnings, svcLoadWarnings...)
 	resolvedLoadSites := 0
 	for _, s := range svcLoadSites {
-		if s.Interface != "" {
+		if len(s.Candidates()) > 0 {
 			resolvedLoadSites++
 		}
 	}
