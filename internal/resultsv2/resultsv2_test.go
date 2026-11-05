@@ -149,3 +149,34 @@ func TestExportV1(t *testing.T) {
 		t.Errorf("mismatch not reported: %v", m)
 	}
 }
+
+func TestCheckApplicability(t *testing.T) {
+	src := func(withdrawn string, ranges ...cves.AffectedRange) cves.Source {
+		return cves.Source{ID: "S", Withdrawn: withdrawn, Ranges: ranges}
+	}
+	fixed := func(pkg, v string) cves.AffectedRange {
+		return cves.AffectedRange{Package: pkg, Type: "ECOSYSTEM", Events: []map[string]string{{"introduced": "0"}, {"fixed": v}}}
+	}
+	gav := [2]string{"g:a", "1.5"}
+	cases := []struct {
+		c    cves.CVE
+		want string
+		ok   bool
+	}{
+		{cves.CVE{Sources: []cves.Source{src("", fixed("g:a", "2.0"))}}, "in", true},
+		{cves.CVE{Sources: []cves.Source{src("", fixed("g:a", "1.2"))}}, "out", false},
+		{cves.CVE{Sources: []cves.Source{src("", fixed("g:other", "1.2"))}}, "none", true},
+		{cves.CVE{Sources: []cves.Source{src("2026-01-01T00:00:00Z", fixed("g:a", "2.0"))}}, "none", true},
+		{cves.CVE{Sources: []cves.Source{src("", cves.AffectedRange{Package: "g:a", Type: "GIT"})}}, "undetermined", false},
+		{cves.CVE{Sources: []cves.Source{src("", fixed("g:a", "1.2"), fixed("g:a", "2.0"))}}, "in", true},
+	}
+	for i, c := range cases {
+		got := checkApplicability(c.c, gav)
+		if got.OSVRanges != c.want || got.Agrees != c.ok {
+			t.Errorf("case %d: %+v, want %s %v", i, got, c.want, c.ok)
+		}
+	}
+	if checkApplicability(cves.CVE{}, [2]string{"g:a", ""}) != nil {
+		t.Error("no version: want nil")
+	}
+}

@@ -537,7 +537,12 @@ records exactly the data a run used, `-snapshot-in` replays it without
 cache or network, and `-snapshot-compare` names, per advisory, what moved:
 the advisory text, the mapping or its fix commits, an input jar, an
 algorithm version. A snapshot reproduces the data, not the analyzer: the
-same analyzer version is required.
+same analyzer version is required. Why are versions compared by Maven's
+rules and not SemVer? Because Maven versions are not SemVer: `2.0.0.RC1`
+is older than `2.0.0`, `1-sp` newer than `1`, `1.0.0.Final` equal to `1`.
+`internal/mavenversion` follows Maven 3.9 and is checked against the
+installed Maven's own comparator; a version it cannot place (a SNAPSHOT,
+a non-numeric string) is "undetermined", never guessed textually.
 
 Numbers: petclinic — 148 CVEs for 87 dependencies; WebGoat — 160 CVEs
 for 126 dependencies (including 34 for `xstream:1.4.5` alone).

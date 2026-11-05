@@ -62,11 +62,13 @@ its own axis.
 
 | Code | Axis | Meaning | Example |
 |---|---|---|---|
-| `VERSION_UNKNOWN` | identity/version | The component's version could not be established, so the affected range cannot be checked | a jar without `pom.properties` and no `deps.txt` line |
+| `VERSION_UNKNOWN` | identity/version | The component's version could not be established, or (CVE:F4) is irregular (SNAPSHOT, non-numeric), so a version range cannot be checked | a jar without `pom.properties` and no `deps.txt` line |
 | `CLASSPATH_CONFLICT` | identity/version | Several copies of a class are on the input; the selected one follows the declared classpath order, which may not match the real deployment | the same FQCN in two jars (`Hierarchy.Duplicates()`) |
 | `MAPPING_PARTIAL` | mapping | The method list is known to cover only part of the vulnerable code | a diff mapping that touched one of several affected methods |
 | `MAPPING_ENTRYPOINT_ONLY` | mapping | The mapped methods are entry points into the vulnerable behavior (e.g. a deserialization call), not the vulnerable code itself | XStream `fromXML` for gadget-chain CVEs |
 | `METHOD_NOT_FOUND` | mapping | No mapped method exists in the analyzed graph | a method renamed in the analyzed version |
+| `MAPPING_VERSION_UNCOVERED` | mapping | (CVE:F4) The mapping is versioned and none of its variants covers this instance's version: there is no method list for it | a mapping for `[1.0,2.0)` and `[2.0,3.0)`; the input has 3.1 |
+| `MAPPING_CONFLICT` | mapping | (CVE:F4) Several variants of the mapping cover this instance's version with different methods; none is chosen | overlapping `[1.0,2.0]` and `[2.0,3.0)` for 2.0 |
 | `SOURCE_UNAVAILABLE` | mapping | The evidence needed for a mapping (fix commit, diff, advisory detail) could not be obtained | an OSV record without a fix reference |
 | `MODEL_INCOMPLETE` | model | An explicit gap in the call-graph model (unresolved reflection, ServiceLoader, callback, …) is relevant to this finding | an unresolved `Method#invoke` in the affected package |
 | `RUNTIME_UNSUPPORTED` | runtime | The finding depends on runtime behavior ariadne does not model (JDK/JRE vulnerabilities, custom class loaders) | a CVE in the JDK itself |
@@ -118,8 +120,8 @@ its own axis.
 | `tool` | `name`, `version` (the build) |
 | `snapshot` | `kind: "inputs"`, `id` = SHA-256 over every artifact's stable location and content hash (independent of temp paths), `offline`, `classpath_order`, and (CVE:F3) `data_set` when the run recorded or replayed a data snapshot: `id` (the manifest's `data_set_id`), `replayed`, `config_matches` |
 | `components[]` | one per component instance, inventory order: `id`, `artifact_id`, `location`, `role`, `sha256`, `bytes`, `gav`, `identity` (`identified`, `unidentified`, `conflict` = a shadowed class of this instance differs in content from the selected copy), `detection`, `evidence[]`, `classes`, `shadowed`, `shadowed_differing` |
-| `advisories[]` | sorted by id: `aliases`, `summary`, `severity`, `affected[]`, `mapping` (null when no source mapped it): `methods`, `match_precision` (`name` — overload-insensitive; descriptors are CVE:F4), `source` (evidence kind), `role`, `coverage`, `review`, LLM `model`/`evidence` |
-| `findings[]` | one per advisory × affected instance: `advisory_id`, `component_instance_id`, `identity`, `applicability` (always `affected` today: OSV is queried with the exact version; ranges are CVE:F4), `reachability`, `reason_codes` (instance axis only — mapping role/coverage stay on `mapping`), `model_gaps`, `path`, `entry`, `note` |
+| `advisories[]` | sorted by id: `aliases`, `summary`, `severity`, `affected[]`, `mapping` (null when no source mapped it): `methods`, `match_precision` (CVE:F4: `name`, `params`, `exact` or `mixed`, from the selectors), `source` (evidence kind), `role`, `coverage`, `review`, `variants` (versioned manual mappings), `method_roles` (LLM), LLM `model`/`evidence` |
+| `findings[]` | one per advisory × affected instance: `advisory_id`, `component_instance_id`, `identity`, `applicability` (`affected`: OSV is queried with the exact version) with `applicability_check` (CVE:F4: the OSV ranges evaluated by `internal/mavenversion` — `in`/`out`/`undetermined`/`none` — and whether that agrees), `match_precision` (of the selector a positive path reached), `reachability`, `reason_codes` (instance axis only — mapping role/coverage stay on `mapping`), `model_gaps`, `path`, `entry`, `note` |
 | `coverage` | `global_gaps` (unresolved sites, reachable, unbounded, model-analysis warnings), `unidentified_components`, `advisories_without_instance` (with their whole-graph verdict), `counts` (advisories, findings, advisories by v1 status, findings by reachability), `data_freshness` (CVE:F2: `state` `complete`/`stale`/`unknown`, `ttl`, `max_data_age`, per-kind counts and oldest validation time), `withdrawn_advisories` (every source withdrawn; no findings), `snapshot_changes` (with `-snapshot-compare`: per advisory, why its derived result was invalidated and how its verdict changed) |
 
 `not_assessed` is defined but not emitted yet (no finding today lacks a reachability

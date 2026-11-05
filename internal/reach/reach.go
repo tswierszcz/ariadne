@@ -6,6 +6,7 @@ package reach
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"ariadne/internal/callgraph"
@@ -13,6 +14,7 @@ import (
 	"ariadne/internal/cves"
 	"ariadne/internal/findings"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/mavenversion"
 	"ariadne/internal/vulnmap"
 )
 
@@ -113,12 +115,16 @@ type InstanceFinding struct {
 	Entry     *EntryEdge
 	Note      string
 	ModelGaps map[string]int // as Result.ModelGaps, for this instance
+	// MatchPrecision is, for a positive finding, the precision of the
+	// selector that matched the path's target (vulnmap.Precision*): a
+	// path to a name-only match is weaker evidence than an exact one.
+	MatchPrecision string
 }
 
 // EngineVersion versions the reachability semantics (statuses, per-instance
 // findings, aggregation, gap rule). Bump it on any change that can change
 // a result for the same graph and mapping; snapshots record it (CVE:F3).
-const EngineVersion = "1"
+const EngineVersion = "2" // 2: CVE:F4 descriptor selectors, variant selection
 
 // Engine holds everything needed to answer "is this CVE reachable" for
 // every CVE in one run: the call graph, the class hierarchy (for roots,
@@ -245,6 +251,7 @@ func (e *Engine) Analyze(list []cves.CVE, vm map[string]vulnmap.Entry) []Result 
 	for i, cve := range list {
 		results[i] = e.analyzeOne(cve, vm)
 		e.fillFindings(&results[i], cve)
+		e.notePrecision(&results[i], vm[cve.ID])
 	}
 	return results
 }
@@ -285,7 +292,9 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 		reasons = append(reasons, findings.MappingEntrypointOnly)
 	}
 
-	if instances := e.affectedInstances(cve); len(instances) > 0 {
+	if instances := e.affectedInstances(cve); len(instances) > 0 && len(entry.Variants) > 0 {
+		e.analyzeVariants(&result, entry, instances)
+	} else if len(instances) > 0 {
 		e.analyzePerInstance(&result, entry, matched, instances)
 	} else {
 		e.classify(&result, matched)
@@ -502,6 +511,99 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 	}
 }
 
+// analyzeVariants handles a versioned mapping (CVE:F4): every instance
+// gets the method list of the one variant whose package and version range
+// cover it. An irregular version is VERSION_UNKNOWN, no covering variant
+// MAPPING_VERSION_UNCOVERED, several with different methods
+// MAPPING_CONFLICT — never a guess. Instances that select the same list
+// are analyzed together exactly like an unversioned mapping; the row is
+// the aggregate of all findings, its path the shortest among the findings
+// that carry the aggregate status.
+func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances []component.Instance) {
+	byInstance := map[string]InstanceFinding{}
+	groups := map[string][]component.Instance{}
+	methodsOf := map[string][]string{}
+	var order []string
+	for _, in := range instances {
+		version, pkg := in.GAV.Version, in.GAV.PackageName()
+		f := InstanceFinding{Instance: in.ID, GAV: in.GAV.String(), Status: StatusUnknown}
+		if !mavenversion.Regular(version) {
+			f.Reasons = []findings.ReasonCode{findings.VersionUnknown}
+			f.Note = fmt.Sprintf("version %q cannot be placed in the mapping's version ranges", version)
+			byInstance[in.ID] = f
+			continue
+		}
+		var chosen []vulnmap.Variant
+		for _, v := range entry.Variants {
+			if (v.Package == "" || v.Package == pkg) && v.Range.Contains(version) == mavenversion.In {
+				chosen = append(chosen, v)
+			}
+		}
+		keys := map[string]bool{}
+		for _, v := range chosen {
+			ms := append([]string(nil), v.Methods...)
+			sort.Strings(ms)
+			keys[strings.Join(ms, "\n")] = true
+		}
+		switch {
+		case len(chosen) == 0:
+			f.Reasons = []findings.ReasonCode{findings.MappingVersionUncovered}
+			f.Note = fmt.Sprintf("no variant of the mapping covers %s %s", pkg, version)
+			byInstance[in.ID] = f
+		case len(keys) > 1:
+			var ranges []string
+			for _, v := range chosen {
+				ranges = append(ranges, v.Versions)
+			}
+			f.Reasons = []findings.ReasonCode{findings.MappingConflict}
+			f.Note = fmt.Sprintf("variants %s all cover %s with different methods", strings.Join(ranges, ", "), version)
+			byInstance[in.ID] = f
+		default:
+			var key string
+			for k := range keys {
+				key = k
+			}
+			if _, seen := groups[key]; !seen {
+				order = append(order, key)
+				methodsOf[key] = chosen[0].Methods
+			}
+			groups[key] = append(groups[key], in)
+		}
+	}
+
+	var parts []Result
+	for _, key := range order {
+		var matched []uint32
+		for _, spec := range methodsOf[key] {
+			matched = append(matched, matchVulnerableMethod(e.g, e.h, spec)...)
+		}
+		var r Result
+		e.analyzePerInstance(&r, entry, matched, groups[key])
+		for _, f := range r.Findings {
+			byInstance[f.Instance] = f
+		}
+		parts = append(parts, r)
+	}
+	for _, in := range instances {
+		result.Findings = append(result.Findings, byInstance[in.ID])
+	}
+	result.Status, result.Reasons = Aggregate(result.Findings)
+	switch result.Status {
+	case StatusReachable, StatusFramework:
+		for _, r := range parts {
+			if r.Status == result.Status && (result.Path == nil || len(r.Path) < len(result.Path)) {
+				result.Path, result.Entry = r.Path, r.Entry
+			}
+		}
+	case StatusNotReachable:
+		affected := map[string]bool{}
+		for _, in := range instances {
+			affected[in.ID] = true
+		}
+		e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+	}
+}
+
 // statusRank orders verdicts for "a positive finding wins".
 func statusRank(s Status) int {
 	switch s {
@@ -650,6 +752,41 @@ func (e *Engine) fillFindings(r *Result, cve cves.CVE) {
 			Instance: in.ID, GAV: in.GAV.String(), Status: r.Status, Reasons: reasons,
 			Path: r.Path, Entry: r.Entry, Note: r.Note, ModelGaps: r.ModelGaps,
 		})
+	}
+}
+
+// notePrecision sets MatchPrecision on every positive finding: the best
+// precision among the mapping's selectors that match the path's target.
+func (e *Engine) notePrecision(r *Result, entry vulnmap.Entry) {
+	rank := map[string]int{vulnmap.PrecisionName: 1, vulnmap.PrecisionParams: 2, vulnmap.PrecisionExact: 3}
+	for i := range r.Findings {
+		f := &r.Findings[i]
+		if len(f.Path) == 0 || (f.Status != StatusReachable && f.Status != StatusFramework) {
+			continue
+		}
+		fqcn, rest, _ := strings.Cut(f.Path[len(f.Path)-1], "#")
+		name, desc := rest, ""
+		if j := strings.IndexByte(rest, '('); j >= 0 {
+			name, desc = rest[:j], rest[j:]
+		}
+		target, ok := e.g.ID(fqcn, name, desc)
+		if !ok {
+			continue
+		}
+		best := ""
+		for _, spec := range entry.Methods {
+			sel, err := vulnmap.ParseSelector(spec)
+			if err != nil || rank[sel.Precision()] <= rank[best] {
+				continue
+			}
+			for _, id := range matchVulnerableMethod(e.g, e.h, spec) {
+				if id == target {
+					best = sel.Precision()
+					break
+				}
+			}
+		}
+		f.MatchPrecision = best
 	}
 }
 

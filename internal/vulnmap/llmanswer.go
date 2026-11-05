@@ -83,6 +83,16 @@ func parseLLMAnswer(content, finishReason string) (llmAnswer, error) {
 // with dots ("a.Outer.Inner") is retried as "a.Outer$Inner". exists == nil
 // disables the check.
 func groundMethods(ans llmAnswer, exists func(fqcn, method string) bool) (methods []string, dropped int) {
+	methods, _, dropped = groundMethodsWithRoles(ans, exists)
+	return methods, dropped
+}
+
+// groundMethodsWithRoles is groundMethods plus each kept method's role
+// from the answer ("vulnerable" or "entry_point"; vulnerable wins when
+// the model gave a method both). CVE:F4 keeps the roles: a method that
+// exists in the bytecode is not thereby confirmed vulnerable.
+func groundMethodsWithRoles(ans llmAnswer, exists func(fqcn, method string) bool) (methods []string, roles map[string]string, dropped int) {
+	roles = map[string]string{}
 	seen := map[string]bool{}
 	for _, m := range ans.Methods {
 		class, ok := m.Class, true
@@ -98,9 +108,12 @@ func groundMethods(ans llmAnswer, exists func(fqcn, method string) bool) (method
 			seen[spec] = true
 			methods = append(methods, spec)
 		}
+		if roles[spec] != "vulnerable" {
+			roles[spec] = m.Role
+		}
 	}
 	sort.Strings(methods)
-	return methods, dropped
+	return methods, roles, dropped
 }
 
 // findClass tries class as written, then with its trailing dot-separated

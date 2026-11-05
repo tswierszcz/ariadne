@@ -128,13 +128,19 @@ func (r *Resolver) resolveFromLLM(ctx context.Context, cve cves.CVE) (Entry, boo
 		return Entry{}, false, nil
 	}
 
-	methods, dropped := groundMethods(*rec.Answer, r.MethodExists)
+	methods, roles, dropped := groundMethodsWithRoles(*rec.Answer, r.MethodExists)
 	if len(methods) == 0 {
 		s.record(func(st *LLMStats) { st.Empty++; st.Dropped += dropped }, "")
 		return Entry{}, false, nil
 	}
 	s.record(func(st *LLMStats) { st.Mapped++; st.Dropped += dropped }, "")
-	return Entry{Methods: methods, Source: SourceLLM, Model: s.Config.Model, Evidence: evidence}.WithDefaults(), true, nil
+	role := RoleEntrypoint
+	for _, m := range methods {
+		if roles[m] == "vulnerable" {
+			role = RoleVulnerable
+		}
+	}
+	return Entry{Methods: methods, MethodRoles: roles, Role: role, Source: SourceLLM, Model: s.Config.Model, Evidence: evidence}.WithDefaults(), true, nil
 }
 
 // llmCommitDiffs fetches (through the shared HTTP cache, so normally a hit

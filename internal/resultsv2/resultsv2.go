@@ -19,6 +19,7 @@ import (
 	"ariadne/internal/cves"
 	"ariadne/internal/findings"
 	"ariadne/internal/httpcache"
+	"ariadne/internal/mavenversion"
 	"ariadne/internal/reach"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/vulnmap"
@@ -121,6 +122,28 @@ type Mapping struct {
 	Review         string `json:"review"`
 	Model          string `json:"model,omitempty"`
 	Evidence       string `json:"evidence,omitempty"` // LLM: fix-diff or advisory text
+	// Variants: a versioned mapping's method lists (CVE:F4); each finding
+	// uses the one covering its instance's version.
+	Variants []MappingVariant `json:"variants,omitempty"`
+	// MethodRoles: an LLM mapping's per-method roles (vulnerable /
+	// entry_point); bytecode presence does not confirm either.
+	MethodRoles map[string]string `json:"method_roles,omitempty"`
+}
+
+// MappingVariant is one versioned method list.
+type MappingVariant struct {
+	Package  string   `json:"package,omitempty"`
+	Versions string   `json:"versions"`
+	Methods  []string `json:"methods"`
+}
+
+// ApplicabilityCheck is CVE:F4's own evaluation of the advisory's OSV
+// ranges for the instance's version (mavenversion, Maven 3.9 ordering),
+// next to OSV's query answer: "in", "out", "undetermined", or "none" when
+// the records carry no range for the package.
+type ApplicabilityCheck struct {
+	OSVRanges string `json:"osv_ranges"`
+	Agrees    bool   `json:"agrees"`
 }
 
 // Finding is one advisory × component instance.
@@ -131,13 +154,15 @@ type Finding struct {
 	// Applicability: OSV is queried with the instance's exact version, so
 	// a finding exists only for a version reported as affected; the
 	// version-range check of CVE:F4 adds not_affected/undetermined.
-	Applicability string                `json:"applicability"`
-	Reachability  string                `json:"reachability"`
-	ReasonCodes   []findings.ReasonCode `json:"reason_codes,omitempty"`
-	ModelGaps     map[string]int        `json:"model_gaps,omitempty"`
-	Path          []string              `json:"path,omitempty"`
-	Entry         *reach.EntryEdge      `json:"entry,omitempty"`
-	Note          string                `json:"note,omitempty"`
+	Applicability      string                `json:"applicability"`
+	ApplicabilityCheck *ApplicabilityCheck   `json:"applicability_check,omitempty"`
+	MatchPrecision     string                `json:"match_precision,omitempty"`
+	Reachability       string                `json:"reachability"`
+	ReasonCodes        []findings.ReasonCode `json:"reason_codes,omitempty"`
+	ModelGaps          map[string]int        `json:"model_gaps,omitempty"`
+	Path               []string              `json:"path,omitempty"`
+	Entry              *reach.EntryEdge      `json:"entry,omitempty"`
+	Note               string                `json:"note,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -242,6 +267,7 @@ func Build(in Inputs) Document {
 	}
 
 	identity := map[string]string{}
+	gavOf := map[string][2]string{} // instance -> package, version
 	if inv := in.Inventory; inv != nil {
 		doc.Snapshot = Snapshot{Kind: "inputs", ID: inputsID(inv), Offline: in.Offline, ClasspathOrder: inv.ClasspathOrder, DataSet: in.DataSet}
 		differing := map[string]int{}
@@ -278,6 +304,9 @@ func Build(in Inputs) Document {
 				c.Evidence = append(c.Evidence, e)
 			}
 			identity[inst.ID] = c.Identity
+			if inst.GAV != nil {
+				gavOf[inst.ID] = [2]string{inst.GAV.PackageName(), inst.GAV.Version}
+			}
 			doc.Components = append(doc.Components, c)
 		}
 	}
@@ -303,8 +332,12 @@ func Build(in Inputs) Document {
 			methods := append([]string(nil), e.Methods...)
 			sort.Strings(methods)
 			adv.Mapping = &Mapping{
-				Methods: methods, MatchPrecision: "name", Source: e.Source,
+				Methods: methods, MatchPrecision: vulnmap.MappingPrecision(methods), Source: e.Source,
 				Role: e.Role, Coverage: e.Coverage, Review: e.Review, Model: e.Model, Evidence: e.Evidence,
+				MethodRoles: e.MethodRoles,
+			}
+			for _, v := range e.Variants {
+				adv.Mapping.Variants = append(adv.Mapping.Variants, MappingVariant{Package: v.Package, Versions: v.Versions, Methods: v.Methods})
 			}
 		}
 		doc.Advisories = append(doc.Advisories, adv)
@@ -319,7 +352,8 @@ func Build(in Inputs) Document {
 		for _, f := range r.Findings {
 			doc.Findings = append(doc.Findings, Finding{
 				AdvisoryID: cve.ID, ComponentInstanceID: f.Instance, Identity: identity[f.Instance],
-				Applicability: "affected", Reachability: string(f.Status), ReasonCodes: f.Reasons,
+				Applicability: "affected", ApplicabilityCheck: checkApplicability(cve, gavOf[f.Instance]),
+				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
 				ModelGaps: f.ModelGaps, Path: f.Path, Entry: f.Entry, Note: f.Note,
 			})
 			counts.Findings++
@@ -328,6 +362,42 @@ func Build(in Inputs) Document {
 	}
 	doc.Coverage.Counts = counts
 	return doc
+}
+
+// checkApplicability evaluates every range of the advisory's active source
+// records for the instance's package: in when any says in, out when every
+// range says out, otherwise undetermined; nil without an instance version.
+func checkApplicability(c cves.CVE, gav [2]string) *ApplicabilityCheck {
+	if gav[1] == "" {
+		return nil
+	}
+	n, in, out := 0, false, true
+	for _, s := range c.Sources {
+		if s.Withdrawn != "" {
+			continue
+		}
+		for _, r := range s.Ranges {
+			if r.Package != gav[0] {
+				continue
+			}
+			n++
+			switch mavenversion.EvalOSV(r.Type, r.Events, gav[1]) {
+			case mavenversion.In:
+				in = true
+			case mavenversion.Undetermined:
+				out = false
+			}
+		}
+	}
+	switch {
+	case n == 0:
+		return &ApplicabilityCheck{OSVRanges: "none", Agrees: true}
+	case in:
+		return &ApplicabilityCheck{OSVRanges: "in", Agrees: true}
+	case out:
+		return &ApplicabilityCheck{OSVRanges: "out", Agrees: false}
+	}
+	return &ApplicabilityCheck{OSVRanges: "undetermined", Agrees: false}
 }
 
 // instanceReasons drops the mapping-axis codes: in v2 the mapping's role

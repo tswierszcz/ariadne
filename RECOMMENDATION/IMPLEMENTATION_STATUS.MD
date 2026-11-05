@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3: DONE (2026-11-05); F4–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. Następny krok: F4 (wersje i sygnatury). |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. Następny krok: F5 (obie strony poprawki). |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2126,6 +2126,87 @@ Przy dodawaniu kolejnego wpisu zapisz:
   od nowa) — klucze służą wyjaśnieniu zmian, nie ponownemu użyciu.
 - **Następny krok (wymaga zgody):** CVE:F4 — mapowania wersji i dokładnych
   sygnatur.
+
+### CVE:F4 — mapowania wersji i dokładnych sygnatur — DONE (2026-11-05)
+
+- **Zakres zatwierdzony:** zadania F4.1–F4.11 planu CVE. F4.5–F4.7
+  (dokładny lookup w `internal/hierarchy`, CHA z deskryptorem, wywołania
+  dziedziczone) były już zrobione w JVM_GRAPH G2 (`ResolveExact`,
+  `ResolveByParams`) — tu wykorzystane, nie powtórzone.
+- **Decyzja (plan, tabela decyzji "Komparator wersji Maven"):** własna
+  implementacja w Go bez nowej zależności (brak pytania o licencję),
+  zgodność ustalona z **zainstalowanym Maven 3.9.12** jako wyrocznią.
+- **Zrealizowane:**
+  1. `internal/mavenversion`: porządek Maven 3.9 (tokeny, podlisty,
+     kwalifikatory, aliasy, normalizacja), `Regular` (SNAPSHOT i wersje
+     nienumeryczne — nierozstrzygnięte, bez porównania tekstowego),
+     `ParseRange` (składnia Maven, unie; goła wersja odrzucona),
+     `Range.Contains`, `EvalOSV` (`ECOSYSTEM`: introduced/fixed/
+     last_affected/limit, sortowane wg wersji). Dane referencyjne z Maven:
+     197 wersji (przykłady specyfikacji + wszystkie wersje zależności
+     aplikacji referencyjnych) → 38809 porównań, 197 struktur tokenów, 396
+     przypadków zakresów; `scripts/maven-version-oracle.sh` je odtwarza
+     (sprawdzone: wynik identyczny).
+  2. `vulnmap`: selektory `Class#name` / `Class#name(params)` /
+     `Class#name(params)ret` z walidacją deskryptorów (`ParseSelector`,
+     `MappingPrecision`); schemat v2 tabeli ręcznej: `variants` z
+     `package`, `versions` (zakres Maven), `methods`; ścisła walidacja
+     (nieznane pola, identyfikatory, pakiety, zakresy, deskryptory, albo
+     `methods` albo `variants`); stary YAML bez zmian znaczenia (bez
+     zakresu, po nazwie, partial). LLM: role per metoda zachowane
+     (`MethodRoles`), wpis `entrypoint`, gdy wszystkie metody to
+     `entry_point`. CVE-2022-1471 w tabeli osadzonej wersjonowane do
+     `(,2.0)`.
+  3. `reach`: dopasowanie z deskryptorem (dokładne / po parametrach /
+     po nazwie; podtyp nadpisuje tylko ten sam deskryptor), wybór wariantu
+     per instancja z kodami `VERSION_UNKNOWN`, `MAPPING_VERSION_UNCOVERED`,
+     `MAPPING_CONFLICT` (nowe, w kontrakcie §3), grupowanie instancji o
+     tej samej liście metod, agregacja z ustaleń; `MatchPrecision`
+     pozytywnych ustaleń.
+  4. v2: `mapping.match_precision` (wyliczana), `variants`,
+     `method_roles`; ustalenie: `match_precision`, `applicability_check`
+     (zakresy OSV oceniane komparatorem obok odpowiedzi OSV).
+  5. Fikstura `testdata/overloadfixture` (lib.jar/app.jar) kompilowana bez
+     binarki `javac` — `scripts/JavaBuild.java` (moduł `jdk.compiler` przez
+     `ToolProvider`, `-source/-target 17`, bo środowisko nie ma `ct.sym`),
+     `scripts/build-overload-fixture.sh`; jary bajtowo powtarzalne.
+  6. Wersje algorytmów: `vulnmap.resolver` 1→2, `reach.engine` 1→2; hash
+     mapowania w kluczu wyprowadzenia (F3) obejmuje warianty i role.
+- **Weryfikacja:** `internal/mavenversion` (Maven: porównania, tokeny,
+  zakresy; `Regular`, błędne zakresy, `EvalOSV` z nieposortowanymi
+  zdarzeniami i last_affected), `internal/vulnmap` (selektory, schemat v2 i
+  8 rodzajów odrzuceń, role LLM), `internal/reach` (`TestExactSelectors` —
+  0104 i dziedziczenie, `TestVersionedMappings` — 0101, brak pokrycia,
+  konflikt, SNAPSHOT), `internal/resultsv2` (`TestCheckApplicability`).
+  Mutacje: ignorowanie deskryptora, `Contains` zawsze `In` — testy padają.
+  `go vet ./...`, `go test ./...` — PASS. Na prawdziwych danych (offline):
+  - v1 **bajtowo identyczny** z F3 na petclinic, WebGoat i czterech
+    demach (servlet, jakarta, micronaut, quarkus), także po wersjonowaniu
+    CVE-2022-1471 (SnakeYAML 1.27/1.30 < 2.0; demo servlet nadal
+    REACHABLE + `MAPPING_ENTRYPOINT_ONLY`);
+  - `applicability_check`: 155/155 (petclinic) i 168/168 (WebGoat)
+    ustaleń — zakresy OSV oceniane komparatorem dają `in`, zgodnie z OSV;
+  - `-llm` (petclinic): jedyna zmiana — CVE-2016-1000027 dostaje
+    `MAPPING_ENTRYPOINT_ONLY` (model oznaczył obie metody `entry_point`;
+    sprawdzone w zapisanej odpowiedzi).
+- **Kryteria F4:** dwa przeciążenia i dwa zakresy wersji — rozłączne
+  dopasowania (test na skompilowanej fiksturze); brak doklejania
+  przeciążenia po nazwie — tak dla selektorów z deskryptorem (G2 dla
+  grafu); dziedziczone wywołania zachowują właściwe ciało — tak;
+  brakująca metoda, nieznana wersja, konflikt — nierozstrzygnięte z kodem.
+- **Dokumentacja:** README (krok 6, `results.json`), FAQ, `docs/SUPPORT.MD`
+  (nowy wiersz), kontrakt (§3: dwa kody, `VERSION_UNKNOWN`; §5: pola v2),
+  nagłówek `vuln_methods.yaml`, `testdata/cve-control/cases.yaml` (`v1` dla
+  0101–0104 i CVE-2022-1471), ten rejestr, nagłówek F4 w planie.
+- **Ograniczenia:** diffy i LLM nadal dają selektory po nazwie (obie strony
+  poprawki — F5); w tabeli osadzonej wersjonowane jest tylko
+  CVE-2022-1471; `applicability` to odpowiedź OSV, ocena zakresów jest
+  kontrolą krzyżową (`not_affected` nie jest jeszcze emitowane); metody
+  bridge dopasowywane jako zwykłe zadeklarowane metody. Uwaga na przyszłość:
+  `scripts/JavaBuild.java` umożliwia teraz realną weryfikację bytecode,
+  na którą czekał JVM_GRAPH G2 (bridge/default) — poza zakresem F4.
+- **Następny krok (wymaga zgody):** CVE:F5 — obie strony poprawki i
+  powiązanie z badanym wydaniem.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4580,7 +4661,8 @@ Przy dodawaniu kolejnego wpisu zapisz:
    komponentów) i CVE:F1b (kody powodów, ustalenia per instancja, reguła
    luk report-only) oraz CVE:F1c (`-json-format v2`) zrobione — CVE:F1
    zamknięte; CVE:F2 (świeżość danych) i CVE:F3 (snapshoty) zrobione
-   2026-11-05 — następny krok w tym obszarze: CVE:F4.
+   2026-11-05, CVE:F4 (wersje i sygnatury) również — następny krok w tym
+   obszarze: CVE:F5.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

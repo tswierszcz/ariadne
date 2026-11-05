@@ -289,7 +289,7 @@ func TestLoadManualMeta_embeddedTable(t *testing.T) {
 	}
 	os.WriteFile(legacy, []byte("CVE-1: [a.B#m]\n"), 0o644)
 	lm, err := LoadManualMeta(legacy)
-	if err != nil || lm["CVE-1"] != (MappingMeta{Coverage: CoveragePartial, Review: ReviewReviewed}) {
+	if m := lm["CVE-1"]; err != nil || m.Coverage != CoveragePartial || m.Review != ReviewReviewed || m.Role != "" || m.Variants != nil {
 		t.Errorf("legacy meta = %+v (%v)", lm, err)
 	}
 }

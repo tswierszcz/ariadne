@@ -22,6 +22,9 @@ const (
 	MappingEntrypointOnly ReasonCode = "MAPPING_ENTRYPOINT_ONLY"
 	MethodNotFound        ReasonCode = "METHOD_NOT_FOUND"
 	SourceUnavailable     ReasonCode = "SOURCE_UNAVAILABLE"
+	// CVE:F4: versioned mappings.
+	MappingVersionUncovered ReasonCode = "MAPPING_VERSION_UNCOVERED"
+	MappingConflict         ReasonCode = "MAPPING_CONFLICT"
 
 	// Reachability-model axis.
 	ModelIncomplete ReasonCode = "MODEL_INCOMPLETE"
@@ -34,6 +37,7 @@ const (
 var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict,
 	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable,
+	MappingVersionUncovered, MappingConflict,
 	ModelIncomplete,
 	RuntimeUnsupported,
 }

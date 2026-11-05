@@ -43,13 +43,19 @@ type Entry struct {
 	// version of the advisory (CVE:F2 reuse rule).
 	SourceHashes []string `json:"-"`
 	Reused       bool     `json:"-"`
+	// Variants are a versioned manual mapping's method lists (CVE:F4):
+	// the engine chooses one per component instance; Methods is their
+	// union. MethodRoles are an LLM mapping's per-method roles
+	// ("vulnerable" / "entry_point").
+	Variants    []Variant         `json:"-"`
+	MethodRoles map[string]string `json:"-"`
 }
 
 // ResolverVersion versions the mapping resolution (manual → diff → LLM
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "1"
+const ResolverVersion = "2" // 2: CVE:F4 versioned manual variants, LLM per-method roles
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -157,7 +163,7 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 	for _, id := range append([]string{cve.ID}, cve.Aliases...) {
 		if methods, ok := r.Manual[id]; ok && len(methods) > 0 {
 			meta := r.ManualMeta[id]
-			return Entry{Methods: methods, Source: SourceManual, Role: meta.Role, Coverage: meta.Coverage, Review: meta.Review}.WithDefaults(), true, nil
+			return Entry{Methods: methods, Source: SourceManual, Role: meta.Role, Coverage: meta.Coverage, Review: meta.Review, Variants: meta.Variants}.WithDefaults(), true, nil
 		}
 	}
 

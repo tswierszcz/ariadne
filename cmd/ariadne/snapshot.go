@@ -178,7 +178,11 @@ func derivations(list []cves.CVE, vm map[string]vulnmap.Entry, results []reach.R
 		methods := append([]string(nil), e.Methods...)
 		sort.Strings(methods)
 		d.Source = e.Source
-		d.MappingHash = snapshot.HashJSON([]any{methods, e.Role, e.Coverage, e.Review})
+		var vars []any
+		for _, v := range e.Variants {
+			vars = append(vars, []any{v.Package, v.Versions, v.Methods})
+		}
+		d.MappingHash = snapshot.HashJSON([]any{methods, e.Role, e.Coverage, e.Review, vars, e.MethodRoles})
 		d.SourceHashes = e.SourceHashes
 		if e.Source == vulnmap.SourceLLM {
 			d.LLM = &snapshot.LLMDerivation{Model: llmModel, PromptVersion: strconv.Itoa(vulnmap.PromptVersion), Reused: e.Reused}

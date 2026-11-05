@@ -286,7 +286,23 @@ For each CVE, in priority order:
    reviewed|unreviewed}`; the list form means partial and reviewed. An
    `entrypoint` role adds `MAPPING_ENTRYPOINT_ONLY` to the result;
    diff-derived mappings are vulnerable/partial/unreviewed, LLM ones
-   vulnerable/unknown/unreviewed.
+   vulnerable/unknown/unreviewed (or `entrypoint` when the model labelled
+   every method `entry_point`; per-method roles are kept, CVE:F4).
+   **Schema v2 (CVE:F4):** instead of `methods`, an entry may give
+   `variants: [{package: g:a, versions: "[1.0,2.0)", methods: [...]}]`;
+   each component instance uses the one variant whose package and Maven
+   version range cover it. An irregular version (SNAPSHOT, non-numeric) is
+   `UNKNOWN`/`VERSION_UNKNOWN`, no covering variant
+   `MAPPING_VERSION_UNCOVERED`, several with different methods
+   `MAPPING_CONFLICT`. A selector may carry a JVM descriptor:
+   `Class#name` matches every overload, `Class#name(params)` one parameter
+   list, `Class#name(params)ret` one method; an inherited call still
+   reaches the declaring class's body, and a subclass overrides only the
+   same descriptor. Unknown fields, bad ids, ranges and descriptors fail
+   loading. Versions compare by Maven 3.9's rules (`internal/mavenversion`,
+   checked against the installed Maven's own `ComparableVersion` on 38809
+   pairs and `VersionRange` on 396 cases). The embedded table's
+   CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only `.java` files under a `src/main/` path
@@ -500,7 +516,12 @@ the same cached inputs produce **byte-for-byte identical output**
 non-determinism bug this guarantee caught and how it was fixed; the new
 `entry.kind`/`entry.basis`/`entry.pc` fields were checked for the same
 byte-identical-rerun property against real petclinic/WebGoat runs).
-CVE:F1b added two optional fields, `reasons` (stable reason codes, see
+v2 additionally records each mapping's `match_precision` (`name`,
+`params`, `exact`, `mixed`), `variants` and LLM `method_roles`, and per
+finding the precision of the selector a positive path reached and an
+`applicability_check` — the advisory's OSV ranges evaluated with the
+Maven comparator next to OSV's own answer (on the reference apps: 323 of
+323 findings agree). CVE:F1b added two optional fields, `reasons` (stable reason codes, see
 [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §3) and `model_gaps`
 (relevant gap counts by kind); no existing field changed. An advisory
 that affects several component instances is evaluated per instance

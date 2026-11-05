@@ -11,18 +11,35 @@
 #           coverage: complete_under_declared_assumptions|partial|unknown,
 #           review: reviewed|unreviewed}
 # The list form stays valid and means coverage partial, review reviewed,
-# role unknown. Roles and coverage below follow the CVE:F0 audit
+# role unknown.
+#
+# Schema v2 (CVE:F4) — versioned, optionally with descriptors:
+#   CVE-X: {role: ..., coverage: ..., review: ...,
+#           variants: [{package: g:a, versions: "[1.0,2.0)",
+#                       methods: ["a.B#parse(Ljava/lang/String;)V", ...]}]}
+# `versions` is a Maven range; a selector is Class#name (every overload),
+# Class#name(params) or Class#name(params)ret (one JVM method). Unknown
+# fields, bad ranges and bad descriptors are load errors.
+#
+# Roles and coverage below follow the CVE:F0 audit
 # (testdata/cve-control/MANUAL_MAPPING_AUDIT.MD): no entry is complete.
 
 CVE-2022-1471: # SnakeYAML, unsafe Constructor deserialization (RCE)
+  # Versioned (schema v2, CVE:F4): SnakeYAML 2.0 changed the default
+  # Constructor (LoaderOptions, restricted global tags), so these entry
+  # points describe 1.x only; a 2.x instance gets MAPPING_VERSION_UNCOVERED,
+  # never this list.
   role: entrypoint
   coverage: partial
   review: reviewed
-  methods:
-    - org.yaml.snakeyaml.Yaml#load
-    - org.yaml.snakeyaml.Yaml#loadAs
-    - org.yaml.snakeyaml.Yaml#loadAll
-    - org.yaml.snakeyaml.constructor.Constructor#<init>
+  variants:
+    - package: org.yaml:snakeyaml
+      versions: "(,2.0)"
+      methods:
+        - org.yaml.snakeyaml.Yaml#load
+        - org.yaml.snakeyaml.Yaml#loadAs
+        - org.yaml.snakeyaml.Yaml#loadAll
+        - org.yaml.snakeyaml.constructor.Constructor#<init>
 
 CVE-2021-44228: # Log4Shell
   role: sink

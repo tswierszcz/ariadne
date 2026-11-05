@@ -15,6 +15,11 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"regexp"
+	"sort"
+	"strings"
+
+	"ariadne/internal/mavenversion"
 
 	"gopkg.in/yaml.v3"
 )
@@ -46,29 +51,145 @@ type MappingMeta struct {
 	Role     string `yaml:"role"`
 	Coverage string `yaml:"coverage"`
 	Review   string `yaml:"review"`
+	// Variants are the versioned method lists of a schema-v2 entry
+	// (CVE:F4); nil for an unversioned entry.
+	Variants []Variant `yaml:"-"`
 }
 
-// manualEntry accepts both forms of one vuln_methods.yaml value: the
-// legacy list of "Class#method" strings, or an object with methods plus
-// role/coverage/review.
+// Variant is one versioned method list of a mapping (CVE:F4): it applies
+// to the component instances of Package (any package when empty) whose
+// version is in Versions (Maven range syntax).
+type Variant struct {
+	Package  string             `yaml:"package"`
+	Versions string             `yaml:"versions"`
+	Methods  []string           `yaml:"methods"`
+	Range    mavenversion.Range `yaml:"-"`
+}
+
+// manualEntry accepts every form of one vuln_methods.yaml value: the
+// legacy list of "Class#method" strings, an object with methods plus
+// role/coverage/review, or (schema v2, CVE:F4) an object with variants.
 type manualEntry struct {
 	Methods []string
 	MappingMeta
 }
 
+func keysOf(n *yaml.Node) []string {
+	if n.Kind == yaml.AliasNode {
+		n = n.Alias
+	}
+	var keys []string
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		keys = append(keys, n.Content[i].Value)
+	}
+	return keys
+}
+
+func checkKeys(n *yaml.Node, what string, allowed ...string) error {
+	ok := map[string]bool{}
+	for _, a := range allowed {
+		ok[a] = true
+	}
+	for _, k := range keysOf(n) {
+		if !ok[k] {
+			return fmt.Errorf("%s: unknown field %q (allowed: %s)", what, k, strings.Join(allowed, ", "))
+		}
+	}
+	return nil
+}
+
 func (e *manualEntry) UnmarshalYAML(n *yaml.Node) error {
-	if n.Kind == yaml.SequenceNode {
+	node := n
+	if node.Kind == yaml.AliasNode {
+		node = node.Alias
+	}
+	if node.Kind == yaml.SequenceNode {
 		return n.Decode(&e.Methods)
 	}
+	if err := checkKeys(node, "mapping", "methods", "role", "coverage", "review", "variants"); err != nil {
+		return err
+	}
 	var obj struct {
-		Methods     []string `yaml:"methods"`
+		Methods     []string    `yaml:"methods"`
+		Variants    []yaml.Node `yaml:"variants"`
 		MappingMeta `yaml:",inline"`
 	}
 	if err := n.Decode(&obj); err != nil {
 		return err
 	}
 	e.Methods, e.MappingMeta = obj.Methods, obj.MappingMeta
+	for i := range obj.Variants {
+		if err := checkKeys(&obj.Variants[i], fmt.Sprintf("variants[%d]", i), "package", "versions", "methods"); err != nil {
+			return err
+		}
+		var v Variant
+		if err := obj.Variants[i].Decode(&v); err != nil {
+			return err
+		}
+		e.Variants = append(e.Variants, v)
+	}
 	return nil
+}
+
+var advisoryID = regexp.MustCompile(`^[A-Z][A-Z0-9]*-[0-9A-Za-z][0-9A-Za-z._:-]*$`)
+var packageName = regexp.MustCompile(`^[^:\s]+:[^:\s]+$`)
+
+// validate checks one entry: identifiers, selectors, ranges, and that a
+// mapping is either unversioned (methods) or versioned (variants).
+func (e *manualEntry) validate(id string) error {
+	if !advisoryID.MatchString(id) {
+		return fmt.Errorf("%q is not an advisory identifier", id)
+	}
+	switch {
+	case len(e.Variants) > 0 && len(e.Methods) > 0:
+		return fmt.Errorf("%s: give either methods or variants, not both", id)
+	case len(e.Variants) == 0 && len(e.Methods) == 0:
+		return fmt.Errorf("%s: no methods", id)
+	}
+	for _, m := range e.Methods {
+		if _, err := ParseSelector(m); err != nil {
+			return fmt.Errorf("%s: %w", id, err)
+		}
+	}
+	for i := range e.Variants {
+		v := &e.Variants[i]
+		if v.Package != "" && !packageName.MatchString(v.Package) {
+			return fmt.Errorf("%s: variants[%d]: package %q is not group:artifact", id, i, v.Package)
+		}
+		r, err := mavenversion.ParseRange(v.Versions)
+		if err != nil {
+			return fmt.Errorf("%s: variants[%d]: %w", id, i, err)
+		}
+		v.Range = r
+		if len(v.Methods) == 0 {
+			return fmt.Errorf("%s: variants[%d]: no methods", id, i)
+		}
+		for _, m := range v.Methods {
+			if _, err := ParseSelector(m); err != nil {
+				return fmt.Errorf("%s: variants[%d]: %w", id, i, err)
+			}
+		}
+	}
+	return nil
+}
+
+// AllMethods is every method of the entry (the union of its variants).
+func (e manualEntry) AllMethods() []string {
+	if len(e.Variants) == 0 {
+		return e.Methods
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, v := range e.Variants {
+		for _, m := range v.Methods {
+			if !seen[m] {
+				seen[m] = true
+				out = append(out, m)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func loadManualEntries(path string) (map[string]manualEntry, error) {
@@ -85,6 +206,10 @@ func loadManualEntries(path string) (map[string]manualEntry, error) {
 		return nil, fmt.Errorf("parsing vuln_methods.yaml: %w", err)
 	}
 	for id, e := range m {
+		if err := e.validate(id); err != nil {
+			return nil, fmt.Errorf("vuln_methods.yaml: %w", err)
+		}
+		m[id] = e
 		switch e.Role {
 		case "", RoleVulnerable, RoleEntrypoint, RoleSink:
 		default:
@@ -115,7 +240,7 @@ func LoadManual(path string) (map[string][]string, error) {
 	}
 	m := make(map[string][]string, len(entries))
 	for id, e := range entries {
-		m[id] = e.Methods
+		m[id] = e.AllMethods()
 	}
 	return m, nil
 }

@@ -157,7 +157,7 @@ Pozwolić odtworzyć analizę oraz ustalić, dlaczego wynik się zmienił.
 - Zmiana advisory, mapowania lub wersji algorytmu unieważnia właściwe wyniki pochodne.
 - Dokumentacja uczciwie rozróżnia odtworzenie danych od odtworzenia całego środowiska wykonania narzędzia.
 
-## F4. Mapowania wersji i dokładnych sygnatur
+## F4. Mapowania wersji i dokładnych sygnatur — DONE (2026-11-05; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 
