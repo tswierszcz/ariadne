@@ -1,0 +1,3 @@
+commit dbc9939710e80a35d6159215a5f3582ab43fe3e8 + working-tree changes (the commit that adds this baseline)
+go go1.27.3
+flags -offline -profile spring

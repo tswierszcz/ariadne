@@ -51,7 +51,7 @@ Kolejność jest zalecaną sekwencją wdrażania. F8 zależy przede wszystkim od
 - **Drugi przyrost:** F6–F7 oraz sprawdzenia z F9. Komponenty osadzone i jawna relokacja.
 - **Trzeci przyrost:** F8 oraz sprawdzenia z F9. Podatności runtime’u dla pierwszego dostawcy.
 
-## F0. Kontrakty, zakres i przypadki odniesienia
+## F0. Kontrakty, zakres i przypadki odniesienia — DONE (kontrakt, 2026-11-05; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

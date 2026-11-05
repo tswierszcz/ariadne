@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -155,5 +156,28 @@ func TestCacheConcurrentSetSameKey(t *testing.T) {
 	}
 	if len(b) == 0 {
 		t.Errorf("final cache entry is empty")
+	}
+}
+
+func TestGetTracesHitsWhenRequested(t *testing.T) {
+	dir := t.TempDir()
+	c, err := New(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Set("k1", []byte("{}")); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(t.TempDir(), "trace")
+	t.Setenv("ARIADNE_CACHE_TRACE", trace)
+	if _, ok, err := c.Get("k1"); err != nil || !ok {
+		t.Fatalf("Get: ok=%v err=%v", ok, err)
+	}
+	if _, _, err := c.Get("missing"); err == nil {
+		t.Fatal("offline miss must still error")
+	}
+	b, err := os.ReadFile(trace)
+	if err != nil || string(b) != "k1\n" {
+		t.Errorf("trace = %q (%v), want only the hit", b, err)
 	}
 }

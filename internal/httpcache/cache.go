@@ -60,7 +60,25 @@ func (c *Cache) Get(key string) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("reading cache entry %s: %w", key, err)
 	}
+	traceHit(key)
 	return b, true, nil
+}
+
+// traceHit appends key to the file named by ARIADNE_CACHE_TRACE, if set
+// — tooling for CVE:F0's baseline (scripts/cve-baseline.sh), which needs
+// the exact set of cached network responses a run used. Best-effort:
+// a trace that cannot be written never affects the analysis.
+func traceHit(key string) {
+	path := os.Getenv("ARIADNE_CACHE_TRACE")
+	if path == "" {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintln(f, key)
 }
 
 // Set writes b under key. It writes to a uniquely-named temp file first

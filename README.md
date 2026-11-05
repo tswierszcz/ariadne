@@ -311,7 +311,7 @@ found:
 |---|---|
 | `REACHABLE` | Found in pass 1: a path exists that never has to pass *through* framework-internal code to get there. The shortest such path is recorded, along with the first app → dependency edge on it (the "entry call"). |
 | `FRAMEWORK` | Found only in pass 2: the only path runs through framework code the static graph can't follow past. Needs manual review. |
-| `NOT_REACHABLE` | vulnmap has methods for this CVE, but neither pass ever visits any of them. |
+| `NOT_REACHABLE` | vulnmap has methods for this CVE, but neither pass ever visits any of them. This currently includes the case where **none of the mapped methods exists in the analyzed graph** (e.g. a diff-derived method absent under that name in the analyzed version) — on the reference apps 7 of 26 (petclinic) and 6 of 18 (WebGoat) `NOT_REACHABLE` rows; the results contract ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD), CVE:F0) separates the two and CVE:F1 will report them as `UNKNOWN`/`METHOD_NOT_FOUND`. Explicit model gaps do not yet affect this verdict. |
 | `UNKNOWN` | vulnmap has no entry for this CVE at all. |
 | `NOT_APPLICABLE` | Every affected dependency is a WebJar (no `.class` file, assets under `META-INF/resources/webjars/`): client-side JavaScript/CSS a call graph cannot analyze. Checked before everything else. **Not** a verdict that the app is safe: the code runs in the browser. An empty jar alone does not qualify, since Maven aggregators such as `spring-boot-starter-web` are class-free too and CVEs filed against them (Spring4Shell) concern JVM code in other jars. |
 
