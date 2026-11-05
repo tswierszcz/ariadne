@@ -16,6 +16,17 @@ import (
 // handle (jsr/ret, an internal inconsistency) is reported through
 // MethodFacts.Aborted, never as an error or a panic.
 func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
+	return analyze(cf, fqcn, m, false)
+}
+
+// AnalyzeWithParameterRefs is Analyze with explicit formal-parameter markers
+// in the initial locals. It is intended for interprocedural consumers that
+// will substitute a returned parameter against one exact caller site.
+func AnalyzeWithParameterRefs(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
+	return analyze(cf, fqcn, m, true)
+}
+
+func analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method, parameterRefs bool) (*MethodFacts, error) {
 	f := &MethodFacts{calls: map[bytecodeir.Site][]valueflow.Value{}, receivers: map[bytecodeir.Site]valueflow.Value{}, fieldWrites: map[bytecodeir.Site]valueflow.Value{}, returns: map[bytecodeir.Site]valueflow.Value{}}
 	if len(m.Code) == 0 {
 		return f, nil
@@ -64,7 +75,7 @@ func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodF
 		}
 	}
 
-	it := &interp{fqcn: fqcn, m: m, opByPC: opByPC, site: site, facts: f}
+	it := &interp{fqcn: fqcn, m: m, opByPC: opByPC, site: site, facts: f, parameterRefs: parameterRefs}
 	f.reason = it.run(cfg)
 	f.aborted = f.reason != ""
 	return f, nil
@@ -79,11 +90,12 @@ func callArgCount(desc string) (int, error) {
 }
 
 type interp struct {
-	fqcn   string
-	m      classfile.Method
-	opByPC map[int]classfile.LocalOp
-	site   func(pc int, kind bytecodeir.OpKind) bytecodeir.Site
-	facts  *MethodFacts
+	fqcn          string
+	m             classfile.Method
+	opByPC        map[int]classfile.LocalOp
+	site          func(pc int, kind bytecodeir.OpKind) bytecodeir.Site
+	facts         *MethodFacts
+	parameterRefs bool
 }
 
 // stackEntry is one operand-stack slot: its abstract value and its JVM
@@ -170,9 +182,13 @@ func (it *interp) run(cfg *classfile.CFG) string {
 	if err != nil {
 		return fmt.Sprintf("invalid method descriptor: %v", err)
 	}
-	for _, a := range args {
+	for i, a := range args {
 		if a.Slot < maxLocals {
-			initial.locals[a.Slot] = valueflow.Typed(a.Type)
+			if it.parameterRefs {
+				initial.locals[a.Slot] = valueflow.FormalParameter(a.Type, i)
+			} else {
+				initial.locals[a.Slot] = valueflow.Typed(a.Type)
+			}
 		}
 	}
 

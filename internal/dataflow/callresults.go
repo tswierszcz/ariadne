@@ -2,6 +2,7 @@ package dataflow
 
 import (
 	"fmt"
+	"strings"
 
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
@@ -38,10 +39,70 @@ func ResolveCallResult(h *hierarchy.Hierarchy, ref valueflow.CallResultRef) (val
 	return v, append(warnings, chaseWarnings...)
 }
 
+// ResolveCallResultOneHop resolves only the exact invokestatic/invokespecial
+// target named by ref and merges its immediate return values. If a return is
+// itself a KindCallResult or KindField, it is left intact for consumers that
+// need to preserve provenance boundaries or apply their own depth limit.
+func ResolveCallResultOneHop(h *hierarchy.Hierarchy, ref valueflow.CallResultRef) (valueflow.Value, []string) {
+	return resolveCallResultOnce(h, ref)
+}
+
+// ResolveCallResultOneHopWithParameterRefs preserves a returned formal
+// parameter as a typed value carrying its descriptor index. A caller can
+// then substitute that marker using the arguments at ref.Site.
+func ResolveCallResultOneHopWithParameterRefs(h *hierarchy.Hierarchy, ref valueflow.CallResultRef) (valueflow.Value, []string) {
+	return resolveCallResultOnceMode(h, ref, true)
+}
+
+// ResolveCallArgumentAtCall analyzes the method containing ref.Site and
+// returns the exact argument at index. It does not resolve virtual dispatch.
+func ResolveCallArgumentAtCall(h *hierarchy.Hierarchy, ref valueflow.CallResultRef, index int) (valueflow.Value, []string) {
+	var warnings []string
+	separator := strings.LastIndexByte(ref.Site.Method, '#')
+	if separator <= 0 || ref.Site.Descriptor == "" {
+		return valueflow.Unknown("helper call site has no usable caller method identity"), warnings
+	}
+	callerOwner, callerName := ref.Site.Method[:separator], ref.Site.Method[separator+1:]
+	ci, ok := h.Lookup(callerOwner)
+	if !ok {
+		return valueflow.Unknown(fmt.Sprintf("caller class %s is not in the analyzed hierarchy", callerOwner)), warnings
+	}
+	callerMethod, ok := ci.MethodByNameAndDesc(callerName, ref.Site.Descriptor)
+	if !ok {
+		return valueflow.Unknown(fmt.Sprintf("caller method %s#%s%s is not in the analyzed hierarchy", callerOwner, callerName, ref.Site.Descriptor)), warnings
+	}
+	var jarReader classfile.JarClassReader
+	defer jarReader.Close()
+	cf, err := jarReader.ReadClass(ci.SourceJar, ci.SourceEntry)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("re-reading %s (%s) for helper call arguments: %v", ci.SourceJar, ci.SourceEntry, err))
+		return valueflow.Unknown("could not re-read the caller class to substitute a helper parameter"), warnings
+	}
+	facts, err := Analyze(cf, callerOwner, callerMethod.Method)
+	if err != nil {
+		return valueflow.Unknown(fmt.Sprintf("caller local-value analysis failed: %v", err)), warnings
+	}
+	if aborted, reason := facts.Aborted(); aborted {
+		warnings = append(warnings, fmt.Sprintf("%s#%s%s: caller local-value analysis aborted: %s", callerOwner, callerName, ref.Site.Descriptor, reason))
+	}
+	args, err := classfile.ArgumentSlots(ref.Desc, true)
+	if err != nil {
+		return valueflow.Unknown(fmt.Sprintf("invalid helper descriptor %q: %v", ref.Desc, err)), warnings
+	}
+	if index < 0 || index >= len(args) {
+		return valueflow.Unknown(fmt.Sprintf("helper parameter index %d is outside descriptor %s", index, ref.Desc)), warnings
+	}
+	return facts.ArgumentAt(ref.Site, index), warnings
+}
+
 // resolveCallResultOnce is ResolveCallResult's own one-hop resolution,
 // with no further chasing — the piece chaseFieldOrCall calls back into
 // when a field chase lands on a call result.
 func resolveCallResultOnce(h *hierarchy.Hierarchy, ref valueflow.CallResultRef) (valueflow.Value, []string) {
+	return resolveCallResultOnceMode(h, ref, false)
+}
+
+func resolveCallResultOnceMode(h *hierarchy.Hierarchy, ref valueflow.CallResultRef, parameterRefs bool) (valueflow.Value, []string) {
 	var warnings []string
 	declaring, ok := h.ResolveExact(ref.Owner, ref.Name, ref.Desc)
 	if !ok {
@@ -67,7 +128,7 @@ func resolveCallResultOnce(h *hierarchy.Hierarchy, ref valueflow.CallResultRef) 
 		return valueflow.Unknown("could not re-read the declaring class to find its own return value"), warnings
 	}
 
-	v, mergeWarnings := mergeReturns(cf, declaring, m)
+	v, mergeWarnings := mergeReturnsMode(cf, declaring, m, parameterRefs)
 	return v, append(warnings, mergeWarnings...)
 }
 
@@ -122,8 +183,18 @@ func chaseFieldOrCall(h *hierarchy.Hierarchy, v valueflow.Value, visited map[str
 // which this codebase's own byte-identical-results.json determinism
 // contract cannot tolerate.
 func mergeReturns(cf *classfile.ClassFile, declaring string, m hierarchy.Method) (valueflow.Value, []string) {
+	return mergeReturnsMode(cf, declaring, m, false)
+}
+
+func mergeReturnsMode(cf *classfile.ClassFile, declaring string, m hierarchy.Method, parameterRefs bool) (valueflow.Value, []string) {
 	var warnings []string
-	facts, err := Analyze(cf, declaring, m.Method)
+	var facts *MethodFacts
+	var err error
+	if parameterRefs {
+		facts, err = AnalyzeWithParameterRefs(cf, declaring, m.Method)
+	} else {
+		facts, err = Analyze(cf, declaring, m.Method)
+	}
 	if err != nil {
 		return valueflow.Unknown(fmt.Sprintf("local-value analysis: %v", err)), warnings
 	}

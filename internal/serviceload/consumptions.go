@@ -23,6 +23,7 @@ func FindConsumptionSites(h *hierarchy.Hierarchy, loads []ServiceLoadSite) ([]Se
 	}
 
 	var sites []ServiceConsumptionSite
+	streamTerminals := map[siteKey]bool{}
 	var warnings []string
 	var jarReader classfile.JarClassReader
 	defer jarReader.Close()
@@ -47,6 +48,8 @@ func FindConsumptionSites(h *hierarchy.Hierarchy, loads []ServiceLoadSite) ([]Se
 				continue
 			}
 			aborted, abortReason := facts.Aborted()
+			methodKey := siteKey{caller: fqcn, desc: method.Name + method.Descriptor}
+			streamTerminals[methodKey] = hasStreamTerminal(method.Calls)
 			for _, call := range method.Calls {
 				isConsumption := isServiceConsumptionCall(call.Owner, call.Name, call.Desc)
 				if !isConsumption && call.Kind != classfile.CallVirtual && call.Kind != classfile.CallInterface {
@@ -62,7 +65,7 @@ func FindConsumptionSites(h *hierarchy.Hierarchy, loads []ServiceLoadSite) ([]Se
 					origins.Reason = "local-value analysis for this method aborted: " + abortReason
 				} else {
 					receiver = facts.ReceiverAt(at)
-					origins = serviceLoadOrigins(receiver, loadBySite)
+					origins = serviceLoadOrigins(receiver, loadBySite, h)
 				}
 				providerMethodCall := false
 				if !isConsumption {
@@ -82,6 +85,8 @@ func FindConsumptionSites(h *hierarchy.Hierarchy, loads []ServiceLoadSite) ([]Se
 					ProviderMethodCall: providerMethodCall,
 					Interfaces:         origins.Interfaces, LoaderKinds: origins.LoaderKinds,
 					UnresolvedReason: origins.Reason,
+					streamLoadSites:  origins.LoadSites,
+					streamTraceSites: origins.StreamTraceSites,
 				}
 				if aborted {
 					site.UnresolvedReason = "local-value analysis for this method aborted: " + abortReason
@@ -90,7 +95,64 @@ func FindConsumptionSites(h *hierarchy.Hierarchy, loads []ServiceLoadSite) ([]Se
 			}
 		}
 	}
+	for i := range sites {
+		stream := &sites[i]
+		if stream.CallOwner != serviceLoaderOwner || stream.CallName != "stream" {
+			continue
+		}
+		methodKey := siteKey{caller: stream.CallerFQCN, desc: stream.CallerName + stream.CallerDesc}
+		stream.streamTerminalSeen = streamTerminals[methodKey]
+		if !stream.streamTerminalSeen {
+			continue
+		}
+		for j := range sites {
+			providerGet := &sites[j]
+			if providerGet.CallerFQCN != stream.CallerFQCN || providerGet.CallerName != stream.CallerName || providerGet.CallerDesc != stream.CallerDesc || providerGet.CallOwner != "java.util.ServiceLoader$Provider" || providerGet.CallName != "get" || providerGet.UnresolvedReason != "" {
+				continue
+			}
+			if containsTraceSite(providerGet.streamTraceSites, bytecodeir.Site{
+				Method: stream.CallerFQCN + "#" + stream.CallerName, Descriptor: stream.CallerDesc,
+				PC: stream.PC, Op: bytecodeir.OpCall,
+			}) && intersectsLoadSites(stream.streamLoadSites, providerGet.streamLoadSites) {
+				stream.streamTerminalSupported = true
+				break
+			}
+		}
+	}
 	return sites, warnings, nil
+}
+
+func containsTraceSite(sites []bytecodeir.Site, target bytecodeir.Site) bool {
+	for _, site := range sites {
+		if site == target {
+			return true
+		}
+	}
+	return false
+}
+
+func hasStreamTerminal(calls []classfile.Call) bool {
+	for _, call := range calls {
+		if !strings.HasPrefix(call.Owner, "java.util.stream.") && call.Owner != "java.util.stream.Stream" {
+			continue
+		}
+		switch call.Name {
+		case "findFirst", "findAny", "forEach", "forEachOrdered", "toArray", "reduce", "collect", "min", "max", "count":
+			return true
+		}
+	}
+	return false
+}
+
+func intersectsLoadSites(a, b []siteKey) bool {
+	for _, left := range a {
+		for _, right := range b {
+			if left == right {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func linkedProviderMethodCall(receiver valueflow.Value, callOwner string, origins serviceOrigins) bool {
@@ -177,13 +239,43 @@ type serviceOrigins struct {
 	Interfaces         []string
 	LoaderKinds        []LoaderKind
 	Reason             string
+	LoadSites          []siteKey
+	StreamTraceSites   []bytecodeir.Site
 }
 
-func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite) serviceOrigins {
+func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite, h *hierarchy.Hierarchy) serviceOrigins {
 	var out serviceOrigins
 	interfaces := map[string]bool{}
 	loaderKinds := map[LoaderKind]bool{}
+	loadSites := map[siteKey]bool{}
+	streamTraceSites := map[bytecodeir.Site]bool{}
 	var reasons []string
+	resolvedValues := map[string]bool{}
+	var substituteParameters func(valueflow.Value, valueflow.CallResultRef) (valueflow.Value, []string)
+	substituteParameters = func(current valueflow.Value, call valueflow.CallResultRef) (valueflow.Value, []string) {
+		switch current.Kind {
+		case valueflow.KindTyped:
+			if current.Parameter == nil {
+				return current, nil
+			}
+			return dataflow.ResolveCallArgumentAtCall(h, call, current.Parameter.Index)
+		case valueflow.KindSet:
+			var result valueflow.Value
+			var warnings []string
+			for i, candidate := range current.Candidates {
+				substituted, candidateWarnings := substituteParameters(candidate, call)
+				warnings = append(warnings, candidateWarnings...)
+				if i == 0 {
+					result = substituted
+				} else {
+					result = valueflow.Merge(result, substituted)
+				}
+			}
+			return result, warnings
+		default:
+			return current, nil
+		}
+	}
 	var visit func(valueflow.Value, int)
 	visit = func(current valueflow.Value, depth int) {
 		if depth > valueflow.MaxCallTraceDepth+2 {
@@ -195,32 +287,87 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite) se
 			if current.Call == nil {
 				return
 			}
-			if current.Call.Owner != serviceLoaderOwner {
+			if current.Call.Owner == serviceLoaderOwner {
+				if _, isLoad := serviceLoaderOverloads[overloadKey{current.Call.Name, current.Call.Desc}]; !isLoad {
+					return
+				}
+				out.ServiceLoaderValue = true
+				key, ok := siteKeyFromIR(current.Call.Site)
+				if !ok {
+					reasons = append(reasons, "load call result has no usable bytecode-site identity")
+					return
+				}
+				load, ok := loads[key]
+				if !ok {
+					reasons = append(reasons, "load call result has no matching resolved ServiceLoader load-site record")
+					return
+				}
+				if load.Interface == "" {
+					reasons = append(reasons, load.UnresolvedReason)
+					return
+				}
+				loadSites[key] = true
+				interfaces[load.Interface] = true
+				loaderKinds[load.LoaderKind] = true
 				return
 			}
-			if _, isLoad := serviceLoaderOverloads[overloadKey{current.Call.Name, current.Call.Desc}]; !isLoad {
+
+			// DATA_FLOW D3 resolves only exact invokestatic/invokespecial
+			// results. Follow a helper's returned value to a ServiceLoader
+			// factory result, preserving that factory's own bytecode site.
+			key := callResultSiteKey(*current.Call)
+			if resolvedValues[key] {
+				reasons = append(reasons, "service provenance revisits the same helper call result")
 				return
 			}
-			out.ServiceLoaderValue = true
-			key, ok := siteKeyFromIR(current.Call.Site)
-			if !ok {
-				reasons = append(reasons, "load call result has no usable bytecode-site identity")
+			resolvedValues[key] = true
+			if h == nil {
+				reasons = append(reasons, "helper call result cannot be resolved without a class hierarchy")
 				return
 			}
-			load, ok := loads[key]
-			if !ok {
-				reasons = append(reasons, "load call result has no matching resolved ServiceLoader load-site record")
+			resolved, warnings := dataflow.ResolveCallResultOneHopWithParameterRefs(h, *current.Call)
+			reasons = append(reasons, warnings...)
+			resolved, substitutionWarnings := substituteParameters(resolved, *current.Call)
+			reasons = append(reasons, substitutionWarnings...)
+			if resolved.Kind == valueflow.KindUnknown {
+				if resolved.Reason != "" {
+					reasons = append(reasons, "helper call result is unresolved: "+resolved.Reason)
+				}
 				return
 			}
-			if load.Interface == "" {
-				reasons = append(reasons, load.UnresolvedReason)
+			visit(resolved, depth+1)
+		case valueflow.KindField:
+			if current.Field == nil {
 				return
 			}
-			interfaces[load.Interface] = true
-			loaderKinds[load.LoaderKind] = true
+			ref := *current.Field
+			key := "field:" + ref.Owner + "#" + ref.Name + ":" + ref.Desc
+			if resolvedValues[key] {
+				reasons = append(reasons, "service provenance revisits the same field")
+				return
+			}
+			resolvedValues[key] = true
+			if h == nil {
+				reasons = append(reasons, "field value cannot be resolved without a class hierarchy")
+				return
+			}
+			resolved, warnings := dataflow.ResolveFieldOneHop(h, ref)
+			reasons = append(reasons, warnings...)
+			if resolved.Kind == valueflow.KindUnknown {
+				if resolved.Reason != "" {
+					reasons = append(reasons, "field value is unresolved: "+resolved.Reason)
+				}
+				return
+			}
+			visit(resolved, depth+1)
 		case valueflow.KindCallTrace:
-			if current.CallTrace != nil && current.CallTrace.Receiver != nil {
-				visit(*current.CallTrace.Receiver, depth+1)
+			if current.CallTrace != nil {
+				if current.CallTrace.Owner == serviceLoaderOwner && current.CallTrace.Name == "stream" {
+					streamTraceSites[current.CallTrace.Site] = true
+				}
+				if current.CallTrace.Receiver != nil {
+					visit(*current.CallTrace.Receiver, depth+1)
+				}
 			}
 		case valueflow.KindSet:
 			for _, candidate := range current.Candidates {
@@ -235,6 +382,30 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite) se
 	for loader := range loaderKinds {
 		out.LoaderKinds = append(out.LoaderKinds, loader)
 	}
+	for key := range loadSites {
+		out.LoadSites = append(out.LoadSites, key)
+	}
+	for site := range streamTraceSites {
+		out.StreamTraceSites = append(out.StreamTraceSites, site)
+	}
+	sort.Slice(out.StreamTraceSites, func(i, j int) bool {
+		if out.StreamTraceSites[i].Method != out.StreamTraceSites[j].Method {
+			return out.StreamTraceSites[i].Method < out.StreamTraceSites[j].Method
+		}
+		if out.StreamTraceSites[i].Descriptor != out.StreamTraceSites[j].Descriptor {
+			return out.StreamTraceSites[i].Descriptor < out.StreamTraceSites[j].Descriptor
+		}
+		return out.StreamTraceSites[i].PC < out.StreamTraceSites[j].PC
+	})
+	sort.Slice(out.LoadSites, func(i, j int) bool {
+		if out.LoadSites[i].caller != out.LoadSites[j].caller {
+			return out.LoadSites[i].caller < out.LoadSites[j].caller
+		}
+		if out.LoadSites[i].desc != out.LoadSites[j].desc {
+			return out.LoadSites[i].desc < out.LoadSites[j].desc
+		}
+		return out.LoadSites[i].pc < out.LoadSites[j].pc
+	})
 	sort.Strings(out.Interfaces)
 	sort.Slice(out.LoaderKinds, func(i, j int) bool { return out.LoaderKinds[i] < out.LoaderKinds[j] })
 	if len(reasons) > 0 {
@@ -245,6 +416,10 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite) se
 		out.Reason = "ServiceLoader load-site identity was found, but its service interface is unresolved"
 	}
 	return out
+}
+
+func callResultSiteKey(ref valueflow.CallResultRef) string {
+	return ref.Owner + "#" + ref.Name + ref.Desc + "@" + ref.Site.Method + ref.Site.Descriptor + ":" + fmt.Sprint(ref.Site.PC)
 }
 
 func siteKeyFromIR(site bytecodeir.Site) (siteKey, bool) {

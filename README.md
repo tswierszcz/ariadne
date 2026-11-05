@@ -425,8 +425,9 @@ and recognized ServiceLoader consumption/dispatch sites with their linked
 load interface or gap; the registered providers with constructible no-argument
 constructors are also listed (the B3 model adds graph edges only when a reachable
 `Iterator.next()` or `Provider.get()` can be traced through a bounded same-method receiver chain
-to the exact `ServiceLoader.load(...)` call; `load()` itself is lazy, while
-unlinked calls and stream terminal operations remain explicit model gaps;
+to the exact `ServiceLoader.load(...)` call; the linear `stream().findFirst().get().get()`
+path is also modeled at `Provider.get()`. A stream without a terminal operation remains lazy;
+unlinked calls and unsupported callback/terminal flows remain explicit model gaps;
 SERVICE_LOADING S0/S1/S2 — see "Known limitations" below for the limits),
 every Spring MVC HTTP mapping found with its real
 path(s)/verb(s), every `@Component`-family stereotype's own declared
@@ -806,8 +807,11 @@ report:
   interface's registered providers can add model-derived call-graph edges
   to their public no-argument constructors at a linked `Iterator.next()` or
   `Provider.get()` call. `Iterator.hasNext()` is recognized but does not
-  materialize an instance. The link is limited to bounded,
-  same-method receiver provenance from that consumption call to the exact
+  materialize an instance. The link follows bounded receiver provenance
+  exact `invokestatic`/`invokespecial` helper return summaries, including a
+  returned formal parameter substituted from that call site's argument, and
+  D3 field summaries (static fields and final instance fields written by `this`
+  in a constructor) to the
   `load()` site. A subsequent call through that exact service interface can
   add descriptor-exact edges to the registered provider implementations;
   existing CHA edges remain as their broader conservative result. The
@@ -815,8 +819,10 @@ report:
   provider table lists materializable candidates; it
   does not claim every listed provider was instantiated. Unsupported
   receiver flows produce an explicit incomplete-model warning rather than
-  a guessed edge. `stream()` terminal operations, receiver flows through
-  fields/parameters/helper methods, custom loaders, and JPMS `module-info`
+  a guessed edge. Callback-based stream pipelines and unsupported terminal flows, receiver
+  flows through arbitrary mutable fields, parameter values supplied by unknown callers,
+  virtual helper returns and other unresolved results,
+  custom loaders, and JPMS `module-info`
   `uses`/`provides` remain unsupported or incomplete.
 - **Shaded/relocated dependencies**: a jar whose classes were relocated
   under a different package than its own Maven coordinates declare is

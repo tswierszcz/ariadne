@@ -16,7 +16,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Sprawdzić wspólne wymagania F0–F1 i aktualny model wyników. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3 (streszczenia pól statycznych): częściowe; D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
-| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1: DONE; S2: IN_PROGRESS; S3–S4: UNASSESSED | S2 zachowuje bounded provenance od `ServiceLoader.load()` do `Iterator.next()`/`Provider.get()`, dodaje krawędzie do konstruktorów i `<clinit>`, a dla dalszych wywołań przez dokładny interfejs usługi modeluje descriptor-exact cele providerów po weryfikacji assignability. `load()` pozostaje lazy; `hasNext()` nie tworzy instancji. Pola/parametry/granice metod, stream callback flows i loader/JPMS gaps pozostają otwarte. |
+| SERVICE_LOADING | [S0–S4](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) | S0, S1: DONE; S2: IN_PROGRESS; S3–S4: UNASSESSED | S2 zachowuje bounded provenance od `ServiceLoader.load()` do `Iterator.next()`/`Provider.get()`, dodaje krawędzie do konstruktorów i `<clinit>`, a dla dalszych wywołań przez dokładny interfejs usługi modeluje descriptor-exact cele providerów po weryfikacji assignability. Obsługiwane są streszczenia D3: pola statyczne, `final` pola instancji zapisywane przez `this` w konstruktorze, zwrot parametru z dokładnego helpera `invokestatic`/`invokespecial` podstawiany argumentem tego call site oraz liniowy `stream().findFirst().get().get()`. Pozostałe parametry, arbitralne/mutowalne pola, callback stream pipelines i wywołania wirtualne pozostają lukami. Fixture skompilowany; kontrolne przebiegi petclinic i WebGoat zakończone (2026-11-05) z reachability bajtowo identycznym jak przed tymi przyrostami. Stream bez terminala i `load()` pozostają lazy; `hasNext()` nie tworzy instancji. |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
@@ -1023,6 +1023,138 @@ Przy dodawaniu kolejnego wpisu zapisz:
   międzywywołaniowe śledzenie tożsamości load → iterator/stream → provider
   i dispatch metod. `SERVICE_LOADING:S3` (JPMS) pozostaje odrębne.
 
+#### SERVICE_LOADING:S2 — D3 field provenance (2026-10-26)
+
+- **Zakres:** kontynuacja poprzedniego zatwierdzonego przyrostu S2; wykorzystać
+  D3 dla pól, bez points-to i bez tworzenia celów dla nierozstrzygniętych pól.
+- **Zrealizowane:** `ResolveFieldOneHop` zwraca bezpośrednie streszczenie D3,
+  a `serviceLoadOrigins` śledzi jego wynik z własnym limitem głębokości i
+  ochroną przed cyklami wspólną dla ścieżki pól/helperów. Działa dla pól
+  statycznych oraz `final` pól instancji zapisywanych przez `this` w
+  konstruktorach — dokładnie w kształcie udostępnianym przez D3. Pozostałe
+  pola i parametry pozostają nierozstrzygnięte.
+- **Weryfikacja w tym przyroście:** JDK zawiera moduł `jdk.compiler`, mimo że
+  nie udostępnia komend `javac`/`javap`; artefakty fixture odświeżono z JDK
+  przez `java --module jdk.compiler/com.sun.tools.javac.Main -source 8 -target 8`.
+  `TestCompiledServiceLoaderFixture` PASS: przepływ przez `static final` pole
+  dochodzi do konstruktora i descriptor-exact dispatch providera; `mutable`
+  pole instancji oraz helper bez wartości pozostają jawnymi gapami bez
+  provider edges. `GOCACHE=/tmp/ariadne-gocache go test ./internal/serviceload
+  ./internal/dataflow`, `go test ./...`, `go vet ./...`, `git diff --check`
+  oraz `go build -o /tmp/ariadne-s2-fields ./cmd/ariadne` — PASS. Kontrolne
+  przebiegi bez nowych wpisów OSV offline: petclinic 29,123 klas, 29 load
+  sites i 57 consumption/dispatch (39 linked); WebGoat 40,569 klas, 48 load
+  sites i 115 consumption/dispatch (90 linked). Późniejszy etap analizy CVE
+  przerwał brakujący wpis OSV; pełne wyniki reachability tych przebiegów nie
+  są raportowane.
+- **Pozostało w S2:** inne pola, parametry, wirtualne helper returns oraz
+  stream callback/pipeline flows pozostają nieobsługiwane lub jawnie
+  niepełne. Widoczność przez explicit/system/installed loaderów pozostaje
+  gapem. Bazowy CHA nadal dodaje szersze cele; RTA nie istnieje. JPMS S3
+  pozostaje odrębne.
+
+#### SERVICE_LOADING:S2 — skompilowany fixture pól (2026-10-26)
+
+- **Zrealizowane:** rozszerzono `Entry` w fixture o `static final LOADER`
+  inicjalizowany przez `ServiceLoader.load`, konsumenta tego pola oraz
+  konsumenta pola instancji mutowalnego. Zaktualizowano checked-in classfiles
+  do classfile major 52. Test integracyjny sprawdza pełny graf przez pole
+  statyczne (konstruktor i descriptor-exact dispatch providera) oraz
+  potwierdza, że ścieżka pola mutowalnego daje `Incomplete` bez modelowych
+  krawędzi. Poprzednie plany „uzupełnić fixture” są tym samym zamknięte.
+- **Weryfikacja:** `TestCompiledServiceLoaderFixture -count=1` PASS;
+  pełne `go test ./...`, `go vet ./...`, build i `git diff --check` PASS.
+  Świeży petclinic `-offline -profile spring`: 29,123 klas, 29 load sites,
+  57 consumption/dispatch (39 linked), 4 model edges; analiza osiągalności
+  zakończyła się (`2/15/9/15/6`). Świeży WebGoat: 40,569 klas, 48 load sites,
+  115 consumption/dispatch (90 linked); analiza doszła do OSV, lecz zakończyła
+  się błędem braku wpisu `b1e63ee08008e9916ecd8fb4d3495aacb7c0edffdb844a556869cb679b822a55`
+  w offline cache, więc reachability WebGoat nie jest potwierdzona w tym
+  przebiegu.
+- **Pozostało:** tylko dalsze ograniczenia S2 wymienione wyżej; osobne
+  `SERVICE_LOADING:S3` obejmuje JPMS.
+
+#### SERVICE_LOADING:S2 — final instance field i cykle (2026-10-26)
+
+- **Zrealizowane:** fixture ma teraz `final` pole instancji inicjalizowane
+  przez `ServiceLoader.load()` w konstruktorze. Sprawdza dodatni przepływ
+  `constructor load → final field → iterator → next → provider.decode`,
+  w tym krawędzie do konstruktora i dokładnej metody providera. Dodano też
+  dwa statyczne pola z cyklicznymi referencjami. Cykliczne i mutowalne pole
+  kończą analizę jawnym `Incomplete`, bez provider edges.
+- **Weryfikacja:** fixture skompilowany JDK-owym `javac` przez
+  `java --module jdk.compiler/com.sun.tools.javac.Main -source 8 -target 8`;
+  classfile major 52. `go test ./internal/serviceload -run
+  TestCompiledServiceLoaderFixture -count=1`, `go test ./...`, `go vet ./...`,
+  build i `git diff --check` — PASS. Petclinic świeżo: 29,123 klas, 29 load
+  sites, 57 consumption/dispatch (39 linked), 4 model edges i zakończona
+  reachability `2/15/9/15/6`. WebGoat: 40,569 klas, 48 load sites,
+  115 consumption/dispatch (90 linked); przebieg znów zatrzymał się na tym
+  samym brakującym wpisie OSV offline, więc reachability WebGoat pozostaje
+  niezweryfikowana w tym przebiegu.
+- **Pozostało:** nowe przypadki pól bezpiecznych i cyklicznych są zweryfikowane
+  end-to-end. Inne ograniczenia S2 pozostają wymienione wyżej; JPMS jest S3.
+
+#### SERVICE_LOADING:S2 — podstawienie zwracanego parametru (2026-10-26)
+
+- **Zakres:** dokładny `invokestatic`/`invokespecial` helper, którego ciało
+  zwraca formalny parametr; rozwiązać ten marker tylko z argumentu na jego
+  konkretnym call site. Nie rozciągać tego na wirtualną dispatch lub dowolne
+  parametry zewnętrznych callerów.
+- **Zrealizowane:** D2 może opcjonalnie zachować indeks formalnego parametru
+  przy analizie zwrotów. `ResolveCallResultOneHopWithParameterRefs` oddaje
+  parametr wraz z indeksem, a `ResolveCallArgumentAtCall` odtwarza argument z
+  metody caller'a wskazanej w `CallResultRef.Site`. S2 podstawia tę wartość
+  i kontynuuje ograniczony traversal; zestawy branchy są podstawiane
+  kandydat po kandydacie. Zwykła analiza D2 pozostaje bez zmian, chyba że
+  konsument jawnie zażąda markerów.
+- **Weryfikacja:** skompilowany Java 8 fixture sprawdza `load → passLoader(x)
+  → return x → iterator → next → provider.decode` z krawędziami do
+  konstruktora i metody; caller z nieznanym parametrem nie dostaje interfejsu
+  usługi ani modelowych celów. `GOCACHE=/tmp/ariadne-gocache go test
+  ./internal/serviceload ./internal/dataflow ./internal/valueflow`, pełne
+  `go test ./...`, `go vet ./...`, build i `git diff --check` — PASS.
+  Petclinic: 29,123 klas, 29 load sites, 57 consumption/dispatch (39 linked),
+  4 model edges, reachability `2/15/9/15/6`, bez zmiany względem poprzedniego
+  pomiaru. WebGoat: 40,569 klas, 48 load sites, 115 consumption/dispatch
+  (90 linked), po czym OSV offline przerwało analizę z brakującym kluczem
+  `b1e63ee08008e9916ecd8fb4d3495aacb7c0edffdb844a556869cb679b822a55`;
+  reachability WebGoat nie jest potwierdzona.
+- **Pozostało:** marker formalnego parametru jest substytuowany wyłącznie
+  przez konkretny direct-call site; nieznane argumenty pozostają gapem.
+  Wirtualne helper returns, parametry zewnętrznych API, stream callback flows
+  oraz pozostałe ograniczenia S2 nie zmieniają statusu. Następny krok pozostaje
+  `SERVICE_LOADING:S2`.
+
+#### SERVICE_LOADING:S2 — liniowy terminal Stream API (2026-10-26)
+
+- **Zakres:** weryfikacja `ServiceLoader.stream().findFirst().get().get()`;
+  bez callbacków i transformacji streama.
+- **Zrealizowane:** analizator rozróżnia stream bez operacji terminalnej,
+  wsparty łańcuch z powiązanym `Provider.get()` i nierozpoznany terminal.
+  Stream bez terminala pozostaje lazy; prosty łańcuch daje krawędź do providera
+  dokładnie przy `Provider.get()` oraz późniejszy descriptor-exact dispatch.
+  Terminal jest wspierany tylko wtedy, gdy provenance wskazuje dokładną
+  instrukcję `stream()` i ten sam load site; współdzielenie jednego loadera
+  przez osobne streamy nie łączy ich przypadkowo.
+  Terminal ze ścieżką callback `map(provider -> provider.get())` pozostaje
+  `Incomplete`; sam `Provider.get()` w callbacku nie jest łączony z load site.
+- **Weryfikacja:** skompilowany fixture sprawdza dodatnią ścieżkę i providerowe
+  krawędzie, lazy stream bez materializacji oraz lukę callbacku bez zgadywanych
+  krawędzi; test jednostkowy odrzuca też powiązanie terminala z innym PC
+  `stream()`. `go test ./internal/serviceload ./internal/dataflow`, pełne
+  `go test ./...`, `go vet ./...`, `go build -o /tmp/ariadne-s2-stream
+  ./cmd/ariadne` oraz `git diff --check` — PASS. Petclinic: 29,123 klas,
+  29 load sites, 57 consumption/dispatch (39 linked), 4 model edges,
+  reachability `2/15/9/15/6`, bez zmiany. WebGoat: 40,569 klas, 48 load sites,
+  115 consumption/dispatch (90 linked); późniejszy etap OSV przerwał brak
+  wpisu `b1e63ee08008e9916ecd8fb4d3495aacb7c0edffdb844a556869cb679b822a55`,
+  więc reachability WebGoat nie jest potwierdzona.
+- **Ograniczenia:** wsparty jest tylko liniowy przepływ `findFirst` → Optional
+  `get` → `Provider.get`; `map`/`filter`/inne callbacki i terminale bez
+  rozpoznanego `Provider.get` pozostają lukami. S2 nadal trwa, JPMS pozostaje
+  osobnym S3.
+
 #### SERVICE_LOADING:S2 — kontynuacja: lazy materialization z lokalnym provenance (2026-10-26)
 
 - **Zakres zatwierdzony:** w ramach S2 powiązać wybrane lokalne użycia
@@ -1033,6 +1165,13 @@ Przy dodawaniu kolejnego wpisu zapisz:
   zwracających referencję wywołań JDK `ServiceLoader`, `Iterator`,
   `Optional`, `Spliterator` i `java.util.stream.*`. `FindConsumptionSites`
   rozwiązuje wybrane punkty do dokładnego load site i interfejsu usługi.
+  Kontynuacja S2 wykorzystuje `dataflow.ResolveCallResultOneHop` dla
+  dokładnych wyników `invokestatic`/`invokespecial`: statyczny helper
+  zwracający `ServiceLoader.load(...)` może przenieść pochodzenie do metody
+  konsumenta, z zachowaniem PC factory call-site. Pola nie były obsługiwane
+  w tym pomiarze; późniejszy przyrost poniżej dodaje ograniczoną obsługę
+  streszczeń D3. Wirtualne wyniki, parametry i helpery o nierozstrzygalnym
+  wyniku nie tworzą provider edges; ich zużycie pozostaje jawnie niepełne.
   `Iterator.next()` i `Provider.get()` dodają krawędzie z własnego PC do
   publicznych konstruktorów providerów i istniejących `<clinit>`;
   `ServiceLoader.load()` oraz `Iterator.hasNext()` nie tworzą krawędzi
@@ -1043,11 +1182,14 @@ Przy dodawaniu kolejnego wpisu zapisz:
   overapproximation. Nierozpoznane receiver flows i stream pipelines
   pozostają jawnie `Incomplete`; provider targets nie są zgadywane.
 - **Zmienione pliki:** `internal/valueflow/value.go`,
-  `internal/dataflow/step.go` i testy, `internal/serviceload/consumptions.go`,
+  `internal/dataflow/step.go`, `callresults.go` i testy,
+  `internal/serviceload/consumptions.go`,
   `inventory.go`, `model.go`, testy provenance i grafu, `cmd/ariadne/main.go`,
   szablon raportu, `internal/report/report.go` i testy renderowania, `README.md`,
-  `docs/SUPPORT.MD` oraz ten rejestr. Poprzednie zmiany B3
-  w tym checkout pozostają częścią wspólnego, niezatwierdzonego diffu.
+  `docs/SUPPORT.MD` oraz ten rejestr. Potwierdzenie ścieżki na plikach
+  classfile dodaje `internal/serviceload/fixture_integration_test.go` oraz
+  `testdata/serviceloader/{src,classes}`: źródła Java i gotowe artefakty
+  Java 8 (classfile major 52), w tym `META-INF/services`.
 - **Weryfikacja:** `GOCACHE=/tmp/ariadne-gocache go test ./...` — PASS;
   `GOCACHE=/tmp/ariadne-gocache go vet ./...` — PASS; `git diff --check`
   — PASS; `GOCACHE=/tmp/ariadne-gocache go build -o
@@ -1059,23 +1201,59 @@ Przy dodawaniu kolejnego wpisu zapisz:
   Test `TestS2_linkedNextReachesProviderConstructorAndCHAServiceMethod`
   sprawdza pełny modelowy graf `load → iterator → next → constructor →
   provider.decode()V`, z dodatkowym overloadem jako negatywnym przypadkiem.
-  Finalne przebiegi `-offline -profile spring`: petclinic 29,123 klas /
-  29 load sites (13 resolved) / 51 consumption/dispatch sites (39 linked) /
+  Nowy `TestCompiledServiceLoaderFixture` przechodzi przez prawdziwe
+  classfile’y: `hierarchy.Build` → `FindLoadSites` → `Inventory` →
+  `FindConsumptionSites` → `analysis.Run`; potwierdza przepływ
+  `load → createLoader() → iterator → next → decode`, krawędzie do
+  konstruktora oraz `decode()Ljava/lang/String;`, brak materializacji dla
+  `loadWithoutConsuming()` i jawny gap bez celu dla brakującego providera.
+  `runWithUnknownLoader()` zwraca jawny `Incomplete` i nie dodaje krawędzi
+  modelowej. `ResolveCallResultOneHop` zachowuje bezpośredni wynik
+  helpera bez rekurencyjnego rozwiązywania jego zwróconego `ServiceLoader`;
+  łańcuch jest ograniczany przez limit call-trace.
+  Artefakty wygenerowano z dołączonych źródeł przez Eclipse Java Compiler
+  3.17.0; test Go czyta gotowe `.class` i nie wymaga kompilatora Java.
+  Finalne przebiegi `-offline -profile spring` po tej zmianie: petclinic
+  29,123 klas / 29 load sites (13 resolved) / 55 consumption/dispatch sites
+  (39 linked) /
   4 model edges / 3-62-26-51-6 statusy; WebGoat 40,569 klas / 48 load sites
-  (31 resolved) / 107 consumption/dispatch sites (87 linked) / 75 model
-  edges / 42-44-18-56-0 statusy. Oba wyjściowe
+  (31 resolved) / 111 consumption/dispatch sites (87 linked) / 75 model
+  edges / 42-44-18-56-0 statusy. Liczba nowych krawędzi modelu pozostała
+  bez zmian na obu aplikacjach; dodatkowe wykryte miejsca nie są połączone
+  z load-site. Oba wyjściowe
   `results.json` są bajtowo identyczne z `out/petclinic/results.json` i
   `out/WebGoat/results.json`. Nowa tabela "ServiceLoader consumption and
   dispatch sites" jest obecna w obu raportach.
-- **Pozostało w S2:** receiver provenance nie przechodzi przez pola,
-  parametry ani granice metod; stream callback/pipeline flows są niepełne;
+- **Pozostało w S2:** helpery są śledzone tylko przez dokładne
+  `invokestatic`/`invokespecial` wyniki do limitu call-trace; poza nowym
+  podzbiorem streszczeń D3 inne pola, parametry i virtual helper returns
+  pozostają nierozstrzygnięte. Stream
+  callback/pipeline flows są niepełne;
   weryfikacja widoczności przez explicit/system/installed loaderów pozostaje
   gapem. Dispatch dodany przez model jest dokładny dla wykrytej rejestracji,
   ale bazowy CHA nadal dodaje szersze cele. Test pełnej ścieżki używa
-  kontrolowanego `Hierarchy.NewForTesting`, a nie skompilowanego fixture
-  Java; świeże aplikacje kontrolne nie mają odpowiadającej, namierzonej
-  ścieżki podatności. Typy nie są przekazywane do osobnego RTA, bo RTA nie
-  istnieje w obecnym kodzie. JPMS S3 pozostaje osobne.
+  kontrolowanego classpath fixture, a świeże aplikacje kontrolne nie mają
+  odpowiadającej, namierzonej ścieżki podatności. Typy nie są przekazywane
+  do osobnego RTA, bo RTA nie istnieje w obecnym kodzie. JPMS S3 pozostaje
+  osobne.
+
+#### SERVICE_LOADING:S2 — weryfikacja przed commitem przyrostów pól/helperów/stream (2026-11-05)
+
+- **Zakres:** sama weryfikacja niezacommitowanych przyrostów 2026-10-26
+  (pola D3, final instance field i cykle, podstawienie zwracanego
+  parametru, liniowy terminal Stream API); bez zmian w kodzie.
+- **Weryfikacja:** `go vet ./...`, `go test ./...`, `git diff --check`,
+  `make build` — PASS. `bin/ariadne -offline -profile spring` na petclinic
+  dwukrotnie: bajtowo identyczny JSON, 29 load sites (13 resolved),
+  57 consumption/dispatch (39 linked), 4 model edges, statusy
+  `3/62/26/51/6`. WebGoat tym razem przeszedł do końca (wcześniejszy
+  brak wpisu OSV w offline cache nie wystąpił): 48 load sites
+  (31 resolved), 115 consumption/dispatch (90 linked), 75 model edges,
+  statusy `42/44/18/56/0`. Na obu aplikacjach `results.json` jest bajtowo
+  identyczny z buildem z poprzedniego commita (`2e3ab2f`): nowe
+  przyrosty rozpoznają więcej miejsc konsumpcji (WebGoat 107→115,
+  87→90 linked), ale nie dodają krawędzi modelu ani nie zmieniają
+  reachability — fixture pozostaje jedynym dowodem dodatniej ścieżki.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

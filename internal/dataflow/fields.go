@@ -218,6 +218,13 @@ func ResolveField(h *hierarchy.Hierarchy, ref valueflow.FieldRef) (valueflow.Val
 	return v, append(warnings, chaseWarnings...)
 }
 
+// ResolveFieldOneHop resolves the exact field summary without chasing a
+// stored KindField or KindCallResult. Callers that need provenance can then
+// traverse those values themselves and preserve their own cycle/depth rules.
+func ResolveFieldOneHop(h *hierarchy.Hierarchy, ref valueflow.FieldRef) (valueflow.Value, []string) {
+	return resolveFieldOnce(h, ref)
+}
+
 // resolveFieldOnce is ResolveField's own one-hop dispatch, with no
 // further chasing — the piece chaseFieldOrCall calls back into when a
 // call-result chase lands on a field.

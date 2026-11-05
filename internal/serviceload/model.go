@@ -219,8 +219,10 @@ func (e *ModelEvaluator) evaluateConsumption(model *models.Model, site models.Ca
 		fact.Reason = consumption.UnresolvedReason
 	}
 	if site.Call.Owner == serviceLoaderOwner && site.Call.Name == "stream" {
-		fact.Incomplete = true
-		fact.Reason = joinReasons(fact.Reason, "ServiceLoader.stream() terminal operations are not fully modeled")
+		if consumption.streamTerminalSeen && !consumption.streamTerminalSupported {
+			fact.Incomplete = true
+			fact.Reason = joinReasons(fact.Reason, "ServiceLoader.stream() terminal or callback flow is not modeled")
+		}
 		return fact
 	}
 	if site.Call.Owner == serviceLoaderOwner && site.Call.Name == "iterator" {

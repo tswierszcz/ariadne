@@ -3,6 +3,7 @@ package serviceload
 import (
 	"fmt"
 
+	"ariadne/internal/bytecodeir"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
 )
@@ -89,6 +90,10 @@ type ServiceConsumptionSite struct {
 	Interfaces                         []string
 	LoaderKinds                        []LoaderKind
 	UnresolvedReason                   string
+	streamLoadSites                    []siteKey
+	streamTraceSites                   []bytecodeir.Site
+	streamTerminalSeen                 bool
+	streamTerminalSupported            bool
 }
 
 // ProviderMaterialization is SERVICE_LOADING S2's resolved candidate:

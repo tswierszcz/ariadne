@@ -147,6 +147,13 @@ type FieldRef struct {
 	Owner, Name, Desc string
 }
 
+// ParameterRef identifies one formal parameter in the exact method body
+// that produced a return value. It is provenance metadata on KindTyped,
+// not evidence about a caller until a call-site consumer substitutes it.
+type ParameterRef struct {
+	Index int
+}
+
 // CallResultRef identifies one invokestatic/invokespecial call site's
 // target method — Owner/Name/Desc exactly as the bytecode's own
 // Methodref names it, before any resolution (the same owner-as-named
@@ -314,6 +321,10 @@ type Value struct {
 	// call's argument actually is).
 	Type string
 
+	// Parameter is set only for a KindTyped value created while an
+	// interprocedural consumer requests formal-parameter provenance.
+	Parameter *ParameterRef
+
 	// AllocSite is set only when Kind == KindAlloc.
 	AllocSite *bytecodeir.Site
 
@@ -362,6 +373,12 @@ func Const(typ string, v any) Value { return Value{Kind: KindConst, Type: typ, C
 
 // Typed returns an upper-bound-only value: known type, unknown constant.
 func Typed(typ string) Value { return Value{Kind: KindTyped, Type: typ} }
+
+// FormalParameter is a typed value that retains the zero-based descriptor
+// parameter index in the method currently being analyzed.
+func FormalParameter(typ string, index int) Value {
+	return Value{Kind: KindTyped, Type: typ, Parameter: &ParameterRef{Index: index}}
+}
 
 // Alloc returns a value identified by the allocation site that produced
 // it and that site's own static type (the class `new` named, or the
@@ -461,7 +478,10 @@ func (v Value) Equal(other Value) bool {
 	case KindConst:
 		return v.Type == other.Type && v.Const == other.Const
 	case KindTyped:
-		return v.Type == other.Type
+		if v.Type != other.Type || (v.Parameter == nil) != (other.Parameter == nil) {
+			return false
+		}
+		return v.Parameter == nil || v.Parameter.Index == other.Parameter.Index
 	case KindAlloc:
 		return v.AllocSite != nil && other.AllocSite != nil && *v.AllocSite == *other.AllocSite
 	case KindNull:
