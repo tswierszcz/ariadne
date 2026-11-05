@@ -158,3 +158,11 @@ func TestFreshnessFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestSnapshotFlags(t *testing.T) {
+	for _, args := range [][]string{{"-snapshot-in", "a", "-snapshot-out", "b"}, {"-snapshot-in", "a", "-refresh"}} {
+		if code, stderr := runWithEnv(append(args, baseArgs...), nil); code != 2 || !strings.Contains(stderr, "-snapshot-in replays recorded data") {
+			t.Errorf("%v: code=%d stderr=%q", args, code, stderr)
+		}
+	}
+}

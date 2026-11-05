@@ -20,6 +20,7 @@ import (
 	"ariadne/internal/findings"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/reach"
+	"ariadne/internal/snapshot"
 	"ariadne/internal/vulnmap"
 )
 
@@ -53,6 +54,16 @@ type Snapshot struct {
 	ID             string `json:"id"`
 	Offline        bool   `json:"offline"`
 	ClasspathOrder string `json:"classpath_order"`
+	// DataSet is the data snapshot of the run (CVE:F3), when one was
+	// recorded (-snapshot-out) or replayed (-snapshot-in).
+	DataSet *DataSet `json:"data_set,omitempty"`
+}
+
+// DataSet references a data snapshot by its logical data-set ID.
+type DataSet struct {
+	ID            string `json:"id"`
+	Replayed      bool   `json:"replayed"`
+	ConfigMatches bool   `json:"config_matches"`
 }
 
 // Component is one component instance together with its artifact.
@@ -143,6 +154,9 @@ type Coverage struct {
 	DataFreshness             DataFreshness `json:"data_freshness"`
 	// WithdrawnAdvisories are not analyzed: no finding is made for them.
 	WithdrawnAdvisories []WithdrawnAdvisory `json:"withdrawn_advisories,omitempty"`
+	// SnapshotChanges: with -snapshot-compare, why derived results were
+	// invalidated or verdicts changed since that snapshot.
+	SnapshotChanges []snapshot.Change `json:"snapshot_changes,omitempty"`
 }
 
 // GlobalGaps are the run's model gaps (contract §4), reported once.
@@ -180,6 +194,8 @@ type Inputs struct {
 	Gaps        GlobalGaps
 	Freshness   DataFreshness
 	Withdrawn   []cves.CVE
+	DataSet     *DataSet
+	Changes     []snapshot.Change
 }
 
 // DataFreshness is the run's data-freshness state (CVE:F2): State is
@@ -213,6 +229,7 @@ func Build(in Inputs) Document {
 	}
 	doc.Coverage.GlobalGaps = in.Gaps
 	doc.Coverage.DataFreshness = in.Freshness
+	doc.Coverage.SnapshotChanges = in.Changes
 	if doc.Coverage.DataFreshness.Kinds == nil {
 		doc.Coverage.DataFreshness.Kinds = []httpcache.Freshness{}
 	}
@@ -226,7 +243,7 @@ func Build(in Inputs) Document {
 
 	identity := map[string]string{}
 	if inv := in.Inventory; inv != nil {
-		doc.Snapshot = Snapshot{Kind: "inputs", ID: inputsID(inv), Offline: in.Offline, ClasspathOrder: inv.ClasspathOrder}
+		doc.Snapshot = Snapshot{Kind: "inputs", ID: inputsID(inv), Offline: in.Offline, ClasspathOrder: inv.ClasspathOrder, DataSet: in.DataSet}
 		differing := map[string]int{}
 		for _, c := range inv.Conflicts {
 			if !c.SameContent {

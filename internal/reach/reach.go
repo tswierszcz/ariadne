@@ -115,6 +115,11 @@ type InstanceFinding struct {
 	ModelGaps map[string]int // as Result.ModelGaps, for this instance
 }
 
+// EngineVersion versions the reachability semantics (statuses, per-instance
+// findings, aggregation, gap rule). Bump it on any change that can change
+// a result for the same graph and mapping; snapshots record it (CVE:F3).
+const EngineVersion = "1"
+
 // Engine holds everything needed to answer "is this CVE reachable" for
 // every CVE in one run: the call graph, the class hierarchy (for roots,
 // inherited-method matching, and the app/dependency distinction), and

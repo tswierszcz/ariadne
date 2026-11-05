@@ -532,7 +532,12 @@ after `-data-ttl` (24h); content pinned to a full commit SHA never
 changes and never expires; LLM answers are paid results and are never
 re-asked because of a refresh. On the reference apps the first online
 refresh added 5 (petclinic) and 4 (WebGoat) advisories that the old
-cache did not have.
+cache did not have. And when a result changes, why? `-snapshot-out`
+records exactly the data a run used, `-snapshot-in` replays it without
+cache or network, and `-snapshot-compare` names, per advisory, what moved:
+the advisory text, the mapping or its fix commits, an input jar, an
+algorithm version. A snapshot reproduces the data, not the analyzer: the
+same analyzer version is required.
 
 Numbers: petclinic — 148 CVEs for 87 dependencies; WebGoat — 160 CVEs
 for 126 dependencies (including 34 for `xstream:1.4.5` alone).

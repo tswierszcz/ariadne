@@ -38,16 +38,39 @@ func KindForURL(url string) Kind {
 // req must already be built, body included. A non-2xx response other than
 // 304 is an error and is not cached. req's headers are never stored.
 func Fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.Request) ([]byte, error) {
+	if cache.replay != nil {
+		b, _, err := cache.fromReplay(key, kind)
+		return b, err
+	}
+	b, meta, err := fetch(client, cache, key, kind, req)
+	if err != nil {
+		cache.observeErr(key, kind, err)
+		return nil, err
+	}
+	cache.observeHit(key, kind, b, meta)
+	return b, nil
+}
+
+// fetch is Fetch without observation; meta is the entry's metadata when
+// known.
+func fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.Request) ([]byte, *Meta, error) {
 	c := cache
 	body, err := os.ReadFile(c.path(key))
 	present := err == nil
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("reading cache entry %s: %w", key, err)
+		return nil, nil, fmt.Errorf("reading cache entry %s: %w", key, err)
 	}
 	var meta Meta
 	known := false
 	if present {
 		meta, known = c.readMeta(key, body)
+	}
+	metaPtr := func() *Meta {
+		if known {
+			m := meta
+			return &m
+		}
+		return nil
 	}
 	now := c.now()
 	age := now.Sub(meta.ValidatedAt)
@@ -61,15 +84,15 @@ func Fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.R
 				f.noteValidated(meta.ValidatedAt)
 			}
 		})
-		return body, nil
+		return body, metaPtr(), nil
 	}
 
-	serveStale := func(cause error) ([]byte, error) {
+	serveStale := func(cause error) ([]byte, *Meta, error) {
 		if !p.allowed(age, known) {
 			if known {
-				return nil, fmt.Errorf("%w: %s is %s old (limit %s)", ErrTooOld, key, age.Round(1e9), p.MaxAge)
+				return nil, nil, fmt.Errorf("%w: %s is %s old (limit %s)", ErrTooOld, key, age.Round(1e9), p.MaxAge)
 			}
-			return nil, fmt.Errorf("%w: %s has no recorded fetch time (cached before CVE:F2)", ErrTooOld, key)
+			return nil, nil, fmt.Errorf("%w: %s has no recorded fetch time (cached before CVE:F2)", ErrTooOld, key)
 		}
 		traceHit(key)
 		c.stats.record(kind, func(f *Freshness) {
@@ -83,12 +106,12 @@ func Fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.R
 				f.RefreshFailures = append(f.RefreshFailures, cause.Error())
 			}
 		})
-		return body, nil
+		return body, metaPtr(), nil
 	}
 
 	if c.offline {
 		if !present {
-			return nil, fmt.Errorf("%w: %s", ErrOffline, key)
+			return nil, nil, fmt.Errorf("%w: %s", ErrOffline, key)
 		}
 		return serveStale(nil)
 	}
@@ -107,17 +130,17 @@ func Fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.R
 			return serveStale(ferr)
 		}
 		if present {
-			return nil, fmt.Errorf("refreshing cached %s (pass -allow-stale to use the cached copy): %w", key, ferr)
+			return nil, nil, fmt.Errorf("refreshing cached %s (pass -allow-stale to use the cached copy): %w", key, ferr)
 		}
-		return nil, ferr
+		return nil, nil, ferr
 	}
 	if resp.StatusCode == http.StatusNotModified && present && known {
 		meta.ValidatedAt = now.UTC()
 		if err := c.writeMeta(meta); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		c.stats.record(kind, func(f *Freshness) { f.Revalidated++ })
-		return body, nil
+		return body, &meta, nil
 	}
 	m := Meta{
 		Key: key, Kind: kind, Method: req.Method, URL: req.URL.String(),
@@ -125,8 +148,9 @@ func Fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.R
 		ETag: resp.Header.Get("ETag"), LastModified: resp.Header.Get("Last-Modified"),
 	}
 	if err := c.store(m, fresh); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	m.SHA256, m.Bytes = sha256Hex(fresh), len(fresh)
 	c.stats.record(kind, func(f *Freshness) {
 		if present {
 			f.Refreshed++
@@ -134,7 +158,7 @@ func Fetch(client *http.Client, cache *Cache, key string, kind Kind, req *http.R
 			f.Fetched++
 		}
 	})
-	return fresh, nil
+	return fresh, &m, nil
 }
 
 // do performs req; a 304 is returned as a response with a nil body.

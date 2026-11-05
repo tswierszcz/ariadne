@@ -19,6 +19,7 @@ import (
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/serviceload"
+	"ariadne/internal/snapshot"
 )
 
 // Header carries everything section 6's report header asks for.
@@ -99,11 +100,16 @@ type Data struct {
 	PerInstance []reach.Result
 	// Withdrawn are advisories whose every OSV record is withdrawn: listed,
 	// not analyzed (CVE:F2).
-	Withdrawn       []cves.CVE
-	Reachable       []reach.Result
-	Framework       []reach.Result
-	TotalCVEs       int
-	WarningMessages []string
+	Withdrawn []cves.CVE
+	// SnapshotChanges explain, per advisory, what invalidated its derived
+	// result or changed its verdict since the snapshot SnapshotComparedWith
+	// (CVE:F3 -snapshot-compare).
+	SnapshotChanges      []snapshot.Change
+	SnapshotComparedWith string
+	Reachable            []reach.Result
+	Framework            []reach.Result
+	TotalCVEs            int
+	WarningMessages      []string
 
 	// ServiceRegistrations is SERVICE_LOADING S0's own inventory: every
 	// META-INF/services/<Interface> provider declaration found across the

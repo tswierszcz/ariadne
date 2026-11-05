@@ -87,6 +87,8 @@ type Freshness struct {
 	Revalidated int `json:"revalidated"`
 	Stale       int `json:"stale"`
 	UnknownAge  int `json:"unknown_age"`
+	// Replayed: served from a data snapshot (CVE:F3 -snapshot-in).
+	Replayed int `json:"replayed,omitempty"`
 	// OldestValidated is the oldest validation time among the entries of
 	// known age served from cache (a timestamp, not an age, so reruns on
 	// the same cache report the same value); zero when none.

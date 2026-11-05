@@ -200,12 +200,15 @@ func (s *LLMSource) exchange(ctx context.Context, cveID, system, user string) (l
 		if _, indexed, _ := s.Cache.Get(latest); !indexed && !s.Cache.Offline() {
 			s.Cache.Set(latest, b) // answers cached before the index existed
 		}
+		noteEvidence(ctx, b)
 		return decode(b, key)
 	}
 	if !s.ReaskChanged {
 		if b, hit, _ := s.Cache.Get(latest); hit {
 			s.record(func(st *LLMStats) { st.Reused++ },
 				cveID+": advisory data changed since the cached LLM answer; previous answer reused (pass -llm-reask-changed to ask again)")
+			noteEvidence(ctx, b)
+			noteReused(ctx)
 			return decode(b, latest)
 		}
 	}
@@ -260,5 +263,6 @@ func (s *LLMSource) exchange(ctx context.Context, cveID, system, user string) (l
 	if err := s.Cache.Set(latest, mustJSON(rec)); err != nil {
 		return llmRecord{}, err
 	}
+	noteEvidence(ctx, mustJSON(rec))
 	return rec, nil
 }

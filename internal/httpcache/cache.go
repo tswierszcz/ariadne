@@ -27,6 +27,10 @@ type Cache struct {
 	policy  Policy
 	now     func() time.Time
 	stats   stats
+
+	namespace string
+	recorder  Recorder
+	replay    Replayer
 }
 
 // New returns a Cache rooted at dir, creating it if necessary, with the
@@ -58,17 +62,24 @@ func (c *Cache) path(key string) string {
 // applies no freshness policy: it is for results that never expire (LLM
 // answers); network resources go through Fetch.
 func (c *Cache) Get(key string) ([]byte, bool, error) {
+	if c.replay != nil {
+		return c.fromReplay(key, KindLLM)
+	}
 	b, err := os.ReadFile(c.path(key))
 	if errors.Is(err, os.ErrNotExist) {
 		if c.offline {
-			return nil, false, fmt.Errorf("%w: %s", ErrOffline, key)
+			err := fmt.Errorf("%w: %s", ErrOffline, key)
+			c.observeErr(key, KindLLM, err)
+			return nil, false, err
 		}
+		c.observeMiss(key, KindLLM)
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, fmt.Errorf("reading cache entry %s: %w", key, err)
 	}
 	traceHit(key)
+	c.observeHit(key, KindLLM, b, nil)
 	return b, true, nil
 }
 
@@ -92,6 +103,10 @@ func traceHit(key string) {
 // Set writes b under key as a never-expiring result (KindLLM), with its
 // metadata sidecar.
 func (c *Cache) Set(key string, b []byte) error {
+	if c.replay != nil {
+		return nil // a replay never writes
+	}
+	c.observeHit(key, KindLLM, b, nil)
 	now := c.now().UTC()
 	return c.store(Meta{Key: key, Kind: KindLLM, FetchedAt: now, ValidatedAt: now}, b)
 }

@@ -1,6 +1,8 @@
 # ariadne reachability report
 {{if eq .DataFreshness "stale"}}
 > **Built on stale data.** Some OSV/advisory responses used are older than the freshness window (offline, or `-allow-stale` after a failed refresh); see "Data freshness" and the warnings.
+{{else if eq .DataFreshness "replayed"}}
+> **Replayed data snapshot.** Every OSV/advisory/LLM response comes from a recorded snapshot, not from the cache or the network; see "Data freshness".
 {{else if eq .DataFreshness "unknown"}}
 > **Data of unknown age.** Some OSV/advisory responses were cached before ariadne recorded fetch times; run online (or with `-refresh`) to revalidate them.
 {{end}}
@@ -85,6 +87,21 @@ None.
 {{end}}{{end}}
 {{end}}
 
+{{if .SnapshotComparedWith}}
+## Changes since snapshot {{.SnapshotComparedWith}}
+
+Advisories whose derived result is invalidated (advisory content, affected instances, mapping or
+its sources, resolver/LLM/algorithm versions, input artifacts or configuration changed) or whose
+verdict changed (CVE:F3).
+{{if not .SnapshotChanges}}
+None.
+{{else}}
+| Advisory | Verdict | Why |
+|---|---|---|
+{{range .SnapshotChanges}}| {{.Advisory}} | {{if .Verdict}}{{.Verdict}}{{else}}unchanged{{end}} | {{range $i, $r := .Reasons}}{{if $i}}; {{end}}{{$r}}{{end}} |
+{{end}}
+{{end}}
+{{end}}
 ## Withdrawn advisories
 
 Advisories whose every OSV source record is withdrawn are not analyzed (CVE:F2). A withdrawn

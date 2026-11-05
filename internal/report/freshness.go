@@ -13,6 +13,7 @@ const (
 	FreshnessComplete = "complete" // every expiring response was within the TTL or fetched now
 	FreshnessStale    = "stale"    // some were older than the TTL (offline, or -allow-stale after a failed refresh)
 	FreshnessUnknown  = "unknown"  // some had no recorded fetch time (cached before CVE:F2)
+	FreshnessReplayed = "replayed" // every response came from a data snapshot (CVE:F3 -snapshot-in)
 )
 
 // DescribeFreshness turns the cache's per-kind counts into the run's

@@ -24,4 +24,6 @@ empty cache directory and running with `-offline -cache-dir <dir>` reproduces bo
 `results.json` files byte-for-byte; this was verified when the baseline was taken (every
 restored response matched its recorded SHA-256). The script records responses with the
 `ARIADNE_CACHE_TRACE` environment variable (`internal/httpcache`), which lists the keys of
-cache hits and has no effect on the analysis.
+cache hits and has no effect on the analysis. Since CVE:F3, `-snapshot-out` records the same
+information (plus misses, errors, input hashes, configuration and analyzer versions) in a
+self-contained, verifiable form; this baseline stays as the F0 reference.

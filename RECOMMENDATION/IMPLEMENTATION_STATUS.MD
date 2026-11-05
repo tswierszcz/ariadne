@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2: DONE (2026-11-05); F3–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. Następny krok: F3 (snapshoty). |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3: DONE (2026-11-05); F4–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. Następny krok: F4 (wersje i sygnatury). |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2049,6 +2049,83 @@ Przy dodawaniu kolejnego wpisu zapisz:
   (LLM) nie mają reguły ponownego użycia — klucz zależy od ścieżki.
 - **Następny krok (wymaga zgody):** CVE:F3 — snapshoty, odtwarzanie i
   unieważnianie wyników pochodnych.
+
+### CVE:F3 — snapshoty, odtwarzanie i unieważnianie wyników pochodnych — DONE (2026-11-05)
+
+- **Zakres zatwierdzony:** zadania F3.1–F3.8 planu CVE.
+- **Zrealizowane:**
+  1. `internal/snapshot`: `Manifest` (wersja formatu, `data_set_id` =
+     SHA-256 po obserwacjach, nie po czasie; `created_at` osobno; narzędzie:
+     wersja, Go, hash binarki, `dirty`/`reproducible`; wersje algorytmów;
+     konfiguracja; wejścia po stabilnych lokalizacjach; obserwacje;
+     wyprowadzenia; werdykty v1; stan świeżości), magazyn `objects/`
+     adresowany SHA-256, `Recorder` (stan końcowy klucza: trafienie wygrywa
+     z wcześniejszym chybieniem), `Replayer` (weryfikacja hasha przy każdym
+     odczycie, lista porażek), `CheckTool`, `CheckInputs`, `ConfigDiff`,
+     `Compare`.
+  2. `internal/httpcache`: `Observation` (trafienie / chybienie / błąd z
+     klasą `offline`/`too_old`/`other` — obserwacje negatywne, np. 404
+     aliasu), haki `SetRecorder`/`SetReplay`/`SetNamespace`; w odtwarzaniu
+     brak odczytu katalogu, zapisu i sieci, błędy odtwarzane z tą samą
+     klasą dla `errors.Is`, `ErrNotInSnapshot`.
+  3. Klucz wyprowadzenia per advisory: hash advisory (wszystkie źródła),
+     dotknięte instancje (lokalizacje) i wersje, hash mapowania (metody,
+     rola, pokrycie, przegląd), hashe treści użytych do mapowania (diffy,
+     pliki, rekord LLM — zbierane per CVE przez kontekst w `vulnmap`),
+     `vulnmap.ResolverVersion`, dla LLM model, wersja promptu i znacznik
+     odpowiedzi ponownie użytej (F2).
+  4. Wersje algorytmów: `callgraph.BuilderVersion`, `reach.EngineVersion`,
+     `vulnmap.ResolverVersion`, wersje promptów LLM/exploit/framework,
+     `results.v2`, format snapshotu.
+  5. CLI: `-snapshot-out`, `-snapshot-in` (wymusza offline; z `-refresh` lub
+     `-snapshot-out` — błąd walidacji), `-snapshot-compare`; odtwarzanie
+     kończy się błędem, gdy snapshot nie odpowiedział na którekolwiek
+     zapytanie (nawet gdy wywołujący połknąłby błąd jako ostrzeżenie).
+     Raport: baner "Replayed", stan `replayed`, sekcja "Changes since
+     snapshot"; v2: `snapshot.data_set`, `coverage.snapshot_changes`.
+- **Znalezione i naprawione w trakcie:** uszkodzony obiekt początkowo nie
+  przerywał odtwarzania (błąd pobrania diffu jest w `vulnmap` ostrzeżeniem
+  per CVE) — stąd lista porażek `Replayer` sprawdzana przed zapisem
+  wyników; Go oznacza zmodyfikowane drzewo jako `+dirty`, nie `-dirty` —
+  wykrywanie poprawione.
+- **Weryfikacja:** `internal/snapshot` (zapis/odtworzenie, obserwacja
+  negatywna, uszkodzony obiekt i edytowany manifest — 0404, ID niezależne
+  od czasu, `CheckTool` z wersją/algorytmem/binarką dirty, `CheckInputs`,
+  `Compare` — zmiana advisory, mapowania, algorytmu, nowe/usunięte,
+  porażki), `internal/httpcache` (`TestRecordThenReplayWithoutNetwork`),
+  `cmd/ariadne` (`TestSnapshotFlags`); `-race`; `go vet ./...`, `go test
+  ./...` — PASS. Na prawdziwych danych (offline, `.cache` nietknięty):
+  - zapis nie zmienia wyników (v1 petclinic/WebGoat bajtowo jak F2);
+    snapshot petclinic 23 MB / 1082 obserwacji, WebGoat 14 MB / 895;
+    dwukrotny zapis WebGoat — ten sam `data_set_id`;
+  - odtworzenie z pustym `-cache-dir` w przestrzeni nazw bez sieci
+    (`unshare -rn`): v1 bajtowo identyczny, ustalenia v2 identyczne, dwa
+    odtworzenia v2 bajtowo identyczne, katalog cache pusty; z `-llm` (114
+    obserwacji LLM) — identyczny;
+  - odrzucone: zmieniony `jackson-databind-2.11.4.jar` (hash), uszkodzony
+    obiekt, inna binarka dirty; zmieniona konfiguracja (`-roots profile`) —
+    dozwolona z ostrzeżeniem, `config_matches: false`;
+  - `-snapshot-compare`: dane OSV odświeżone w F2 względem starego
+    snapshotu — 5 nowych advisory i 1 ze zmienioną treścią
+    (CVE-2026-54512), werdykty bez zmian; zmienione `coverage` jednego
+    ręcznego mapowania (`-vuln-methods`) — unieważnione wyłącznie
+    CVE-2022-1471.
+- **Kryteria F3:** analiza ze snapshotu bez sieci — tak; zmieniony artefakt
+  odrzucony — tak; zmiana advisory/mapowania/wersji algorytmu unieważnia
+  właściwe wyniki — tak (dane rzeczywiste i testy); dokumentacja rozróżnia
+  odtworzenie danych od środowiska — tak (README "Data snapshots", SUPPORT).
+- **Dokumentacja:** README (flagi, sekcja "Data snapshots"), FAQ,
+  `docs/SUPPORT.MD` (nowy wiersz), kontrakt §5, `testdata/baseline/README.MD`,
+  `testdata/cve-control/cases.yaml` (`v1` dla 0404), ten rejestr, nagłówek
+  F3 w planie.
+- **Ograniczenia:** binaria wejściowe nie są archiwizowane (tylko hashe);
+  analizator musi być tej samej wersji (dirty: ta sama binarka); Go/OS
+  zapisywane, niewymuszane; wersje algorytmów podnoszone ręcznie; zmiana
+  wersji analizatora unieważnia w porównaniu wszystkie wyprowadzenia;
+  wyniki pochodne nie są cache'owane między przebiegami (mapowania liczone
+  od nowa) — klucze służą wyjaśnieniu zmian, nie ponownemu użyciu.
+- **Następny krok (wymaga zgody):** CVE:F4 — mapowania wersji i dokładnych
+  sygnatur.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4502,8 +4579,8 @@ Przy dodawaniu kolejnego wpisu zapisz:
    REFLECTION:R3). **CVE:F0 zrobione 2026-11-05 (kontrakt)**, CVE:F1a (model
    komponentów) i CVE:F1b (kody powodów, ustalenia per instancja, reguła
    luk report-only) oraz CVE:F1c (`-json-format v2`) zrobione — CVE:F1
-   zamknięte; CVE:F2 (świeżość danych) zrobione 2026-11-05 — następny krok
-   w tym obszarze: CVE:F3.
+   zamknięte; CVE:F2 (świeżość danych) i CVE:F3 (snapshoty) zrobione
+   2026-11-05 — następny krok w tym obszarze: CVE:F4.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

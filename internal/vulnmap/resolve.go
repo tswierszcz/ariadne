@@ -2,6 +2,8 @@ package vulnmap
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"sort"
 	"sync"
@@ -35,6 +37,47 @@ type Entry struct {
 	Role     string `json:"role,omitempty"`
 	Coverage string `json:"coverage,omitempty"`
 	Review   string `json:"review,omitempty"`
+	// SourceHashes are the SHA-256 of every fetched body (fix diff, raw
+	// file, LLM record) this mapping was derived from, sorted (CVE:F3
+	// derivation key); Reused marks an LLM answer given for an earlier
+	// version of the advisory (CVE:F2 reuse rule).
+	SourceHashes []string `json:"-"`
+	Reused       bool     `json:"-"`
+}
+
+// ResolverVersion versions the mapping resolution (manual → diff → LLM
+// order, diff attribution, grounding). Bump it on any change that can
+// change a mapping for the same inputs; it is part of every derivation
+// key (CVE:F3).
+const ResolverVersion = "1"
+
+// PromptVersion is the LLM prompt version (part of derivation keys).
+const PromptVersion = promptVersion
+
+type evidenceKey struct{}
+
+// evidence collects, per Resolve call, the hashes of the bodies used.
+type evidence struct {
+	mu     sync.Mutex
+	hashes map[string]bool
+	reused bool
+}
+
+func noteEvidence(ctx context.Context, body []byte) {
+	if ev, ok := ctx.Value(evidenceKey{}).(*evidence); ok {
+		s := sha256.Sum256(body)
+		ev.mu.Lock()
+		ev.hashes[hex.EncodeToString(s[:])] = true
+		ev.mu.Unlock()
+	}
+}
+
+func noteReused(ctx context.Context) {
+	if ev, ok := ctx.Value(evidenceKey{}).(*evidence); ok {
+		ev.mu.Lock()
+		ev.reused = true
+		ev.mu.Unlock()
+	}
 }
 
 // WithDefaults fills Role/Coverage/Review from Source when they are empty.
@@ -98,6 +141,19 @@ func NewResolver(manual map[string][]string, cache *httpcache.Cache) *Resolver {
 // fix-commit diffs, then (if enabled) asking the LLM. ok is false when no
 // source found anything — internal/reach treats that as status UNKNOWN.
 func (r *Resolver) Resolve(ctx context.Context, cve cves.CVE) (Entry, bool, error) {
+	ev := &evidence{hashes: map[string]bool{}}
+	e, ok, err := r.resolve(context.WithValue(ctx, evidenceKey{}, ev), cve)
+	if ok {
+		for h := range ev.hashes {
+			e.SourceHashes = append(e.SourceHashes, h)
+		}
+		sort.Strings(e.SourceHashes)
+		e.Reused = ev.reused
+	}
+	return e, ok, err
+}
+
+func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, error) {
 	for _, id := range append([]string{cve.ID}, cve.Aliases...) {
 		if methods, ok := r.Manual[id]; ok && len(methods) > 0 {
 			meta := r.ManualMeta[id]

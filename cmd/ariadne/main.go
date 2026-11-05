@@ -33,6 +33,7 @@ import (
 	"ariadne/internal/report"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/serviceload"
+	"ariadne/internal/snapshot"
 	"ariadne/internal/springxml"
 	"ariadne/internal/vulnmap"
 	"ariadne/internal/webxml"
@@ -51,6 +52,9 @@ type config struct {
 	jsonOut         string
 	jsonFormat      string
 	llmReaskChanged bool
+	snapshotOut     string
+	snapshotIn      string
+	snapshotCompare string
 	refresh         bool
 	allowStale      bool
 	dataTTL         time.Duration
@@ -106,6 +110,9 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
 	fs.StringVar(&cfg.jsonFormat, "json-format", "v1", `results.json schema: "v1" (default: one row per advisory) or "v2" (CVE:F1c: components, findings per advisory × component instance, coverage, inputs reference; docs/RESULTS_CONTRACT.MD §5)`)
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
+	fs.StringVar(&cfg.snapshotOut, "snapshot-out", "", "write a data snapshot to this new directory (CVE:F3): every OSV/fix-commit/LLM lookup outcome of the run, input hashes, configuration, analyzer and algorithm versions, derivation keys and verdicts")
+	fs.StringVar(&cfg.snapshotIn, "snapshot-in", "", "replay a data snapshot: every lookup is answered from it (no cache, no network); inputs, analyzer and algorithm versions must match it")
+	fs.StringVar(&cfg.snapshotCompare, "snapshot-compare", "", "compare this run with an earlier snapshot: list the advisories whose derived results were invalidated, and why")
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
 	fs.BoolVar(&cfg.allowStale, "allow-stale", false, "when an online refresh fails, use the cached copy and mark the report as built on stale data (never past -max-data-age)")
 	fs.DurationVar(&cfg.dataTTL, "data-ttl", httpcache.DefaultTTL, "how long a fetched OSV/advisory response counts as fresh before it is fetched again (CVE:F2)")
@@ -125,6 +132,9 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	if cfg.showVersion {
 		fmt.Fprintf(stdout, "ariadne %s\n", version())
 		return 0
+	}
+	if cfg.snapshotIn != "" && !cfg.refresh {
+		cfg.offline = true // a replay never touches the network
 	}
 
 	if cfg.llm || cfg.exploitCheck || cfg.frameworkCheck {
@@ -165,6 +175,9 @@ func validate(cfg config) error {
 			return err
 		}
 	}
+	if cfg.snapshotIn != "" && (cfg.refresh || cfg.snapshotOut != "") {
+		return fmt.Errorf("-snapshot-in replays recorded data: it cannot be combined with -refresh or -snapshot-out")
+	}
 	if cfg.refresh && cfg.offline {
 		return fmt.Errorf("-refresh and -offline cannot be combined: a refresh needs the network")
 	}
@@ -202,6 +215,14 @@ func validate(cfg config) error {
 
 func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log := func(format string, a ...any) { fmt.Fprintf(stdout, format+"\n", a...) }
+
+	sr, err := newSnapshotRun(cfg)
+	if err != nil {
+		return err
+	}
+	if sr.replay != nil {
+		log("snapshot: replaying %s (data set %s, created %s)", cfg.snapshotIn, sr.replay.DataSetID, sr.replay.CreatedAt.Format(time.RFC3339))
+	}
 
 	log("preparing application input from %s", cfg.app)
 	prepared, err := input.PrepareAppInput(cfg.app)
@@ -372,6 +393,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}, h)
 	if err != nil {
 		return fmt.Errorf("building the component inventory: %w", err)
+	}
+	snapInputs, err := snapshotInputs(cfg, components)
+	if err != nil {
+		return err
+	}
+	if sr.replay != nil {
+		if err := snapshot.CheckInputs(*sr.replay, snapInputs); err != nil {
+			return err
+		}
+		log("snapshot: %d inputs match the manifest", len(snapInputs))
 	}
 	nArtifacts, nIdentified, nUnidentified, nConflicts := components.Counts()
 	log("components: %d artifacts, %d identified instances, %d unidentified, %d class conflicts (first copy wins)", nArtifacts, nIdentified, nUnidentified, nConflicts)
@@ -656,6 +687,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
 	}
+	sr.attach(cache, "main")
 	cache.SetPolicy(httpcache.Policy{TTL: cfg.dataTTL, MaxAge: cfg.maxDataAge, Refresh: cfg.refresh, AllowStale: cfg.allowStale})
 
 	var gavs []input.GAV
@@ -686,6 +718,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("opening LLM cache dir: %w", err)
 		}
+		sr.attach(llmCache, "llm")
 		llmSrc = vulnmap.NewLLMSource(cfg.llmConfig, llmCache, nil)
 		llmSrc.ReaskChanged = cfg.llmReaskChanged
 		resolver.LLM = llmSrc
@@ -783,6 +816,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("opening exploit-check cache dir: %w", err)
 		}
+		sr.attach(exploitCache, "exploit")
 		checker := exploit.NewChecker(cfg.llmConfig, exploitCache, nil)
 		findings, err := checker.CheckAll(ctx, results, cveByID)
 		if err != nil {
@@ -808,6 +842,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("opening framework-check cache dir: %w", err)
 		}
+		sr.attach(frameworkCache, "framework-check")
 		checker := exploit.NewFrameworkChecker(cfg.llmConfig, frameworkCache, nil)
 		findings, err := checker.CheckAll(ctx, results, cveByID)
 		if err != nil {
@@ -829,8 +864,44 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// Every network fetch of the run is done by now (OSV, fix diffs).
 	freshness := cache.Freshness()
 	freshnessState, freshnessLines, freshnessWarnings := report.DescribeFreshness(freshness, cfg.dataTTL)
-	warnings = append(warnings, freshnessWarnings...)
+	if sr.replay != nil {
+		recorded := sr.replay.DataFreshness
+		freshnessState = report.FreshnessReplayed
+		freshnessLines = []string{fmt.Sprintf("snapshot data set %s, created %s, recorded as %q", sr.replay.DataSetID, sr.replay.CreatedAt.Format(time.RFC3339), recorded)}
+		freshnessWarnings = nil
+		for _, d := range snapshot.ConfigDiff(sr.replay.Config, sr.config) {
+			warnings = append(warnings, "snapshot: configuration differs from the recorded run: "+d)
+		}
+		if !sr.replay.Tool.Reproducible {
+			warnings = append(warnings, "snapshot: recorded by a locally modified build — the data replays, the analyzer source is identified only by the binary hash")
+		}
+	} else {
+		warnings = append(warnings, freshnessWarnings...)
+	}
 	log("data freshness: %s (%s)", freshnessState, strings.Join(freshnessLines, "; "))
+
+	if sr.replayer != nil {
+		if f := sr.replayer.Failures(); len(f) > 0 {
+			return fmt.Errorf("the snapshot could not answer %d lookups, so the replay is not a reproduction: %s", len(f), strings.Join(f, "; "))
+		}
+	}
+	// CVE:F3: derivation keys, the manifest of this run, and the
+	// comparison with an earlier snapshot.
+	ders := derivations(cveList, vm, results, components, cfg.llmConfig.Model)
+	var observations []httpcache.Observation
+	if sr.recorder != nil {
+		if observations, err = sr.recorder.Observations(); err != nil {
+			return fmt.Errorf("writing snapshot objects: %w", err)
+		}
+	} else if sr.replay != nil {
+		observations = sr.replay.Observations
+	}
+	current := sr.manifest(snapInputs, observations, ders, results, freshnessState)
+	var changes []snapshot.Change
+	if sr.compare != nil {
+		changes = snapshot.Compare(*sr.compare, current)
+		log("snapshot compare: %d advisories with invalidated derivations or changed verdicts since %s", len(changes), sr.compare.DataSetID)
+	}
 	profileLabel := prof.Name
 	if cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
@@ -880,6 +951,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data.Modules = moduleInventory
 	data.Components = components
 	data.Withdrawn = resolution.Withdrawn
+	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)
@@ -892,6 +964,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		ToolVersion: version(), Offline: cfg.offline, Inventory: components, CVEs: cveList, Mappings: vm, Results: results,
 		Freshness: resultsv2.DataFreshness{State: freshnessState, TTL: cfg.dataTTL.String(), MaxAge: maxAgeString(cfg.maxDataAge), Kinds: freshness},
 		Withdrawn: resolution.Withdrawn,
+		DataSet:   dataSetRef(sr, cfg, observations),
+		Changes:   changes,
 		Gaps:      resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
@@ -908,6 +982,30 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("wrote %s", cfg.jsonOut)
 
+	if sr.recorder != nil {
+		if err := snapshot.Write(cfg.snapshotOut, current); err != nil {
+			return fmt.Errorf("writing snapshot: %w", err)
+		}
+		log("wrote snapshot %s (data set %s, %d observations)", cfg.snapshotOut, snapshot.DataSetID(observations), len(observations))
+	}
+	return nil
+}
+
+func compareID(sr *snapshotRun) string {
+	if sr.compare == nil {
+		return ""
+	}
+	return sr.compare.DataSetID
+}
+
+// dataSetRef is v2's reference to the data snapshot of the run, if any.
+func dataSetRef(sr *snapshotRun, cfg config, obs []httpcache.Observation) *resultsv2.DataSet {
+	switch {
+	case sr.replay != nil:
+		return &resultsv2.DataSet{ID: sr.replay.DataSetID, Replayed: true, ConfigMatches: len(snapshot.ConfigDiff(sr.replay.Config, sr.config)) == 0}
+	case sr.recorder != nil:
+		return &resultsv2.DataSet{ID: snapshot.DataSetID(obs), ConfigMatches: true}
+	}
 	return nil
 }
 

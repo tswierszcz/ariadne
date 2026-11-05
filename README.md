@@ -552,6 +552,9 @@ Flags:
 | `-refresh` | no | Revalidate every cached OSV/advisory response now, whatever its age; never re-asks an LLM. Not with `-offline`. |
 | `-allow-stale` | no | When an online refresh fails, use the cached copy and mark the report "stale" (never past `-max-data-age`). |
 | `-max-data-age` | no | Hard limit on the age of any OSV/advisory data used, offline included; data of unknown age fails it. |
+| `-snapshot-out` | no | Write a data snapshot to a new directory (CVE:F3; see "Data snapshots"). |
+| `-snapshot-in` | no | Replay a data snapshot: no cache, no network; inputs, analyzer and algorithm versions must match. Not with `-refresh`/`-snapshot-out`. |
+| `-snapshot-compare` | no | Compare this run with an earlier snapshot: which advisories' derived results were invalidated, and why (report section and v2 `coverage.snapshot_changes`). |
 | `-llm-reask-changed` | no | With `-llm`: ask again when a CVE's advisory text or fix diff changed since its cached answer. Default: reuse the previous answer with a warning, so a data refresh never triggers paid requests by itself. |
 | `-llm` | no | Enable the LLM source for CVEs the manual table and fix-commit diffs could not map. Needs a model and `ARIADNE_LLM_API_KEY`. |
 | `-llm-model` | no | LLM model id; overrides `ARIADNE_LLM_MODEL` (e.g. `z-ai/glm-5.3`). |
@@ -591,6 +594,42 @@ With `-offline`, `-llm` needs no key: every answer must already be in
 that directory. After a data refresh changes a CVE's advisory text, the
 previous answer for that CVE is reused (counted in the `llm:` log line,
 with a warning) unless `-llm-reask-changed` is given.
+
+### Data snapshots (CVE:F3)
+
+```bash
+bin/ariadne -app ... -deps ... -out report.md -json results.json -snapshot-out snap/
+bin/ariadne -app ... -deps ... -out report.md -json results.json -snapshot-in snap/
+bin/ariadne -app ... -deps ... -out report.md -json results.json -snapshot-compare snap/
+```
+
+`-snapshot-out` writes `manifest.json` and a content-addressed `objects/` store holding
+only what the run read (petclinic: 23 MB, 1082 responses, against a 56 MB shared cache).
+The manifest records the outcome of every cache lookup (hits, misses, errors such as an
+alias's 404), the input artifacts' SHA-256 by stable location, the configuration, the tool
+version, Go version, binary hash, algorithm versions, a **derivation key** per advisory
+(advisory content, affected instances, mapping, the hashes of the fix commits/LLM answer it
+came from, resolver/prompt versions), and the v1 verdicts. Its `data_set_id` hashes the
+observations, not the time, so it names the logical data set.
+
+`-snapshot-in` answers every lookup from the snapshot: no cache directory, no network (the
+replay passes inside a network-less namespace). It refuses a different tool or algorithm
+version, a changed, missing or extra input artifact, an edited manifest, and an object that
+does not match its hash; a lookup the snapshot cannot answer fails the run. A different
+configuration is allowed and reported (v2 `snapshot.data_set.config_matches: false`).
+
+**What a snapshot does and does not reproduce:** it reproduces the *data* of a run. It does
+not archive the analyzed binaries (they must be supplied; their hashes are checked) or the
+analyzer: the same analyzer version is required, and a locally modified ("dirty") build is
+marked `reproducible: false` and can replay only with the identical binary. The Go
+toolchain and OS are recorded, not enforced.
+
+`-snapshot-compare` explains, per advisory, why a result may differ from the earlier
+snapshot: new or gone advisory, advisory content, affected instances, mapping or its
+sources, resolver/LLM/algorithm versions, analyzer version, configuration, input artifact,
+and the verdict change. Algorithm versions (`callgraph.builder`, `reach.engine`,
+`vulnmap.resolver`, prompt versions) are constants bumped by hand when semantics change;
+the analyzer version check is the backstop.
 
 ### Exploit-check (PLAN.md Phase 8)
 

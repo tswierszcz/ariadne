@@ -133,7 +133,7 @@ Uniemożliwić bezterminowe używanie starych odpowiedzi jako aktualnych danych 
 - Wycofane źródło i aktywny alias są poprawnie rozpatrywane.
 - Odświeżenie CVE nie powoduje automatycznych płatnych zapytań LLM.
 
-## F3. Snapshoty, odtwarzanie i unieważnianie wyników pochodnych
+## F3. Snapshoty, odtwarzanie i unieważnianie wyników pochodnych — DONE (2026-11-05; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 
