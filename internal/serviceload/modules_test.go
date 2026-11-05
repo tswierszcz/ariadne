@@ -144,7 +144,7 @@ func TestInventoryModules_compiledFixture(t *testing.T) {
 			t.Errorf("%s: %+v, want explicit %s from module-info.class", filepath.Base(jar), d, want)
 		}
 	}
-	if app := descriptorFor(t, inv, j.app); len(app.Info.Uses) != 1 || app.Info.Uses[0] != "fixture.jpms.api.Codec" {
+	if app := descriptorFor(t, inv, j.app); strings.Join(app.Info.Uses, ",") != "fixture.jpms.api.Codec,fixture.jpms.api.Hasher" {
 		t.Errorf("app uses = %v", app.Info.Uses)
 	}
 
@@ -224,7 +224,7 @@ func TestInventoryModules_classpathSemanticsUnchanged(t *testing.T) {
 		got = append(got, m.Registration.ProviderClass)
 	}
 	sort.Strings(got)
-	want := []string{"fixture.jpms.auto.AutoCodec", "fixture.jpms.impl.LegacyCodec", "fixture.jpms.impl.ModuleCodec"}
+	want := []string{"fixture.jpms.auto.AutoCodec", "fixture.jpms.auto.AutoHasher", "fixture.jpms.impl.LegacyCodec", "fixture.jpms.impl.ModuleCodec"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("materializations = %v, want %v (FactoryCodec is module-path only)", got, want)
 	}
@@ -802,5 +802,65 @@ func TestDoPrivileged(t *testing.T) {
 	ri, _ := reflectinvoke.ResolveInvokes(h, []reflectinvoke.InvokeSite{site})
 	if len(ri) != 1 || ri[0].OwnerFQCN != p+"$Target" || ri[0].MethodName != "hit" {
 		t.Errorf("reflective invoke = %+v, want Target#hit via doPrivileged", ri)
+	}
+}
+
+// TestRegression_duplicatesAndTwoLoaders: S4's compiled-fixture cases.
+// A provider listed twice in one file and shipped in two jars is
+// materialized once, with a duplicate warning; two loaders for two
+// services in one method do not mix their providers.
+func TestRegression_duplicatesAndTwoLoaders(t *testing.T) {
+	j := buildJPMSJars(t)
+	copyJar := zipFixture(t, filepath.Join(jpmsClasses, "auto"), t.TempDir(), "fixture-auto-copy-1.0.jar", nil)
+	deps := append(j.deps(), input.DepJar{Path: copyJar})
+	h, _, err := hierarchy.Build(j.app, deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	regs, warnings, err := Inventory(h, j.app, deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(warnings, "\n"), "fixture.jpms.auto.AutoCodec") {
+		t.Errorf("want a duplicate-entry warning for AutoCodec, got %v", warnings)
+	}
+	loads, _, _ := FindLoadSites(h)
+	n := 0
+	for _, m := range FindMaterializations(h, loads, regs) {
+		if m.Registration.ProviderClass == "fixture.jpms.auto.AutoCodec" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("AutoCodec materialized %d times, want once despite two jars and a repeated line", n)
+	}
+
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	g, root, _, _ := runJPMS(t, j, nouses, ScenarioConfig{Scenario: ScenarioClasspath, AppJar: j.app}, "fixture.jpms.app.Regression", "twoLoaders", "()V")
+	consumptions, _, _ := FindConsumptionSites(h, loads)
+	var codecNext, hasherNext int = -1, -1
+	for _, c := range consumptions {
+		if c.CallerFQCN != "fixture.jpms.app.Regression" || c.CallName != "next" {
+			continue
+		}
+		switch strings.Join(c.Interfaces, ",") {
+		case "fixture.jpms.api.Codec":
+			codecNext = c.PC
+		case "fixture.jpms.api.Hasher":
+			hasherNext = c.PC
+		default:
+			t.Errorf("next() at pc=%d linked to %v, want exactly one service", c.PC, c.Interfaces)
+		}
+	}
+	if codecNext < 0 || hasherNext < 0 {
+		t.Fatalf("want one Codec and one Hasher next() site, got codec=%d hasher=%d", codecNext, hasherNext)
+	}
+	codecCtor, _ := g.ID("fixture.jpms.auto.AutoCodec", "<init>", "()V")
+	hasherCtor, _ := g.ID("fixture.jpms.auto.AutoHasher", "<init>", "()V")
+	if !hasModelEdgeAt(g, root, codecCtor, codecNext) || hasModelEdgeAt(g, root, hasherCtor, codecNext) {
+		t.Error("Codec next() must reach AutoCodec and not AutoHasher")
+	}
+	if !hasModelEdgeAt(g, root, hasherCtor, hasherNext) || hasModelEdgeAt(g, root, codecCtor, hasherNext) {
+		t.Error("Hasher next() must reach AutoHasher and not AutoCodec")
 	}
 }

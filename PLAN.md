@@ -1147,7 +1147,7 @@ for which RECOMMENDATION document supersedes it. Phases 10 and 11 (`-cves-file`,
 not covered by RECOMMENDATION and remain this file's own backlog.
 
 ### Phase 9 (optional, future) — Closing known blind spots
-**Superseded in detail by [RECOMMENDATION/SERVICE_LOADING.MD](RECOMMENDATION/SERVICE_LOADING.MD),
+**Superseded in detail by [archive/2026-11-05/service_loading/SERVICE_LOADING.MD](archive/2026-11-05/service_loading/SERVICE_LOADING.MD),
 [REFLECTION.MD](RECOMMENDATION/REFLECTION.MD) and [FRAMEWORKS.MD](RECOMMENDATION/FRAMEWORKS.MD)** —
 kept here for history; start new work in those documents instead.
 

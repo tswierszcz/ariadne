@@ -1,1 +1,3 @@
 fixture.jpms.auto.AutoCodec
+# duplicate entry: ServiceLoader yields it once
+fixture.jpms.auto.AutoCodec

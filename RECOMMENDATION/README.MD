@@ -24,9 +24,14 @@ DONE (2026-10-22), wszystkie fazy G0–G5.** Dawne `JVM_GRAPH.MD`/
 jedno wciąż otwarte ograniczenie czekające na JDK). Szczegółowe wpisy per-fazowe
 zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 
+**ServiceLoader i moduły JPMS — DONE (2026-11-05), wszystkie fazy S0–S4.** Dawne
+`SERVICE_LOADING.MD`/`SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-05/service_loading/`](../archive/2026-11-05/service_loading/COMPLETION.md)
+(`COMPLETION.md` tam: co dostarczono, wyrocznia JVM, pomiar historyczny, jawne
+ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
+
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
-| ServiceLoader i moduły JPMS | [SERVICE_LOADING.MD](SERVICE_LOADING.MD) | [SERVICE_LOADING_IMPLEMENTATION_PLAN.MD](SERVICE_LOADING_IMPLEMENTATION_PLAN.MD) |
 | Refleksja i rozpoznawanie nazw klas/metod | [REFLECTION.MD](REFLECTION.MD) | [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD) |
 | Frameworki: proxy, AOP, DI, konfiguracja i zewnętrzne wejścia | [FRAMEWORKS.MD](FRAMEWORKS.MD) | [FRAMEWORKS_IMPLEMENTATION_PLAN.MD](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) |
 | Callbacki i wykonywanie asynchroniczne | [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD) | [ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) |
@@ -44,7 +49,7 @@ zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 |---|---|
 | Inicjalizacja klas `<clinit>` | JVM_GRAPH — **DONE, zarchiwizowane** (G3) |
 | Wywołania odziedziczonych metod | JVM_GRAPH — **DONE, zarchiwizowane** (G2); wspólna realizacja z CVE F4 nie została naruszona (F4 samo nieodnotowane) |
-| ServiceLoader i JPMS | SERVICE_LOADING |
+| ServiceLoader i JPMS | SERVICE_LOADING — **DONE, zarchiwizowane** (S0–S4) |
 | Refleksja przez literały, zmienne i konfigurację | REFLECTION; wartości dostarcza DATA_FLOW, konfigurację FRAMEWORKS |
 | Proxy, AOP i dependency injection | FRAMEWORKS |
 | Callbacki i kod asynchroniczny | ASYNC_CALLBACKS |

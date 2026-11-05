@@ -51,7 +51,7 @@ func TestParse_moduleInfoFromCompiledFixture(t *testing.T) {
 	}
 
 	app := parseFixtureFile(t, "../../testdata/jpms/classes/mods/fixture.jpms.app/module-info.class").Module
-	if !reflect.DeepEqual(app.Uses, []string{"fixture.jpms.api.Codec"}) {
+	if !reflect.DeepEqual(app.Uses, []string{"fixture.jpms.api.Codec", "fixture.jpms.api.Hasher"}) {
 		t.Errorf("Uses = %v", app.Uses)
 	}
 }

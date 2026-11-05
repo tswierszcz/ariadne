@@ -1,0 +1,63 @@
+classpath	fixture.app.Entry#run	fixture.provider.DecoderProvider
+classpath	fixture.app.Entry#runThroughParameter	fixture.provider.DecoderProvider
+classpath	fixture.app.Entry#runThroughStream	fixture.provider.DecoderProvider
+classpath	fixture.app.Entry#streamWithoutConsuming	-
+classpath	fixture.app.Entry#runThroughStreamCallback	fixture.provider.DecoderProvider
+classpath	fixture.app.Entry#runThroughStaticField	fixture.provider.DecoderProvider
+classpath	fixture.app.Entry#runThroughFinalInstanceField	fixture.provider.DecoderProvider
+classpath	fixture.app.Entry#runThroughCyclicField	-	ERROR java.lang.NullPointerException
+classpath	fixture.app.Entry#runThroughMutableField	-	ERROR java.lang.NullPointerException
+classpath	fixture.app.Entry#loadWithoutConsuming	-
+classpath	fixture.app.Entry#runWithUnknownLoader	-	ERROR java.lang.UnsupportedOperationException
+classpath	fixture.jpms.app.Main#main	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Layers#boot	-
+classpath	fixture.jpms.app.Loaders#context	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Loaders#system	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Loaders#nullLoader	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Loaders#defining	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Params#viaCodec	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Params#viaRunnable	-
+classpath	fixture.jpms.app.Params#modules	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Params#recEntry	-
+classpath	fixture.jpms.app.Captures#jackson	-
+classpath	fixture.jpms.app.Captures#boxes	-
+classpath	fixture.jpms.app.Captures#mutable	-
+classpath	fixture.jpms.app.Privileged#anon	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Privileged#lambda	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Privileged#exception	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+classpath	fixture.jpms.app.Regression#twoLoaders	fixture.jpms.auto.AutoCodec,fixture.jpms.auto.AutoHasher,fixture.jpms.impl.LegacyCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Main#main	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Layers#boot	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Loaders#context	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Loaders#system	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Loaders#nullLoader	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Loaders#defining	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Params#viaCodec	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Params#viaRunnable	-	ERROR java.util.ServiceConfigurationError
+module-path	fixture.jpms.app.Params#modules	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Params#recEntry	-
+module-path	fixture.jpms.app.Captures#jackson	-
+module-path	fixture.jpms.app.Captures#boxes	-	ERROR java.util.ServiceConfigurationError
+module-path	fixture.jpms.app.Captures#mutable	-
+module-path	fixture.jpms.app.Privileged#anon	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Privileged#lambda	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Privileged#exception	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.app.Regression#twoLoaders	fixture.jpms.auto.AutoCodec,fixture.jpms.auto.AutoHasher,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+module-path	fixture.jpms.nouses.NoUses#main	-	ERROR java.util.ServiceConfigurationError
+mixed	fixture.jpms.app.Main#main	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Layers#boot	fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Loaders#context	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Loaders#system	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Loaders#nullLoader	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Loaders#defining	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Params#viaCodec	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Params#viaRunnable	-	ERROR java.util.ServiceConfigurationError
+mixed	fixture.jpms.app.Params#modules	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Params#recEntry	-
+mixed	fixture.jpms.app.Captures#jackson	-
+mixed	fixture.jpms.app.Captures#boxes	-	ERROR java.util.ServiceConfigurationError
+mixed	fixture.jpms.app.Captures#mutable	-
+mixed	fixture.jpms.app.Privileged#anon	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Privileged#lambda	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Privileged#exception	fixture.jpms.auto.AutoCodec,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec
+mixed	fixture.jpms.app.Regression#twoLoaders	fixture.jpms.auto.AutoCodec,fixture.jpms.auto.AutoHasher,fixture.jpms.impl.FactoryCodec,fixture.jpms.impl.ModuleCodec

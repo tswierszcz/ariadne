@@ -7,7 +7,7 @@ pracą). Obszar SERVICE_LOADING jako całość pozostaje aktywny: S3 (JPMS) i S4
 (regresja i rozszerzenia API) są otwarte.
 
 Oryginalny tekst fazy (sketch sprzed implementacji) jest na końcu tego pliku;
-w `RECOMMENDATION/SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` zastąpiono go
+w `SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` (teraz w tym samym katalogu archiwum) zastąpiono go
 wskaźnikiem. Bieżące zachowanie opisują `docs/SUPPORT.MD` (wiersze
 "ServiceLoader and JPMS service models" i "Library model iteration
 foundation") oraz README; szczegółowe wpisy per-przyrost zostają w

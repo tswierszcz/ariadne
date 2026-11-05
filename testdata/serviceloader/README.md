@@ -31,3 +31,6 @@ For Stream API coverage it includes the linear
 `stream().findFirst().get().get()` path, a returned stream with no terminal
 operation (lazy, no provider construction), and a `map` callback that calls
 `Provider.get()` (reported as unsupported, with no guessed provider target).
+
+`DecoderProvider`'s constructor prints `ORACLE-PROVIDER fixture.provider.DecoderProvider`
+for the real-JVM oracle in `testdata/oracle` (SERVICE_LOADING S4).

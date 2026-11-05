@@ -1,0 +1,4 @@
+# scenario	entry	provider	reason
+# A provider the real JVM instantiates but the ServiceLoader model does not connect.
+# Each must be a documented gap the analysis reports as Incomplete.
+classpath	fixture.app.Entry#runThroughStreamCallback	fixture.provider.DecoderProvider	stream().map(Provider::get) callback pipeline is not modeled (SUPPORT.MD: callback stream pipelines remain incomplete)

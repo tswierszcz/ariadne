@@ -22,7 +22,7 @@ cd testdata/jpms && rm -rf classes
 $J -source 11 -target 11 -nowarn -d classes/mods --module-source-path src \
   --module fixture.jpms.api,fixture.jpms.impl,fixture.jpms.app,fixture.jpms.nouses
 $J -source 8 -target 8 -nowarn -cp classes/mods/fixture.jpms.api -d classes/auto \
-  src/auto/fixture/jpms/auto/AutoCodec.java
+  src/auto/fixture/jpms/auto/*.java
 $J -source 8 -target 8 -nowarn -d classes/mr src/mr/base/fixture/jpms/mr/Util.java
 $J -source 9 -target 9 -nowarn -d classes/mr/META-INF/versions/9 \
   --patch-module fixture.jpms.mr=classes/mr src/mr/versions9/module-info.java
@@ -39,3 +39,11 @@ it with the same module command, `--module fixture.jpms.nouses`.
 `ServiceLoader.load(ModuleLayer.boot(), Codec.class)` and
 `ServiceLoader.load(layer, Codec.class)` with a parameter layer; it is part of
 the `fixture.jpms.app` module and is rebuilt by the same module command.
+
+SERVICE_LOADING S4 additions: `fixture.jpms.api.Hasher` (second service) with
+`fixture.jpms.auto.AutoHasher`; `auto`'s `META-INF/services/fixture.jpms.api.Codec`
+lists `AutoCodec` twice (duplicate entry); `fixture.jpms.app.Regression` loads both
+services in one method. Every provider prints `ORACLE-PROVIDER <class>` from its
+constructor (or `FactoryCodec.provider()`) for the real-JVM oracle in
+`testdata/oracle`. Compile `auto` with `src/auto/fixture/jpms/auto/*.java` and add
+`fixture.jpms.nouses` to the module list.

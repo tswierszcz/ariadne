@@ -1,6 +1,6 @@
 # ServiceLoader i JPMS — fazy S0–S4
 
-Status: plan. Wymagania: [SERVICE_LOADING.MD](SERVICE_LOADING.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: **DONE (S0–S4), zarchiwizowane 2026-11-05** — zob. [COMPLETION.md](COMPLETION.md). Wymagania: [SERVICE_LOADING.MD](SERVICE_LOADING.MD). Wspólna kolejność: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## S0. Inwentaryzacja zasobów i kontrakt zdarzeń
 
@@ -25,13 +25,16 @@ Gotowe: dwa loadery dla różnych usług nie mieszają dostawców; niewykorzysta
 
 ## S2. Materializacja i krawędzie dispatch — DONE (2026-11-05)
 
-Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md](../archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md).
+Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md](SERVICE_LOADING_S2.md).
 
 ## S3. JPMS i warstwy — DONE (2026-11-05)
 
-Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md](../archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md).
+Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md](SERVICE_LOADING_S3.md).
 
-## S4. Regresja i rozszerzenia API
+## S4. Regresja i rozszerzenia API — DONE (2026-11-05)
+
+Zrealizowane: zob. [COMPLETION.md](COMPLETION.md) (wyrocznia JVM, fixtures, pomiar historyczny, lista sygnatur; rozszerzenie stream API świadomie niezrobione).
+
 
 - Dodać fixtures dla usług z konstruktorem, fabryką, Provider, duplikatem, dwoma loaderami i modułami; ich regeneracja wymaga odpowiedniego JDK, zwykłe testy czytają gotowe artefakty.
 - Rozszerzać stream API dopiero z modelem operacji materializujących i terminalnych, współdzielonym z ASYNC/operacjami callbacków tam, gdzie ma zastosowanie.

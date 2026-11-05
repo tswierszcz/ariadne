@@ -7,7 +7,7 @@ jak przy S2. Obszar SERVICE_LOADING pozostaje aktywny: S4 (regresja i
 rozszerzenia API) jest otwarte.
 
 Oryginalny tekst fazy jest na końcu pliku; w
-`RECOMMENDATION/SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` zastąpiono go
+`SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` (teraz w tym samym katalogu archiwum) zastąpiono go
 wskaźnikiem. Bieżące zachowanie opisują `docs/SUPPORT.MD` (wiersz
 "ServiceLoader and JPMS service models"), README (flagi `-jpms-scenario`,
 `-jpms-module-path`, ograniczenia ServiceLoader/JPMS) i FAQ. Szczegółowe wpisy

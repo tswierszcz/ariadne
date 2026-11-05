@@ -634,6 +634,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/prepare-micronaut-demo.sh   /path/to/jdk11-or-later/JAVA_HOME # Micronaut, control case
 ./scripts/prepare-quarkus-demo.sh     /path/to/jdk17-or-later/JAVA_HOME # Quarkus, control case
 ./scripts/prepare-jpms-demo.sh        /path/to/jdk11-or-later/JAVA_HOME # JPMS provides/provider(), -jpms-scenario control case
+./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 
 ## Project layout
@@ -859,7 +860,11 @@ report:
   warning. A `requires` on a module absent from the input is a warning (the
   JVM would refuse to start). No exact dispatch edge follows a
   `provider()`-created object (its runtime type is not tracked; CHA edges
-  remain). `-jpms-scenario mixed` puts only the `-jpms-module-path` jars on
+  remain). The exact supported signatures are listed in `docs/SUPPORT.MD`
+  ("ServiceLoader: exact supported signatures and scenarios"); the model is
+  checked against a real-JVM oracle over the fixtures
+  (`scripts/serviceloader-oracle.sh`, `testdata/oracle/`).
+  `-jpms-scenario mixed` puts only the `-jpms-module-path` jars on
   the module path: class-path jars keep their `META-INF/services` providers
   (visible to `ServiceLoader.load(Class)` alongside module-path providers), a
   class-path jar's `module-info.class` is ignored, the `uses` rule applies only
