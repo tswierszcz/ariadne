@@ -27,19 +27,9 @@ Gotowe: dwa loadery dla różnych usług nie mieszają dostawców; niewykorzysta
 
 Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md](../archive/2026-11-05/service_loading/SERVICE_LOADING_S2.md).
 
-## S3. JPMS i warstwy
+## S3. JPMS i warstwy — DONE (2026-11-05)
 
-Stan: IN_PROGRESS — wycinek 1 (deskryptory i inwentarz `provides`, scenariusz classpath) wycinek 2 (`-jpms-scenario module-path`) i wycinek 3 (`mixed`, `ModuleLayer.boot()`) zrobione 2026-11-05; zob. IMPLEMENTATION_STATUS.
-
-Zależności: S2, JVM G4; zaawansowane wartości mogą korzystać z DATA_FLOW D3.
-
-- Rozszerzyć `internal/classfile` o dane atrybutu `Module`, `uses` i `provides`. Zachować deskryptor modułu poza zwykłym indeksem klas.
-- Utworzyć jawny model module path i czytelności w analizowanym scenariuszu. Brak scenariusza nie oznacza poprawnego odtworzenia pełnej konfiguracji runtime’u.
-- Rozwiązywać właściwe reguły dostawcy, m.in. metodę `provider()` dla odpowiednich rodzajów modułów; nie stosować jej automatycznie do każdego wpisu classpath.
-- Dodać ograniczoną deklarację warstw i rodziców. Dynamicznie budowane nieznane warstwy oznaczać jako lukę do uzupełnienia śladem runtime’u.
-- Zachować wszystkie dane w snapshotcie CVE F3; uwzględnić wariant modułu w kluczu modelu.
-
-Gotowe: classpath, named module, automatic module i niedostępny provider są rozróżnione. Nieznana warstwa nie daje pewnego negatywnego wyniku.
+Zarchiwizowane: [archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md](../archive/2026-11-05/service_loading/SERVICE_LOADING_S3.md).
 
 ## S4. Regresja i rozszerzenia API
 
