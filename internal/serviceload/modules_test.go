@@ -10,6 +10,7 @@ import (
 
 	"ariadne/internal/analysis"
 	"ariadne/internal/callgraph"
+	"ariadne/internal/dataflow"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
 	"ariadne/internal/models"
@@ -614,5 +615,91 @@ func TestLoadSites_explicitLoaderIdentity(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(res.Reasons, "\n"), "provider visibility for explicit loader") {
 		t.Errorf("given: want the explicit-loader gap, got %v", res.Reasons)
+	}
+}
+
+// TestLoadSites_parametersFromCallers covers DATA_FLOW D3's "parameters
+// from callers" slice through its first consumer, ServiceLoader.load.
+func TestLoadSites_parametersFromCallers(t *testing.T) {
+	j := buildJPMSJars(t)
+	h, _, err := hierarchy.Build(j.app, j.deps())
+	if err != nil {
+		t.Fatal(err)
+	}
+	loads, _, err := FindLoadSites(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]ServiceLoadSite{}
+	for _, l := range loads {
+		if strings.HasPrefix(l.CallerFQCN, "fixture.jpms.app.Params") {
+			by[l.CallerFQCN+"#"+l.CallerName] = l
+		}
+	}
+	const p = "fixture.jpms.app.Params"
+
+	if l := by[p+"#loadFor"]; l.Interface != "" || strings.Join(l.Interfaces, ",") != "fixture.jpms.api.Codec,java.lang.Runnable" || l.UnresolvedReason != "" || !l.ClassParamSet {
+		t.Errorf("loadFor: %+v, want the complete set {Codec, Runnable}", l)
+	}
+	if l := by[p+"#secure"]; l.Interface != "fixture.jpms.api.Codec" || l.LoaderIdentity != LoaderIdentSystem || !strings.Contains(l.LoaderDetail, "null") {
+		t.Errorf("secure (Jackson shape): %+v, want Codec and the system loader via null two levels up", l)
+	}
+	if l := by[p+"#rec"]; l.Interface != "fixture.jpms.api.Codec" || l.UnresolvedReason != "" {
+		t.Errorf("rec: %+v, want recursion to converge on Codec", l)
+	}
+	for name, want := range map[string]string{
+		p + "#viaLambda": "lambda/method-reference implementation",
+		p + "#orphan":    "no caller in the analyzed input",
+		p + "$Base#go":   "is overridden in fixture.jpms.app.Params$Sub",
+	} {
+		l := by[name]
+		if len(l.Candidates()) != 0 || !strings.Contains(l.UnresolvedReason, want) {
+			t.Errorf("%s: %+v, want unresolved with %q", name, l, want)
+		}
+	}
+}
+
+// TestParameters_noCrossCallerPath: the helper's load site has the set
+// {Codec, Runnable}, but each caller's consumption is narrowed to its own
+// argument, so the Runnable caller gets no Codec provider edge.
+func TestParameters_noCrossCallerPath(t *testing.T) {
+	j := buildJPMSJars(t)
+	nouses := zipFixture(t, filepath.Join(jpmsClasses, "mods", "fixture.jpms.nouses"), t.TempDir(), "fixture-nouses-1.0.jar", nil)
+	cp := ScenarioConfig{Scenario: ScenarioClasspath, AppJar: j.app}
+
+	g, root, _, _ := runJPMS(t, j, nouses, cp, "fixture.jpms.app.Params", "viaCodec", "()V")
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("viaCodec: missing Codec provider edge")
+	}
+	g, root, _, _ = runJPMS(t, j, nouses, cp, "fixture.jpms.app.Params", "viaRunnable", "()V")
+	if hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("viaRunnable: Codec provider edge from the other caller's argument")
+	}
+	g, root, res, _ := runJPMS(t, j, nouses, cp, "fixture.jpms.app.Params", "findAll", "(Ljava/lang/ClassLoader;)V")
+	if !hasModelEdgeFrom(g, root, "fixture.jpms.impl.ModuleCodec", "<init>", "()V") {
+		t.Error("findAll: missing Codec provider edge through secure()")
+	}
+	if strings.Contains(strings.Join(res.Reasons, "\n"), "explicit loader") {
+		t.Errorf("findAll: the loader parameter resolves to null; no visibility gap expected: %v", res.Reasons)
+	}
+}
+
+func TestResolveParameter_limits(t *testing.T) {
+	j := buildJPMSJars(t)
+	h, _, err := hierarchy.Build(j.app, j.deps())
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := dataflow.NewCallerIndex(h)
+	defer idx.Close()
+	pv := idx.ResolveParameter(dataflow.MethodID{Owner: "fixture.jpms.app.Params", Name: "loadFor", Desc: "(Ljava/lang/Class;)Ljava/util/ServiceLoader;"}, 0)
+	if !pv.Complete() || len(pv.Values) != 2 || pv.Callers != 2 {
+		t.Errorf("loadFor param = %+v", pv)
+	}
+	// secure's loader parameter: findAll passes its own parameter, whose
+	// only caller (modules) passes null — two caller levels.
+	pv = idx.ResolveParameter(dataflow.MethodID{Owner: "fixture.jpms.app.Params", Name: "secure", Desc: "(Ljava/lang/Class;Ljava/lang/ClassLoader;)Ljava/util/ServiceLoader;"}, 1)
+	if !pv.Complete() || len(pv.Values) != 1 || pv.Values[0].Kind != "null" || pv.Callers != 2 {
+		t.Errorf("secure loader param = %+v", pv)
 	}
 }

@@ -156,7 +156,7 @@ None found.
 {{else}}
 | Caller | Loader | Interface |
 |---|---|---|
-{{range .ServiceLoadSites}}| `{{.CallerMethod}}` (pc={{.PC}}) | {{.LoaderKind}}{{if .LoaderIdentity}} ({{.LoaderIdentity}}: {{.LoaderDetail}}){{end}}{{if .Layer}} (layer: {{.Layer}}){{end}} | {{if .Interface}}`{{.Interface}}`{{else}}unresolved: {{.UnresolvedReason}}{{end}} |
+{{range .ServiceLoadSites}}| `{{.CallerMethod}}` (pc={{.PC}}) | {{.LoaderKind}}{{if .LoaderIdentity}} ({{.LoaderIdentity}}: {{.LoaderDetail}}){{end}}{{if .Layer}} (layer: {{.Layer}}){{end}} | {{if .Interface}}`{{.Interface}}`{{else if .Interfaces}}{{range $i, $x := .Interfaces}}{{if $i}}, {{end}}`{{$x}}`{{end}}{{if .UnresolvedReason}}; gap: {{.UnresolvedReason}}{{end}}{{else}}unresolved: {{.UnresolvedReason}}{{end}}{{if .ParamSource}} ({{.ParamSource}}){{end}} |
 {{end}}
 {{end}}
 
@@ -194,8 +194,13 @@ left out. "Gap" explains why a found provider has no constructor target (for exa
 no public no-argument constructor). Receiver flows through fields, static-field
 summaries, final instance fields written through `this` in a constructor, and an
 exact direct helper returning one of its parameters (substituted from that call
-site's argument) are followed using DATA_FLOW D3; arbitrary mutable fields,
-parameters from unknown callers, virtual helper returns and unresolved helper
+site's argument) are followed using DATA_FLOW D3. A service `Class` or `ClassLoader`
+argument that is a parameter of the method calling `load` is resolved from that
+method's analyzed callers (D3; up to 3 caller levels and 16 call sites, statically
+exact methods only, assuming the input holds every caller; the load-site table shows
+the caller count), and a consumption through one helper call uses that call's own
+argument. Arbitrary mutable fields, parameters not resolvable from analyzed callers,
+virtual helper returns and unresolved helper
 results are not resolved; stream
 terminal operations and visibility through caller-supplied loaders not recognized
 above (parameters, fields), installed loaders and non-boot module layers remain

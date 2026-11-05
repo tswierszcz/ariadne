@@ -2,6 +2,7 @@ package serviceload
 
 import (
 	"fmt"
+	"strings"
 
 	"ariadne/internal/bytecodeir"
 	"ariadne/internal/classfile"
@@ -54,6 +55,8 @@ func FindLoadSites(h *hierarchy.Hierarchy) ([]ServiceLoadSite, []string, error) 
 	var warnings []string
 	var jarReader classfile.JarClassReader
 	defer jarReader.Close()
+	callers := &lazyCallers{h: h}
+	defer callers.close()
 
 	for _, fqcn := range h.SortedFQCNs() {
 		ci, ok := h.Lookup(fqcn)
@@ -75,7 +78,7 @@ func FindLoadSites(h *hierarchy.Hierarchy) ([]ServiceLoadSite, []string, error) 
 			if !anyServiceLoaderCall([]hierarchy.Method{m}) {
 				continue
 			}
-			found, err := loadSitesInMethod(cf, fqcn, m)
+			found, err := loadSitesInMethod(cf, fqcn, m, callers)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf(
 					"%s#%s%s: local-value analysis: %v", fqcn, m.Name, m.Descriptor, err))
@@ -151,8 +154,95 @@ func moduleLayerArgument(v valueflow.Value, aborted bool) (LayerKind, string) {
 	return LayerUnknown, fmt.Sprintf("the ModuleLayer argument is %s, not ModuleLayer.boot()", v.Kind)
 }
 
-func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method) ([]ServiceLoadSite, error) {
-	facts, err := dataflow.Analyze(cf, fqcn, m.Method)
+// lazyCallers builds DATA_FLOW D3's caller index only when a load-site
+// argument is actually a parameter.
+type lazyCallers struct {
+	h   *hierarchy.Hierarchy
+	idx *dataflow.CallerIndex
+}
+
+func (l *lazyCallers) get() *dataflow.CallerIndex {
+	if l.idx == nil {
+		l.idx = dataflow.NewCallerIndex(l.h)
+	}
+	return l.idx
+}
+
+func (l *lazyCallers) close() {
+	if l.idx != nil {
+		l.idx.Close()
+	}
+}
+
+// resolveParameterArg resolves a formal-parameter argument through the
+// method's callers (DATA_FLOW D3).
+func (l *lazyCallers) resolveParameterArg(v valueflow.Value, fqcn string, m hierarchy.Method) (dataflow.ParameterValues, bool) {
+	if v.Kind != valueflow.KindTyped || v.Parameter == nil {
+		return dataflow.ParameterValues{}, false
+	}
+	return l.get().ResolveParameter(dataflow.MethodID{Owner: fqcn, Name: m.Name, Desc: m.Descriptor}, v.Parameter.Index), true
+}
+
+// applyParameterInterfaces fills the site's service interface(s) from
+// the caller-derived values of its Class parameter.
+func applyParameterInterfaces(site *ServiceLoadSite, pv dataflow.ParameterValues) {
+	var ifaces, other []string
+	for _, v := range pv.Values {
+		if v.Kind == valueflow.KindConst && v.Type == "java.lang.Class" {
+			ifaces = appendUnique(ifaces, v.Const.(string))
+		} else {
+			other = append(other, fmt.Sprintf("a caller passes %s, not a Class literal", v.Kind))
+		}
+	}
+	missing := append(append([]string{}, pv.Unknown...), other...)
+	site.ParamSource = "Class parameter resolved through callers (DATA_FLOW D3): " + pv.Describe()
+	switch {
+	case len(ifaces) == 1 && len(missing) == 0:
+		site.Interface = ifaces[0]
+	case len(ifaces) > 0:
+		site.Interfaces = ifaces
+		if len(missing) > 0 {
+			site.UnresolvedReason = "some callers' Class arguments are not resolved: " + strings.Join(missing, "; ")
+		}
+	default:
+		site.UnresolvedReason = "the argument is a parameter whose callers pass no resolvable Class literal: " + strings.Join(missing, "; ")
+	}
+}
+
+func appendUnique(list []string, s string) []string {
+	for _, x := range list {
+		if x == s {
+			return list
+		}
+	}
+	return append(list, s)
+}
+
+// parameterLoaderIdentity recognizes a ClassLoader parameter only when
+// every caller-derived value is a recognized loader shape.
+func parameterLoaderIdentity(pv dataflow.ParameterValues) (LoaderIdentity, string) {
+	if !pv.Complete() {
+		return "", ""
+	}
+	var ident LoaderIdentity
+	var details []string
+	for _, v := range pv.Values {
+		id, detail := classLoaderArgument(v)
+		if id == "" {
+			return "", ""
+		}
+		if ident == "" {
+			ident = id
+		} else if ident != id {
+			ident = LoaderIdentMixed
+		}
+		details = append(details, detail)
+	}
+	return ident, "parameter; callers pass " + strings.Join(details, ", ")
+}
+
+func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method, callers *lazyCallers) ([]ServiceLoadSite, error) {
+	facts, err := dataflow.AnalyzeWithParameterRefs(cf, fqcn, m.Method)
 	if err != nil {
 		return nil, err
 	}
@@ -178,9 +268,13 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method)
 		}
 		argSite := bytecodeir.Site{Method: fqcn + "#" + m.Name, Descriptor: m.Descriptor, PC: c.PC, Op: bytecodeir.OpCall}
 		val := facts.ArgumentAt(argSite, ov.argIndex)
+		pv, isParam := callers.resolveParameterArg(val, fqcn, m)
 		switch {
 		case val.Kind == valueflow.KindConst && val.Type == "java.lang.Class":
 			site.Interface = val.Const.(string)
+		case !aborted && isParam:
+			site.ClassParamSet, site.ClassParamIndex = true, val.Parameter.Index
+			applyParameterInterfaces(&site, pv)
 		case aborted:
 			site.UnresolvedReason = "local-value analysis for this method aborted: " + abortReason
 		case val.Kind == valueflow.KindUnknown:
@@ -189,7 +283,11 @@ func loadSitesInMethod(cf *classfile.ClassFile, fqcn string, m hierarchy.Method)
 			site.UnresolvedReason = fmt.Sprintf("the argument is %s, not a resolvable Class literal", val.Kind)
 		}
 		if ov.kind == LoaderExplicit && !aborted {
-			site.LoaderIdentity, site.LoaderDetail = classLoaderArgument(facts.ArgumentAt(argSite, 1))
+			loaderArg := facts.ArgumentAt(argSite, 1)
+			site.LoaderIdentity, site.LoaderDetail = classLoaderArgument(loaderArg)
+			if lpv, ok := callers.resolveParameterArg(loaderArg, fqcn, m); ok && site.LoaderIdentity == "" {
+				site.LoaderIdentity, site.LoaderDetail = parameterLoaderIdentity(lpv)
+			}
 		}
 		if ov.kind == LoaderModuleLayer {
 			site.Layer, site.LayerReason = moduleLayerArgument(facts.ArgumentAt(argSite, 0), aborted)

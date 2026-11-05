@@ -40,7 +40,7 @@ func TestLoadSitesInMethod_literalClassResolves(t *testing.T) {
 		},
 	}
 
-	sites, err := loadSitesInMethod(cf, "test.Caller", m)
+	sites, err := loadSitesInMethod(cf, "test.Caller", m, &lazyCallers{h: hierarchy.NewForTesting(nil)})
 	if err != nil {
 		t.Fatalf("loadSitesInMethod: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestLoadSitesInMethod_unknownArgumentStaysUnresolved(t *testing.T) {
 		},
 	}
 
-	sites, err := loadSitesInMethod(cf, "test.Caller", m)
+	sites, err := loadSitesInMethod(cf, "test.Caller", m, &lazyCallers{h: hierarchy.NewForTesting(nil)})
 	if err != nil {
 		t.Fatalf("loadSitesInMethod: %v", err)
 	}

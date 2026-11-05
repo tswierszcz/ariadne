@@ -22,8 +22,8 @@ import (
 func FindMaterializations(h *hierarchy.Hierarchy, sites []ServiceLoadSite, regs []ServiceRegistration) []ProviderMaterialization {
 	usedInterfaces := map[string]bool{}
 	for _, s := range sites {
-		if s.Interface != "" {
-			usedInterfaces[s.Interface] = true
+		for _, iface := range s.Candidates() {
+			usedInterfaces[iface] = true
 		}
 	}
 
@@ -118,14 +118,13 @@ func EdgeTargets(sites []ServiceLoadSite, materializations []ProviderMaterializa
 
 	var out []MaterializedEdge
 	for _, s := range sites {
-		if s.Interface == "" {
-			continue
-		}
-		for _, providerFQCN := range providersByInterface[s.Interface] {
-			out = append(out, MaterializedEdge{
-				CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc,
-				PC: s.PC, ProviderFQCN: providerFQCN,
-			})
+		for _, iface := range s.Candidates() {
+			for _, providerFQCN := range providersByInterface[iface] {
+				out = append(out, MaterializedEdge{
+					CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc,
+					PC: s.PC, ProviderFQCN: providerFQCN,
+				})
+			}
 		}
 	}
 	return out

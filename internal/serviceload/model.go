@@ -112,7 +112,7 @@ func (e *ModelEvaluator) noProviderReason(iface string) string {
 func (e *ModelEvaluator) linkedLoadSites(c ServiceConsumptionSite, iface string) []ServiceLoadSite {
 	var out []ServiceLoadSite
 	for _, key := range c.streamLoadSites {
-		if load, ok := e.sites[key]; ok && load.Interface == iface {
+		if load, ok := e.sites[key]; ok && containsString(load.Candidates(), iface) {
 			out = append(out, load)
 		}
 	}
@@ -195,7 +195,7 @@ func (e *ModelEvaluator) usesAllowed(consumption ServiceConsumptionSite, iface s
 	checked := false
 	for _, key := range consumption.streamLoadSites {
 		load, ok := e.sites[key]
-		if !ok || load.Interface != iface {
+		if !ok || !containsString(load.Candidates(), iface) {
 			continue
 		}
 		checked = true
@@ -253,7 +253,7 @@ func (e *ModelEvaluator) Evaluate(model *models.Model, site models.CallSite) mod
 	if !ok {
 		return models.Fact{Incomplete: true, Reason: "ServiceLoader call site has no matching resolved S1 inventory record"}
 	}
-	if resolved.Interface == "" {
+	if len(resolved.Candidates()) == 0 || resolved.UnresolvedReason != "" {
 		return models.Fact{Incomplete: true, Reason: resolved.UnresolvedReason}
 	}
 	// Creating a ServiceLoader is lazy: provider constructors are only

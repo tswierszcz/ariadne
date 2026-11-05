@@ -276,8 +276,12 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite, h 
 			return current, nil
 		}
 	}
-	var visit func(valueflow.Value, int)
-	visit = func(current valueflow.Value, depth int) {
+	// via is the most recent exact helper call this trace came through:
+	// a load site whose Class argument is that helper's own parameter is
+	// narrowed to the argument at that call site (context-sensitive), so
+	// two callers of one helper do not share each other's services.
+	var visit func(valueflow.Value, int, *valueflow.CallResultRef)
+	visit = func(current valueflow.Value, depth int, via *valueflow.CallResultRef) {
 		if depth > valueflow.MaxCallTraceDepth+2 {
 			reasons = append(reasons, "ServiceLoader receiver provenance exceeded the call-trace depth limit")
 			return
@@ -302,12 +306,22 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite, h 
 					reasons = append(reasons, "load call result has no matching resolved ServiceLoader load-site record")
 					return
 				}
-				if load.Interface == "" {
-					reasons = append(reasons, load.UnresolvedReason)
+				candidates := load.Candidates()
+				unresolved := load.UnresolvedReason
+				if iface, ok := narrowToCallSite(h, load, via); ok {
+					candidates, unresolved = []string{iface}, ""
+				}
+				if len(candidates) == 0 {
+					reasons = append(reasons, unresolved)
 					return
 				}
+				if unresolved != "" {
+					reasons = append(reasons, unresolved) // partial caller-derived set
+				}
 				loadSites[key] = true
-				interfaces[load.Interface] = true
+				for _, iface := range candidates {
+					interfaces[iface] = true
+				}
 				loaderKinds[load.LoaderKind] = true
 				return
 			}
@@ -335,7 +349,7 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite, h 
 				}
 				return
 			}
-			visit(resolved, depth+1)
+			visit(resolved, depth+1, current.Call)
 		case valueflow.KindField:
 			if current.Field == nil {
 				return
@@ -359,23 +373,23 @@ func serviceLoadOrigins(v valueflow.Value, loads map[siteKey]ServiceLoadSite, h 
 				}
 				return
 			}
-			visit(resolved, depth+1)
+			visit(resolved, depth+1, via)
 		case valueflow.KindCallTrace:
 			if current.CallTrace != nil {
 				if current.CallTrace.Owner == serviceLoaderOwner && current.CallTrace.Name == "stream" {
 					streamTraceSites[current.CallTrace.Site] = true
 				}
 				if current.CallTrace.Receiver != nil {
-					visit(*current.CallTrace.Receiver, depth+1)
+					visit(*current.CallTrace.Receiver, depth+1, via)
 				}
 			}
 		case valueflow.KindSet:
 			for _, candidate := range current.Candidates {
-				visit(candidate, depth+1)
+				visit(candidate, depth+1, via)
 			}
 		}
 	}
-	visit(v, 0)
+	visit(v, 0, nil)
 	for iface := range interfaces {
 		out.Interfaces = append(out.Interfaces, iface)
 	}
@@ -441,4 +455,22 @@ func uniqueStrings(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// narrowToCallSite resolves a load site's Class parameter from the exact
+// helper call the receiver trace came through, when the load site sits
+// directly in that helper and the argument there is a Class literal.
+func narrowToCallSite(h *hierarchy.Hierarchy, load ServiceLoadSite, via *valueflow.CallResultRef) (string, bool) {
+	if via == nil || h == nil || !load.ClassParamSet {
+		return "", false
+	}
+	decl, ok := h.ResolveExact(via.Owner, via.Name, via.Desc)
+	if !ok || decl != load.CallerFQCN || via.Name != load.CallerName || via.Desc != load.CallerDesc {
+		return "", false
+	}
+	arg, _ := dataflow.ResolveCallArgumentAtCall(h, *via, load.ClassParamIndex)
+	if arg.Kind == valueflow.KindConst && arg.Type == "java.lang.Class" {
+		return arg.Const.(string), true
+	}
+	return "", false
 }

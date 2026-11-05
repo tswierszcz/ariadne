@@ -823,7 +823,11 @@ report:
   does not claim every listed provider was instantiated. Unsupported
   receiver flows produce an explicit incomplete-model warning rather than
   a guessed edge. Callback-based stream pipelines and unsupported terminal flows, receiver
-  flows through arbitrary mutable fields, parameter values supplied by unknown callers,
+  flows through arbitrary mutable fields, parameter values not resolvable from
+  the analyzed callers (DATA_FLOW D3 now resolves a `Class`/`ClassLoader`
+  parameter of the method calling `load` from its callers, up to 3 levels and
+  16 call sites, for statically exact methods only; a consumption through one
+  helper call uses that call's own argument),
   virtual helper returns and other unresolved results,
   and caller-supplied loaders remain unsupported or incomplete, except a
   `load(Class, ClassLoader)` loader recognized in the calling method itself —

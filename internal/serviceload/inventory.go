@@ -104,6 +104,27 @@ type ServiceLoadSite struct {
 	// loader is used).
 	LoaderIdentity LoaderIdentity
 	LoaderDetail   string
+	// Interfaces is set (with Interface "") when the Class argument is a
+	// parameter of CallerMethod and DATA_FLOW D3's ResolveParameter found
+	// several Class literals among its callers, or found some but not all
+	// of them (UnresolvedReason then says what is missing). ParamSource
+	// describes the caller resolution whenever it was used.
+	Interfaces  []string
+	ParamSource string
+	// ClassParamSet/ClassParamIndex record that the Class argument is
+	// formal parameter ClassParamIndex of CallerMethod, so a consumption
+	// reached through one exact helper call can use that call's argument.
+	ClassParamSet   bool
+	ClassParamIndex int
+}
+
+// Candidates returns every service interface this load site may request:
+// Interface when exact, otherwise the caller-derived Interfaces.
+func (s ServiceLoadSite) Candidates() []string {
+	if s.Interface != "" {
+		return []string{s.Interface}
+	}
+	return s.Interfaces
 }
 
 // LoaderIdentity is a recognized ClassLoader argument of
@@ -118,6 +139,7 @@ const (
 	LoaderIdentContext  LoaderIdentity = "context"  // Thread#getContextClassLoader()
 	LoaderIdentSystem   LoaderIdentity = "system"   // ClassLoader.getSystemClassLoader(), or null (ServiceLoader's documented fallback)
 	LoaderIdentDefining LoaderIdentity = "defining" // SomeClass#getClassLoader()
+	LoaderIdentMixed    LoaderIdentity = "mixed"    // a parameter whose callers pass different recognized shapes
 )
 
 // LayerKind identifies the ModuleLayer a load(ModuleLayer, Class) call
