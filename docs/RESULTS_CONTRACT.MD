@@ -13,7 +13,7 @@ confidence number (B0), and an answer on one axis never stands in for another.
 
 | Axis | Question | Values (F1 vocabulary) | Today (v1) |
 |---|---|---|---|
-| Component identity | Which artifact and component instance is this, and how was it identified? | `identified` (GAV from `pom.properties`/`deps.txt`, with evidence), `unidentified`, `conflict` | GAV or "unidentified jar"; since CVE:F1a an artifact/instance inventory with SHA-256, stable location and identity evidence (report "Components"), not yet used by findings |
+| Component identity | Which artifact and component instance is this, and how was it identified? | `identified` (GAV from `pom.properties`/`deps.txt`, with evidence), `unidentified`, `conflict` | GAV or "unidentified jar"; since CVE:F1a an artifact/instance inventory with SHA-256, stable location and identity evidence (report "Components"); since CVE:F1b/F1c findings are per instance (report, `-json-format v2`) |
 | Applicability | Does the advisory's affected range include this instance's version? | `applicability`: `affected`, `not_affected`, `undetermined` | OSV is queried with the exact GAV; an unidentified jar is never queried |
 | Mapping precision | Which methods does the advisory concern, and how sure is that? | method `role` (`vulnerable`, `entrypoint`, `sink`); `coverage` (`complete_under_declared_assumptions`, `partial`, `unknown`); `review` (`reviewed`, `unreviewed`) | `methods` list + `source` (`manual`, `diff`, `llm`) + `evidence` for LLM; no role, no completeness |
 | Evidence source | Where did each fact come from? | JVM rule, library model, heuristic, input declaration, observation (B0) | edge `basis` on the entry edge; `source` on the mapping |
@@ -103,13 +103,30 @@ its own axis.
 
 - **v1** (today's `-json` array of `{cve, status, methods, source, …}`) stays the default
   and keeps its meaning. Additive fields may appear; no field changes type or meaning.
-- **v2 (F1)** is opt-in (`-json-format v2`): an object with `schema_version`, components,
+- **v2 (F1, implemented by F1c)** is opt-in (`-json-format v2`): an object with `schema_version`, components,
   findings (advisory × component instance), coverage and a data-snapshot reference.
 - **v1 export from v2 (F1):** one row per advisory. Aggregation: any positive finding
   wins (`REACHABLE` over `FRAMEWORK`); without one, an unresolved instance is never
   hidden under `NOT_REACHABLE` — the row becomes `UNKNOWN`; `NOT_APPLICABLE` only when
   every instance is a WebJar. Counts of unique advisories and of per-component findings
   are reported separately.
+
+### v2 schema (implemented by CVE:F1c, `schema_version: "2"`)
+
+| Field | Content |
+|---|---|
+| `tool` | `name`, `version` (the build) |
+| `snapshot` | `kind: "inputs"`, `id` = SHA-256 over every artifact's stable location and content hash (independent of temp paths), `offline`, `classpath_order`. A reference to the analyzed inputs only; the data snapshot of advisory/fix responses is CVE:F3 |
+| `components[]` | one per component instance, inventory order: `id`, `artifact_id`, `location`, `role`, `sha256`, `bytes`, `gav`, `identity` (`identified`, `unidentified`, `conflict` = a shadowed class of this instance differs in content from the selected copy), `detection`, `evidence[]`, `classes`, `shadowed`, `shadowed_differing` |
+| `advisories[]` | sorted by id: `aliases`, `summary`, `severity`, `affected[]`, `mapping` (null when no source mapped it): `methods`, `match_precision` (`name` — overload-insensitive; descriptors are CVE:F4), `source` (evidence kind), `role`, `coverage`, `review`, LLM `model`/`evidence` |
+| `findings[]` | one per advisory × affected instance: `advisory_id`, `component_instance_id`, `identity`, `applicability` (always `affected` today: OSV is queried with the exact version; ranges are CVE:F4), `reachability`, `reason_codes` (instance axis only — mapping role/coverage stay on `mapping`), `model_gaps`, `path`, `entry`, `note` |
+| `coverage` | `global_gaps` (unresolved sites, reachable, unbounded, model-analysis warnings), `unidentified_components`, `advisories_without_instance` (with their whole-graph verdict), `counts` (advisories, findings, advisories by v1 status, findings by reachability) |
+
+`not_assessed` is defined but not emitted yet (no finding today lacks a reachability
+model). **Export limits of v1:** a v1 row shows one path (the shortest over every
+instance's code) and drops the per-instance verdicts, identities and coverage; reasons on
+a v1 row mix both axes (`MAPPING_*` and instance codes). Every run builds the v2 document
+and fails if its v1 export disagrees with the v1 rows (`resultsv2.CheckV1`).
 
 ## 6. Legacy mappings
 

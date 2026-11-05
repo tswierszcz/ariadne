@@ -110,6 +110,7 @@ type InstanceFinding struct {
 	Status    Status
 	Reasons   []findings.ReasonCode
 	Path      []string
+	Entry     *EntryEdge
 	Note      string
 	ModelGaps map[string]int // as Result.ModelGaps, for this instance
 }
@@ -238,6 +239,7 @@ func (e *Engine) Analyze(list []cves.CVE, vm map[string]vulnmap.Entry) []Result 
 	results := make([]Result, len(list))
 	for i, cve := range list {
 		results[i] = e.analyzeOne(cve, vm)
+		e.fillFindings(&results[i], cve)
 	}
 	return results
 }
@@ -302,6 +304,11 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 		result.Status = StatusUnknown
 		result.Note = fmt.Sprintf("LLM (%s) suggested %s from the advisory text only (no fix diff); not reachable, but unverified",
 			entry.Model, strings.Join(entry.Methods, ", "))
+		for i := range result.Findings {
+			if f := &result.Findings[i]; f.Status == StatusNotReachable {
+				f.Status, f.Note = StatusUnknown, result.Note
+			}
+		}
 	case result.Status == StatusNotReachable && entry.Coverage != vulnmap.CoverageComplete:
 		// Option B of CVE:F1b: v1 keeps NOT_REACHABLE for a partial
 		// mapping but says so; v2 (F1c) carries the coverage itself.
@@ -419,21 +426,47 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 		}
 	}
 
+	// related are allowed nodes outside every affected instance: code of
+	// a sibling artifact the advisory's fix touched.
+	var related []uint32
+	for _, id := range allowed {
+		if !affected[e.nodeInstance(id)] {
+			related = append(related, id)
+		}
+	}
+	const relatedNote = "mapped methods are in a related artifact, not in this instance"
+
 	for _, in := range instances {
 		f := InstanceFinding{Instance: in.ID, GAV: in.GAV.String()}
 		var r Result
 		switch own := byInstance[in.ID]; {
 		case len(own) > 0:
 			e.classify(&r, own)
-			f.Status, f.Path = r.Status, r.Path
+			f.Status, f.Path, f.Entry = r.Status, r.Path, r.Entry
+			if r.Status != StatusReachable && len(related) > 0 {
+				// Related-artifact evidence counts for every instance
+				// (as for the advisory row); own code wins a tie.
+				var rr Result
+				e.classify(&rr, related)
+				if statusRank(rr.Status) > statusRank(r.Status) {
+					f.Status, f.Path, f.Entry, f.Note = rr.Status, rr.Path, rr.Entry, relatedNote
+				}
+			}
 		case shadowedOwn[in.ID]:
 			// Its own copy of a mapped class is not in the graph; another
-			// jar's copy (affected or not) is not this instance's code.
+			// affected jar's copy is not this instance's code. Only
+			// related-artifact code can still give a path.
 			f.Status, f.Reasons = StatusUnknown, []findings.ReasonCode{findings.ClasspathConflict}
+			if len(related) > 0 {
+				e.classify(&r, related)
+				if r.Status != StatusNotReachable {
+					f.Status, f.Path, f.Entry, f.Note = r.Status, r.Path, r.Entry, relatedNote
+				}
+			}
 		case len(allowed) > 0:
 			e.classify(&r, allowed)
-			f.Status, f.Path = r.Status, r.Path
-			f.Note = "mapped methods are in a related artifact, not in this instance"
+			f.Status, f.Path, f.Entry = r.Status, r.Path, r.Entry
+			f.Note = relatedNote
 		case len(borrowed) > 0:
 			f.Status, f.Reasons = StatusUnknown, []findings.ReasonCode{findings.ClasspathConflict}
 		default:
@@ -449,24 +482,60 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 		}
 	}
 
-	// Aggregate (contract §5): a positive path wins; otherwise any
-	// unresolved instance makes the advisory UNKNOWN with the union of
-	// the instances' reasons, never NOT_REACHABLE.
-	e.classify(result, allowed)
-	if result.Status != StatusNotReachable {
-		return
+	// Aggregate (contract §5) from the findings, so v1 is an export of
+	// them. The row's path stays the shortest over every allowed node
+	// (as before F1b); its status equals the best finding's by
+	// construction of the cases above.
+	result.Status, result.Reasons = Aggregate(result.Findings)
+	switch result.Status {
+	case StatusReachable, StatusFramework:
+		var r Result
+		e.classify(&r, allowed)
+		result.Path, result.Entry = r.Path, r.Entry
+	case StatusNotReachable:
+		e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
 	}
+}
+
+// statusRank orders verdicts for "a positive finding wins".
+func statusRank(s Status) int {
+	switch s {
+	case StatusReachable:
+		return 3
+	case StatusFramework:
+		return 2
+	}
+	return 0
+}
+
+// Aggregate is the v1 export rule of docs/RESULTS_CONTRACT.MD §5 over one
+// advisory's per-instance findings: the best positive status wins
+// (REACHABLE over FRAMEWORK) with no reasons; otherwise any UNKNOWN
+// finding makes it UNKNOWN with the union of their reasons; NOT_APPLICABLE
+// only when every finding is; else NOT_REACHABLE.
+func Aggregate(fs []InstanceFinding) (Status, []findings.ReasonCode) {
+	best := StatusNotReachable
 	var unresolved []findings.ReasonCode
-	for _, f := range result.Findings {
+	unknown, notApplicable := false, len(fs) > 0
+	for _, f := range fs {
+		if statusRank(f.Status) > statusRank(best) {
+			best = f.Status
+		}
 		if f.Status == StatusUnknown {
+			unknown = true
 			unresolved = append(unresolved, f.Reasons...)
 		}
+		notApplicable = notApplicable && f.Status == StatusNotApplicable
 	}
-	if len(unresolved) > 0 {
-		result.Status, result.Reasons = StatusUnknown, orderedReasons(unresolved)
-		return
+	switch {
+	case best != StatusNotReachable:
+		return best, nil
+	case unknown:
+		return StatusUnknown, orderedReasons(unresolved)
+	case notApplicable:
+		return StatusNotApplicable, nil
 	}
-	e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+	return StatusNotReachable, nil
 }
 
 // GapSite is one unresolved dynamic site of the run (reflection,
@@ -553,6 +622,29 @@ func (e *Engine) annotateGaps(reasons *[]findings.ReasonCode, gaps *map[string]i
 	if g := e.relevantGaps(instances); g != nil {
 		*reasons = append(*reasons, findings.ModelIncomplete)
 		*gaps = g
+	}
+}
+
+// fillFindings gives a result decided without per-instance matching
+// (WebJar, no mapping, no affected instance in the inventory) one finding
+// per affected instance carrying the row's verdict, so every advisory ×
+// instance has a finding. Mapping-axis codes stay on the row (v2 keeps
+// mapping on its own axis).
+func (e *Engine) fillFindings(r *Result, cve cves.CVE) {
+	if len(r.Findings) > 0 {
+		return
+	}
+	var reasons []findings.ReasonCode
+	for _, c := range r.Reasons {
+		if c != findings.MappingPartial && c != findings.MappingEntrypointOnly {
+			reasons = append(reasons, c)
+		}
+	}
+	for _, in := range e.affectedInstances(cve) {
+		r.Findings = append(r.Findings, InstanceFinding{
+			Instance: in.ID, GAV: in.GAV.String(), Status: r.Status, Reasons: reasons,
+			Path: r.Path, Entry: r.Entry, Note: r.Note, ModelGaps: r.ModelGaps,
+		})
 	}
 }
 

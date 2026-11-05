@@ -487,7 +487,11 @@ CVE:F1b added two optional fields, `reasons` (stable reason codes, see
 that affects several component instances is evaluated per instance
 (the report's "Findings per component instance" section) and aggregated
 into its one v1 row: a positive path wins, otherwise any unresolved
-instance makes the row `UNKNOWN`.
+instance makes the row `UNKNOWN`. With `-json-format v2` the file is instead one
+object (`schema_version: "2"`) holding those per-instance findings with
+identity, applicability, mapping and reachability as separate fields;
+v1 stays the default and is unchanged. Every run checks that the v2
+findings aggregate to exactly the v1 verdicts.
 
 ## Usage
 
@@ -522,6 +526,7 @@ Flags:
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
+| `-json-format` | no | `v1` (default: one row per advisory) or `v2` (CVE:F1c: components, one finding per advisory × component instance, coverage, inputs reference — schema in [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §5). |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
 | `-offline` | no | Serve only from the cache; a miss is a clear, immediate error. |
 | `-llm` | no | Enable the LLM source for CVEs the manual table and fix-commit diffs could not map. Needs a model and `ARIADNE_LLM_API_KEY`. |

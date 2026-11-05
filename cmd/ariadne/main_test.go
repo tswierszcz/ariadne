@@ -126,3 +126,15 @@ func TestJPMSScenarioFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestJSONFormatFlag(t *testing.T) {
+	code, stderr := runWithEnv(append([]string{"-json-format", "v3"}, baseArgs...), nil)
+	if code != 2 || !strings.Contains(stderr, "-json-format must be") {
+		t.Errorf("v3: code=%d stderr=%q, want 2 and a -json-format message", code, stderr)
+	}
+	for _, v := range []string{"v1", "v2"} {
+		if code, stderr := runWithEnv(append([]string{"-json-format", v}, baseArgs...), nil); code == 2 {
+			t.Errorf("-json-format %s: code=%d stderr=%q, want validation to accept it", v, code, stderr)
+		}
+	}
+}

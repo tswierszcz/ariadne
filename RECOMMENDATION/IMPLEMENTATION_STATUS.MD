@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: IN_PROGRESS (F1a, F1b zrobione 2026-11-05; F1c — `-json-format v2` — zostało); F2–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. Następny krok: F2 (cache i świeżość). |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -1921,6 +1921,62 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - **Następny krok (wymaga zgody):** CVE:F1c — `-json-format v2`
   (komponenty, ustalenia per instancja, pokrycie, odwołanie do
   snapshotu) i eksport v1 z v2.
+
+### CVE:F1c — wynik v2 i eksport v1 — DONE; CVE:F1 DONE (2026-11-05)
+
+- **Zakres zatwierdzony:** zadania F1.9 (`-json-format v2`) i F1.10
+  (eksport v1 z v2) planu CVE.
+- **Zrealizowane:**
+  1. `internal/resultsv2`: `Document` (`schema_version` "2", `tool`,
+     `snapshot`, `components`, `advisories`, `findings`, `coverage`;
+     schemat w `docs/RESULTS_CONTRACT.MD` §5). `snapshot` to odwołanie
+     do wejść (SHA-256 po stabilnych lokalizacjach i treści artefaktów,
+     niezależny od ścieżek tymczasowych) — snapshot danych to CVE:F3.
+     Tożsamość `identified`/`unidentified`/`conflict` (przesłonięta
+     kopia o innej treści). Mapowanie jako osobna oś (`match_precision:
+     name`, `source`, `role`, `coverage`, `review`); kody `MAPPING_*` nie
+     trafiają do `reason_codes` ustaleń. `applicability` zawsze
+     `affected` (OSV pytane dokładną wersją; zakresy to F4).
+  2. `ExportV1`/`CheckV1`: werdykt v1 jako `reach.Aggregate` ustaleń
+     (kontrakt §5). Silnik liczy wiersz v1 tą samą funkcją; CLI buduje
+     v2 w każdym przebiegu i kończy się błędem, jeśli eksport nie zgadza
+     się z v1.
+  3. `reach`: by werdykt wiersza był agregatem ustaleń także w
+     przypadkach brzegowych — instancja, której własny kod nie daje
+     REACHABLE, sprawdza też kod pokrewnych, niedotkniętych artefaktów
+     (z notatką; własny kod wygrywa remis); instancja z przesłoniętą
+     kopią może mieć ścieżkę tylko przez taki kod (zostaje
+     `CLASSPATH_CONFLICT`); degradacja LLM obejmuje ustalenia;
+     werdykty bez dopasowania (WebJar, brak mapowania) dostają ustalenie
+     per instancja (`fillFindings`). `InstanceFinding.Entry`.
+  4. CLI: `-json-format v1|v2` (domyślnie v1, walidacja), linia
+     `results: N advisories, M findings …; v1 export from v2 consistent`.
+- **Weryfikacja:** `internal/resultsv2`: `TestBuild` (tożsamości, sortowanie,
+  domyślne mapowania, brak kodów mapowania w ustaleniach, pokrycie,
+  liczniki), `TestSnapshotIDIgnoresPaths`, `TestExportV1` (agregacja i
+  wykrycie niezgodności); `internal/reach`: `TestAggregate`,
+  `TestFindingsForUnmatchedVerdicts`, `TestRelatedArtifactEvidence`
+  (mutacja: wyłączenie reguły pokrewnego artefaktu — test pada);
+  `cmd/ariadne`: `TestJSONFormatFlag`. `go vet ./...`, `go test ./...` —
+  PASS. Offline (`-profile spring`): v1 obu aplikacji **bajtowo identyczny**
+  z F1b (binarka z `6033206` w osobnym worktree); v2 petclinic 148
+  advisory / 155 ustaleń, WebGoat 160 / 168, 0 advisory bez instancji,
+  eksport v1 zgodny w 100%; drugi przebieg v2 WebGoat bajtowo
+  identyczny. Przykład: CVE-2023-6378 — logback-classic NOT_REACHABLE z
+  `MODEL_INCOMPLETE`, logback-core FRAMEWORK, wiersz v1 FRAMEWORK.
+- **Kryteria F1:** dwie instancje — osobne wyniki i dowody (v2); losowa
+  kolejność odczytu — G1/F1a; v2 nie miesza niepewności mapowania z
+  osiągalnością, ograniczenia eksportu v1 opisane (kontrakt §5);
+  dotychczasowe polecenia bez zmian, zmiany werdyktów opisane (F1b).
+  **F1 zamknięte.**
+- **Dokumentacja:** kontrakt (§1, §5: schemat v2, ograniczenia v1),
+  README (flaga, `results.json`), `docs/SUPPORT.MD`, FAQ, ten rejestr,
+  nagłówek F1 w planie.
+- **Ograniczenia:** `not_assessed` zdefiniowane, nieemitowane; brak
+  snapshotu danych (F3), zakresów wersji (F4) i JDK (F8); raport
+  Markdown nadal na v1 z sekcją per instancja.
+- **Następny krok (wymaga zgody):** CVE:F2 — cache z metadanymi i
+  polityką świeżości.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4373,7 +4429,8 @@ Przy dodawaniu kolejnego wpisu zapisz:
    CVE:F0–F1 (wpływ luk na werdykt), GRAPH_PRECISION (RTA; odblokowałoby
    REFLECTION:R3). **CVE:F0 zrobione 2026-11-05 (kontrakt)**, CVE:F1a (model
    komponentów) i CVE:F1b (kody powodów, ustalenia per instancja, reguła
-   luk report-only) zrobione — następny krok w tym obszarze: CVE:F1c.
+   luk report-only) oraz CVE:F1c (`-json-format v2`) zrobione — CVE:F1
+   zamknięte; następny krok w tym obszarze: CVE:F2.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

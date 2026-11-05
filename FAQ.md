@@ -616,6 +616,10 @@ gaps only an annotation (`MODEL_INCOMPLETE`) and not `UNKNOWN`? Because,
 measured, hundreds of reachable unresolved reflection sites in Spring have
 no bounded target set, so the rule applied to every `NOT_REACHABLE` row
 of both reference apps — a label on everything distinguishes nothing.
+`-json-format v2` writes those per-instance findings themselves (one per
+advisory × component instance), with identity, version applicability,
+mapping precision and reachability as separate fields instead of one
+status — the v1 row is their aggregate, and each run checks that it is.
 
 **Path and "entry call":** the BFS remembers, for every node, which node
 it was first reached from (a parent pointer) — reconstructing a path is

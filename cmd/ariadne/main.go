@@ -31,6 +31,7 @@ import (
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/report"
+	"ariadne/internal/resultsv2"
 	"ariadne/internal/serviceload"
 	"ariadne/internal/springxml"
 	"ariadne/internal/vulnmap"
@@ -48,6 +49,7 @@ type config struct {
 	vulnMethods string
 	out         string
 	jsonOut     string
+	jsonFormat  string
 	cacheDir    string
 	offline     bool
 	showVersion bool
@@ -97,6 +99,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.jpmsModulePath, "jpms-module-path", "", `with -jpms-scenario mixed: comma-separated jar file-name patterns (path.Match syntax, e.g. "commons-text-*.jar") for the jars on the module path; "app" names the analyzed application; every other jar stays on the class path`)
 	fs.StringVar(&cfg.out, "out", "", "report.md output path (required)")
 	fs.StringVar(&cfg.jsonOut, "json", "", "results.json output path (required)")
+	fs.StringVar(&cfg.jsonFormat, "json-format", "v1", `results.json schema: "v1" (default: one row per advisory) or "v2" (CVE:F1c: components, findings per advisory × component instance, coverage, inputs reference; docs/RESULTS_CONTRACT.MD §5)`)
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "disk cache directory for OSV/GitHub HTTP responses")
 	fs.BoolVar(&cfg.offline, "offline", false, "serve only from the cache; fail clearly on a miss instead of touching the network")
 	fs.BoolVar(&cfg.llm, "llm", false, "also map CVEs no other source could to vulnerable methods by asking an LLM (needs ARIADNE_LLM_API_KEY and a model)")
@@ -151,6 +154,9 @@ func validate(cfg config) error {
 		if err := cfg.llmConfig.Validate(cfg.offline); err != nil {
 			return err
 		}
+	}
+	if cfg.jsonFormat != "v1" && cfg.jsonFormat != "v2" {
+		return fmt.Errorf("-json-format must be %q or %q, got %q", "v1", "v2", cfg.jsonFormat)
 	}
 	if cfg.roots != "all" && cfg.roots != "profile" {
 		return fmt.Errorf("-roots must be %q or %q, got %q", "all", "profile", cfg.roots)
@@ -693,6 +699,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	} else {
 		roots = reach.AppRoots(g, h)
 	}
+	var modelGapReasons []string
 	registry := models.NewRegistry()
 	serviceload.RegisterModel(registry)
 	serviceload.RegisterDispatchModels(registry, svcConsumptionSites)
@@ -704,6 +711,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("models: %d facts, %d edges added, %d iterations (incomplete=%t)", len(modelResult.Facts), modelResult.AddedEdges, modelResult.Iterations, modelResult.Incomplete)
 	for _, reason := range modelResult.Reasons {
 		warnings = append(warnings, "model analysis: "+reason)
+		modelGapReasons = append(modelGapReasons, reason)
 	}
 	var engine *reach.Engine
 	if cfg.roots == "profile" {
@@ -848,7 +856,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("wrote %s", cfg.out)
 
-	if err := report.WriteResultsJSON(cfg.jsonOut, results); err != nil {
+	// The v2 document is built on every run so that its v1 export is
+	// checked against the engine's v1 rows (contract §5) either way.
+	doc := resultsv2.Build(resultsv2.Inputs{
+		ToolVersion: version(), Offline: cfg.offline, Inventory: components, CVEs: cveList, Mappings: vm, Results: results,
+		Gaps: resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
+	})
+	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
+		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
+	}
+	log("results: %d advisories, %d findings per component instance (%d advisories without an instance); v1 export from v2 consistent",
+		doc.Coverage.Counts.Advisories, doc.Coverage.Counts.Findings, len(doc.Coverage.AdvisoriesWithoutInstance))
+	if cfg.jsonFormat == "v2" {
+		if err := resultsv2.Write(cfg.jsonOut, doc); err != nil {
+			return err
+		}
+	} else if err := report.WriteResultsJSON(cfg.jsonOut, results); err != nil {
 		return fmt.Errorf("writing results JSON: %w", err)
 	}
 	log("wrote %s", cfg.jsonOut)

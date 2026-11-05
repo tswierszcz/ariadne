@@ -161,3 +161,64 @@ func TestAggregateNeverHidesUnresolvedInstance(t *testing.T) {
 		t.Fatalf("aggregate = %s %v (findings %+v), want UNKNOWN [CLASSPATH_CONFLICT]", r.Status, r.Reasons, r.Findings)
 	}
 }
+
+// TestAggregate is the v1 export rule of contract §5.
+func TestAggregate(t *testing.T) {
+	f := func(s Status, rs ...findings.ReasonCode) InstanceFinding {
+		return InstanceFinding{Status: s, Reasons: rs}
+	}
+	cases := []struct {
+		name    string
+		in      []InstanceFinding
+		status  Status
+		reasons []findings.ReasonCode
+	}{
+		{"reachable beats framework", []InstanceFinding{f(StatusFramework), f(StatusReachable)}, StatusReachable, nil},
+		{"positive beats unknown", []InstanceFinding{f(StatusUnknown, findings.ClasspathConflict), f(StatusFramework)}, StatusFramework, nil},
+		{"unknown not hidden", []InstanceFinding{f(StatusNotReachable, findings.ModelIncomplete), f(StatusUnknown, findings.MethodNotFound), f(StatusUnknown, findings.ClasspathConflict)},
+			StatusUnknown, reasons(findings.ClasspathConflict, findings.MethodNotFound)},
+		{"all webjar", []InstanceFinding{f(StatusNotApplicable), f(StatusNotApplicable)}, StatusNotApplicable, nil},
+		{"webjar and not reachable", []InstanceFinding{f(StatusNotApplicable), f(StatusNotReachable)}, StatusNotReachable, nil},
+		{"not reachable", []InstanceFinding{f(StatusNotReachable)}, StatusNotReachable, nil},
+	}
+	for _, c := range cases {
+		if s, rs := Aggregate(c.in); s != c.status || !reflect.DeepEqual(rs, c.reasons) {
+			t.Errorf("%s: %s %v, want %s %v", c.name, s, rs, c.status, c.reasons)
+		}
+	}
+}
+
+// Every advisory × affected instance has a finding, also when the verdict
+// is decided without matching (no mapping, WebJar); mapping-axis codes
+// stay on the row.
+func TestFindingsForUnmatchedVerdicts(t *testing.T) {
+	e := buildInstanceEngine(t, false)
+	r := analyzeAffected(t, e, vulnmap.Entry{}, "1.0")
+	if r.Status != StatusUnknown || len(r.Findings) != 1 || r.Findings[0].Status != StatusUnknown || r.Findings[0].GAV != "org.vulnerable:lib:1.0" {
+		t.Errorf("no mapping: %s %+v", r.Status, r.Findings)
+	}
+	e.SetWebAssetPackages(map[string]bool{"org.vulnerable:lib": true})
+	r = analyzeAffected(t, e, vulnmap.Entry{Methods: []string{"reachfixture.VulnerableLib#vulnerable"}, Source: vulnmap.SourceDiff}, "1.0")
+	if r.Status != StatusNotApplicable || len(r.Findings) != 1 || r.Findings[0].Status != StatusNotApplicable {
+		t.Errorf("webjar: %s %+v", r.Status, r.Findings)
+	}
+	if s, _ := Aggregate(r.Findings); s != r.Status {
+		t.Errorf("aggregate %s != row %s", s, r.Status)
+	}
+}
+
+// An instance whose own mapped code is not reached still gets the
+// positive path through a related (non-affected) artifact's mapped code,
+// annotated — so the row's verdict is the aggregate of its findings.
+func TestRelatedArtifactEvidence(t *testing.T) {
+	e := buildInstanceEngine(t, false)
+	entry := vulnmap.Entry{Methods: []string{"reachfixture.VulnerableLib#unreachable", "reachfixture.FrameworkThing#riskyMethod"}, Source: vulnmap.SourceDiff}
+	r := analyzeAffected(t, e, entry, "1.0")
+	if len(r.Findings) != 1 {
+		t.Fatalf("findings = %+v", r.Findings)
+	}
+	f := r.Findings[0]
+	if f.Status == StatusNotReachable || f.Status != r.Status || f.Note == "" || !reflect.DeepEqual(f.Path, r.Path) {
+		t.Errorf("finding %+v, row %s %v", f, r.Status, r.Path)
+	}
+}
