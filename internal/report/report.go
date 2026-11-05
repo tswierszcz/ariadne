@@ -10,6 +10,7 @@ import (
 
 	"ariadne/internal/aop"
 	"ariadne/internal/callback"
+	"ariadne/internal/component"
 	"ariadne/internal/cves"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/profile"
@@ -120,6 +121,10 @@ type Data struct {
 	// `provides` declarations under an explicit launch scenario
 	// (class path only) — facts, never registrations or edges.
 	Modules serviceload.ModuleInventory
+
+	// Components is CVE:F1a's artifact/component-instance inventory
+	// (nil in reports built without it, e.g. tests).
+	Components *component.Inventory
 
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
 	// every call site matching (or nearly matching) a cataloged

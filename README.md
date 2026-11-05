@@ -419,7 +419,10 @@ wiring at build time via Jandex indexing and bytecode recording, the same
 `invokedynamic` count, dependency identification rate), a status/severity
 summary, the full CVE table, every `REACHABLE` CVE's full call path with
 its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
-review, the list of unidentified dependency jars, a `META-INF/services`
+review, the list of unidentified dependency jars, a "Components" inventory
+(CVE:F1a: every jar's SHA-256 and stable location, its component instance with
+identity evidence and embedded `pom.properties` candidates, and every class present in
+several jars with the selected and non-selected copy), a `META-INF/services`
 provider inventory, every resolved `ServiceLoader.load(...)` call site,
 and recognized ServiceLoader consumption/dispatch sites with their linked
 load interface or gap; the registered providers with constructible no-argument

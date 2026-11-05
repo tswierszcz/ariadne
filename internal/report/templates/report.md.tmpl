@@ -116,6 +116,34 @@ None.
 {{end}}
 {{end}}
 
+## Components
+
+CVE:F1a inventory (docs/RESULTS_CONTRACT.MD, "Component identity"): every jar read, by
+content hash and a location that is stable across runs, and the component instance
+assigned to it — one per jar for now; further `pom.properties` inside the same jar are
+listed as embedded candidates, not instances. Identifiers do not depend on temp paths.
+This inventory does not change any verdict above.
+{{with .Components}}{{$inv := .}}
+| Instance | Identity | Detection | Location | SHA-256 | Classes | Packages | Shadowed | Evidence |
+|---|---|---|---|---|---|---|---|---|
+{{range .Instances}}| `{{.ID}}` | {{if .GAV}}`{{.GAV}}`{{else}}—{{end}} | {{.Detection}} | {{$inv.ArtifactLocation .ArtifactID}} | `{{$inv.ArtifactShortHash .ArtifactID}}` | {{.Classes}} | {{len .Packages}} | {{.Shadowed}} | {{range $i, $e := .Evidence}}{{if $i}}; {{end}}{{$e.Kind}}: {{$e.Detail}}{{end}} |
+{{end}}
+### Class conflicts
+
+Same class in several jars. Assumed classpath order: {{.ClasspathOrder}}. The
+non-selected copy is not in the call graph and is never used as a reachability proof.
+{{if not .Conflicts}}
+None.
+{{else}}
+| Class | Selected from | Not selected | Same content |
+|---|---|---|---|
+{{range .Conflicts}}| `{{.FQCN}}` | `{{.KeptInstance}}` | `{{.ShadowedInstance}}` | {{if .SameContent}}yes{{else}}**no**{{end}} |
+{{end}}
+{{end}}
+{{else}}
+Not available in this report.
+{{end}}
+
 ## ServiceLoader provider registrations
 
 A declarative inventory of `META-INF/services/<Interface>` files across the app and

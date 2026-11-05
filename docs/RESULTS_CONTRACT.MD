@@ -13,7 +13,7 @@ confidence number (B0), and an answer on one axis never stands in for another.
 
 | Axis | Question | Values (F1 vocabulary) | Today (v1) |
 |---|---|---|---|
-| Component identity | Which artifact and component instance is this, and how was it identified? | `identified` (GAV from `pom.properties`/`deps.txt`, with evidence), `unidentified`, `conflict` | GAV or "unidentified jar" in the report header; no per-instance record |
+| Component identity | Which artifact and component instance is this, and how was it identified? | `identified` (GAV from `pom.properties`/`deps.txt`, with evidence), `unidentified`, `conflict` | GAV or "unidentified jar"; since CVE:F1a an artifact/instance inventory with SHA-256, stable location and identity evidence (report "Components"), not yet used by findings |
 | Applicability | Does the advisory's affected range include this instance's version? | `applicability`: `affected`, `not_affected`, `undetermined` | OSV is queried with the exact GAV; an unidentified jar is never queried |
 | Mapping precision | Which methods does the advisory concern, and how sure is that? | method `role` (`vulnerable`, `entrypoint`, `sink`); `coverage` (`complete_under_declared_assumptions`, `partial`, `unknown`); `review` (`reviewed`, `unreviewed`) | `methods` list + `source` (`manual`, `diff`, `llm`) + `evidence` for LLM; no role, no completeness |
 | Evidence source | Where did each fact come from? | JVM rule, library model, heuristic, input declaration, observation (B0) | edge `basis` on the entry edge; `source` on the mapping |

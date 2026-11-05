@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". Brak nowej funkcji dla użytkownika. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: IN_PROGRESS (F1a zrobione 2026-11-05); F2–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". Brak nowej funkcji dla użytkownika. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -1802,6 +1802,52 @@ Przy dodawaniu kolejnego wpisu zapisz:
   powiązanie klas z instancją); potem F1b (strukturalne mapowania, kody
   powodów w wynikach, METHOD_NOT_FOUND i reguła luk) i F1c
   (`-json-format v2`).
+
+### CVE:F1a — model artefaktów i instancji komponentów — DONE for this slice; CVE:F1 IN_PROGRESS (2026-11-05)
+
+- **Zakres zatwierdzony:** zadania F1.1–F1.3 i F1.6–F1.8 planu CVE:
+  `internal/component` (`Artifact`, `Instance`, `IdentityEvidence`,
+  `Conflict`), SHA-256 i stabilna lokalizacja, identyfikatory z treści i
+  lokalizacji, jedna instancja na jar (dodatkowe `pom.properties` jako
+  kandydaci osadzeni), powiązanie klas z instancją, inwentarz kopii
+  niewybranych; bez zmian werdyktów i `results.json`.
+- **Zrealizowane:** `internal/component/component.go` (`Build`,
+  `InstanceForJar`/`InstanceForClass`, `Counts`); `internal/input`:
+  `PreparedApp.LibEntries` (oryginalna ścieżka każdego wypakowanego jara:
+  `BOOT-INF/lib/…`, `WEB-INF/lib/…`, `x.war!/WEB-INF/lib/…`, jar EAR-a),
+  `JarPOMProperties`. Lokalizacje: `app:<nazwa wejścia>`,
+  `deps:<plik>`, `app:<nazwa>!/<wpis>`. ID artefaktu = skrót SHA-256(treść,
+  lokalizacja), ID instancji = skrót (artefakt, tożsamość). Konflikty z
+  `hierarchy.Duplicates()` (JVM_GRAPH G1 — deterministyczny wybór już
+  istniał), z jawnym założeniem kolejności classpath. CLI: linia
+  `components:`; raport: sekcja "Components" + "Class conflicts".
+- **Weryfikacja:** `internal/component`: `TestIDsStableAcrossTempPaths`
+  (katalog klas i fat jar budowany dwa razy w różnych katalogach),
+  `TestTwoInstancesOfOneComponent` (ten sam GAV w dwóch jarach → dwie
+  instancje z własnymi dowodami, kandydat osadzony, konflikt z wybraną i
+  przesłoniętą kopią), `TestUnidentifiedJar`; mutacje (ścieżka w ID;
+  usunięcie kandydatów osadzonych) — testy padają. `go vet ./...`,
+  `go test ./...` — PASS. Offline: petclinic 88 artefaktów / 87
+  zidentyfikowanych / 31 konfliktów (wszystkie identyczne), WebGoat 127 /
+  126 / 242 (163 o różnej treści); `results.json` obu bajtowo identyczny z
+  baseline'em CVE:F0. petclinic jako fat jar `spring-petclinic-2.4.5.jar`
+  (online raz, by uzupełnić cache OSV, potem offline): 76 artefaktów z
+  lokalizacjami `BOOT-INF/lib`, 1 niezidentyfikowany
+  (`spring-boot-jarmode-layertools`), tabela komponentów i wyniki
+  identyczne w obu przebiegach. Kandydaci osadzeni: byte-buddy, ehcache,
+  jruby-core.
+- **Kryteria F1 a ten wycinek:** "dwie instancje tego samego komponentu"
+  — osobne instancje i dowody tak, osobne *wyniki* to F1b/F1c; "losowa
+  kolejność odczytu nie zmienia wybranej klasy" — zapewnione przez G1,
+  inwentarz to raportuje.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz tożsamości), README (sekcja
+  raportu), `docs/RESULTS_CONTRACT.MD` (oś tożsamości), szablon raportu,
+  ten rejestr.
+- **Następny krok (wymaga zgody):** CVE:F1b — strukturalne mapowania
+  (`MethodSelector` z rolą i kompletnością), ustalenia per advisory ×
+  instancja, kody powodów w wynikach (`METHOD_NOT_FOUND`,
+  `MAPPING_ENTRYPOINT_ONLY`, `CLASSPATH_CONFLICT`) i reguła luk modelu
+  (kontrakt §4); potem F1c (`-json-format v2`).
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4252,8 +4298,8 @@ Przy dodawaniu kolejnego wpisu zapisz:
    (`archive/2026-11-05/service_loading/COMPLETION.md`). Najbliższe
    kandydatury: dalsze modele B3, FRAMEWORKS:F3, ASYNC_CALLBACKS:A3,
    CVE:F0–F1 (wpływ luk na werdykt), GRAPH_PRECISION (RTA; odblokowałoby
-   REFLECTION:R3). **CVE:F0 zrobione 2026-11-05 (kontrakt)** — następny
-   krok w tym obszarze: CVE:F1a (model komponentów).
+   REFLECTION:R3). **CVE:F0 zrobione 2026-11-05 (kontrakt)**, CVE:F1a (model
+   komponentów) zrobione — następny krok w tym obszarze: CVE:F1b.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

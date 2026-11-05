@@ -19,6 +19,7 @@ import (
 	"ariadne/internal/aop"
 	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
+	"ariadne/internal/component"
 	"ariadne/internal/cves"
 	"ariadne/internal/exploit"
 	"ariadne/internal/hierarchy"
@@ -335,6 +336,20 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	} else {
 		log("hierarchy: %d classes (max bytecode version %d)", h.Len(), maxBytecode)
 	}
+
+	// CVE:F1a: artifacts (content hash, stable location) and component
+	// instances with identity evidence — an inventory only; verdicts are
+	// unchanged (docs/RESULTS_CONTRACT.MD, "Component identity").
+	components, err := component.Build(component.Inputs{
+		AppInput: cfg.app, AppJar: prepared.AppClassesJar,
+		DepsDir: depsDir, Extracted: prepared.ExtractedLibs != "", LibEntries: prepared.LibEntries,
+		DepJars: depJars,
+	}, h)
+	if err != nil {
+		return fmt.Errorf("building the component inventory: %w", err)
+	}
+	nArtifacts, nIdentified, nUnidentified, nConflicts := components.Counts()
+	log("components: %d artifacts, %d identified instances, %d unidentified, %d class conflicts (first copy wins)", nArtifacts, nIdentified, nUnidentified, nConflicts)
 
 	// SERVICE_LOADING S0: a declarative inventory of META-INF/services
 	// provider registrations, never a call-graph edge (see
@@ -811,6 +826,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
 	data.Modules = moduleInventory
+	data.Components = components
 
 	if err := report.WriteMarkdown(cfg.out, data); err != nil {
 		return fmt.Errorf("writing report: %w", err)

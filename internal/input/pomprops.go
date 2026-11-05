@@ -23,6 +23,14 @@ const webJarPrefix = "META-INF/resources/webjars/"
 // warning (see DepJar.Warnings) rather than a hard error, since we can
 // still identify at least one real dependency inside it. It also reports
 // whether the jar is a WebJar with no JVM bytecode (see DepJar.WebAssetsOnly).
+// JarPOMProperties returns every GAV read from a META-INF/maven/**/
+// pom.properties inside the jar at path, in entry order (CVE:F1a uses all
+// of them as identity evidence; ResolveDepJars picks one).
+func JarPOMProperties(path string) ([]GAV, error) {
+	gavs, _, err := inspectJar(path)
+	return gavs, err
+}
+
 func inspectJar(path string) (gavs []GAV, webAssetsOnly bool, err error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
