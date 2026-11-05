@@ -1582,6 +1582,44 @@ Przy dodawaniu kolejnego wpisu zapisz:
   callbacki; albo pola zapisywane z parametru konstruktora (połączenie
   z istniejącym streszczeniem pól `final`).
 
+### REFLECTION:R3 — wycinek 1 (parametry i fabryki): pomiar, reguła stopu zadziałała — NOT STARTED, zmierzone (2026-11-05)
+
+- **Zakres zatwierdzony:** krok 0 = pomiar; jeśli na petclinic i WebGoat
+  zero realnych miejsc daje się zamienić na krawędź, przerwać i zapisać
+  pomiar zamiast budować odbiorców (decyzja użytkownika przy
+  zatwierdzeniu planu).
+- **Metoda:** tymczasowa sonda (tymczasowy test Go, usunięty po użyciu)
+  na prawdziwych jarach: dla każdego `Method#invoke` analiza wywołującego
+  z `AnalyzeWithParameterRefs`; receiver-parametr rozwiązywany przez
+  `dataflow.CallerIndex.ResolveParameter` (D3); receiver będący wynikiem
+  helpera, którego `ResolveCallResult` nie rozwiązuje, sprawdzany pod
+  kątem stałych argumentów w miejscu wywołania
+  (`ResolveCallArgumentAtCall`).
+- **Wynik:**
+  - petclinic: 619 miejsc `invoke`; 72 z receiverem-parametrem — **0**
+    z jakimkolwiek rozpoznanym `Method` od wywołujących; 48
+    nierozwiązanych wyników helperów, 4 ze stałymi argumentami.
+  - WebGoat: 628; 75 parametrów — **0**; 52 helpery, 6 ze stałymi.
+  - Kandydaci "fabryka": Tomcat `IntrospectionUtils#findMethod(
+    obj.getClass(), "setExecutor", …)` i XStream
+    `SerializationMethodInvoker#getMethod(type, "readResolve", …)` —
+    klasa znana dopiero w czasie działania (nieznana / parametr);
+    Hibernate `ReflectHelper#getMethod(Stream.class, "takeWhile"|
+    "dropWhile", …)` — jedyne z pełnymi stałymi, ale cel
+    `java.util.stream.Stream` jest poza analizowanym wejściem (JDK), więc
+    krawędź i tak nie powstałaby.
+  - Łącznie **0** miejsc możliwych do zamiany na krawędź na obu
+    aplikacjach → reguła stopu. Zgodne z wcześniejszą oceną (sesja
+    2026-10-23), teraz potwierdzone pomiarem, a nie przewidywaniem.
+- **Zmiany w kodzie:** brak (sonda usunięta). Dokumentacja wsparcia bez
+  zmian — nic nowego nie jest wspierane.
+- **Następny krok:** R3 wycinek 1 ma sens dopiero z inną aplikacją
+  kontrolną, która przekazuje `Method`/nazwy przez helpery z klasami z
+  wejścia, albo w połączeniu z wartościami klas znanymi w czasie
+  działania (np. `obj.getClass()` przy znanym typie alokacji — RTA,
+  GRAPH_PRECISION). Inne kandydatury: pola zapisywane z parametru
+  konstruktora (D3), SERVICE_LOADING:S4, dalsze modele B3, FRAMEWORKS:F3.
+
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
 - **Zakres zlecenia i zależności:** B0–B3 (wspólne — rejestr modeli B3
@@ -4021,9 +4059,11 @@ Przy dodawaniu kolejnego wpisu zapisz:
    Rozpoznawanie jawnych `ClassLoader` (korekta po S2) zrobione: 1/19
    i 5/32 miejsc. DATA_FLOW:D3 wycinek "parametry od wywołujących"
    zrobiony (load sites z usługą 13→20 / 31→38, statusy bez zmian).
-   Najbliższe kandydatury: REFLECTION:R3 na `ResolveParameter`,
-   pola z parametru konstruktora, SERVICE_LOADING:S4, dalsze modele B3,
-   albo FRAMEWORKS:F3.
+   REFLECTION:R3 wycinek 1 zmierzony 2026-11-05: 0 możliwych krawędzi
+   na petclinic/WebGoat, reguła stopu — nie budowany (zob. wpis).
+   Najbliższe kandydatury: pola z parametru konstruktora (D3),
+   SERVICE_LOADING:S4, dalsze modele B3, albo FRAMEWORKS:F3; R3 dopiero
+   z RTA albo nową aplikacją kontrolną.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 
