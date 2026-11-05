@@ -384,7 +384,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("inventorying JPMS module descriptors: %w", err)
 	}
 	warnings = append(warnings, moduleWarnings...)
-	jpmsScenario, _ := serviceload.ParseScenario(cfg.jpmsScenario) // validated in parseFlags
+	jpmsScenario, _ := serviceload.ParseScenario(cfg.jpmsScenario)           // validated in parseFlags
 	modulePathJars, _ := serviceload.ParseModulePathJars(cfg.jpmsModulePath) // validated in parseFlags
 	scenarioView, scenarioWarnings := serviceload.ApplyScenario(serviceload.ScenarioConfig{Scenario: jpmsScenario, ModulePathJars: modulePathJars, AppJar: prepared.AppClassesJar}, svcRegs, &moduleInventory, h)
 	warnings = append(warnings, scenarioWarnings...)
