@@ -5,18 +5,38 @@
 # Format: CVE-2021-44228: ["Class#method", ...] — overload-insensitive
 # (no descriptor), matching ariadne's convention everywhere else.
 # Constructors use "<init>", the name the JVM itself uses.
+#
+# Object form (CVE:F1b, docs/RESULTS_CONTRACT.MD):
+#   CVE-X: {methods: [...], role: vulnerable|entrypoint|sink,
+#           coverage: complete_under_declared_assumptions|partial|unknown,
+#           review: reviewed|unreviewed}
+# The list form stays valid and means coverage partial, review reviewed,
+# role unknown. Roles and coverage below follow the CVE:F0 audit
+# (testdata/cve-control/MANUAL_MAPPING_AUDIT.MD): no entry is complete.
 
 CVE-2022-1471: # SnakeYAML, unsafe Constructor deserialization (RCE)
-  - org.yaml.snakeyaml.Yaml#load
-  - org.yaml.snakeyaml.Yaml#loadAs
-  - org.yaml.snakeyaml.Yaml#loadAll
-  - org.yaml.snakeyaml.constructor.Constructor#<init>
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  methods:
+    - org.yaml.snakeyaml.Yaml#load
+    - org.yaml.snakeyaml.Yaml#loadAs
+    - org.yaml.snakeyaml.Yaml#loadAll
+    - org.yaml.snakeyaml.constructor.Constructor#<init>
 
 CVE-2021-44228: # Log4Shell
-  - org.apache.logging.log4j.core.lookup.JndiLookup#lookup
+  role: sink
+  coverage: partial
+  review: reviewed
+  methods:
+    - org.apache.logging.log4j.core.lookup.JndiLookup#lookup
 
 CVE-2022-42889: # Text4Shell
-  - org.apache.commons.text.StringSubstitutor#replace
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  methods:
+    - org.apache.commons.text.StringSubstitutor#replace
 
 # XStream (WebGoat's control case). An unconfigured XStream's
 # fromXML/fromXML-family entry points are the shared attack surface for
@@ -26,10 +46,13 @@ CVE-2022-42889: # Text4Shell
 # getting a distinct, gadget-specific method list. The exact CVE ids
 # below are every XStream 1.4.5 vulnerability OSV reported when ariadne
 # ran against the real WebGoat dependency set (see PLAN.md Phase 2).
-CVE-2013-7285:
-  &xstream-entry-points
-  - com.thoughtworks.xstream.XStream#fromXML
-  - com.thoughtworks.xstream.XStream#unmarshal
+CVE-2013-7285: &xstream-entry-points
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  methods:
+    - com.thoughtworks.xstream.XStream#fromXML
+    - com.thoughtworks.xstream.XStream#unmarshal
 CVE-2016-3674: *xstream-entry-points
 CVE-2017-7957: *xstream-entry-points
 CVE-2020-26217: *xstream-entry-points

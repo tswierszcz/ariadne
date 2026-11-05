@@ -9,6 +9,7 @@
 - **JPMS scenario:** {{if .JPMSScenario}}{{.JPMSScenario}}{{else}}classpath{{end}} (see "JPMS module descriptors")
 - **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model)
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
+- **Model gaps:** {{.GapSites}} unresolved reflection/MethodHandle/callback/ServiceLoader sites, {{.GapsReachable}} reachable from the roots ({{.GapsUnbounded}} with no bounded candidate set) — see `MODEL_INCOMPLETE` below
 - **Calls resolved outside the analyzed input:** {{.UnresolvedOwner}} (informational — expected to be a few thousand on a real app; dominated by methods actually inherited from the JDK or another class outside `-app`/`-deps`, not evidence of a bug on its own)
 - **Dependencies:** {{.DepsTotal}} total, {{.DepsIdentified}} identified{{if .UnidentifiedJar}}, {{len .UnidentifiedJar}} unidentified{{end}}
 {{- if .LLMModel}}
@@ -48,10 +49,35 @@ the affected component.
 
 ## CVEs
 
-| CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source |
-|---|---|---|---|---|---|---|
+| CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source | Reasons |
+|---|---|---|---|---|---|---|---|
 {{range .Rows -}}
-| {{.CVE}} | {{.Package}} | {{.Version}} | {{.Severity}} | {{.Status}} | {{.Methods}} | {{.Source}} |
+| {{.CVE}} | {{.Package}} | {{.Version}} | {{.Severity}} | {{.Status}} | {{.Methods}} | {{.Source}} | {{.Reasons}} |
+{{end}}
+
+Reasons are stable codes from docs/RESULTS_CONTRACT.MD §3: `METHOD_NOT_FOUND` — no mapped
+method exists in the analyzed graph (no verdict, not "not reachable");
+`MAPPING_ENTRYPOINT_ONLY` — the mapping names entry points into the vulnerable behavior, not
+the vulnerable code; `MAPPING_PARTIAL` — `NOT_REACHABLE` on a mapping not known to be
+complete; `CLASSPATH_CONFLICT` — the affected instance's copy of a mapped class lost to
+another jar's copy, so its code is not in the graph; `MODEL_INCOMPLETE` (with counts by kind)
+— `NOT_REACHABLE` although reachable unresolved sites could dispatch into the affected
+component. The verdict is kept (report-only, docs/RESULTS_CONTRACT.MD §4): read it as "no
+path in the model", not "safe".
+
+## Findings per component instance
+
+Advisories affecting several component instances, or whose instance findings carry a note or a
+reason not already on the advisory row (CVE:F1b; contract §5). The status above aggregates these: a positive
+finding wins; otherwise any unresolved instance makes the advisory `UNKNOWN`. A path never
+runs through another jar's copy of a class the affected instance also contains.
+{{if not .PerInstance}}
+None.
+{{else}}
+| CVE | Instance | Component | Status | Reasons / note |
+|---|---|---|---|---|
+{{range $r := .PerInstance}}{{range .Findings}}| {{$r.CVE}} | `{{.Instance}}` | `{{.GAV}}` | {{.Status}} | {{range $i, $c := .Reasons}}{{if $i}}, {{end}}`{{$c}}`{{end}}{{if .ModelGaps}} ({{gapCounts .ModelGaps}}){{end}}{{if .Note}}{{if .Reasons}}; {{end}}{{.Note}}{{end}} |
+{{end}}{{end}}
 {{end}}
 
 {{if .Notes}}

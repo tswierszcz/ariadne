@@ -4,6 +4,7 @@
 package report
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"ariadne/internal/callback"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
+	"ariadne/internal/findings"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
@@ -44,9 +46,12 @@ type Header struct {
 	ModelEdges      int
 	UnresolvedDyn   int
 	UnresolvedOwner int
-	DepsTotal       int
-	DepsIdentified  int
-	UnidentifiedJar []string
+	// Model gaps (contract §4): unresolved dynamic sites, those reachable
+	// from the roots, and those of them with no bounded candidate set.
+	GapSites, GapsReachable, GapsUnbounded int
+	DepsTotal                              int
+	DepsIdentified                         int
+	UnidentifiedJar                        []string
 
 	// LLM* are set only when -llm was used.
 	LLMModel   string
@@ -73,16 +78,20 @@ type Row struct {
 	Status   reach.Status
 	Methods  string
 	Source   string
+	Reasons  string // CVE:F1b reason codes, comma-separated
 }
 
 // Data is everything the Markdown/JSON templates need, already computed
 // and sorted — the template itself does no logic beyond formatting.
 type Data struct {
 	Header
-	StatusCounts    map[string]int
-	SeverityCounts  map[string]int
-	Rows            []Row
-	Notes           []reach.Result // results carrying a Note, e.g. downgraded LLM verdicts
+	StatusCounts   map[string]int
+	SeverityCounts map[string]int
+	Rows           []Row
+	Notes          []reach.Result // results carrying a Note, e.g. downgraded LLM verdicts
+	// PerInstance are results whose advisory affects several component
+	// instances or whose instance findings carry reasons/notes (CVE:F1b).
+	PerInstance     []reach.Result
 	Reachable       []reach.Result
 	Framework       []reach.Result
 	TotalCVEs       int
@@ -401,13 +410,17 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 				Status:   r.Status,
 				Methods:  joinMethods(r.Methods),
 				Source:   sourceLabel(r),
+				Reasons:  joinReasons(r.Reasons, r.ModelGaps),
 			})
 		}
 		if len(cve.Affected) == 0 {
 			data.Rows = append(data.Rows, Row{
 				CVE: r.CVE, Severity: sev, Status: r.Status,
-				Methods: joinMethods(r.Methods), Source: sourceLabel(r),
+				Methods: joinMethods(r.Methods), Source: sourceLabel(r), Reasons: joinReasons(r.Reasons, r.ModelGaps),
 			})
+		}
+		if showPerInstance(r) {
+			data.PerInstance = append(data.PerInstance, r)
 		}
 
 		if r.Note != "" {
@@ -576,4 +589,54 @@ func severityLabel(raw string) string {
 		return "unknown"
 	}
 	return raw
+}
+
+// joinReasons renders reason codes; MODEL_INCOMPLETE is followed by the
+// relevant gap counts by kind, e.g. "(reflection 12, callback 1)".
+func joinReasons(rs []findings.ReasonCode, gaps map[string]int) string {
+	parts := make([]string, len(rs))
+	for i, r := range rs {
+		parts[i] = "`" + string(r) + "`"
+		if r == findings.ModelIncomplete && len(gaps) > 0 {
+			parts[i] += " (" + GapCounts(gaps) + ")"
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+// GapCounts renders model-gap counts by kind in sorted kind order.
+func GapCounts(gaps map[string]int) string {
+	kinds := make([]string, 0, len(gaps))
+	for k := range gaps {
+		kinds = append(kinds, k)
+	}
+	sort.Strings(kinds)
+	parts := make([]string, len(kinds))
+	for i, k := range kinds {
+		parts[i] = fmt.Sprintf("%s %d", k, gaps[k])
+	}
+	return strings.Join(parts, ", ")
+}
+
+// showPerInstance: several instances, or an instance finding that says
+// more than the advisory row already does (a note, or another reason).
+func showPerInstance(r reach.Result) bool {
+	if len(r.Findings) > 1 {
+		return true
+	}
+	onRow := map[findings.ReasonCode]bool{}
+	for _, c := range r.Reasons {
+		onRow[c] = true
+	}
+	for _, f := range r.Findings {
+		if f.Note != "" {
+			return true
+		}
+		for _, c := range f.Reasons {
+			if !onRow[c] {
+				return true
+			}
+		}
+	}
+	return false
 }

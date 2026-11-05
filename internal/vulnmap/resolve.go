@@ -26,6 +26,35 @@ type Entry struct {
 	// advisory text alone (EvidenceAdvisory).
 	Model    string `json:"model,omitempty"`
 	Evidence string `json:"evidence,omitempty"`
+	// Role/Coverage/Review are the mapping's structure (CVE:F1b,
+	// docs/RESULTS_CONTRACT.MD): manual entries carry what
+	// vuln_methods.yaml declares; a diff mapping is vulnerable/partial/
+	// unreviewed (methods changed by a fix are never assumed complete);
+	// an LLM mapping is vulnerable/unknown/unreviewed. Empty in an entry
+	// read from an older cache file; WithDefaults fills it in.
+	Role     string `json:"role,omitempty"`
+	Coverage string `json:"coverage,omitempty"`
+	Review   string `json:"review,omitempty"`
+}
+
+// WithDefaults fills Role/Coverage/Review from Source when they are empty.
+func (e Entry) WithDefaults() Entry {
+	switch e.Source {
+	case SourceDiff:
+		e.Role, e.Coverage, e.Review = orDefault(e.Role, RoleVulnerable), orDefault(e.Coverage, CoveragePartial), orDefault(e.Review, ReviewUnreviewed)
+	case SourceLLM:
+		e.Role, e.Coverage, e.Review = orDefault(e.Role, RoleVulnerable), orDefault(e.Coverage, CoverageUnknown), orDefault(e.Review, ReviewUnreviewed)
+	case SourceManual:
+		e.Coverage, e.Review = orDefault(e.Coverage, CoveragePartial), orDefault(e.Review, ReviewReviewed)
+	}
+	return e
+}
+
+func orDefault(v, d string) string {
+	if v == "" {
+		return d
+	}
+	return v
 }
 
 const resolveWorkers = 8
@@ -33,7 +62,10 @@ const resolveWorkers = 8
 // Resolver maps CVEs to vulnerable methods using the manual table first, a
 // GitHub fix-commit diff second, and (when LLM is set) an LLM third.
 type Resolver struct {
-	Manual     map[string][]string
+	Manual map[string][]string
+	// ManualMeta is each manual entry's role/coverage/review
+	// (LoadManualMeta); nil leaves the legacy defaults.
+	ManualMeta map[string]MappingMeta
 	HTTPClient *http.Client
 	Cache      *httpcache.Cache
 
@@ -68,7 +100,8 @@ func NewResolver(manual map[string][]string, cache *httpcache.Cache) *Resolver {
 func (r *Resolver) Resolve(ctx context.Context, cve cves.CVE) (Entry, bool, error) {
 	for _, id := range append([]string{cve.ID}, cve.Aliases...) {
 		if methods, ok := r.Manual[id]; ok && len(methods) > 0 {
-			return Entry{Methods: methods, Source: SourceManual}, true, nil
+			meta := r.ManualMeta[id]
+			return Entry{Methods: methods, Source: SourceManual, Role: meta.Role, Coverage: meta.Coverage, Review: meta.Review}.WithDefaults(), true, nil
 		}
 	}
 
@@ -78,7 +111,7 @@ func (r *Resolver) Resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 	}
 	if len(methods) > 0 {
 		sort.Strings(methods)
-		return Entry{Methods: methods, Source: SourceDiff}, true, nil
+		return Entry{Methods: methods, Source: SourceDiff}.WithDefaults(), true, nil
 	}
 
 	if r.LLM == nil {

@@ -53,7 +53,12 @@ identifiable version) go to the coverage section, never under an invented adviso
 
 Stable, machine-readable codes (`internal/findings`). Once emitted they are part of the
 output contract: never renamed, never reused for another meaning; a superseded code is
-deprecated. CVE:F0 defines them; nothing sets them yet.
+deprecated. CVE:F0 defines them. Since CVE:F1b, `METHOD_NOT_FOUND`, `CLASSPATH_CONFLICT`,
+`MAPPING_PARTIAL`, `MAPPING_ENTRYPOINT_ONLY` and `MODEL_INCOMPLETE` are emitted (v1 `reasons`);
+`VERSION_UNKNOWN`, `SOURCE_UNAVAILABLE` and `RUNTIME_UNSUPPORTED` are not set yet.
+`MAPPING_PARTIAL` on v1 qualifies `NOT_REACHABLE` without changing it (F1b, "option B"): every
+mapping today is partial, so making it `UNKNOWN` would erase the state; v2 carries coverage as
+its own axis.
 
 | Code | Axis | Meaning | Example |
 |---|---|---|---|
@@ -82,6 +87,17 @@ deprecated. CVE:F0 defines them; nothing sets them yet.
   gaps. Global gaps are reported once per run; relevant gaps per finding.
 - The relevance rule is deliberately conservative and will be measured; it is not
   assumed to be right without the baseline comparison (§7).
+- **Measured (CVE:F1b, 2026-11-05) and amended to report-only.** Gap sites: unresolved
+  reflection `Method#invoke`/`Constructor#newInstance` and `MethodHandle#invoke`
+  (unbounded), unresolved callback arguments (bounded by the callback interface's subtypes),
+  unresolved ServiceLoader load/consumption sites (bounded by the registered providers).
+  Reachable sites: 424 on petclinic (376 unbounded), 526 on WebGoat (456 unbounded). The rule
+  as written applies to **every** `NOT_REACHABLE` row (19/19, 12/12); with unbounded sites
+  ignored it still covers 18/19 and 11/12. A rule that covers every case carries no
+  information, so in F1 a relevant gap **does not change the verdict**: the finding keeps
+  `NOT_REACHABLE` and adds `MODEL_INCOMPLETE` with the gap counts by kind (v1 `model_gaps`).
+  The `UNKNOWN` form of the rule waits until gap resolution (REFLECTION, DYNAMIC_LINKAGE,
+  ASYNC_CALLBACKS) makes it selective; control case ARIADNE-TEST-0004 records that target.
 
 ## 5. JSON compatibility
 

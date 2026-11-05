@@ -7,6 +7,7 @@ import (
 
 	"ariadne/internal/callgraph"
 	"ariadne/internal/cves"
+	"ariadne/internal/findings"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
 	"ariadne/internal/vulnmap"
@@ -182,15 +183,16 @@ func TestAnalyze_unknownWithNoVulnmapEntry(t *testing.T) {
 	}
 }
 
-func TestAnalyze_unmatchedMethodIsNotReachable(t *testing.T) {
+func TestAnalyze_unmatchedMethodIsMethodNotFound(t *testing.T) {
 	e, _, _ := buildEngine(t)
 	// A vulnmap entry that names a method nowhere in this universe
-	// (neither declared nor called) must not panic and must be
-	// NOT_REACHABLE, not UNKNOWN (ariadne *does* have a mapping for the
-	// CVE; it just can't find the method in this app's graph).
+	// (neither declared nor called) must not panic. Before CVE:F1b this
+	// was NOT_REACHABLE; the results contract (docs/RESULTS_CONTRACT.MD §2)
+	// separates "method not found" from "no path": UNKNOWN with
+	// METHOD_NOT_FOUND.
 	r := analyzeOne(t, e, []string{"com.example.NoSuchClass#noSuchMethod"})
-	if r.Status != StatusNotReachable {
-		t.Fatalf("Status = %q, want NOT_REACHABLE", r.Status)
+	if r.Status != StatusUnknown || len(r.Reasons) != 1 || r.Reasons[0] != findings.MethodNotFound {
+		t.Fatalf("Status = %q reasons %v, want UNKNOWN [METHOD_NOT_FOUND]", r.Status, r.Reasons)
 	}
 }
 

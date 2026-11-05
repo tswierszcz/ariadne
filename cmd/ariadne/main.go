@@ -650,6 +650,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("loading vuln_methods.yaml: %w", err)
 	}
 	resolver := vulnmap.NewResolver(manual, cache)
+	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
+		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)
+	}
 	var llmSrc *vulnmap.LLMSource
 	if cfg.llm {
 		llmCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "llm"), cfg.offline)
@@ -709,6 +712,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	} else {
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	}
+	engine.SetComponents(components) // CVE:F1b: findings per affected component instance
+	gapSites := collectGapSites(h, gapInputs{
+		reflectInvokes: resolvedReflectInvokes, newInstances: resolvedReflectNewInstances, handles: resolvedHandles,
+		callbackSites: callbackSites, callbacks: resolvedCallbacks,
+		loadSites: svcLoadSites, consumptions: svcConsumptionSites, registrations: svcRegs,
+	})
+	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
+	reachableGaps, unboundedGaps := engine.ReachableGaps()
+	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)
 	webAssets := map[string]bool{}
 	for _, dj := range depJars {
 		if dj.WebAssetsOnly && dj.GAV != nil {
@@ -804,6 +816,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		ModelEdges:         g.ModelEdgeCount(),
 		UnresolvedDyn:      g.UnresolvedDynamicCount(),
 		UnresolvedOwner:    g.UnresolvedOwnerCount(),
+		GapSites:           len(gapSites),
+		GapsReachable:      reachableGaps,
+		GapsUnbounded:      unboundedGaps,
 		DepsTotal:          len(depJars),
 		DepsIdentified:     identified,
 		UnidentifiedJar:    unidentified,

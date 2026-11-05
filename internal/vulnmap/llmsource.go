@@ -125,7 +125,7 @@ func (r *Resolver) resolveFromLLM(ctx context.Context, cve cves.CVE) (Entry, boo
 		return Entry{}, false, nil
 	}
 	s.record(func(st *LLMStats) { st.Mapped++; st.Dropped += dropped }, "")
-	return Entry{Methods: methods, Source: SourceLLM, Model: s.Config.Model, Evidence: evidence}, true, nil
+	return Entry{Methods: methods, Source: SourceLLM, Model: s.Config.Model, Evidence: evidence}.WithDefaults(), true, nil
 }
 
 // llmCommitDiffs fetches (through the shared HTTP cache, so normally a hit

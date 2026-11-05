@@ -4,6 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"ariadne/internal/cves"
@@ -243,4 +246,50 @@ func mustCache(t *testing.T) *httpcache.Cache {
 		t.Fatalf("httpcache.New: %v", err)
 	}
 	return c
+}
+
+// TestLoadManualMeta_embeddedTable: every embedded entry carries the
+// CVE:F0 audit's role and coverage (38 entry points, 1 sink, none
+// complete), the list API still returns the same methods, and the legacy
+// list form keeps its defaults.
+func TestLoadManualMeta_embeddedTable(t *testing.T) {
+	meta, err := LoadManualMeta("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	methods, err := LoadManual("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta) != 39 || len(methods) != 39 {
+		t.Fatalf("entries meta=%d methods=%d, want 39", len(meta), len(methods))
+	}
+	roles := map[string]int{}
+	for id, m := range meta {
+		roles[m.Role]++
+		if m.Coverage != CoveragePartial || m.Review != ReviewReviewed {
+			t.Errorf("%s: %+v, want partial/reviewed", id, m)
+		}
+		if len(methods[id]) == 0 {
+			t.Errorf("%s: no methods", id)
+		}
+	}
+	if roles[RoleEntrypoint] != 38 || roles[RoleSink] != 1 {
+		t.Errorf("roles = %v, want 38 entrypoint + 1 sink", roles)
+	}
+	if got := methods["CVE-2021-39144"]; len(got) != 2 || got[0] != "com.thoughtworks.xstream.XStream#fromXML" {
+		t.Errorf("XStream alias methods = %v", got)
+	}
+
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "legacy.yaml")
+	os.WriteFile(legacy, []byte("CVE-1: [a.B#m]\nCVE-2: {methods: [c.D#n], role: bogus}\n"), 0o644)
+	if _, err := LoadManualMeta(legacy); err == nil || !strings.Contains(err.Error(), "unknown role") {
+		t.Errorf("want an unknown-role error, got %v", err)
+	}
+	os.WriteFile(legacy, []byte("CVE-1: [a.B#m]\n"), 0o644)
+	lm, err := LoadManualMeta(legacy)
+	if err != nil || lm["CVE-1"] != (MappingMeta{Coverage: CoveragePartial, Review: ReviewReviewed}) {
+		t.Errorf("legacy meta = %+v (%v)", lm, err)
+	}
 }

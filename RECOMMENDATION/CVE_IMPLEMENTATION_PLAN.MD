@@ -76,7 +76,7 @@ Ustalić znaczenie nowych wyników oraz mierzalną bazę przed zmianą algorytm�
 - Zestaw kontrolny obejmuje wszystkie pięć rozszerzeń.
 - Ustalono, które stare wyniki zmienią się ze względu na ostrożniejszą semantykę, a które powinny pozostać zgodne.
 
-## F1. Model komponentów, dowodów i wyników v2 — IN_PROGRESS (F1a zrobione 2026-11-05; zob. IMPLEMENTATION_STATUS)
+## F1. Model komponentów, dowodów i wyników v2 — IN_PROGRESS (F1a, F1b zrobione 2026-11-05; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

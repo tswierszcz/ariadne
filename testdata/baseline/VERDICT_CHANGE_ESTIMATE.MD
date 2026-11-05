@@ -8,7 +8,7 @@ using `reach.matchVulnerableMethod` on the same hierarchy/graph, removed after u
 ## 1. "Method not found" reported as `NOT_REACHABLE` (contract §2)
 
 A `NOT_REACHABLE` row whose mapped methods match **no** node of the graph. Under F1 these
-become `UNKNOWN` + `METHOD_NOT_FOUND`.
+become `UNKNOWN` + `METHOD_NOT_FOUND`. Confirmed by CVE:F1b: exactly these 7 and 6 rows changed.
 
 | App | `NOT_REACHABLE` today | Method not found | Advisories |
 |---|---|---|---|
@@ -34,6 +34,11 @@ Conclusion recorded in the contract: the broad rule would turn almost every
 `NOT_REACHABLE` into `UNKNOWN` and carry no information, so F1's rule also requires the
 unresolved site to be reachable from the roots. The tighter count is measured when F1b
 implements the rule; it is not estimated here.
+
+**Measured by CVE:F1b (2026-11-05).** With the reachability condition the rule still covers
+every `NOT_REACHABLE` row that has a mapped method in the graph: 19/19 (petclinic) and 12/12
+(WebGoat); counting only sites with a bounded candidate set, 18/19 and 11/12. The rule ships
+report-only (`MODEL_INCOMPLETE` on a kept `NOT_REACHABLE`), see the contract §4.
 
 ## 3. What should stay compatible
 

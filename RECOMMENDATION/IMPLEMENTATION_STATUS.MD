@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: IN_PROGRESS (F1a zrobione 2026-11-05); F2–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". Brak nowej funkcji dla użytkownika. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: IN_PROGRESS (F1a, F1b zrobione 2026-11-05; F1c — `-json-format v2` — zostało); F2–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -1848,6 +1848,79 @@ Przy dodawaniu kolejnego wpisu zapisz:
   instancja, kody powodów w wynikach (`METHOD_NOT_FOUND`,
   `MAPPING_ENTRYPOINT_ONLY`, `CLASSPATH_CONFLICT`) i reguła luk modelu
   (kontrakt §4); potem F1c (`-json-format v2`).
+
+### CVE:F1b — strukturalne mapowania, kody powodów, ustalenia per instancja, reguła luk — DONE for this slice; CVE:F1 IN_PROGRESS (2026-11-05)
+
+- **Zakres zatwierdzony:** zadania F1.4, F1.5 (bez eksportu v2), F1.10
+  (agregacja v1) planu CVE i reguła luk kontraktu §4. Decyzja w trakcie
+  (użytkownik, po pomiarze): reguła luk **report-only**.
+- **Zrealizowane:**
+  1. `vuln_methods.yaml`: forma obiektowa `{methods, role, coverage,
+     review}` obok listy (lista = partial/reviewed); walidacja wartości;
+     39 wpisów z rolami wg audytu F0 (entrypoint/sink, wszystkie
+     partial). `vulnmap.Entry` niesie `Role/Coverage/Review`;
+     `WithDefaults`: diff → vulnerable/partial/unreviewed, LLM →
+     vulnerable/unknown/unreviewed (także wpisy ze starego cache).
+  2. `reach`: `Result.Reasons` (v1, addytywne), `InstanceFinding` per
+     dotknięta instancja komponentu (CVE:F1a). Węzeł przypisany do
+     instancji klasy deklarującej metodę; kopia wybrana z innego jara,
+     gdy dotknięta instancja ma własną przesłoniętą kopię, nie jest jej
+     dowodem (`CLASSPATH_CONFLICT`). Agregacja §5: pozytywna ścieżka
+     wygrywa, w przeciwnym razie nierozstrzygnięta instancja daje
+     `UNKNOWN` (nigdy nie znika pod NOT_REACHABLE). `METHOD_NOT_FOUND` →
+     `UNKNOWN`; `MAPPING_ENTRYPOINT_ONLY` z roli; `MAPPING_PARTIAL` na
+     NOT_REACHABLE (opcja B: werdykt zachowany, v2 niesie kompletność).
+  3. Reguła luk: `cmd/ariadne/gaps.go` zbiera nierozwiązane miejsca
+     (refleksja invoke/newInstance i MethodHandle — nieograniczone;
+     callback — podtypy interfejsu callbacku; ServiceLoader —
+     zarejestrowani dostawcy), `Engine.SetGaps` zostawia osiągalne z
+     korzeni (przebieg FRAMEWORK). Istotna luka na NOT_REACHABLE dodaje
+     `MODEL_INCOMPLETE` i `model_gaps` (liczby wg rodzaju), werdykt
+     bez zmian. CLI: linia `model gaps:`; raport: nagłówek, kolumna
+     Reasons, sekcja "Findings per component instance".
+- **Pomiar reguły luk (powód report-only):** osiągalne miejsca 424
+  (376 nieograniczonych) petclinic, 526 (456) WebGoat. Reguła jak w
+  kontrakcie: 19/19 i 12/12 NOT_REACHABLE → UNKNOWN (NOT_REACHABLE = 0);
+  tylko miejsca ograniczone: 18/19 i 11/12. Etykieta na wszystkim nic
+  nie rozróżnia; kontrakt §4 poprawiony, ARIADNE-TEST-0004 zachowuje
+  docelową formę `UNKNOWN` z adnotacją `v1`.
+- **Weryfikacja:** `internal/reach`: `TestContractCases` (0001–0003,
+  0007, 0008, dwie instancje), `TestModelGapRule` (nieograniczona,
+  ograniczona do dotkniętej / innej instancji, nieosiągalne miejsce,
+  pozytywna ścieżka), `TestAggregateNeverHidesUnresolvedInstance`;
+  `internal/vulnmap` (forma obiektowa, walidacja); `internal/report`
+  (`TestJoinReasonsWithGaps`, `TestShowPerInstance`). Mutacje (wyłączona
+  agregacja §5; `relevantGaps` zawsze puste) — testy padają. `go vet
+  ./...`, `go test ./...` — PASS. Offline na baseline'ie CVE:F0
+  (`-profile spring`): zmiany wyłącznie oczekiwane — petclinic 7
+  NOT_REACHABLE → UNKNOWN/`METHOD_NOT_FOUND`, WebGoat 6 (dokładnie
+  szacunek F0); 19/12 NOT_REACHABLE z `MAPPING_PARTIAL,MODEL_INCOMPLETE`;
+  `MAPPING_ENTRYPOINT_ONLY` na 1 (petclinic) / 37 (WebGoat) pozytywnych
+  wierszach; wiersze REACHABLE/FRAMEWORK poza `reasons` bajtowo zgodne z
+  baseline'em (ścieżki, wejścia). Drugi przebieg WebGoat: `results.json`
+  bajtowo identyczny. Przykład per instancja: CVE-2023-6378
+  logback-classic NOT_REACHABLE, logback-core FRAMEWORK — osobne wyniki.
+- **Kryteria F1 a ten wycinek:** "dwie instancje tego samego komponentu
+  mają osobne wyniki i dowody" — tak (raport; eksport v2 to F1c);
+  "losowa kolejność odczytu nie zmienia wybranej klasy" — G1/F1a;
+  "v2 nie miesza niepewności mapowania z osiągalnością" — F1c;
+  "uzasadnione zmiany werdyktów opisane" — tak (wyżej, README, kontrakt).
+- **Dokumentacja:** `docs/RESULTS_CONTRACT.MD` (§3 emitowane kody, opcja
+  B; §4 pomiar i report-only), `docs/SUPPORT.MD`, README (tabela
+  statusów, `vuln_methods.yaml`, pola `reasons`/`model_gaps`), FAQ
+  (statusy), `testdata/baseline/VERDICT_CHANGE_ESTIMATE.MD` (pomiar),
+  `testdata/cve-control/cases.yaml` (pole `v1` dla 0004, 0005), ten
+  rejestr. Baseline nie był regenerowany (pozostaje odniesieniem F0).
+- **Ograniczenia:** reguła luk nie zmienia werdyktu, dopóki rozwiązywanie
+  refleksji/MethodHandle nie zawęzi kandydatów; ograniczenia callbacków
+  (wszystkie podtypy interfejsu) i ServiceLoadera (wszyscy dostawcy) są
+  szerokie. `VERSION_UNKNOWN`, `SOURCE_UNAVAILABLE`, `RUNTIME_UNSUPPORTED`
+  nieustawiane. Węzeł spoza dotkniętej instancji, ale z pokrewnego
+  artefaktu (np. advisory na `spring-boot-starter-web`, kod w
+  `spring-beans`), nadal się liczy, z adnotacją.
+- **Następny krok (wymaga zgody):** CVE:F1c — `-json-format v2`
+  (komponenty, ustalenia per instancja, pokrycie, odwołanie do
+  snapshotu) i eksport v1 z v2.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
@@ -4299,7 +4372,8 @@ Przy dodawaniu kolejnego wpisu zapisz:
    kandydatury: dalsze modele B3, FRAMEWORKS:F3, ASYNC_CALLBACKS:A3,
    CVE:F0–F1 (wpływ luk na werdykt), GRAPH_PRECISION (RTA; odblokowałoby
    REFLECTION:R3). **CVE:F0 zrobione 2026-11-05 (kontrakt)**, CVE:F1a (model
-   komponentów) zrobione — następny krok w tym obszarze: CVE:F1b.
+   komponentów) i CVE:F1b (kody powodów, ustalenia per instancja, reguła
+   luk report-only) zrobione — następny krok w tym obszarze: CVE:F1c.
 3. Zaproponuj najbliższą wykonalną fazę lub minimalny wspólny kontrakt, przedstaw zakres, kolejność i priorytety, a następnie zaczekaj na wyraźną zgodę użytkownika. Do tego czasu wykonuj tylko przegląd do odczytu.
 4. Po zatwierdzeniu wykonaj rezultat fazy, jego weryfikację i aktualizację dokumentacji. Jeżeli jest to faza kontraktowa, nie oznaczaj przez to funkcji jako zaimplementowanej.
 

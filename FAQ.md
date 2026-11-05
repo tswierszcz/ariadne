@@ -606,7 +606,16 @@ which is not the same as safe. (A merely empty jar does not count: Maven
 aggregators like `spring-boot-starter-web` are empty too, and Spring4Shell
 is filed against exactly that one.) Then: no entry from step 6 → `UNKNOWN`. Otherwise:
 matched nodes visited in search 1 → `REACHABLE` (the shortest such
-path). Visited only in search 2 → `FRAMEWORK`. Neither → `NOT_REACHABLE`.
+path). Visited only in search 2 → `FRAMEWORK`. Neither → `NOT_REACHABLE`
+— unless no mapped method exists in the graph at all, which is `UNKNOWN`
+with `METHOD_NOT_FOUND` (CVE:F1b; "method not found" is not "no path").
+The advisory is evaluated per affected component instance and aggregated;
+the instance whose own copy of a class lost to another jar's copy gets
+`CLASSPATH_CONFLICT` instead of borrowing that copy's path. Why are model
+gaps only an annotation (`MODEL_INCOMPLETE`) and not `UNKNOWN`? Because,
+measured, hundreds of reachable unresolved reflection sites in Spring have
+no bounded target set, so the rule applied to every `NOT_REACHABLE` row
+of both reference apps — a label on everything distinguishes nothing.
 
 **Path and "entry call":** the BFS remembers, for every node, which node
 it was first reached from (a parent pointer) — reconstructing a path is

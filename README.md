@@ -260,7 +260,14 @@ For each CVE, in priority order:
 
 1. **The manual table** (`internal/vulnmap/vuln_methods.yaml`, embedded
    in the binary; override with `-vuln-methods`). Matched by the CVE's
-   own id or any of its aliases. This always wins when present.
+   own id or any of its aliases. This always wins when present. An entry
+   is either the legacy list of `"Class#method"` strings or (CVE:F1b) an
+   object `{methods: [...], role: vulnerable|entrypoint|sink, coverage:
+   complete_under_declared_assumptions|partial|unknown, review:
+   reviewed|unreviewed}`; the list form means partial and reviewed. An
+   `entrypoint` role adds `MAPPING_ENTRYPOINT_ONLY` to the result;
+   diff-derived mappings are vulnerable/partial/unreviewed, LLM ones
+   vulnerable/unknown/unreviewed.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only `.java` files under a `src/main/` path
@@ -311,8 +318,8 @@ found:
 |---|---|
 | `REACHABLE` | Found in pass 1: a path exists that never has to pass *through* framework-internal code to get there. The shortest such path is recorded, along with the first app → dependency edge on it (the "entry call"). |
 | `FRAMEWORK` | Found only in pass 2: the only path runs through framework code the static graph can't follow past. Needs manual review. |
-| `NOT_REACHABLE` | vulnmap has methods for this CVE, but neither pass ever visits any of them. This currently includes the case where **none of the mapped methods exists in the analyzed graph** (e.g. a diff-derived method absent under that name in the analyzed version) — on the reference apps 7 of 26 (petclinic) and 6 of 18 (WebGoat) `NOT_REACHABLE` rows; the results contract ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD), CVE:F0) separates the two and CVE:F1 will report them as `UNKNOWN`/`METHOD_NOT_FOUND`. Explicit model gaps do not yet affect this verdict. |
-| `UNKNOWN` | vulnmap has no entry for this CVE at all. |
+| `NOT_REACHABLE` | vulnmap has methods for this CVE, at least one of them exists in the analyzed graph, but neither pass ever visits any of them. Since CVE:F1b the row carries `reasons`: `MAPPING_PARTIAL` when the mapping is not known to be complete (every mapping today), and `MODEL_INCOMPLETE` plus `model_gaps` (counts by kind) when reachable unresolved reflection/MethodHandle/callback/ServiceLoader sites could dispatch into the affected component. That gap rule is **report-only**: on the reference apps it applies to every `NOT_REACHABLE` row (19 of 19 petclinic, 12 of 12 WebGoat), so turning them into `UNKNOWN` would carry no information ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §4). Read the verdict as "no path in the model", not "safe". |
+| `UNKNOWN` | vulnmap has no entry for this CVE at all; or (CVE:F1b, with `reasons`) **none of the mapped methods exists in the analyzed graph** (`METHOD_NOT_FOUND` — e.g. a diff-derived method absent under that name in the analyzed version; 7 petclinic and 6 WebGoat rows that v1 used to report as `NOT_REACHABLE`), or the affected instance's own copy of a mapped class lost to another jar's copy under the classpath order (`CLASSPATH_CONFLICT` — a path through the other copy is not that instance's code). |
 | `NOT_APPLICABLE` | Every affected dependency is a WebJar (no `.class` file, assets under `META-INF/resources/webjars/`): client-side JavaScript/CSS a call graph cannot analyze. Checked before everything else. **Not** a verdict that the app is safe: the code runs in the browser. An empty jar alone does not qualify, since Maven aggregators such as `spring-boot-starter-web` are class-free too and CVEs filed against them (Spring4Shell) concern JVM code in other jars. |
 
 Matching a vulnmap method name (`"Class#method"`, no descriptor — matching
@@ -474,6 +481,13 @@ the same cached inputs produce **byte-for-byte identical output**
 non-determinism bug this guarantee caught and how it was fixed; the new
 `entry.kind`/`entry.basis`/`entry.pc` fields were checked for the same
 byte-identical-rerun property against real petclinic/WebGoat runs).
+CVE:F1b added two optional fields, `reasons` (stable reason codes, see
+[docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §3) and `model_gaps`
+(relevant gap counts by kind); no existing field changed. An advisory
+that affects several component instances is evaluated per instance
+(the report's "Findings per component instance" section) and aggregated
+into its one v1 row: a positive path wins, otherwise any unresolved
+instance makes the row `UNKNOWN`.
 
 ## Usage
 
