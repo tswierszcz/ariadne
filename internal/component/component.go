@@ -291,7 +291,6 @@ func shortHash(parts ...string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
-
 func (inv *Inventory) artifact(id string) *Artifact {
 	for i := range inv.Artifacts {
 		if inv.Artifacts[i].ID == id {
