@@ -133,7 +133,7 @@ func TestEmbeddedConfirmed(t *testing.T) {
 	hostJar(t, filepath.Join(deps, "fat-1.0.jar"), map[string][]byte{codecEntry: padUtf8(t, codec), hasherEntry: hasher}, "org.other:embedded:2.3")
 	inv, h := buildWithH(t, deps)
 	c := &fakeCentral{jars: map[string][]byte{"org.other:embedded:2.3": jarBytes(t, map[string][]byte{codecEntry: codec, hasherEntry: hasher})}}
-	if err := inv.ResolveEmbedded(context.Background(), c.fetch, "https://central.test", h); err != nil {
+	if err := inv.ResolveEmbedded(context.Background(), c.fetch, "https://central.test", h, nil); err != nil {
 		t.Fatal(err)
 	}
 	e := embeddedByGAV(inv, "org.other:embedded:2.3")
@@ -175,7 +175,7 @@ func TestEmbeddedNotConfirmed(t *testing.T) {
 		"org.swap:lib:1.0":   jarBytes(t, map[string][]byte{codecEntry: hasher}),
 		"org.min:lib:1.0":    jarBytes(t, map[string][]byte{codecEntry: codec, hasherEntry: hasher, "other/X.class": hasher}),
 	}}
-	if err := inv.ResolveEmbedded(context.Background(), c.fetch, "https://central.test", h); err != nil {
+	if err := inv.ResolveEmbedded(context.Background(), c.fetch, "https://central.test", h, nil); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]string{
@@ -216,7 +216,7 @@ func TestEmbeddedTwoVersions(t *testing.T) {
 	inv, h := buildWithH(t, deps)
 	ref := jarBytes(t, map[string][]byte{codecEntry: codec})
 	c := &fakeCentral{jars: map[string][]byte{"org.other:embedded:2.3": ref, "org.other:embedded:2.4": ref}}
-	if err := inv.ResolveEmbedded(context.Background(), c.fetch, "https://central.test", h); err != nil {
+	if err := inv.ResolveEmbedded(context.Background(), c.fetch, "https://central.test", h, nil); err != nil {
 		t.Fatal(err)
 	}
 	a, b := embeddedByGAV(inv, "org.other:embedded:2.3"), embeddedByGAV(inv, "org.other:embedded:2.4")

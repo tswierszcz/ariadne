@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: IN_PROGRESS (F6a DONE 2026-11-06); F7–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. Następny krok: CVE:F6b (SBOM, wersje kandydujące) albo CVE:F7. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: IN_PROGRESS (F6a DONE 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2603,6 +2603,103 @@ Przy dodawaniu kolejnego wpisu zapisz:
   wersje kandydujące / nieznane dla kandydatów `content_differs`) albo
   CVE:F7 (jawna relokacja — trzy realne przypadki `classes_absent` z
   F6a to gotowy materiał testowy).
+
+### CVE:F7a — jawna relokacja pakietów — DONE; CVE:F7 DONE dla jawnej relokacji (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** F7.1 (plik `-embedded-components`,
+  YAML, przypięty do SHA-256), F7.2 (konfiguracja builda — relokacje
+  maven-shade z `pom.xml` JAR-a), F7.3–F7.6. Poza zakresem: F7.7
+  (automatyczne odkrywanie relokacji — w planie osobny etap
+  eksperymentalny) i ASM w jruby (bez `pom.properties`, materiał dla F6b).
+- **Zrealizowane:**
+  1. `internal/relocate`: reguły `from → to` (prefiks tylko na granicy
+     pakietu, najdłuższy wygrywa, sprzeczne reguły odrzucone), nazwy
+     binarne i wewnętrzne, deskryptory (tablice, klasy wewnętrzne),
+     selektory, literały nazw klas, odwrotność, `Under`.
+  2. `classfile.FingerprintWith`: odcisk z przepisaniem nazw w
+     nagłówku, deskryptorach, referencjach puli i literałach;
+     `RelocateClassForTesting` (przepisanie Utf8 w puli, bez ASM/JDK) do
+     fixture'ów.
+  3. `internal/component`: `shadeconfig.go` (każda `<relocation>`
+     wtyczki `maven-shade-plugin`, wszystkie executions/profile, pomija
+     placeholdery/wildcardy z notatką, ignoruje inne wtyczki);
+     `declarations.go` (`LoadDeclarations` — ścisły schemat, wersja 1;
+     `applyDeclarations` — dopięcie do kandydata albo nowy kandydat
+     zadeklarowany, problemy: nieznany hash / niezgodny hash dla
+     nazwanego JAR-a). **Korekta w trakcie:** zadeklarowane reguły
+     najpierw były per kandydat; klasy jednego relokowanego komponentu
+     odwołują się do innych relokowanych pakietów tego samego JAR-a, więc
+     reguły są teraz cechą JAR-a (build-config ∪ deklaracje wszystkich
+     komponentów JAR-a). `ResolveEmbedded`: obrazy klas referencji pod
+     przeniesionymi nazwami, porównanie przez odwrotną relokację,
+     `collision` (klasa przypisana już innemu potwierdzonemu
+     kandydatowi), `relocation_conflict`; instancja z `Relocations`
+     (reguły, pod którymi są jej własne klasy, ze źródłem).
+  4. `internal/reach.matchSpecs`: dla instancji z relokacją selektory
+     mapowania dopasowywane też po przepisaniu (wariantowe też).
+  5. `cmd/ariadne`: flaga `-embedded-components`, plik w wejściach
+     snapshotu, log (potwierdzone/relokowane, notatki z pom.xml),
+     problemy deklaracji jako ostrzeżenia. v2: `components[].relocations`,
+     `embedded_candidates[].declared/relocations`,
+     `coverage.embedded_declaration_issues`. Raport: kolumna relokacji
+     (oryginał → w JAR-ze, źródło), lista niezastosowanych deklaracji.
+  6. `testdata/embedded/petclinic-ehcache.yaml` — deklaracja dla
+     ehcache-3.9.2 (Gradle Shadow, brak konfiguracji w JAR-ze).
+- **Weryfikacja:** `internal/relocate/relocate_test.go` (granica
+  prefiksu, najdłuższa reguła, deskryptory, selektory, literały,
+  odwrotność, konflikty, niepoprawne reguły),
+  `internal/component/relocation_test.go` (bez deklaracji
+  `classes_absent` z podpowiedzią; z deklaracją potwierdzony z regułą i
+  źródłem, własność klas; z `pom.xml` bez deklaracji, z ignorowaniem
+  relokacji innej wtyczki i notatką o placeholderze; zła mapa, niezgodny
+  i nieznany hash, konflikt build-config vs deklaracja, kopia
+  zminimalizowana `partial`, kolizja dwóch kandydatów, odrzucane pliki
+  deklaracji), `internal/reach/f6_test.go` `TestRelocatedInstanceFinding`
+  (aplikacja i biblioteka relokowane `reachfixture` →
+  `shaded.reachfixture`; selektor oryginalny → REACHABLE na instancji
+  osadzonej, ścieżka przez metodę relokowaną). Mutacje: brak
+  przepisania selektorów, brak odwrotnej relokacji w odcisku, relokacje
+  dowolnej wtyczki, brak kontroli kolizji, prefiks bez granicy pakietu,
+  ignorowanie hasha deklaracji — każda łapana; „zachowaj placeholdery”
+  przeżywa jako mutant równoważny (walidacja nazwy pakietu i tak je
+  odrzuca z notatką). `go vet ./...`, `go test ./...` — PASS.
+- **Prawdziwe dane** (`-profile spring`, `-json-format v2`, przed = HEAD
+  F6a, po = F7a; nowa lista GAV zmienia klucz `querybatch` OSV, więc
+  porównanie offline na kopii cache uzupełnionej raz online; do `.cache`
+  przeniesione tylko 2 nowe wpisy `querybatch`):
+  - petclinic z `-embedded-components testdata/embedded/petclinic-ehcache.yaml`:
+    `org.terracotta:offheap-store:2.5.1` 167/167 i
+    `org.terracotta:statistics:2.1` 130/130 (pakiety `statistics` i
+    `context`) potwierdzone pod `org.ehcache.shadow.org.terracotta.*`;
+    wszystkie 4 kandydaci-biblioteki ehcache potwierdzone, 0
+    niepotwierdzonych;
+  - WebGoat bez deklaracji: 2 reguły maven-shade z
+    `META-INF/maven/org.jruby/jruby-core/pom.xml`;
+    `me.qmx.jitescript:jitescript:0.4.1` potwierdzony 9/9 pod
+    `org.jruby.me.qmx.jitescript`; jnr-ffi 656/656 identycznych (było
+    644 — 12 klas odwołujących się do relokowanego ASM);
+  - advisories/ustalenia i werdykty identyczne przed/po (petclinic
+    153/160, WebGoat 164/172): żadna z nowych wersji nie ma advisory w
+    OSV; v2 bajtowo powtarzalny; offline na `.cache` — te same liczby.
+- **Kryteria F7:** relokowane klasy i deskryptory prowadzą do właściwych
+  metod w grafie — tak (test silnika); raport pokazuje nazwy oryginalne
+  i rzeczywiste oraz podstawę relokacji — tak; błędna mapa, kolizja,
+  niezgodny hash, niejednoznaczność — bez potwierdzonego mapowania —
+  tak (testy); zakres obejmuje jawną relokację, nie wszystkie shaded
+  JAR-y — tak (SUPPORT, README).
+- **Dokumentacja:** `docs/SUPPORT.MD`, README (flaga, krok rozpoznawania
+  zależności, ograniczenie „Shaded/relocated”), FAQ krok 1,
+  `docs/RESULTS_CONTRACT.MD`, szablon raportu, `cases.yaml`
+  (SHADED-JACKSON-HADOOP, 0303, 0304), nagłówek F7 w planie CVE, ten
+  rejestr.
+- **Ograniczenia:** relokacja musi być jawna; `<includes>/<excludes>` i
+  `rawString` shade nie modelowane; reguła z profilu pom.xml stosowana do
+  całego JAR-a; weryfikacja kandydatów diffu (F5b) i grounding LLM
+  szukają nazw oryginalnych; odcisk nie obejmuje adnotacji, sygnatur
+  generycznych, tablic wyjątków i switch.
+- **Następny krok (wymaga zgody):** CVE:F6b (SBOM, wersje kandydujące,
+  ASM w jruby jako przypadek bez `pom.properties`), CVE:F8 (docelowy
+  runtime/JDK) albo obszar spoza CVE z ROADMAP (np. GRAPH_PRECISION).
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

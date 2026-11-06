@@ -378,6 +378,20 @@ order:
    serialization-independent fingerprint. Only a confirmed library gets
    an instance, owns its classes and gets looked up; everything else
    stays visible as a coverage gap.
+
+   **Why only explicit relocation (CVE:F7a)?** A relocated copy has
+   none of its original class names, so "is it there, in which
+   version?" needs the map from old to new package. Where the map is
+   stated — jruby-core ships its own `pom.xml` whose maven-shade
+   configuration says `me.qmx.jitescript` → `org.jruby.me.qmx.jitescript`
+   and `org.objectweb` → `org.jruby.org.objectweb` — ariadne uses it
+   (and with it jnr-ffi's last 12 classes, which only differed by their
+   references to the relocated ASM, match too: 656 of 656). Where it is
+   not (ehcache is built with Gradle), the user can state it in an
+   `-embedded-components` file pinned to the jar's hash; ariadne still
+   checks every claim against the classes. Guessing relocations from
+   code similarity would be a heuristic without a version, so it is left
+   to a later, experimental stage.
 2. If the jar has no `pom.properties`, match the file name
    (`artifactId-version[-classifier].jar`) against the `-deps-list`
    (`ParseDepsList` has to strip ANSI color codes and the

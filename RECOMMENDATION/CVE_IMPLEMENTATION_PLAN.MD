@@ -240,7 +240,7 @@ Rozpoznawać wiele komponentów wewnątrz jednego JAR-a i oceniać je osobno.
 - Dwie kopie w różnych wersjach nie są scalane w jedno mapowanie.
 - Pominięte lub nieznane wersje są widoczne w pokryciu.
 
-## F7. Jawna relokacja pakietów
+## F7. Jawna relokacja pakietów — DONE dla jawnej relokacji (F7a, 2026-11-06: zadania 1–6; zadanie 7 — automatyczne odkrywanie — świadomie poza zakresem jako osobny etap eksperymentalny; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

@@ -15,6 +15,7 @@ import (
 	"ariadne/internal/findings"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/mavenversion"
+	"ariadne/internal/relocate"
 	"ariadne/internal/vulnmap"
 )
 
@@ -282,11 +283,7 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	}
 
 	entry = entry.WithDefaults()
-	var matched []uint32
-	for _, spec := range entry.Methods {
-		matched = append(matched, matchVulnerableMethod(e.g, e.h, spec)...)
-	}
-	matched = dedupeIDs(matched)
+	matched := e.matchSpecs(entry.Methods, e.affectedInstances(cve))
 
 	result := Result{
 		CVE: cve.ID, Status: StatusNotReachable, Methods: entry.Methods, Source: entry.Source,
@@ -338,6 +335,32 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	}
 	result.Reasons = orderedReasons(reasons)
 	return result
+}
+
+// matchSpecs matches every selector in the graph, and for an affected
+// instance whose classes were relocated (CVE:F7a) also the selector
+// rewritten by that instance's relocations — the original component's
+// method under the name it has in the artifact.
+func (e *Engine) matchSpecs(specs []string, instances []component.Instance) []uint32 {
+	var matched []uint32
+	for _, spec := range specs {
+		matched = append(matched, matchVulnerableMethod(e.g, e.h, spec)...)
+	}
+	for _, in := range instances {
+		if len(in.Relocations) == 0 {
+			continue
+		}
+		rs, err := relocate.New(in.Relocations)
+		if err != nil {
+			continue
+		}
+		for _, spec := range specs {
+			if r := rs.Selector(spec); r != spec {
+				matched = append(matched, matchVulnerableMethod(e.g, e.h, r)...)
+			}
+		}
+	}
+	return dedupeIDs(matched)
 }
 
 // classify sets result's status and path from the matched nodes over the
@@ -581,10 +604,7 @@ func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances 
 
 	var parts []Result
 	for _, key := range order {
-		var matched []uint32
-		for _, spec := range methodsOf[key] {
-			matched = append(matched, matchVulnerableMethod(e.g, e.h, spec)...)
-		}
+		matched := e.matchSpecs(methodsOf[key], groups[key])
 		var r Result
 		e.analyzePerInstance(&r, entry, matched, groups[key])
 		for _, f := range r.Findings {

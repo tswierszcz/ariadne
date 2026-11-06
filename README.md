@@ -117,6 +117,18 @@ jar/WAR/EAR) is then resolved to a Maven coordinate, in priority order:
    (`content_differs`, `partial`, `classes_absent` — e.g. relocated,
    `reference_unavailable`) and not looked up. The reference jars are
    cached; an offline run reads them from the cache.
+
+   **Relocated copies (CVE:F7a).** A library shaded under another
+   package is found when the relocation is known: from the jar's own
+   `pom.xml` (maven-shade-plugin `<relocation>` rules, read
+   automatically) or from an `-embedded-components` file (pinned to the
+   jar's SHA-256; also for a candidate without `pom.properties`). The
+   reference classes are then looked up under their relocated names and
+   compared with every relocated reference mapped back; a confirmed
+   relocated instance shows both names and the rule's source, and an
+   advisory's methods are matched under their relocated names. A wrong
+   map, contradicting rules, two candidates claiming the same classes
+   (`collision`) or a minimized copy (`partial`) never confirm anything.
 2. `-deps-list` (the output of `mvn dependency:list`), matched by file
    name (`artifactId-version[-classifier].jar`). The parser tolerates
    ANSI color codes and the ` -- module x [auto]` suffix newer versions
@@ -622,6 +634,7 @@ Flags:
 | `-deps` | no* | Directory of dependency jars. *Not needed for a fat jar/WAR/EAR, which supply their own.* |
 | `-deps-list` | no | `mvn dependency:list` output (or its Gradle equivalent, see `scripts/gradle-copy-deps.init.gradle`), used as a fallback for jars with no `pom.properties`. |
 | `-vuln-methods` | no | Override the embedded `vuln_methods.yaml`. |
+| `-embedded-components` | no | YAML file declaring components embedded in dependency jars and the package relocations they sit under, pinned to each jar's SHA-256 (CVE:F7a; example: `testdata/embedded/petclinic-ehcache.yaml`). Declarations are verified against the classes; one for a jar with another hash is reported and ignored. |
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
@@ -1053,10 +1066,13 @@ report:
   modeled.
 - **Shaded/relocated dependencies**: a library embedded with its own
   packages and its `pom.properties` is detected and assessed separately
-  (CVE:F6a); one whose classes were relocated under another package
-  (`classes_absent`), embedded without its `pom.properties`, or embedded
-  in a version other than the one its metadata declares is not — it is
-  listed as an unconfirmed candidate at most.
+  (CVE:F6a), and so is a relocated one whose relocation is explicit — in
+  the jar's own maven-shade configuration or in `-embedded-components`
+  (CVE:F7a). An unknown relocation is not discovered (`classes_absent`);
+  a library embedded without its `pom.properties` needs a declaration;
+  one embedded in a version other than the one its metadata declares is
+  `content_differs`. Diff-mapping verification (CVE:F5b) and LLM
+  grounding still look methods up under their original names.
 - **CHA over-approximates**: a virtual/interface call is treated as
   reaching every subtype that overrides it (as of JVM_GRAPH G2, matched
   by exact descriptor, not just name — so two unrelated overloads of

@@ -21,6 +21,7 @@ import (
 
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
+	"ariadne/internal/relocate"
 )
 
 // Role is an artifact's role in the analyzed input.
@@ -89,6 +90,10 @@ type Instance struct {
 	// "META-INF/maven/<group>/<artifact>" directory there.
 	HostInstance string
 	EmbeddedPath string
+	// Relocations are the package relocations under which an embedded
+	// instance's classes sit in its host (CVE:F7a): a method selector of
+	// the original component is rewritten with them.
+	Relocations []relocate.Rule
 }
 
 // Conflict is one FQCN present in several artifacts: the copy selected
@@ -112,6 +117,11 @@ type Inventory struct {
 	// Embedded are the embedded-component candidates (CVE:F6a), in
 	// artifact order; ResolveEmbedded sets their kind and status.
 	Embedded []Embedded
+	// DeclarationIssues are -embedded-components entries that did not
+	// apply (unknown jar, hash mismatch); BuildConfigNotes the shade
+	// relocations read from, or skipped in, embedded pom.xml files.
+	DeclarationIssues []string
+	BuildConfigNotes  []string
 	// ClasspathOrder documents the order assumption conflicts follow.
 	ClasspathOrder string
 	byJar          map[string]string // run path -> instance ID

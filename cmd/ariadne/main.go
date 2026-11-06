@@ -51,6 +51,7 @@ type config struct {
 	deps            string
 	depsList        string
 	vulnMethods     string
+	embeddedComps   string // -embedded-components: declared embedded components and relocations (CVE:F7a)
 	out             string
 	jsonOut         string
 	jsonFormat      string
@@ -102,6 +103,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.deps, "deps", "", "directory of dependency jars (not needed for a Spring Boot fat jar, which carries its own)")
 	fs.StringVar(&cfg.depsList, "deps-list", "", "optional `mvn dependency:list` output, used as a fallback when a jar has no pom.properties")
 	fs.StringVar(&cfg.vulnMethods, "vuln-methods", "", "override vuln_methods.yaml (default: ariadne's embedded table)")
+	fs.StringVar(&cfg.embeddedComps, "embedded-components", "", "YAML file declaring components embedded in dependency jars and their package relocations, pinned to each jar's SHA-256 (CVE:F7a); every declaration is verified against the classes")
 	fs.StringVar(&cfg.profile, "profile", "auto", "which profile's framework knowledge to use: auto, generic, spring, or a name from -profile-file")
 	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
 	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default) or "profile" (only the active profile's entry points: annotated methods/classes, main)`)
@@ -695,6 +697,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	sr.attach(cache, "main")
 	cache.SetPolicy(httpcache.Policy{TTL: cfg.dataTTL, MaxAge: cfg.maxDataAge, Refresh: cfg.refresh, AllowStale: cfg.allowStale})
 
+	embeddedDecls, err := component.LoadDeclarations(cfg.embeddedComps)
+	if err != nil {
+		return err
+	}
 	// CVE:F6a: embedded components, confirmed by their classes against
 	// the Maven Central reference jar of the declared version.
 	if err := components.ResolveEmbedded(ctx, func(ctx context.Context, url string) ([]byte, error) {
@@ -703,11 +709,23 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			return nil, err
 		}
 		return httpcache.Fetch(http.DefaultClient, cache, httpcache.Key("GET", url), httpcache.KindForURL(url), req)
-	}, cfg.centralURL, h); err != nil {
+	}, cfg.centralURL, h, embeddedDecls); err != nil {
 		return fmt.Errorf("resolving embedded components: %w", err)
 	}
 	embConfirmed, embUnconfirmed, embModules := components.EmbeddedCounts()
-	log("embedded components (CVE:F6a): %d confirmed by their classes, %d unconfirmed (not looked up), %d modules of their host", embConfirmed, embUnconfirmed, embModules)
+	embRelocated := 0
+	for _, e := range components.Embedded {
+		if e.Status == component.EmbeddedConfirmed && len(e.Relocations) > 0 {
+			embRelocated++
+		}
+	}
+	log("embedded components (CVE:F6a/F7a): %d confirmed by their classes (%d relocated), %d unconfirmed (not looked up), %d modules of their host", embConfirmed, embRelocated, embUnconfirmed, embModules)
+	for _, n := range components.BuildConfigNotes {
+		log("embedded components: %s", n)
+	}
+	for _, issue := range components.DeclarationIssues {
+		warnings = append(warnings, "-embedded-components: "+issue)
+	}
 
 	var gavs []input.GAV
 	seenGAV := map[input.GAV]bool{}

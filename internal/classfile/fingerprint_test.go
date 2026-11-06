@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"os"
 	"testing"
+
+	"ariadne/internal/relocate"
 )
 
 // appendUtf8 returns b with one unused Utf8 constant appended to the
@@ -108,13 +110,13 @@ func TestCodeFingerprintNormalizesWideForms(t *testing.T) {
 	short := []byte{0x12, 0x02, 0xc6, 0x00, 0x03, 0xb1}
 	// ldc_w #2; ifnull → return (pc 3 + 3): another offset, same target
 	wide := []byte{0x13, 0x00, 0x02, 0xc6, 0x00, 0x03, 0xb1}
-	a, _ := cf.codeFingerprint(short)
-	b, _ := cf.codeFingerprint(wide)
+	a, _ := cf.codeFingerprint(short, relocate.Set{})
+	b, _ := cf.codeFingerprint(wide, relocate.Set{})
 	if a != b {
 		t.Errorf("ldc vs ldc_w:\n%s\n%s", a, b)
 	}
 	other := []byte{0x12, 0x02, 0xc6, 0x00, 0x03, 0xb0} // areturn instead of return
-	if c, _ := cf.codeFingerprint(other); c == a {
+	if c, _ := cf.codeFingerprint(other, relocate.Set{}); c == a {
 		t.Errorf("different code, same fingerprint")
 	}
 }

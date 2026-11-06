@@ -1,5 +1,10 @@
 package classfile
 
+import (
+	"fmt"
+	"strings"
+)
+
 // PoolEntry is one constant-pool entry, exposed only so a test in another
 // package can build a *ClassFile whose DecodeLocalOps/ExtractCalls
 // resolve real references (ldc of a string/class, methodref, fieldref)
@@ -76,4 +81,49 @@ func NewClassFileForTesting(thisClass string, entries []PoolEntry) *ClassFile {
 		}
 	}
 	return &ClassFile{ThisClass: thisClass, pool: p}
+}
+
+// RelocateClassForTesting returns class file b with every occurrence of
+// the internal package prefix from+"/" replaced by to+"/" in its Utf8
+// constants — class names, descriptors and signatures — which is what a
+// shading tool's relocation does (CVE:F7a fixtures; no ASM, no JDK).
+// The constant pool is rewritten in place, so indices do not move.
+func RelocateClassForTesting(b []byte, from, to string) ([]byte, error) {
+	if len(b) < 10 {
+		return nil, fmt.Errorf("class file too short")
+	}
+	count := int(uint16(b[8])<<8 | uint16(b[9]))
+	out := append([]byte(nil), b[:10]...)
+	pos := 10
+	for i := 1; i < count; i++ {
+		if pos >= len(b) {
+			return nil, fmt.Errorf("truncated constant pool")
+		}
+		tag := b[pos]
+		var n int
+		switch tag {
+		case tagUtf8:
+			l := int(uint16(b[pos+1])<<8 | uint16(b[pos+2]))
+			s := string(b[pos+3 : pos+3+l])
+			s = strings.ReplaceAll(s, from+"/", to+"/")
+			out = append(out, tagUtf8, byte(len(s)>>8), byte(len(s)))
+			out = append(out, s...)
+			pos += 3 + l
+			continue
+		case tagInteger, tagFloat, tagFieldref, tagMethodref, tagInterfaceMethodref, tagNameAndType, tagDynamic, tagInvokeDynamic:
+			n = 5
+		case tagLong, tagDouble:
+			n = 9
+			i++
+		case tagClass, tagString, tagMethodType, tagModule, tagPackage:
+			n = 3
+		case tagMethodHandle:
+			n = 4
+		default:
+			return nil, fmt.Errorf("unknown constant pool tag %d", tag)
+		}
+		out = append(out, b[pos:pos+n]...)
+		pos += n
+	}
+	return append(out, b[pos:]...), nil
 }

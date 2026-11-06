@@ -1,0 +1,19 @@
+# CVE:F7a: components embedded and relocated in petclinic's ehcache-3.9.2.jar
+# (built with Gradle Shadow, so the jar carries no shade configuration).
+# Read from the jar: its META-INF/maven/org.terracotta/{offheap-store,statistics}
+# pom.properties, and the classes under org.ehcache.shadow.org.terracotta.
+version: 1
+jars:
+  - sha256: a62b90116a8990b6cf5f30a02e0bcc1455cda2c13c74da2eb5c73258b83d23cc
+    name: ehcache-3.9.2.jar
+    components:
+      - gav: org.terracotta:offheap-store:2.5.1
+        relocations:
+          - from: org.terracotta.offheapstore
+            to: org.ehcache.shadow.org.terracotta.offheapstore
+      - gav: org.terracotta:statistics:2.1
+        relocations:
+          - from: org.terracotta.statistics
+            to: org.ehcache.shadow.org.terracotta.statistics
+          - from: org.terracotta.context
+            to: org.ehcache.shadow.org.terracotta.context

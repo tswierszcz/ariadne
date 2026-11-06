@@ -7,6 +7,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"ariadne/internal/relocate"
 )
 
 // Fingerprint is a hash of a class's content that does not depend on how
@@ -21,6 +23,14 @@ import (
 // Code (annotations, signatures, debug tables), exception tables and
 // switch tables (only their opcode is hashed).
 func Fingerprint(cf *ClassFile) (string, error) {
+	return FingerprintWith(cf, relocate.Set{})
+}
+
+// FingerprintWith is Fingerprint with every class name (header,
+// descriptors, constant-pool references, class-name string literals)
+// rewritten by rs first (CVE:F7a): a relocated class fingerprinted with
+// the inverse relocation equals its original.
+func FingerprintWith(cf *ClassFile, rs relocate.Set) (string, error) {
 	h := sha256.New()
 	w := func(parts ...string) {
 		for _, p := range parts {
@@ -28,14 +38,17 @@ func Fingerprint(cf *ClassFile) (string, error) {
 			h.Write([]byte{0})
 		}
 	}
-	w("class", cf.ThisClass, cf.SuperClass, fmt.Sprint(cf.AccessFlags))
-	ifs := append([]string(nil), cf.Interfaces...)
+	w("class", rs.Name(cf.ThisClass), rs.Name(cf.SuperClass), fmt.Sprint(cf.AccessFlags))
+	ifs := make([]string, len(cf.Interfaces))
+	for i, n := range cf.Interfaces {
+		ifs[i] = rs.Name(n)
+	}
 	sort.Strings(ifs)
 	w(ifs...)
 
 	fields := make([]string, len(cf.Fields))
 	for i, f := range cf.Fields {
-		fields[i] = fmt.Sprintf("%d %s %s", f.AccessFlags, f.Name, f.Descriptor)
+		fields[i] = fmt.Sprintf("%d %s %s", f.AccessFlags, f.Name, rs.Descriptor(f.Descriptor))
 	}
 	sort.Strings(fields)
 	w(fields...)
@@ -43,11 +56,11 @@ func Fingerprint(cf *ClassFile) (string, error) {
 	type mfp struct{ key, body string }
 	ms := make([]mfp, 0, len(cf.Methods))
 	for _, m := range cf.Methods {
-		body, err := cf.codeFingerprint(m.Code)
+		body, err := cf.codeFingerprint(m.Code, rs)
 		if err != nil {
 			return "", fmt.Errorf("%s#%s%s: %w", cf.ThisClass, m.Name, m.Descriptor, err)
 		}
-		ms = append(ms, mfp{fmt.Sprintf("%d %s %s", m.AccessFlags, m.Name, m.Descriptor), body})
+		ms = append(ms, mfp{fmt.Sprintf("%d %s %s", m.AccessFlags, m.Name, rs.Descriptor(m.Descriptor)), body})
 	}
 	sort.Slice(ms, func(i, j int) bool { return ms[i].key < ms[j].key })
 	for _, m := range ms {
@@ -56,7 +69,7 @@ func Fingerprint(cf *ClassFile) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func (cf *ClassFile) codeFingerprint(code []byte) (string, error) {
+func (cf *ClassFile) codeFingerprint(code []byte, rs relocate.Set) (string, error) {
 	if code == nil {
 		return "", nil
 	}
@@ -80,17 +93,17 @@ func (cf *ClassFile) codeFingerprint(code []byte) (string, error) {
 		var arg string
 		switch {
 		case op == opLdc:
-			op, arg = opLdc, cf.pool.describe(uint16(in.operand[0]))
+			op, arg = opLdc, cf.pool.describe(rs, uint16(in.operand[0]))
 		case op == 0x13 || op == 0x14: // ldc_w, ldc2_w
 			if op == 0x13 {
 				op = opLdc
 			}
-			arg = cf.pool.describe(u16(in.operand))
+			arg = cf.pool.describe(rs, u16(in.operand))
 		case op >= opGetStatic && op <= opInvokeInterface, op == opInvokeDynamic, op == opNew,
 			op == 0xbd, op == 0xc0, op == 0xc1: // anewarray, checkcast, instanceof
-			arg = cf.pool.describe(u16(in.operand))
+			arg = cf.pool.describe(rs, u16(in.operand))
 		case op == 0xc5: // multianewarray
-			arg = fmt.Sprintf("%s %d", cf.pool.describe(u16(in.operand)), in.operand[2])
+			arg = fmt.Sprintf("%s %d", cf.pool.describe(rs, u16(in.operand)), in.operand[2])
 		case (op >= opIfeqFirst && op <= opJsr) || op == opIfnull || op == opIfnonnull:
 			arg = target(in.pc, int32(int16(u16(in.operand))))
 		case op == opGotoW || op == opJsrW:
@@ -112,7 +125,7 @@ func (cf *ClassFile) codeFingerprint(code []byte) (string, error) {
 
 // describe renders a constant-pool entry by what it names, never by its
 // index.
-func (p pool) describe(idx uint16) string {
+func (p pool) describe(rs relocate.Set, idx uint16) string {
 	e, err := p.get(idx)
 	if err != nil {
 		return "?"
@@ -122,13 +135,16 @@ func (p pool) describe(idx uint16) string {
 		return "u:" + e.str
 	case tagClass:
 		n, _ := p.utf8(e.nameIndex)
-		return "c:" + n
+		if strings.HasPrefix(n, "[") {
+			return "c:" + rs.Descriptor(n)
+		}
+		return "c:" + rs.Name(n)
 	case tagString:
 		s, _ := p.utf8(e.nameIndex)
-		return "s:" + s
+		return "s:" + rs.String(s)
 	case tagMethodType:
 		s, _ := p.utf8(e.nameIndex)
-		return "mt:" + s
+		return "mt:" + rs.Descriptor(s)
 	case tagInteger:
 		return fmt.Sprintf("i:%d", int32(e.raw32))
 	case tagFloat:
@@ -138,18 +154,18 @@ func (p pool) describe(idx uint16) string {
 	case tagDouble:
 		return fmt.Sprintf("d:%x", math.Float64bits(math.Float64frombits(e.raw64)))
 	case tagFieldref, tagMethodref, tagInterfaceMethodref:
-		owner := p.describe(e.classIndex)
-		nt := p.describe(e.nameAndTypeIndex)
+		owner := p.describe(rs, e.classIndex)
+		nt := p.describe(rs, e.nameAndTypeIndex)
 		return fmt.Sprintf("r%d:%s.%s", e.tag, owner, nt)
 	case tagNameAndType:
 		n, _ := p.utf8(e.nameIndex)
 		d, _ := p.utf8(e.descriptorIndex)
-		return n + ":" + d
+		return n + ":" + rs.Descriptor(d)
 	case tagMethodHandle:
-		return fmt.Sprintf("mh%d:%s", e.referenceKind, p.describe(e.referenceIndex))
+		return fmt.Sprintf("mh%d:%s", e.referenceKind, p.describe(rs, e.referenceIndex))
 	case tagDynamic, tagInvokeDynamic:
 		// the bootstrap table index may be renumbered too: name and type only
-		return fmt.Sprintf("dyn%d:%s", e.tag, p.describe(e.nameAndTypeIndex))
+		return fmt.Sprintf("dyn%d:%s", e.tag, p.describe(rs, e.nameAndTypeIndex))
 	default:
 		return fmt.Sprintf("t%d", e.tag)
 	}
