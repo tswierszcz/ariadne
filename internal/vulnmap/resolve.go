@@ -67,7 +67,7 @@ func (e Entry) Mapped() bool { return len(e.Methods) > 0 }
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "4" // 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit
+const ResolverVersion = "5" // 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -202,7 +202,7 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 	}
 
 	if r.LLM != nil {
-		e, ok, err := r.resolveFromLLM(ctx, cve)
+		e, ok, err := r.resolveFromLLM(ctx, cve, commits)
 		if ok || err != nil {
 			return e, ok, err
 		}

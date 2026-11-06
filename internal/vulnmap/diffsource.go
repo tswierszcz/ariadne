@@ -59,8 +59,20 @@ type FixCommit struct {
 	// analyzed classes (CVE:F5b): FitPresent, FitNonePresent (none does
 	// although another commit's do — its methods are left out of the
 	// mapping), FitNoCandidates, or "" when not checked.
-	ReleaseFit string    `json:"release_fit,omitempty"`
-	Files      []FixFile `json:"files,omitempty"`
+	ReleaseFit string `json:"release_fit,omitempty"`
+	// ReleaseTag/ReleaseLine relate the commit to the analyzed release in
+	// git history (CVE:F5c): the analyzed version's tag and LineDescends,
+	// LineInRelease or LineOther; ReleaseLineReason says why the line is
+	// unknown (no tag, lookup unavailable, several analyzed versions), or
+	// is NoteOffBranchTag for a LineDescends read through an off-branch
+	// release commit.
+	ReleaseTag        string `json:"release_tag,omitempty"`
+	ReleaseLine       string `json:"release_line,omitempty"`
+	ReleaseLineReason string `json:"release_line_reason,omitempty"`
+	// Excluded says why the commit's methods are left out of the mapping
+	// (ExcludedReleaseLine, ExcludedReleaseFit); empty when they count.
+	Excluded string    `json:"excluded,omitempty"`
+	Files    []FixFile `json:"files,omitempty"`
 	// Error is why the commit's diff itself could not be obtained; such
 	// a commit contributes no methods.
 	Error string `json:"error,omitempty"`
@@ -190,12 +202,13 @@ func (r *Resolver) resolveFromDiffs(ctx context.Context, cve cves.CVE) ([]string
 		}
 		commits = append(commits, fc)
 	}
+	r.noteReleaseLine(ctx, cve, commits)
 	r.noteReleaseFit(commits)
 
 	var methods []string
 	seen := make(map[string]bool)
 	for _, fc := range commits {
-		if fc.ReleaseFit == FitNonePresent {
+		if fc.Excluded != "" {
 			continue
 		}
 		for _, f := range fc.Files {
@@ -233,10 +246,15 @@ func collapseSelectors(ms []string) []string {
 
 // noteReleaseFit sets each commit's ReleaseFit from its candidates'
 // bytecode verification. A commit none of whose candidates exists in the
-// analyzed classes is FitNonePresent — and left out of the mapping — only
-// when another commit of the same advisory has a present candidate: the
-// fix then evidently targets another release line. When no commit has
-// one, every candidate stays (the engine reports METHOD_NOT_FOUND).
+// analyzed classes is FitNonePresent only when another commit of the
+// same advisory, not already excluded by its release line, has a present
+// candidate: the fix then evidently targets another release line, and
+// it is left out of the mapping. That holds for a commit descending from
+// the analyzed release too: in a repository merged forward (Jackson,
+// Spring) the next major line descends from every older tag, so
+// "descends" does not mean "same line" (CVE:F5c). When no commit has a
+// present candidate, every candidate stays (the engine reports
+// METHOD_NOT_FOUND).
 func (r *Resolver) noteReleaseFit(commits []FixCommit) {
 	if r.Bytecode == nil {
 		return
@@ -263,16 +281,24 @@ func (r *Resolver) noteReleaseFit(commits []FixCommit) {
 		case cands == 0:
 			c.ReleaseFit = FitNoCandidates
 		case present > 0:
-			c.ReleaseFit, anyPresent = FitPresent, true
+			c.ReleaseFit = FitPresent
+			if c.Excluded == "" {
+				anyPresent = true
+			}
 		default:
 			c.ReleaseFit = FitNonePresent
 		}
 	}
-	if !anyPresent {
-		for i := range commits {
-			if commits[i].ReleaseFit == FitNonePresent {
-				commits[i].ReleaseFit = "" // nothing to compare against: no conclusion
-			}
+	for i := range commits {
+		c := &commits[i]
+		if c.ReleaseFit != FitNonePresent {
+			continue
+		}
+		switch {
+		case !anyPresent:
+			c.ReleaseFit = "" // nothing to compare against: no conclusion
+		case c.Excluded == "":
+			c.Excluded = ExcludedReleaseFit
 		}
 	}
 }
@@ -602,11 +628,7 @@ func jaccard(a, b map[string]bool) float64 {
 
 func (r *Resolver) commitMeta(ctx context.Context, commit commitRef) (commitMeta, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/commits/%s", r.GithubAPIBaseURL, commit.owner, commit.repo, commit.sha)
-	hdr := http.Header{"Accept": {"application/vnd.github+json"}, "X-Github-Api-Version": {"2022-11-28"}}
-	if r.GithubToken != "" {
-		hdr.Set("Authorization", "Bearer "+r.GithubToken)
-	}
-	b, err := r.fetch(ctx, url, hdr)
+	b, err := r.fetch(ctx, url, r.apiHeader())
 	if err != nil {
 		return commitMeta{}, err
 	}

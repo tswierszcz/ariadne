@@ -748,6 +748,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d; diff read on the post-fix side only=%d; fix commits unreadable=%d)",
 		mapped, len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM], newSideOnly, bySource["unavailable"])
+	log("fix commits vs the analyzed release (CVE:F5c): %s", releaseLineSummary(vm))
 	if llmSrc != nil {
 		st := llmSrc.Stats()
 		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode, %d previous answers reused for changed advisories",
@@ -1096,4 +1097,35 @@ func maxAgeString(d time.Duration) string {
 		return ""
 	}
 	return d.String()
+}
+
+// releaseLineSummary counts readable fix commits by release line and the
+// commits left out of mappings (CVE:F5c).
+func releaseLineSummary(vm map[string]vulnmap.Entry) string {
+	var descends, inRelease, other, unknown, exLine, exFit int
+	for _, e := range vm {
+		for _, c := range e.FixCommits {
+			if c.Error != "" {
+				continue
+			}
+			switch c.ReleaseLine {
+			case vulnmap.LineDescends:
+				descends++
+			case vulnmap.LineInRelease:
+				inRelease++
+			case vulnmap.LineOther:
+				other++
+			default:
+				unknown++
+			}
+			switch c.Excluded {
+			case vulnmap.ExcludedReleaseLine:
+				exLine++
+			case vulnmap.ExcludedReleaseFit:
+				exFit++
+			}
+		}
+	}
+	return fmt.Sprintf("descends from its tag=%d, already in it=%d, another line=%d, unknown=%d; left out of mappings: by release line=%d, by release fit=%d",
+		descends, inRelease, other, unknown, exLine, exFit)
 }

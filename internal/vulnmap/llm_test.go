@@ -95,18 +95,18 @@ func TestPromptGolden(t *testing.T) {
 		}
 	}
 
-	a, ev, err := buildUserPrompt(cve, []string{commitURL}, []commitDiff{{url: commitURL, files: keptFiles}})
+	a, ev, err := buildUserPrompt(cve, []string{commitURL}, []commitDiff{{url: commitURL, files: keptFiles}}, nil)
 	if err != nil || ev != EvidenceDiff {
 		t.Fatalf("variant A: ev=%q err=%v", ev, err)
 	}
-	b, ev, err := buildUserPrompt(cve, []string{commitURL}, []commitDiff{{url: commitURL}})
+	b, ev, err := buildUserPrompt(cve, []string{commitURL}, []commitDiff{{url: commitURL}}, nil)
 	if err != nil || ev != EvidenceAdvisory {
 		t.Fatalf("variant B: ev=%q err=%v", ev, err)
 	}
 	noRef := cve
 	noRef.References = nil
 	noRef.Details = ""
-	c, ev, err := buildUserPrompt(noRef, nil, nil)
+	c, ev, err := buildUserPrompt(noRef, nil, nil, nil)
 	if err != nil || ev != EvidenceAdvisory {
 		t.Fatalf("variant C: ev=%q err=%v", ev, err)
 	}

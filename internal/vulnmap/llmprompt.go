@@ -13,11 +13,12 @@ import (
 // promptVersion is part of every LLM cache key: bump it whenever the system
 // prompt, the user template or the answer schema changes, so stale cached
 // answers are not reused for a different prompt.
-const promptVersion = 1
+const promptVersion = 2 // 2: CVE:F5c fix_methods (both sides of the fix, release line)
 
 const (
 	maxDetailsChars = 8000
 	maxDiffChars    = 60000
+	maxFixMethods   = 80
 )
 
 //go:embed llm_system_prompt.txt
@@ -48,9 +49,12 @@ type fileDiff struct {
 	text string
 }
 
-// commitDiff is the kept (non-test .java) part of one fix commit.
+// commitDiff is the kept (non-test .java) part of one fix commit. note,
+// when set, follows the URL on its "# commit" line (CVE:F5c: a commit on
+// another release line).
 type commitDiff struct {
 	url   string
+	note  string
 	files []fileDiff
 }
 
@@ -99,6 +103,9 @@ func assembleDiff(commits []commitDiff, limit int) (text string, truncated bool)
 			continue
 		}
 		header := "# commit " + c.url + "\n"
+		if c.note != "" {
+			header = "# commit " + c.url + " (" + c.note + ")\n"
+		}
 		headerWritten := false
 		for _, f := range c.files {
 			if truncated {
@@ -161,18 +168,22 @@ type promptData struct {
 	Diff       string
 	Truncated  bool
 	CommitURLs string
+	FixMethods string
 }
 
 // buildUserPrompt renders the user message for cve. commitURLs lists every
 // fix commit the CVE links; commits holds the kept diffs of those that were
-// fetched. It returns the message and what evidence it carries.
-func buildUserPrompt(cve cves.CVE, commitURLs []string, commits []commitDiff) (prompt, evidence string, err error) {
+// fetched; fixes is the diff source's per-commit evidence (both sides of
+// the fix, CVE:F5c), rendered as <fix_methods> when it names a method. It
+// returns the message and what evidence it carries.
+func buildUserPrompt(cve cves.CVE, commitURLs []string, commits []commitDiff, fixes []FixCommit) (prompt, evidence string, err error) {
 	d := promptData{
-		ID:       cve.ID,
-		Aliases:  orNone(strings.Join(cve.Aliases, ", ")),
-		Summary:  orNone(cve.Summary),
-		Details:  orNone(truncateChars(cve.Details, maxDetailsChars)),
-		Packages: orNone(joinPackages(cve.Affected)),
+		FixMethods: renderFixMethods(fixes),
+		ID:         cve.ID,
+		Aliases:    orNone(strings.Join(cve.Aliases, ", ")),
+		Summary:    orNone(cve.Summary),
+		Details:    orNone(truncateChars(cve.Details, maxDetailsChars)),
+		Packages:   orNone(joinPackages(cve.Affected)),
 	}
 
 	diff, truncated := assembleDiff(commits, maxDiffChars)
@@ -213,4 +224,87 @@ func truncateChars(s string, n int) string {
 		return s
 	}
 	return string(r[:n]) + "\n[truncated]"
+}
+
+// publicCommitURL names a commit by its GitHub URL, whatever base URL a
+// test points the resolver at.
+func publicCommitURL(repo, sha string) string {
+	return "https://github.com/" + repo + "/commit/" + sha
+}
+
+// lineNote describes a commit's release line for the prompt.
+func lineNote(c FixCommit) string {
+	var n string
+	switch c.ReleaseLine {
+	case LineDescends:
+		n = "on the analyzed release's line (tag " + c.ReleaseTag + ")"
+	case LineInRelease:
+		n = "already contained in the analyzed release (tag " + c.ReleaseTag + ")"
+	case LineOther:
+		n = "on another release line than the analyzed release (tag " + c.ReleaseTag + ")"
+	}
+	if c.Excluded != "" {
+		if n != "" {
+			n += "; "
+		}
+		n += "not the fix of the analyzed release"
+	}
+	return n
+}
+
+var fixKindText = map[string]string{
+	FixMethodChanged: "changed by the fix (declared before it)",
+	FixMethodRemoved: "removed by the fix (declared before it only)",
+	FixMethodAdded:   "added by the fix (not in the vulnerable release)",
+}
+
+// renderFixMethods lists, per readable commit, the methods the fix
+// touched as read from the source before and after it, with whether each
+// exists in the analyzed classes. "" when no commit names a method.
+func renderFixMethods(fixes []FixCommit) string {
+	var b strings.Builder
+	n, omitted := 0, 0
+	for _, c := range fixes {
+		if c.Error != "" {
+			continue
+		}
+		var lines []string
+		for _, f := range c.Files {
+			for _, m := range f.Methods {
+				if n >= maxFixMethods {
+					omitted++
+					continue
+				}
+				n++
+				sel := m.Selector
+				if !strings.Contains(sel, "(") {
+					sel += "(" + strings.Join(m.SourceParams, ", ") + ")"
+				}
+				kind := fixKindText[m.Kind]
+				if c.Base == BaseNewSideOnly || f.NewSideOnly {
+					kind = "touched by the fix (pre-fix source unavailable)"
+				}
+				line := "- " + sel + ": " + kind
+				switch m.Bytecode {
+				case BytecodeExact, BytecodeAmbiguous, BytecodeParamMismatch:
+					line += "; present in the analyzed classes"
+				case BytecodeMethodMissing, BytecodeClassMissing:
+					line += "; not in the analyzed classes"
+				}
+				lines = append(lines, line)
+			}
+		}
+		if len(lines) == 0 {
+			continue
+		}
+		b.WriteString("# commit " + publicCommitURL(c.Repo, c.SHA))
+		if note := lineNote(c); note != "" {
+			b.WriteString(" (" + note + ")")
+		}
+		b.WriteString("\n" + strings.Join(lines, "\n") + "\n")
+	}
+	if omitted > 0 {
+		fmt.Fprintf(&b, "# [truncated: %d more methods omitted]\n", omitted)
+	}
+	return strings.TrimRight(b.String(), "\n")
 }

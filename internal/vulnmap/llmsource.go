@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 
 	"ariadne/internal/cves"
@@ -102,14 +103,18 @@ type llmRecord struct {
 // nothing. It returns an error only for fatal conditions (rejected key,
 // offline cache miss, cancelled context); every other failure is recorded
 // as a warning and yields (Entry{}, false, nil), i.e. UNKNOWN.
-func (r *Resolver) resolveFromLLM(ctx context.Context, cve cves.CVE) (Entry, bool, error) {
+//
+// fixes is the diff source's per-commit evidence (CVE:F5c): the prompt
+// shows which methods the fix changed, removed or added, and marks a
+// commit on another release line.
+func (r *Resolver) resolveFromLLM(ctx context.Context, cve cves.CVE, fixes []FixCommit) (Entry, bool, error) {
 	s := r.LLM
 
-	commitURLs, commits, err := r.llmCommitDiffs(ctx, cve)
+	commitURLs, commits, err := r.llmCommitDiffs(ctx, cve, fixes)
 	if err != nil {
 		return Entry{}, false, err
 	}
-	user, evidence, err := buildUserPrompt(cve, commitURLs, commits)
+	user, evidence, err := buildUserPrompt(cve, commitURLs, commits, fixes)
 	if err != nil {
 		return Entry{}, false, err
 	}
@@ -145,7 +150,13 @@ func (r *Resolver) resolveFromLLM(ctx context.Context, cve cves.CVE) (Entry, boo
 
 // llmCommitDiffs fetches (through the shared HTTP cache, so normally a hit
 // after source 2) every fix commit's diff and keeps its non-test .java files.
-func (r *Resolver) llmCommitDiffs(ctx context.Context, cve cves.CVE) (urls []string, commits []commitDiff, err error) {
+func (r *Resolver) llmCommitDiffs(ctx context.Context, cve cves.CVE, fixes []FixCommit) (urls []string, commits []commitDiff, err error) {
+	notes := map[string]string{} // "owner/repo@sha-as-referenced" → release-line note
+	for _, fc := range fixes {
+		if fc.ReleaseLine == LineOther || fc.Excluded == ExcludedReleaseLine {
+			notes[fc.Repo+"@"+fc.SHA] = lineNote(fc)
+		}
+	}
 	for _, c := range fixCommits(cve) {
 		url := fmt.Sprintf("%s/%s/%s/commit/%s", r.GithubBaseURL, c.owner, c.repo, c.sha)
 		// The prompt names the commit by its public GitHub URL, not by
@@ -164,6 +175,12 @@ func (r *Resolver) llmCommitDiffs(ctx context.Context, cve cves.CVE) (urls []str
 		}
 		urls = append(urls, public)
 		cd := commitDiff{url: public}
+		for k, n := range notes {
+			repo, sha, _ := strings.Cut(k, "@")
+			if repo == c.owner+"/"+c.repo && strings.HasPrefix(strings.ToLower(sha), strings.ToLower(c.sha)) {
+				cd.note = n
+			}
+		}
 		for _, f := range splitDiffFiles(string(body)) {
 			if keepForLLM(f.path) {
 				cd.files = append(cd.files, f)

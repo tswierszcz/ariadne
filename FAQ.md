@@ -607,6 +607,23 @@ into `UNKNOWN` + `METHOD_NOT_FOUND` (its fixed class does not exist in the
 analyzed jackson version) — in both, the old verdict rested on the wrong
 class.
 
+**Why ask git which release line a fix commit is on (CVE:F5c)?** An
+advisory often links one fix commit per maintained branch. The bytecode
+fit rule only drops a commit whose methods don't exist in your classes;
+a commit on another branch whose methods *do* exist (most of Tomcat's
+fixes touch the same classes on 9.0.x, 10.1.x and main) still added its
+methods. Comparing your version's tag with each commit separates them:
+on Tomcat 9.0.45, CVE-2023-46589 went from 13 mapped methods (mostly from
+a main-line refactoring of request parameter handling) to the one method
+the 9.0.x fix changed. Two git facts needed care: Tomcat and Spring tag
+a release commit that is not on the branch, so every later fix looks
+"diverged" by exactly that commit (treated as descending); and in a
+repository merged forward (Jackson, Spring) the next major line
+descends from every older tag, so "descends" means "fixed after your
+release in history containing it", not "your line" — which is why it
+never overrides the fit rule. No verdict changed on the CVE:F0 inputs;
+the paths now rest on the right line's methods.
+
 Source 3 is an LLM reading the advisory + fix diff, opt-in with `-llm`
 (design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
 runs only for CVEs sources 1 and 2 left unmapped, and each method it

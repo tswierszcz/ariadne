@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: IN_PROGRESS (F5a, F5b DONE 2026-11-06); F6–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. Następny krok: F5c (tagi git, prompt LLM) albo F6. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. Następny krok: CVE:F6. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2389,12 +2389,121 @@ Przy dodawaniu kolejnego wpisu zapisz:
   (wcześniejsze ograniczenie skanera); metody klas anonimowych/lokalnych
   mapowane na metodę otaczającą; brak sources JAR; typ referencji nie
   różnicuje danych GHSA.
-- **Następny krok (wymaga zgody):** do wyboru — (a) CVE:F5c: powiązanie
+- **Następny krok (wymaga zgody):** (zrealizowano wariant (a) jako CVE:F5c,
+  zob. niżej) do wyboru — (a) CVE:F5c: powiązanie
   commita z linią wydań przez tagi git (GitHub compare: czy tag badanej
   wersji jest przodkiem rodzica) i obie strony w prompcie LLM (bez
   uruchamiania LLM; świadoma zmiana wersji promptu), po czym zamknięcie
   F5; albo (b) uznanie F5 za wystarczające i przejście do CVE:F6
   (komponenty osadzone) z F5.7-pełnym jako znanym ograniczeniem.
+
+### CVE:F5c — linia wydań z historii git, obie strony poprawki w prompcie LLM — DONE; CVE:F5 DONE (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** F5.7 w pełni (powiązanie commita
+  z linią wydań przez tagi git, GitHub compare) i F5.11 (obie strony
+  poprawki i zakres wydania w prompcie LLM, świadoma zmiana wersji
+  promptu, bez uruchamiania LLM).
+- **Zrealizowane:**
+  1. `internal/vulnmap/releaseline.go`: tag badanej wersji (z
+     `cve.Affected`) szukany po dokładnej nazwie (`v{V}`, `{V}`,
+     `{artifactId}-{V}`, `{repo}-{V}`, `release-{V}`, `v_{V}`,
+     `version-{V}`) przez `git/matching-refs/tags/{name}` (200 z pustą
+     listą = brak taga, odpowiedź cache'owalna; zapytanie prefiksowe
+     zwraca też `v1.2.30` — liczy się tylko dokładne trafienie).
+     Porównanie `compare/{tag}...{sha}?per_page=1&page=2` (strona 2:
+     GitHub nie wysyła listy plików, ≈10 KB zamiast do ≈1 MB — pierwsza
+     wersja ze stroną 1 zapisała 342 MB w cache; usunięte, pobrane
+     ponownie). `ahead` → `descends_from_release`, `behind`/`identical`
+     → `in_release`, `diverged` → `other_line`, z wyjątkiem: `behind_by
+     == 1` i merge base = rodzic commita taga → `descends_from_release`
+     z notatką `NoteOffBranchTag` (Tomcat „Tag 9.0.45”, Spring „Release
+     v5.3.6” — commit taga poza gałęzią; bez tego wszystkie 192 commity
+     Tomcata 9.0.x były „diverged”). Kilka wersji z tagami → nieznane
+     (mapowanie jest per advisory). Błąd/brak w cache → nieznane z
+     powodem, nigdy błąd globalny (jak metadane commita w F5a).
+  2. `FixCommit`: `release_tag`, `release_line`, `release_line_reason`,
+     `excluded` (`release_line`/`release_fit`). Kolejność: najpierw linia
+     (commit `other_line` wykluczony, gdy inny commit advisory
+     `descends_from_release`), potem reguła F5b liczona tylko względem
+     niewykluczonych commitów. **Korekta w trakcie:** pierwsza wersja
+     dawała historii pierwszeństwo nad regułą fit dla commitów
+     `descends_from_release`; na prawdziwych danych dołożyło to metody
+     Jacksona 3 (`tools.jackson.*`) do CVE jackson-databind 2.11.4 —
+     w repozytoriach scalanych do przodu następna linia główna
+     „pochodzi” od każdego starszego taga. Teraz `descends` nie
+     wyłącza reguły fit.
+  3. Prompt LLM v2 (`promptVersion` 1→2): sekcja `<fix_methods>` (per
+     commit: metody changed/removed/added z obu stron, obecność w
+     klasach, linia wydań, „not the fix of the analyzed release”),
+     notatka na linii `# commit` w diffie dla commitu z innej linii,
+     reguła 8 promptu systemowego (nie wskazywać metod `added` ani
+     commitów oznaczonych jako nie-poprawka badanego wydania);
+     `docs/phase4-llm.md` zsynchronizowany (test
+     `TestSystemPromptMatchesApprovedDoc`). Cache LLM: stare odpowiedzi
+     nie pasują do nowego klucza — ponowne pytania tylko z `-llm`.
+  4. `vulnmap.ResolverVersion` 4→5; log przebiegu: liczniki linii i
+     wykluczeń (`releaseLineSummary` w `cmd/ariadne`).
+- **Weryfikacja:** `internal/vulnmap/f5c_test.go` — wykluczenie innej
+  linii przy dokładnym tagu (prefiks `v1.2.30` nie liczy się), brak
+  commitu `descends` → nic nie wykluczone (`in_release` tylko dowód),
+  brak taga / kilka wersji / offline bez wpisów → nieznane bez błędu,
+  interakcja z regułą fit (w obie strony), tag poza gałęzią (oraz
+  `behind_by` 1 z innym merge base i `behind_by` 5 z merge base =
+  rodzic → `other_line`), złoty prompt `user_d.golden`, notatka dla
+  skróconego SHA w diffie dla LLM. Fałszywy serwer odpowiada tylko na
+  `per_page=1&page=2`. Mutacje: dopasowanie prefiksowe taga, wykluczanie
+  bez commitu `descends`, `diverged` jako `descends`, fit ignorujący
+  wykluczenie, reguła off-branch bez `behind_by == 1` i bez sprawdzenia
+  merge base — każda łapana. `go vet ./...`, `go test ./...` — PASS.
+- **Prawdziwe dane** (wejścia baseline CVE:F0, `-profile spring`,
+  `-json-format v2`): przed = HEAD F5b offline na `.cache`; wpisy tagów i
+  compare pobrane raz online (`GITHUB_TOKEN` z `gh auth token`, tylko w
+  środowisku, kopia cache z `-data-ttl 87600h`) i przeniesione do
+  `.cache` **wyłącznie** jako wpisy `git/matching-refs` (116) i
+  `compare` (326) — przebieg online odświeżył też 157 rekordów OSV i
+  dodał 227 nowych w kopii; tych nie przeniesiono, zestaw CVE bez zmian
+  (offline przed i po: petclinic 148 advisories / 155 ustaleń, WebGoat
+  160 / 168). `.cache` 89→94 MB. Potem offline:
+  - petclinic: 234 czytelne commity → 116 `descends` (83 przez tag poza
+    gałęzią), 3 `in_release`, 109 `other_line`, 6 nieznane (brak taga:
+    log4j2, snakeyaml, netty, http2, commons-fileupload); wykluczone 98
+    przez linię (42 advisories), 7 przez fit;
+  - WebGoat: 125 → 95 (41) / 5 / 20 / 5; wykluczone 9 linią, 4 fitem;
+  - zmienione mapowania 7/2 advisories, wyłącznie zawężenia, każde
+    sprawdzone w `fix_commits`: CVE-2023-46589 (Tomcat 9.0.45) 13 → 1
+    metoda — zostaje poprawka 9.0.x `InputBuffer#realReadByte`, odpadają
+    `Request#getParameter*` itd. z commitu „Implement parameter error
+    handling changes” na linii 10.x/main (`behind_by` 1107);
+    CVE-2023-24998 bez `Parameters#addParameter` (commit z innej linii);
+    CVE-2022-42003 33 → 29 (commit z gałęzi 2.12 rozbieżny z 2.11.4);
+    CVE-2022-22970, CVE-2024-24549, CVE-2025-24813, CVE-2025-53506 —
+    selektor po nazwie z commitu innej linii znika, zostaje dokładny z
+    deskryptorem;
+  - werdykty bez zmian (petclinic 64/6/18/3/57, WebGoat 48/11/40/61),
+    jedna ścieżka FRAMEWORK zmieniona (CVE-2023-46589, 24 → 29 kroków);
+  - v2 bajtowo powtarzalny (dwa przebiegi offline na każdej aplikacji).
+  - LLM nie uruchomiony (płatny); prompt sprawdzony testami złotymi.
+- **Kryteria F5:** usunięta metoda — kandydat (F5a); helper — nie (F5a);
+  rename pliku, merge commit, brak źródeł — odrębne wyniki (F5a);
+  **dwie gałęzie — tak**: commit rozbieżny z tagiem badanej wersji jest
+  pomijany, gdy inny commit pochodzi od taga (test + CVE-2023-46589);
+  przypadki nierozstrzygnięte widoczne (`release_line_reason`, brak
+  wykluczenia bez rozstrzygnięcia). F5 = DONE.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz mapowania), README krok 6
+  (i źródło LLM), FAQ krok 6, `docs/RESULTS_CONTRACT.MD` §5 (pola
+  `fix_commits`), `docs/phase4-llm.md` (prompt v2), `cases.yaml` (0203),
+  nagłówek F5 w planie CVE, ten rejestr.
+- **Ograniczenia:** tagi tylko według wymienionych wzorców (np. XStream
+  `XSTREAM_1_4_19`, PostgreSQL `REL42.3.3` → nieznane); tylko GitHub;
+  `descends_from_release` ≠ „ta sama linia” w repozytoriach scalanych do
+  przodu (dlatego nie wyłącza reguły fit); jeden tag na advisory;
+  commit z innej linii zostaje, gdy żaden nie pochodzi od taga; dane
+  historii wymagają zapytań GitHub API (token zalecany); brak sources
+  JAR (opcjonalne zadanie 8); nowy prompt bez płatnej weryfikacji na
+  prawdziwych CVE.
+- **Następny krok (wymaga zgody):** CVE:F6 — komponenty osadzone bez
+  relokacji (zachowanie wszystkich `pom.properties`, inwentarz
+  komponentów osadzonych, potwierdzanie obecności po klasach).
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

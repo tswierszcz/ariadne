@@ -350,10 +350,29 @@ For each CVE, in priority order:
    commit the OSV reference type and `release_fit`, and pairs a removed
    and an added method with near-identical bodies as `possible_rename`
    (evidence only).
+
+   **Matched to your release line through git history (CVE:F5c).** For
+   each fix commit ariadne looks up the tag of your version in the
+   commit's GitHub repository (exact names `v1.2.3`, `1.2.3`,
+   `artifact-1.2.3`, `repo-1.2.3`, `release-1.2.3`, `v_1.2.3`,
+   `version-1.2.3`) and asks GitHub's compare API how the two relate:
+   `descends_from_release`, `in_release` (your version already contains
+   the commit) or `other_line`. A tag on a release commit made off the
+   branch (Tomcat, Spring) counts as descending. When one commit of an
+   advisory descends from your release, commits on another line are left
+   out of the mapping (`excluded: release_line` in v2); the bytecode fit
+   rule then applies to the rest. No tag or no answer leaves the line
+   unknown and changes nothing. These lookups are GitHub API requests —
+   set `GITHUB_TOKEN` when filling a cache; offline runs read them from
+   the cache.
 3. **An LLM (opt-in, `-llm`).** Only for a CVE sources 1 and 2 found
    nothing for. The model gets the advisory (summary + details) and,
    when the CVE links a fix commit, that commit's non-test `.java` diff;
-   it answers with a JSON list of methods. The reply is validated
+   it answers with a JSON list of methods. Since CVE:F5c the prompt also
+   lists the methods the fix changed, removed or added (read from both
+   sides of the fix), whether each exists in your classes, and which
+   commits are on another release line; the model is told never to name
+   an added method. The reply is validated
    against a schema (one corrective retry), and every method is then
    checked to actually exist in the analyzed bytecode — an invented one
    is dropped. The report marks these `llm (diff)` or `llm (advisory)`.

@@ -10,6 +10,14 @@ Affected Maven package(s): {{.Packages}}
 {{.Details}}
 </advisory_details>
 
+{{if .FixMethods -}}
+The methods the fix touched, read from the source before and after the fix:
+
+<fix_methods>
+{{.FixMethods}}
+</fix_methods>
+
+{{end -}}
 {{if eq .Variant "A" -}}
 The fix diff below contains only the non-test .java files changed by the fix commit(s){{if .Truncated}}; it was truncated to fit, and the omitted files are listed at the end{{end}}.
 
