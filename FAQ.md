@@ -591,6 +591,22 @@ CVE-2024-38821 on WebGoat from a `REACHABLE` that ended in an *added*
 method into `FRAMEWORK` through the actually changed
 `WebFilterChainProxy#filter`.
 
+**Why check diff candidates against the bytecode (CVE:F5b)?** A source
+diff knows method names, not JVM descriptors, and the scanner used to put
+every method of a member class under the top-level class — `AntPathMatcher#matchStrings`
+for code that really lives in `AntPathMatcher$AntPathStringMatcher`. Such a
+selector either matched nothing (and the advisory looked `NOT_REACHABLE`
+on the remaining methods) or matched an unrelated method of the outer
+class. Now member classes keep their `$` names, and each candidate is
+looked up in the analyzed classes: exactly one overload compatible with
+the source parameter types gives an exact selector; anything less certain
+stays a name selector. On the CVE:F0 inputs this turned CVE-2023-20873
+from `NOT_REACHABLE` into `FRAMEWORK` (its fix is in a nested
+`WebFilterChainPostProcessor`) and CVE-2026-50193 from `NOT_REACHABLE`
+into `UNKNOWN` + `METHOD_NOT_FOUND` (its fixed class does not exist in the
+analyzed jackson version) — in both, the old verdict rested on the wrong
+class.
+
 Source 3 is an LLM reading the advisory + fix diff, opt-in with `-llm`
 (design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
 runs only for CVEs sources 1 and 2 left unmapped, and each method it

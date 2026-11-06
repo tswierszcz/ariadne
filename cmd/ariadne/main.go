@@ -712,6 +712,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	resolver := vulnmap.NewResolver(manual, cache)
 	resolver.GithubToken = cfg.githubToken
+	resolver.Bytecode = declaredOverloads(h)
 	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
 		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)
 	}
@@ -1036,6 +1037,27 @@ func methodExists(h *hierarchy.Hierarchy) func(fqcn, method string) bool {
 		}
 		_, found := h.ResolveMethod(fqcn, method)
 		return found
+	}
+}
+
+// declaredOverloads answers CVE:F5b's bytecode verification: the
+// descriptors of the methods named name that class fqcn itself declares,
+// bridge and synthetic methods excluded (a covariant-return bridge is not
+// a separate overload of the source method).
+func declaredOverloads(h *hierarchy.Hierarchy) func(fqcn, name string) ([]string, bool) {
+	const accBridge, accSynthetic = 0x0040, 0x1000
+	return func(fqcn, name string) ([]string, bool) {
+		ci, ok := h.Lookup(fqcn)
+		if !ok {
+			return nil, false
+		}
+		var descs []string
+		for _, m := range ci.Methods {
+			if m.Name == name && m.AccessFlags&(accBridge|accSynthetic) == 0 {
+				descs = append(descs, m.Descriptor)
+			}
+		}
+		return descs, true
 	}
 }
 

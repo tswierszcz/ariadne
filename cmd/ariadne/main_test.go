@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
 )
@@ -164,5 +165,25 @@ func TestSnapshotFlags(t *testing.T) {
 		if code, stderr := runWithEnv(append(args, baseArgs...), nil); code != 2 || !strings.Contains(stderr, "-snapshot-in replays recorded data") {
 			t.Errorf("%v: code=%d stderr=%q", args, code, stderr)
 		}
+	}
+}
+
+// TestDeclaredOverloads (CVE:F5b): bridge and synthetic methods are not
+// overloads of the source method; an absent class is said so.
+func TestDeclaredOverloads(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{{
+		FQCN: "p.Box",
+		Methods: []hierarchy.Method{
+			{Method: classfile.Method{Name: "get", Descriptor: "()Ljava/lang/String;"}},
+			{Method: classfile.Method{Name: "get", Descriptor: "()Ljava/lang/Object;", AccessFlags: 0x0040 | 0x1000}},
+			{Method: classfile.Method{Name: "lambda$get$0", Descriptor: "()V", AccessFlags: 0x1000}},
+		},
+	}})
+	f := declaredOverloads(h)
+	if d, ok := f("p.Box", "get"); !ok || len(d) != 1 || d[0] != "()Ljava/lang/String;" {
+		t.Errorf("get = %v %v, want the one non-bridge overload", d, ok)
+	}
+	if _, ok := f("p.Missing", "get"); ok {
+		t.Error("absent class reported present")
 	}
 }

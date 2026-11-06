@@ -67,7 +67,7 @@ func (e Entry) Mapped() bool { return len(e.Methods) > 0 }
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "3" // 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5 both sides of a fix diff
+const ResolverVersion = "4" // 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -148,6 +148,10 @@ type Resolver struct {
 	// the model's answer in the analyzed bytecode (nil skips the check).
 	LLM          *LLMSource
 	MethodExists func(fqcn, method string) bool
+	// Bytecode, when set, verifies fix-diff candidates in the analyzed
+	// classes (CVE:F5b): the descriptors of the methods named name that
+	// class fqcn declares, and whether the class is present at all.
+	Bytecode func(fqcn, name string) (descs []string, classFound bool)
 }
 
 // NewResolver builds a Resolver from an already-loaded manual table (see

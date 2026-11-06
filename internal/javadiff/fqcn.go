@@ -29,3 +29,11 @@ func FQCN(filePath, src string) (string, bool) {
 	}
 	return m[1] + "." + simpleName, true
 }
+
+// Package returns src's "package ...;" name, "" for the default package.
+func Package(src string) string {
+	if m := packageRe.FindStringSubmatch(src); m != nil {
+		return m[1]
+	}
+	return ""
+}

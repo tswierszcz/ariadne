@@ -1,6 +1,9 @@
 package javadiff
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // methodHeaderRe matches a method/constructor declaration's tail: an
 // identifier directly followed by a balanced, paren-free argument list
@@ -15,7 +18,7 @@ var methodHeaderRe = regexp.MustCompile(`(\w+)\s*\(([^()]*)\)\s*(?:throws\s+[\w.
 // newExprRe matches "new Foo(...)" / "new Foo<Bar>(...)" at the end of a
 // header: an anonymous class body, not a method declaration, even though
 // it has the same "identifier(args)" shape methodHeaderRe looks for.
-var newExprRe = regexp.MustCompile(`(?:^|\W)new\s+\w+\s*(?:<[^>]*>)?\s*\([^()]*\)\s*$`)
+var newExprRe = regexp.MustCompile(`(?:^|\W)new\s+[\w.]+\s*(?:<[^>]*>)?\s*\([^()]*\)\s*$`)
 
 // classHeaderRe matches a class/interface/enum/record declaration and
 // captures its simple name, so a same-named method further down (a
@@ -32,72 +35,153 @@ var controlKeywords = map[string]bool{
 type frameKind byte
 
 const (
-	frameOther  frameKind = iota // a plain block: if/for/lambda body, static/instance initializer, anonymous class, ...
+	frameOther  frameKind = iota // a plain block: if/for/lambda body, static/instance initializer, ...
 	frameClass                   // a class/interface/enum/record body
 	frameMethod                  // a method or constructor body
+	frameAnon                    // an anonymous class body ("new Foo() {")
 )
 
 type frame struct {
-	kind frameKind
-	name string
+	kind   frameKind
+	name   string
+	params []string
+	line   int // the line the body opened on
+}
+
+// MethodRef identifies a method declared in a source file (CVE:F5b).
+// Class is its declaring class's binary name relative to the package —
+// "Outer" for a top-level class, "Outer$Inner" for a member class — so
+// package + "." + Class is the bytecode class name. Params are the source
+// parameter types reduced to simple names with array dimensions ("String",
+// "int[]", "Entry"); "?" marks a type whose erasure cannot be known from
+// the source alone (a type variable). StartLine/EndLine bound the body.
+//
+// Methods of anonymous and local classes are not separate MethodRefs:
+// their bytecode names (Outer$1, Outer$1Local) depend on compiler
+// numbering, so their lines belong to the enclosing method instead.
+type MethodRef struct {
+	Class     string
+	Name      string
+	Params    []string
+	StartLine int
+	EndLine   int
+}
+
+// Key is "Class#name(p1,p2)", unique per overload within a file.
+func (m MethodRef) Key() string {
+	return m.Class + "#" + m.Name + "(" + strings.Join(m.Params, ",") + ")"
 }
 
 // FindMethodsForLines returns the name of the method/constructor
-// enclosing each of the given 1-based line numbers in src (a single
-// top-level — possibly with nested types — .java source file), as
-// "<init>" for a constructor and the plain method name otherwise.
-// Overloads are not distinguished (no descriptor), consistent with how
-// ariadne matches methods everywhere else.
+// enclosing each of the given 1-based line numbers in src, as "<init>"
+// for a constructor and the plain method name otherwise (see
+// MethodsForLines for the declaring class and parameters).
 //
 // A line outside any method (a field initializer, a class-body line, an
 // import) contributes nothing, not an error: fix commits routinely touch
 // such lines too, and the caller simply gets fewer methods out of it.
 func FindMethodsForLines(src string, lines []int) []string {
-	cleaned := stripCommentsAndStrings(src)
-	lineOwner, _ := computeLineOwners(cleaned)
-
 	seen := make(map[string]bool)
 	var out []string
-	for _, l := range lines {
-		if l < 1 || l >= len(lineOwner) {
-			continue
+	for _, m := range MethodsForLines(src, lines) {
+		if !seen[m.Name] {
+			seen[m.Name] = true
+			out = append(out, m.Name)
 		}
-		name := lineOwner[l]
-		if name == "" || seen[name] {
-			continue
-		}
-		seen[name] = true
-		out = append(out, name)
 	}
 	return out
 }
 
-// computeLineOwners returns, for each 1-based line number, the name of
-// the innermost enclosing method/constructor active at that line ("" if
-// none), and the set of every method/constructor name with a body.
-func computeLineOwners(cleaned string) ([]string, map[string]bool) {
-	declared := make(map[string]bool)
-	totalLines := 1
-	for i := 0; i < len(cleaned); i++ {
-		if cleaned[i] == '\n' {
-			totalLines++
+// MethodsForLines returns the declared method owning each given 1-based
+// line, deduplicated, in line order.
+func MethodsForLines(src string, lines []int) []MethodRef {
+	owners, decl := scanMethods(stripCommentsAndStrings(src))
+	seen := make(map[int]bool)
+	var out []MethodRef
+	for _, l := range lines {
+		if l < 1 || l >= len(owners) {
+			continue
 		}
+		i := owners[l]
+		if i < 0 || seen[i] {
+			continue
+		}
+		seen[i] = true
+		out = append(out, decl[i])
 	}
-	lineOwner := make([]string, totalLines+1)
+	return out
+}
 
+// Declared returns every method/constructor with a body declared in src
+// by a named (top-level or member) class, in declaration order.
+func Declared(src string) []MethodRef {
+	_, decl := scanMethods(stripCommentsAndStrings(src))
+	return decl
+}
+
+// DeclaredMethods returns the name of every method/constructor with a
+// body declared in src ("<init>" for constructors), the same names
+// FindMethodsForLines returns. Abstract and interface methods without a
+// body are not listed.
+func DeclaredMethods(src string) map[string]bool {
+	out := make(map[string]bool)
+	for _, m := range Declared(src) {
+		out[m.Name] = true
+	}
+	return out
+}
+
+// scanMethods returns, per 1-based line, the index into decl of the
+// method owning it (-1 for none), and decl itself.
+func scanMethods(cleaned string) ([]int, []MethodRef) {
+	totalLines := strings.Count(cleaned, "\n") + 1
+	owner := make([]int, totalLines+1)
+	for i := range owner {
+		owner[i] = -1
+	}
+	var decl []MethodRef
 	var stack []frame
+	var stackDecl []int // per frame: index into decl for a named method frame, else -1
 	currentLine := 1
 	headerStart := 0
 
-	topMethodName := func() string {
-		for i := len(stack) - 1; i >= 0; i-- {
-			if stack[i].kind == frameMethod {
-				return stack[i].name
+	// innermost returns the innermost method frame that belongs to a
+	// named class reachable through class frames only (not inside an
+	// anonymous or local class).
+	innermost := func() int {
+		best := -1
+		opaque := false
+		inMethod := false
+		for i, f := range stack {
+			switch f.kind {
+			case frameClass:
+				if inMethod {
+					opaque = true // a local class
+				}
+			case frameAnon:
+				opaque = true
+			case frameMethod:
+				if !opaque {
+					best = stackDecl[i]
+				}
+				inMethod = true
 			}
 		}
-		return ""
+		return best
 	}
-	currentClassName := func() string {
+	classPath := func() (string, bool) {
+		var names []string
+		for _, f := range stack {
+			switch f.kind {
+			case frameClass:
+				names = append(names, f.name)
+			case frameMethod, frameAnon:
+				return "", false
+			}
+		}
+		return strings.Join(names, "$"), len(names) > 0
+	}
+	currentClass := func() string {
 		for i := len(stack) - 1; i >= 0; i-- {
 			if stack[i].kind == frameClass {
 				return stack[i].name
@@ -109,36 +193,44 @@ func computeLineOwners(cleaned string) ([]string, map[string]bool) {
 	for i := 0; i < len(cleaned); i++ {
 		switch cleaned[i] {
 		case '\n':
-			if lineOwner[currentLine] == "" {
-				lineOwner[currentLine] = topMethodName()
+			if owner[currentLine] < 0 {
+				owner[currentLine] = innermost()
 			}
 			currentLine++
 		case '{':
-			header := cleaned[headerStart:i]
-			f := classifyHeader(header, currentClassName())
+			f := classifyHeader(cleaned[headerStart:i], currentClass())
+			f.line = currentLine
+			idx := -1
 			if f.kind == frameMethod {
-				declared[f.name] = true
-				// A method opened on this line owns it even if it also
-				// closes on it ("void g() { bad(); }").
-				if lineOwner[currentLine] == "" {
-					lineOwner[currentLine] = f.name
+				if cls, ok := classPath(); ok {
+					idx = len(decl)
+					decl = append(decl, MethodRef{Class: cls, Name: f.name, Params: f.params, StartLine: currentLine})
 				}
 			}
 			stack = append(stack, f)
+			stackDecl = append(stackDecl, idx)
+			// A method opened on this line owns it even if it also closes
+			// on it ("void g() { bad(); }").
+			if idx >= 0 && owner[currentLine] < 0 {
+				owner[currentLine] = innermost()
+			}
 			headerStart = i + 1
 		case '}':
-			if len(stack) > 0 {
-				stack = stack[:len(stack)-1]
+			if n := len(stack); n > 0 {
+				if d := stackDecl[n-1]; d >= 0 {
+					decl[d].EndLine = currentLine
+				}
+				stack, stackDecl = stack[:n-1], stackDecl[:n-1]
 			}
 			headerStart = i + 1
 		case ';':
 			headerStart = i + 1
 		}
 	}
-	if lineOwner[currentLine] == "" {
-		lineOwner[currentLine] = topMethodName()
+	if owner[currentLine] < 0 {
+		owner[currentLine] = innermost()
 	}
-	return lineOwner, declared
+	return owner, decl
 }
 
 func classifyHeader(header, enclosingClass string) frame {
@@ -147,7 +239,7 @@ func classifyHeader(header, enclosingClass string) frame {
 		return frame{kind: frameOther} // static/instance initializer, or a bare nested block
 	}
 	if newExprRe.MatchString(h) {
-		return frame{kind: frameOther} // anonymous class body, not a method
+		return frame{kind: frameAnon}
 	}
 	if m := classHeaderRe.FindStringSubmatch(h); m != nil {
 		return frame{kind: frameClass, name: m[1]}
@@ -160,9 +252,109 @@ func classifyHeader(header, enclosingClass string) frame {
 		if name == enclosingClass {
 			name = "<init>"
 		}
-		return frame{kind: frameMethod, name: name}
+		if strings.HasSuffix(strings.TrimSpace(h[:len(h)-len(m[0])]), "->") || strings.HasSuffix(strings.TrimSpace(h[:len(h)-len(m[0])]), "new") {
+			return frame{kind: frameOther}
+		}
+		return frame{kind: frameMethod, name: name, params: parseParams(m[2], typeVars(h))}
 	}
 	return frame{kind: frameOther}
+}
+
+var typeVarListRe = regexp.MustCompile(`(?:^|[\s>])<([^()]*?)>\s*[\w.\[\]<>?,\s]*\s+\w+\s*\(`)
+
+// typeVars returns the method's own type parameters (the "<T, U extends
+// X>" before its return type), so parameters of those types are "?".
+func typeVars(header string) map[string]bool {
+	out := map[string]bool{}
+	m := typeVarListRe.FindStringSubmatch(header)
+	if m == nil {
+		return out
+	}
+	for _, part := range splitTopLevel(m[1]) {
+		f := strings.Fields(part)
+		if len(f) > 0 {
+			out[f[0]] = true
+		}
+	}
+	return out
+}
+
+// parseParams reduces "final Map.Entry<K,V> e, String... xs, int[] a" to
+// ["Entry", "String[]", "int[]"]. Annotations and modifiers are dropped,
+// generic arguments erased; a type variable of the method is "?". Class
+// type variables are not known here either, so a bare single-uppercase-
+// letter type is "?" too.
+func parseParams(list string, methodTypeVars map[string]bool) []string {
+	list = strings.TrimSpace(list)
+	if list == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range splitTopLevel(list) {
+		p = eraseGenerics(p)
+		var toks []string
+		for _, t := range strings.Fields(strings.ReplaceAll(p, "...", " ... ")) {
+			if strings.HasPrefix(t, "@") || t == "final" {
+				continue
+			}
+			toks = append(toks, t)
+		}
+		if len(toks) < 2 {
+			out = append(out, "?")
+			continue
+		}
+		name := toks[len(toks)-1]
+		typ := strings.Join(toks[:len(toks)-1], "")
+		dims := strings.Count(name, "[]")
+		if strings.HasSuffix(typ, "...") {
+			typ, dims = strings.TrimSuffix(typ, "..."), dims+1
+		}
+		dims += strings.Count(typ, "[]")
+		typ = strings.ReplaceAll(typ, "[]", "")
+		if i := strings.LastIndexByte(typ, '.'); i >= 0 {
+			typ = typ[i+1:]
+		}
+		if methodTypeVars[typ] || (len(typ) == 1 && typ[0] >= 'A' && typ[0] <= 'Z') {
+			typ = "?"
+		}
+		out = append(out, typ+strings.Repeat("[]", dims))
+	}
+	return out
+}
+
+func splitTopLevel(s string) []string {
+	var parts []string
+	depth, start := 0, 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(parts, s[start:])
+}
+
+func eraseGenerics(s string) string {
+	var b strings.Builder
+	depth := 0
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c == '<':
+			depth++
+		case c == '>':
+			depth--
+		case depth == 0:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 func trimSpace(s string) string {
@@ -179,14 +371,4 @@ func trimSpace(s string) string {
 
 func isSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
-}
-
-// DeclaredMethods returns the name of every method/constructor with a
-// body declared in src ("<init>" for constructors), the same names
-// FindMethodsForLines returns — so a caller can tell whether a method a
-// diff touched on one side exists at all on the other (CVE:F5). Abstract
-// and interface methods without a body are not listed.
-func DeclaredMethods(src string) map[string]bool {
-	_, declared := computeLineOwners(stripCommentsAndStrings(src))
-	return declared
 }

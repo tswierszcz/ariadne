@@ -156,7 +156,7 @@ func TestFixDiff_bothSides(t *testing.T) {
 	}
 	f := fc.Files[0]
 	want := map[string]string{"p.Parser#load": FixMethodChanged, "p.Parser#unsafeLoad": FixMethodRemoved, "p.Parser#checkSafe": FixMethodAdded}
-	if !reflect.DeepEqual(f.Methods, want) {
+	if !reflect.DeepEqual(kinds(f.Methods), want) {
 		t.Errorf("file methods = %v, want %v", f.Methods, want)
 	}
 	if f.OldSHA256 == "" || f.NewSHA256 == "" || f.OldSHA256 == f.NewSHA256 {
@@ -253,7 +253,7 @@ index 0000000..4444444
 	if want := []string{"a.Gone#g", "a.Old#m"}; !reflect.DeepEqual(e.Methods, want) {
 		t.Errorf("Methods = %v, want %v", e.Methods, want)
 	}
-	if got := e.FixCommits[0].Files[2].Methods; !reflect.DeepEqual(got, map[string]string{"a.Guard#check": FixMethodAdded}) {
+	if got := kinds(e.FixCommits[0].Files[2].Methods); !reflect.DeepEqual(got, map[string]string{"a.Guard#check": FixMethodAdded}) {
 		t.Errorf("added file methods = %v", got)
 	}
 }
@@ -354,4 +354,12 @@ func TestFixDiff_tokenSent(t *testing.T) {
 	if auth != "Bearer t0k" {
 		t.Errorf("Authorization = %q", auth)
 	}
+}
+
+func kinds(ms []FixMethod) map[string]string {
+	out := map[string]string{}
+	for _, m := range ms {
+		out[m.Selector] = m.Kind
+	}
+	return out
 }

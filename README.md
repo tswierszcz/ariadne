@@ -335,6 +335,21 @@ For each CVE, in priority order:
    `MAPPING_NEW_SIDE_ONLY`. A fix commit that cannot be fetched no longer
    fails the run: it is recorded, and an advisory none of whose commits
    could be read is `UNKNOWN` + `SOURCE_UNAVAILABLE`.
+
+   **Checked against your bytecode (CVE:F5b).** Methods of member classes
+   are named as in bytecode (`Outer$Inner#m`); lines inside anonymous or
+   local classes and lambdas belong to the enclosing method. Each
+   candidate is looked up in the analyzed classes (bridge/synthetic
+   methods ignored): when exactly one overload matches the parameter
+   types read from the source, the selector gets that descriptor
+   (`Class#m(Ljava/lang/String;)V`); otherwise it stays a name selector —
+   ariadne never guesses an overload. A fix commit none of whose methods
+   exists in your classes is dropped from the mapping when another commit
+   of the same advisory does match (typically a backport to another
+   release line). v2 records per method the outcome (`bytecode`), per
+   commit the OSV reference type and `release_fit`, and pairs a removed
+   and an added method with near-identical bodies as `possible_rename`
+   (evidence only).
 3. **An LLM (opt-in, `-llm`).** Only for a CVE sources 1 and 2 found
    nothing for. The model gets the advisory (summary + details) and,
    when the CVE links a fix commit, that commit's non-test `.java` diff;

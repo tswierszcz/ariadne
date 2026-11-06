@@ -204,7 +204,10 @@ public class Yaml {
 		{"inside load body", 7, []string{"load"}},
 		{"inside constructor", 11, []string{"<init>"}},
 		{"inside if-block nested in helper (transparent)", 18, []string{"helper"}},
-		{"inside anonymous class's run method, not withAnon", 25, []string{"run"}},
+		// CVE:F5b: the anonymous class's run is Outer$1#run in bytecode, a
+		// compiler-numbered name; the line belongs to the method that
+		// creates the anonymous class (it exists under its own name).
+		{"inside anonymous class's run method: the enclosing withAnon", 25, []string{"withAnon"}},
 		{"field declaration, no enclosing method", 4, nil},
 	}
 	for _, tc := range tests {
@@ -279,5 +282,52 @@ func TestFindMethodsForLines_oneLineMethod(t *testing.T) {
 	}
 	if got := FindMethodsForLines(src, []int{4}); len(got) != 0 {
 		t.Errorf("closing-brace line owner = %v, want none", got)
+	}
+}
+
+func TestMethodsForLines_nestedClassesAndParams(t *testing.T) {
+	src := `package p;
+public class Outer {
+    public <T> void gen(T t, java.util.Map.Entry<String, Integer> e, final String... rest) {
+        x();
+    }
+    static class Inner {
+        Inner(int[] a, @Deprecated long b) {
+            y();
+        }
+        class Deep { void d(byte[][] b) { z(); } }
+    }
+    void local() {
+        class Local { void lm() {
+            w();
+        } }
+        Runnable r = () -> {
+            v();
+        };
+    }
+}
+class Second {
+    void s(Object o) {
+        u();
+    }
+}
+`
+	got := MethodsForLines(src, []int{4, 8, 10, 14, 17, 23})
+	var keys []string
+	for _, m := range got {
+		keys = append(keys, m.Key())
+	}
+	want := []string{
+		"Outer#gen(?,Entry,String[])",
+		"Outer$Inner#<init>(int[],long)",
+		"Outer$Inner$Deep#d(byte[][])",
+		"Outer#local()", // local class and lambda lines belong to the enclosing method
+		"Second#s(Object)",
+	}
+	if !reflect.DeepEqual(keys, want) {
+		t.Fatalf("got %v\nwant %v", keys, want)
+	}
+	if got[0].StartLine != 3 || got[0].EndLine != 5 {
+		t.Errorf("gen lines = %d-%d, want 3-5", got[0].StartLine, got[0].EndLine)
 	}
 }
