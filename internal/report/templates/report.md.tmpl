@@ -183,14 +183,29 @@ None.
 ## Components
 
 CVE:F1a inventory (docs/RESULTS_CONTRACT.MD, "Component identity"): every jar read, by
-content hash and a location that is stable across runs, and the component instance
-assigned to it — one per jar for now; further `pom.properties` inside the same jar are
-listed as embedded candidates, not instances. Identifiers do not depend on temp paths.
-This inventory does not change any verdict above.
+content hash and a location that is stable across runs, and the component instances
+found in it. Further `pom.properties` inside a jar are embedded candidates (CVE:F6a): a
+library candidate whose classes match the Maven Central jar of that exact version
+becomes its own instance (detection `embedded`, location `<jar>!/META-INF/maven/<g>/<a>`),
+owns those classes and gets its own advisory lookup; every other candidate is listed
+below and has no lookup. Identifiers do not depend on temp paths.
 {{with .Components}}{{$inv := .}}
 | Instance | Identity | Detection | Location | SHA-256 | Classes | Packages | Shadowed | Evidence |
 |---|---|---|---|---|---|---|---|---|
-{{range .Instances}}| `{{.ID}}` | {{if .GAV}}`{{.GAV}}`{{else}}—{{end}} | {{.Detection}} | {{$inv.ArtifactLocation .ArtifactID}} | `{{$inv.ArtifactShortHash .ArtifactID}}` | {{.Classes}} | {{len .Packages}} | {{.Shadowed}} | {{range $i, $e := .Evidence}}{{if $i}}; {{end}}{{$e.Kind}}: {{$e.Detail}}{{end}} |
+{{range .Instances}}| `{{.ID}}` | {{if .GAV}}`{{.GAV}}`{{else}}—{{end}} | {{.Detection}} | {{$inv.InstanceLocation .ID}} | `{{$inv.ArtifactShortHash .ArtifactID}}` | {{.Classes}} | {{len .Packages}} | {{.Shadowed}} | {{range $i, $e := .Evidence}}{{if $i}}; {{end}}{{$e.Kind}}: {{$e.Detail}}{{end}} |
+{{end}}
+### Embedded component candidates
+
+{{if not .Embedded}}
+None.
+{{else}}
+| In instance | Candidate | Kind | Status | Instance | Detail |
+|---|---|---|---|---|---|
+{{range .Embedded}}| `{{.HostInstance}}` | `{{.GAV}}` | {{.Kind}} | {{if .Status}}{{.Status}}{{else}}—{{end}} | {{if .Instance}}`{{.Instance}}`{{else}}—{{end}} | {{.Reason}} |
+{{end}}
+Unconfirmed library candidates (any status other than `confirmed`) are a coverage gap:
+their advisories were not looked up. Modules of the host's own project are part of the
+host. A relocated copy (`classes_absent`) is CVE:F7.
 {{end}}
 ### Class conflicts
 

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -45,6 +46,7 @@ func main() {
 
 type config struct {
 	githubToken     string // GITHUB_TOKEN: authenticates fix-commit metadata requests (CVE:F5)
+	centralURL      string // ARIADNE_MAVEN_CENTRAL: repository root for embedded-component reference jars (CVE:F6a); default Maven Central
 	app             string
 	deps            string
 	depsList        string
@@ -139,6 +141,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	}
 
 	cfg.githubToken = getenv("GITHUB_TOKEN")
+	cfg.centralURL = getenv("ARIADNE_MAVEN_CENTRAL")
 	if cfg.llm || cfg.exploitCheck || cfg.frameworkCheck {
 		cfg.llmConfig = vulnmap.LLMConfigFromEnv(getenv)
 		if cfg.llmModel != "" {
@@ -692,10 +695,32 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	sr.attach(cache, "main")
 	cache.SetPolicy(httpcache.Policy{TTL: cfg.dataTTL, MaxAge: cfg.maxDataAge, Refresh: cfg.refresh, AllowStale: cfg.allowStale})
 
+	// CVE:F6a: embedded components, confirmed by their classes against
+	// the Maven Central reference jar of the declared version.
+	if err := components.ResolveEmbedded(ctx, func(ctx context.Context, url string) ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		return httpcache.Fetch(http.DefaultClient, cache, httpcache.Key("GET", url), httpcache.KindForURL(url), req)
+	}, cfg.centralURL, h); err != nil {
+		return fmt.Errorf("resolving embedded components: %w", err)
+	}
+	embConfirmed, embUnconfirmed, embModules := components.EmbeddedCounts()
+	log("embedded components (CVE:F6a): %d confirmed by their classes, %d unconfirmed (not looked up), %d modules of their host", embConfirmed, embUnconfirmed, embModules)
+
 	var gavs []input.GAV
+	seenGAV := map[input.GAV]bool{}
 	for _, dj := range depJars {
-		if dj.GAV != nil {
+		if dj.GAV != nil && !seenGAV[*dj.GAV] {
+			seenGAV[*dj.GAV] = true
 			gavs = append(gavs, *dj.GAV)
+		}
+	}
+	for _, g := range components.ConfirmedEmbeddedGAVs() {
+		if !seenGAV[g] {
+			seenGAV[g] = true
+			gavs = append(gavs, g)
 		}
 	}
 	log("querying OSV for %d resolved dependencies", len(gavs))

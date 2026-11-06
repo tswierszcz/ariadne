@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. Następny krok: CVE:F6. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: IN_PROGRESS (F6a DONE 2026-11-06); F7–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. Następny krok: CVE:F6b (SBOM, wersje kandydujące) albo CVE:F7. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2504,6 +2504,105 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - **Następny krok (wymaga zgody):** CVE:F6 — komponenty osadzone bez
   relokacji (zachowanie wszystkich `pom.properties`, inwentarz
   komponentów osadzonych, potwierdzanie obecności po klasach).
+
+### CVE:F6a — komponenty osadzone potwierdzone klasami — DONE for this slice; CVE:F6 IN_PROGRESS (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** F6.1, F6.2, F6.4 (referencja z
+  Maven Central — zgoda na pobieranie), F6.6, F6.8, F6.9, F6.7 dla wersji
+  potwierdzonych; reguła „moduł tego samego projektu”. Poza zakresem
+  (F6b): F6.3 SBOM, F6.5 zbiory wersji kandydujących i kandydaci bez
+  `pom.properties`.
+- **Zrealizowane:**
+  1. `internal/component/embedded.go`: kandydaci (`Inventory.Embedded`)
+     z każdego dodatkowego `pom.properties` JAR-a zależności;
+     `isModuleOf` (ta sama wersja, ta sama grupa albo zagnieżdżona) →
+     `module`, bez zapytań; reszta `library` → referencyjny JAR
+     `repo1.maven.org/maven2/<g>/<a>/<v>/<a>-<v>.jar`
+     (`ARIADNE_MAVEN_CENTRAL` zmienia korzeń) przez cache; porównanie
+     wpisów `.class` (bez `META-INF/`, `module-info`): nazwa, potem bajty
+     (CRC-32 + rozmiar) albo `classfile.Fingerprint`. Statusy:
+     `confirmed` (≥ 50% klas referencji obecnych i ≥ 90% z nich takich
+     samych), `content_differs`, `partial`, `classes_absent`,
+     `reference_unavailable` (błąd pobrania — także brak w cache offline
+     — nigdy błąd globalny). Potwierdzony → `Instance` z `Detection
+     embedded`, `HostInstance`, `EmbeddedPath`; własność klas na
+     poziomie klasy (`byClass`, `InstanceForClass`), `recount` przelicza
+     liczby klas, pakiety, właścicieli konfliktów i `Shadowed`.
+     `InstanceLocation`: `<lokalizacja hosta>!/META-INF/maven/<g>/<a>`.
+  2. **Korekta w trakcie:** pierwsza wersja porównywała tylko bajty —
+     na prawdziwych danych 0 z 656 klas jnr-ffi w jruby-core było
+     bajtowo identycznych (ta sama długość, inna kolejność puli stałych:
+     maven-shade przepisuje klasy przez ASM, gdy w JAR-ze jest jakakolwiek
+     relokacja). Dodany `internal/classfile/fingerprint.go`: nagłówek,
+     pola, metody (posortowane), instrukcje z operandami puli zastąpionymi
+     tym, co nazywają, `ldc_w`/`goto_w`/`jsr_w` zwinięte, cele skoków
+     jako indeksy instrukcji; bez atrybutów innych niż Code, tablic
+     wyjątków i tablic switch. Wynik: 644/656 takich samych, 12 różnych
+     (odwołania do relokowanego ASM).
+  3. `internal/httpcache`: JAR wydania z Maven Central (nie SNAPSHOT) =
+     `KindPinned`.
+  4. `cmd/ariadne`: `ResolveEmbedded` po otwarciu cache, log liczników,
+     GAV-y potwierdzonych instancji dodane do zapytania OSV (z
+     deduplikacją listy GAV); `snapshot.go` używa `InstanceLocation`.
+  5. v2: `components[].embedded_in`, detekcja `embedded`, lokalizacja
+     instancji osadzonej; `coverage.embedded_candidates`. Raport: tabela
+     „Embedded component candidates”, kolumna lokalizacji instancji,
+     zaktualizowany opis sekcji Components.
+- **Weryfikacja:** `internal/classfile/fingerprint_test.go` (klasa z
+  dopisaną stałą — inne bajty, ten sam odcisk; inna klasa i zmieniony
+  kod — inny; `ldc` vs `ldc_w` z przesuniętym skokiem — ten sam),
+  `internal/component/embedded_test.go` (potwierdzona przez odcisk,
+  własność klas, lokalizacja; `classes_absent`, `content_differs`,
+  `partial`, `reference_unavailable`, moduł bez zapytania; dwie wersje →
+  dwie instancje, konflikt przypisany instancjom osadzonym),
+  `internal/reach/f6_test.go` (advisory przeciw bibliotece osadzonej →
+  ustalenie REACHABLE na instancji osadzonej). Mutacje: tylko CRC,
+  brak reguły modułu, brak progu `partial`, brak sprawdzenia treści,
+  własność na poziomie JAR-a, surowe offsety skoków, `ldc_w` bez
+  zwinięcia — każda łapana. `go vet ./...`, `go test ./...` — PASS.
+- **Prawdziwe dane** (wejścia baseline CVE:F0, `-profile spring`,
+  `-json-format v2`): referencje pobrane raz online na kopii cache
+  (6 JAR-ów z Central); nowa lista GAV (z jnr-ffi, sizeof,
+  terracotta-utilities-tools) zmienia klucz `querybatch` OSV, więc
+  porównanie przed/po wykonano offline na **tej samej** kopii po
+  uzupełnieniu (HEAD F5c vs F6a): petclinic 153/160, WebGoat 164/172
+  advisories/ustaleń po obu stronach, werdykty identyczne, 0 ustaleń na
+  instancjach osadzonych (żadna z trzech wersji nie ma advisory w OSV).
+  Kandydaci: petclinic — `ehcache-3.9.2`: 5 modułów,
+  `org.ehcache:sizeof:0.4.0` (66/66) i
+  `org.terracotta:terracotta-utilities-tools:0.0.6` (22/22)
+  potwierdzone, `offheap-store`/`statistics` `classes_absent`
+  (relokowane do `org.ehcache.shadow`); byte-buddy: `byte-buddy-dep`
+  moduł; WebGoat — `com.github.jnr:jnr-ffi:2.2.1` w
+  `jruby-core-9.2.14.0` potwierdzony (656 klas, 644 takich samych),
+  `jitescript` `classes_absent`. v2 bajtowo powtarzalny. `.cache`
+  uzupełniony o 252 nowe wpisy (6 JAR-ów z Central, 229 OSV — nowy
+  `querybatch` i rekordy, 3 diffy GitHub), bez nadpisywania istniejących;
+  offline na `.cache`: petclinic 148→153, WebGoat 160→164 advisories —
+  **wyłącznie** przez świeższą odpowiedź `querybatch` (Tomcat 9.0.45,
+  undertow 2.2.4, jackson-databind 2.11.4), nie przez komponenty osadzone.
+- **Kryteria F6:** osadzona biblioteka z zachowanymi pakietami dostaje
+  odrębny wynik — tak (test silnika; na danych realnych instancje są,
+  ustaleń brak, bo brak advisories); stare metadane bez klas nie dają
+  identyfikacji — tak (`classes_absent`, test + 3 przypadki realne); dwie
+  kopie w różnych wersjach nie są scalane — tak (test); pominięte lub
+  nieznane wersje widoczne w pokryciu — tak (`embedded_candidates`).
+  F6 pozostaje IN_PROGRESS: brak SBOM (F6.3) i zbiorów wersji
+  kandydujących (F6.5).
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz tożsamości komponentów),
+  README (krok rozpoznawania zależności, opis raportu, ograniczenie
+  „Shaded/relocated”), FAQ krok 1, `docs/RESULTS_CONTRACT.MD`
+  (`components[]`, `coverage.embedded_candidates`), szablon raportu,
+  `cases.yaml` (0301, 0302), nagłówek F6 w planie CVE, ten rejestr.
+- **Ograniczenia:** kandydaci tylko z `pom.properties`; sprawdzana tylko
+  zadeklarowana wersja; referencja musi być na Maven Central pod tym
+  GAV; progi stałe; klasy niepotwierdzonego kandydata zostają przy
+  hoście; reguła modułu ufa grupie i wersji; relokacja to F7; odcisk nie
+  obejmuje adnotacji, sygnatur generycznych, tablic wyjątków i switch.
+- **Następny krok (wymaga zgody):** CVE:F6b (import SBOM CycloneDX JSON,
+  wersje kandydujące / nieznane dla kandydatów `content_differs`) albo
+  CVE:F7 (jawna relokacja — trzy realne przypadki `classes_absent` z
+  F6a to gotowy materiał testowy).
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

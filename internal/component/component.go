@@ -17,7 +17,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"ariadne/internal/hierarchy"
@@ -67,11 +66,11 @@ type IdentityEvidence struct {
 	GAV    *input.GAV
 }
 
-// Instance is one logical component instance. CVE:F1a assigns exactly one
-// per artifact (CVE_IMPLEMENTATION_PLAN F1.6: "początkowo zwykły JAR
-// zawiera jeden rozpoznany komponent"); additional pom.properties found
-// in the same jar are recorded as embedded-candidate evidence, not as
-// instances (embedded components are CVE:F6).
+// Instance is one logical component instance. CVE:F1a assigns one per
+// artifact; additional pom.properties found in the same jar are recorded
+// as embedded-candidate evidence, and CVE:F6a adds an instance for each
+// candidate confirmed by its classes (ResolveEmbedded), owning those
+// classes.
 type Instance struct {
 	ID         string
 	ArtifactID string
@@ -82,9 +81,14 @@ type Instance struct {
 	// analyzed hierarchy; Packages their distinct packages, sorted.
 	Classes  int
 	Packages []string
-	// Shadowed counts classes of this artifact that another copy of the
+	// Shadowed counts classes of this instance that another copy of the
 	// same FQCN won under the declared classpath order (not in the graph).
 	Shadowed int
+	// HostInstance and EmbeddedPath are set on an embedded instance
+	// (CVE:F6a): the instance of the jar it is inside, and its
+	// "META-INF/maven/<group>/<artifact>" directory there.
+	HostInstance string
+	EmbeddedPath string
 }
 
 // Conflict is one FQCN present in several artifacts: the copy selected
@@ -96,6 +100,8 @@ type Conflict struct {
 	ShadowedInstance         string
 	KeptSHA256, ShadowSHA256 string
 	SameContent              bool
+
+	keptJar, shadowJar string // run paths, for class-level owners
 }
 
 // Inventory is the run's component model.
@@ -103,9 +109,13 @@ type Inventory struct {
 	Artifacts []Artifact
 	Instances []Instance
 	Conflicts []Conflict
+	// Embedded are the embedded-component candidates (CVE:F6a), in
+	// artifact order; ResolveEmbedded sets their kind and status.
+	Embedded []Embedded
 	// ClasspathOrder documents the order assumption conflicts follow.
 	ClasspathOrder string
 	byJar          map[string]string // run path -> instance ID
+	byClass        map[string]string // run path + "\x00" + FQCN -> embedded instance ID
 }
 
 // InstanceForJar returns the instance ID of the artifact read from path
@@ -114,7 +124,7 @@ func (inv *Inventory) InstanceForJar(path string) string { return inv.byJar[path
 
 // InstanceForClass returns the instance a selected class belongs to.
 func (inv *Inventory) InstanceForClass(ci *hierarchy.ClassInfo) string {
-	return inv.byJar[ci.SourceJar]
+	return inv.instanceFor(ci.SourceJar, ci.FQCN)
 }
 
 // Counts returns artifacts, identified instances, unidentified instances
@@ -176,6 +186,7 @@ func Build(in Inputs, h *hierarchy.Hierarchy) (*Inventory, error) {
 		if err != nil {
 			return nil, err
 		}
+		var embedded []input.GAV
 		switch {
 		case dj.WebAssetsOnly:
 			inst.Detection = DetectedWebJar
@@ -202,53 +213,24 @@ func Build(in Inputs, h *hierarchy.Hierarchy) (*Inventory, error) {
 				continue
 			}
 			inst.Evidence = append(inst.Evidence, IdentityEvidence{Kind: "embedded-candidate", Detail: g.String(), GAV: &g})
+			embedded = append(embedded, g)
 		}
 		inv.add(a, inst)
+		host := inv.Instances[len(inv.Instances)-1].ID
+		for _, g := range embedded {
+			inv.Embedded = append(inv.Embedded, Embedded{HostInstance: host, GAV: g,
+				POMPath: fmt.Sprintf("META-INF/maven/%s/%s/pom.properties", g.Group, g.Artifact)})
+		}
 	}
 
-	byID := map[string]*Instance{}
-	for i := range inv.Instances {
-		byID[inv.Instances[i].ID] = &inv.Instances[i]
-	}
-	pkgs := map[string]map[string]bool{}
-	for _, ci := range h.All() {
-		id := inv.byJar[ci.SourceJar]
-		if id == "" {
-			continue
-		}
-		byID[id].Classes++
-		if pkgs[id] == nil {
-			pkgs[id] = map[string]bool{}
-		}
-		if dot := strings.LastIndexByte(ci.FQCN, '.'); dot > 0 {
-			pkgs[id][ci.FQCN[:dot]] = true
-		} else {
-			pkgs[id][""] = true
-		}
-	}
-	for id, set := range pkgs {
-		for p := range set {
-			byID[id].Packages = append(byID[id].Packages, p)
-		}
-		sort.Strings(byID[id].Packages)
-	}
 	for _, d := range h.Duplicates() {
-		kept, shadow := inv.byJar[d.Kept.Jar], inv.byJar[d.Shadowed.Jar]
 		inv.Conflicts = append(inv.Conflicts, Conflict{
-			FQCN: d.FQCN, KeptInstance: kept, ShadowedInstance: shadow,
-			KeptSHA256: d.Kept.SHA256, ShadowSHA256: d.Shadowed.SHA256,
+			FQCN: d.FQCN, KeptSHA256: d.Kept.SHA256, ShadowSHA256: d.Shadowed.SHA256,
 			SameContent: d.Kept.SHA256 != "" && d.Kept.SHA256 == d.Shadowed.SHA256,
+			keptJar:     d.Kept.Jar, shadowJar: d.Shadowed.Jar,
 		})
-		if in := byID[shadow]; in != nil {
-			in.Shadowed++
-		}
 	}
-	sort.Slice(inv.Conflicts, func(i, j int) bool {
-		if inv.Conflicts[i].FQCN != inv.Conflicts[j].FQCN {
-			return inv.Conflicts[i].FQCN < inv.Conflicts[j].FQCN
-		}
-		return inv.Conflicts[i].ShadowedInstance < inv.Conflicts[j].ShadowedInstance
-	})
+	inv.recount(h)
 	return inv, nil
 }
 

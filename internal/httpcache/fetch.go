@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 )
 
 // fullSHA matches a 40-hex commit SHA as a URL path segment (optionally
@@ -14,10 +15,15 @@ import (
 // immutable.
 var fullSHA = regexp.MustCompile(`/[0-9a-f]{40}(\.diff|\.patch)?(/|$)`)
 
-// KindForURL is KindPinned for a URL addressed by a full commit SHA and
-// KindMutable otherwise.
+// centralRelease matches a release (non-SNAPSHOT) artifact on Maven
+// Central: Central never changes a published release file (CVE:F6a
+// reference jars).
+var centralRelease = regexp.MustCompile(`^https://repo1\.maven\.org/maven2/.+/[^/]+/[^/]+/[^/]+\.jar$`)
+
+// KindForURL is KindPinned for a URL addressed by a full commit SHA or a
+// Maven Central release jar, and KindMutable otherwise.
 func KindForURL(url string) Kind {
-	if fullSHA.MatchString(url) {
+	if fullSHA.MatchString(url) || (centralRelease.MatchString(url) && !strings.Contains(url, "-SNAPSHOT")) {
 		return KindPinned
 	}
 	return KindMutable

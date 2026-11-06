@@ -84,6 +84,26 @@ type Component struct {
 	// the classpath order; ShadowedDiffering those whose content differs.
 	Shadowed          int `json:"shadowed,omitempty"`
 	ShadowedDiffering int `json:"shadowed_differing,omitempty"`
+	// EmbeddedIn is, for an embedded instance (CVE:F6a, detection
+	// "embedded"), the instance of the jar it is inside.
+	EmbeddedIn string `json:"embedded_in,omitempty"`
+}
+
+// EmbeddedCandidate is one pom.properties inside a jar other than the
+// jar's own identity, and what was concluded (CVE:F6a).
+type EmbeddedCandidate struct {
+	Host             string `json:"host"` // host instance ID
+	GAV              string `json:"gav"`
+	Path             string `json:"path"`
+	Kind             string `json:"kind"`             // module | library
+	Status           string `json:"status,omitempty"` // library: confirmed | content_differs | partial | classes_absent | reference_unavailable
+	Reason           string `json:"reason,omitempty"`
+	ReferenceURL     string `json:"reference_url,omitempty"`
+	ReferenceSHA256  string `json:"reference_sha256,omitempty"`
+	ReferenceClasses int    `json:"reference_classes,omitempty"`
+	Present          int    `json:"present,omitempty"`
+	Identical        int    `json:"identical,omitempty"`
+	Instance         string `json:"instance,omitempty"` // the instance created when confirmed
 }
 
 // Evidence is one identity fact of a component.
@@ -179,6 +199,10 @@ type Coverage struct {
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`
+	// EmbeddedCandidates are all embedded-component candidates (CVE:F6a).
+	// A library candidate that is not confirmed has no instance and no
+	// advisory lookup: its advisories are not in this document.
+	EmbeddedCandidates []EmbeddedCandidate `json:"embedded_candidates,omitempty"`
 	// AdvisoriesWithoutInstance were reported for a package/version no
 	// component instance carries; their verdict is the engine's
 	// whole-graph one (the v1 row).
@@ -291,9 +315,9 @@ func Build(in Inputs) Document {
 		for _, inst := range inv.Instances {
 			a := arts[inst.ArtifactID]
 			c := Component{
-				ID: inst.ID, ArtifactID: a.ID, Location: a.Location, Role: string(a.Role), SHA256: a.SHA256, Bytes: a.Bytes,
+				ID: inst.ID, ArtifactID: a.ID, Location: inv.InstanceLocation(inst.ID), Role: string(a.Role), SHA256: a.SHA256, Bytes: a.Bytes,
 				Identity: "identified", Detection: string(inst.Detection), Classes: inst.Classes,
-				Shadowed: inst.Shadowed, ShadowedDiffering: differing[inst.ID],
+				Shadowed: inst.Shadowed, ShadowedDiffering: differing[inst.ID], EmbeddedIn: inst.HostInstance,
 			}
 			if inst.GAV != nil {
 				c.GAV = inst.GAV.String()
@@ -316,6 +340,13 @@ func Build(in Inputs) Document {
 				gavOf[inst.ID] = [2]string{inst.GAV.PackageName(), inst.GAV.Version}
 			}
 			doc.Components = append(doc.Components, c)
+		}
+		for _, e := range inv.Embedded {
+			doc.Coverage.EmbeddedCandidates = append(doc.Coverage.EmbeddedCandidates, EmbeddedCandidate{
+				Host: e.HostInstance, GAV: e.GAV.String(), Path: e.POMPath, Kind: e.Kind, Status: e.Status, Reason: e.Reason,
+				ReferenceURL: e.ReferenceURL, ReferenceSHA256: e.ReferenceSHA256, ReferenceClasses: e.ReferenceClasses,
+				Present: e.Present, Identical: e.Identical, Instance: e.Instance,
+			})
 		}
 	}
 

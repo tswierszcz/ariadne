@@ -151,12 +151,8 @@ func baseName(p string) string {
 func derivations(list []cves.CVE, vm map[string]vulnmap.Entry, results []reach.Result, inv *component.Inventory, llmModel string) []snapshot.Derivation {
 	locByInstance := map[string]string{}
 	if inv != nil {
-		arts := map[string]string{}
-		for _, a := range inv.Artifacts {
-			arts[a.ID] = a.Location
-		}
 		for _, in := range inv.Instances {
-			locByInstance[in.ID] = arts[in.ArtifactID]
+			locByInstance[in.ID] = inv.InstanceLocation(in.ID)
 		}
 	}
 	byCVE := map[string]reach.Result{}

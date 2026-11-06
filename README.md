@@ -105,7 +105,18 @@ jar/WAR/EAR) is then resolved to a Maven coordinate, in priority order:
    itself** — works regardless of which build tool produced it. If a jar
    contains more than one such file (a shaded/uber jar bundling other
    libraries' poms), the one whose own `artifact-version` matches the
-   jar's file name is preferred, and the rest are recorded as a warning.
+   jar's file name is preferred, and the rest are recorded as a warning
+   — and examined as **embedded components** (CVE:F6a): a module of the
+   jar's own project (same version, related group) is part of the jar; a
+   separate library is compared class by class with its jar of exactly
+   that version from Maven Central (`ARIADNE_MAVEN_CENTRAL` overrides the
+   repository root). When its classes are there (same bytes, or the same
+   content after a shading tool rewrote them), it becomes its own
+   component instance inside the jar, with its own OSV lookup and its
+   own findings; otherwise it is listed as an unconfirmed candidate
+   (`content_differs`, `partial`, `classes_absent` — e.g. relocated,
+   `reference_unavailable`) and not looked up. The reference jars are
+   cached; an offline run reads them from the cache.
 2. `-deps-list` (the output of `mvn dependency:list`), matched by file
    name (`artifactId-version[-classifier].jar`). The parser tolerates
    ANSI color codes and the ` -- module x [auto]` suffix newer versions
@@ -516,7 +527,8 @@ summary, the full CVE table, every `REACHABLE` CVE's full call path with
 its entry call highlighted, every `FRAMEWORK` CVE flagged for manual
 review, the list of unidentified dependency jars, a "Components" inventory
 (CVE:F1a: every jar's SHA-256 and stable location, its component instance with
-identity evidence and embedded `pom.properties` candidates, and every class present in
+identity evidence, embedded components and the status of every embedded `pom.properties`
+candidate, and every class present in
 several jars with the selected and non-selected copy), a `META-INF/services`
 provider inventory, every resolved `ServiceLoader.load(...)` call site,
 and recognized ServiceLoader consumption/dispatch sites with their linked
@@ -1039,9 +1051,12 @@ report:
   qualified exports, a class-path main class not resolving module-path modules
   without `--add-modules`, and layers other than the boot layer are not
   modeled.
-- **Shaded/relocated dependencies**: a jar whose classes were relocated
-  under a different package than its own Maven coordinates declare is
-  not detected as such.
+- **Shaded/relocated dependencies**: a library embedded with its own
+  packages and its `pom.properties` is detected and assessed separately
+  (CVE:F6a); one whose classes were relocated under another package
+  (`classes_absent`), embedded without its `pom.properties`, or embedded
+  in a version other than the one its metadata declares is not — it is
+  listed as an unconfirmed candidate at most.
 - **CHA over-approximates**: a virtual/interface call is treated as
   reaching every subtype that overrides it (as of JVM_GRAPH G2, matched
   by exact descriptor, not just name — so two unrelated overloads of

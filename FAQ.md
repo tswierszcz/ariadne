@@ -361,6 +361,23 @@ order:
    files (their own bundled submodules) — the one whose
    `artifactId-version` matches the jar's own file name wins, and the
    rest are recorded as a warning.
+
+   **Why confirm an embedded library by its classes (CVE:F6a)?** Those
+   extra `pom.properties` are claims, not facts: in `ehcache-3.9.2` five
+   are ehcache's own modules (one more is the jar's own identity), two (`org.terracotta:offheap-store`,
+   `statistics`) describe code that was relocated to
+   `org.ehcache.shadow` — no class of theirs exists under their own
+   names — and two (`org.ehcache:sizeof`, `terracotta-utilities-tools`)
+   really are there. Looking advisories up for all of them would invent
+   findings; ignoring them hides real libraries. So a library candidate
+   is checked against its jar of exactly that version from Maven
+   Central, class by class. Byte comparison alone is not enough: shading
+   rewrites class files even when it doesn't rename them (constant-pool
+   order changes every index) — `jnr-ffi` inside `jruby-core` had 0 of
+   656 byte-identical classes and 644 identical by the
+   serialization-independent fingerprint. Only a confirmed library gets
+   an instance, owns its classes and gets looked up; everything else
+   stays visible as a coverage gap.
 2. If the jar has no `pom.properties`, match the file name
    (`artifactId-version[-classifier].jar`) against the `-deps-list`
    (`ParseDepsList` has to strip ANSI color codes and the
