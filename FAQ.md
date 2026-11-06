@@ -782,8 +782,23 @@ The report contains: a header, a summary (statuses + severity), the full
 CVE table, a full-path section for every `REACHABLE` CVE (with the
 "entry call" highlighted), a `FRAMEWORK` section labeled "needs manual
 review", the list of unidentified jars, and a fixed Limitations section
-(reflection, dynamic proxies, serialization gadgets, CHA
-over-approximation — the same content as in the README).
+(reflection, dynamic proxies, serialization gadget chains, CHA
+over-approximation — the same content as in the README), and since
+DESERIALIZATION Z1 a "Deserialization entry points" section.
+
+**Why does a `readObject` call connect to every serializable class's
+callbacks, not just the type it is cast to?** Because the cast runs
+*after* deserialization: by the time `(Foo) in.readObject()` checks the
+type, every object in the stream has been created and its `readObject`,
+`readResolve` or `readExternal` has already run. The stream — the data —
+decides which classes appear, not the code that reads it, which is
+exactly what makes deserialization dangerous. So the honest static answer
+is "any concrete serializable class the input contains may run its
+callbacks here", unless a filter restricts it (detected, not yet
+evaluated). On WebGoat this made two advisories reachable whose
+vulnerable code is itself a serialization callback (jackson-databind's
+`NodeSerialization#readExternal`, logback's `LoggingEventVO#readObject`) —
+code no ordinary call ever reaches.
 
 `results.json` is the same list of results as indented JSON, with no
 rendering logic — easy to diff between runs or load into another tool.

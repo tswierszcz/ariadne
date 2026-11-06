@@ -82,7 +82,9 @@ its own axis.
 ## 4. Model gaps and verdicts (B0)
 
 - A **global gap** is any incomplete-model fact of the run (today's "model analysis: …"
-  warnings, unresolved reflection/callback/ServiceLoader sites).
+  warnings, unresolved reflection/callback/ServiceLoader sites, and — since
+  DESERIALIZATION Z1 — every deserialization entry, kind `deserialization`, unbounded:
+  the JDK's own serialization callbacks are not modeled).
 - A gap is **relevant** to a finding when the unresolved site is in a method that is
   **reachable from the roots** *and* its possible targets could include the affected
   component (its candidate owners lie in the affected artifact, or the site has no

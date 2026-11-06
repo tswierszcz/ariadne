@@ -1,8 +1,8 @@
 # Deserializacja — fazy Z0–Z4
 
-Status: plan. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2–Z4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
 
-## Z0. Kontrakt modeli i ról
+## Z0. Kontrakt modeli i ról — DONE (kontrakt, 2026-11-06)
 
 Zależności: B0–B3, CVE F1/F4, JVM G2–G3, DATA_FLOW D0–D2.
 
@@ -13,7 +13,7 @@ Zależności: B0–B3, CVE F1/F4, JVM G2–G3, DATA_FLOW D0–D2.
 
 Gotowe: model rozróżnia podatny komponent, jego wejście i właściwy kod związany z danym CVE.
 
-## Z1. Java serialization i callbacki
+## Z1. Java serialization i callbacki — DONE (2026-11-06; `validateObject`, rekordy i `readObjectOverride` poza zakresem, odnotowane)
 
 - Dodać model wybranych operacji ObjectInputStream i rozpoznawanie typów Serializable/Externalizable dostępnych w scenariuszu.
 - Obsłużyć zadeklarowany zakres callbacków z dokładnymi sygnaturami i dostępem; prywatny `readObject` nie wymaga zwykłego publicznego wywołania.

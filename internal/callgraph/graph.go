@@ -90,6 +90,14 @@ const (
 	// runtime (a caught ReflectiveOperationException, a branch that
 	// never executes).
 	BasisReflection EdgeBasis = "reflection"
+	// BasisDeserialization is a DESERIALIZATION Z1 edge: a Java
+	// serialization entry (ObjectInputStream#readObject…) to a callback
+	// the format may run on an object of the input it creates
+	// (readObject, readObjectNoData, readResolve, readExternal, the
+	// constructor serialization calls). A "may run" edge for every
+	// candidate class — the stream decides which; nothing proves a given
+	// class is in it.
+	BasisDeserialization EdgeBasis = "deserialization"
 	// BasisModel is an edge supplied by a registered library model.
 	BasisModel EdgeBasis = "model"
 )

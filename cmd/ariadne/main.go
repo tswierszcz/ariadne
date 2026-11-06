@@ -23,6 +23,7 @@ import (
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
+	"ariadne/internal/deserialize"
 	"ariadne/internal/exploit"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/httpcache"
@@ -693,6 +694,31 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("reflection: %d Constructor#newInstance call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
 		len(reflectNewInstanceSites), len(reflectNewInstanceEdgeTargets), reflectNewInstanceEdgesAdded)
 
+	// DESERIALIZATION Z1: every Java serialization entry
+	// (ObjectInputStream#readObject/readUnshared, ObjectInput#readObject)
+	// gets a "may run" edge to every callback serialization may run on
+	// a concrete serializable class of the input (readObject,
+	// readObjectNoData, readResolve, readExternal, the constructor it
+	// calls). XStream entries are listed, not connected (entry-only).
+	deserSites := deserialize.FindSites(h)
+	deserTargets, deserSummary := deserialize.Candidates(h)
+	var deserGraphEdges []callgraph.DeserializationEdge
+	for _, e := range deserialize.Edges(deserSites, deserTargets) {
+		deserGraphEdges = append(deserGraphEdges, callgraph.DeserializationEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc, PC: e.PC,
+			TargetFQCN: e.TargetFQCN, TargetName: e.TargetName, TargetDesc: e.TargetDesc,
+		})
+	}
+	deserEdgesAdded := callgraph.ApplyDeserializationEdges(g, deserGraphEdges)
+	deserFiltered := 0
+	for _, s := range deserSites {
+		if s.Filter == deserialize.FilterNotEvaluated {
+			deserFiltered++
+		}
+	}
+	log("deserialization (DESERIALIZATION Z1): %d entry sites (%d with a filter, not evaluated); %d serializable candidate classes (%d Externalizable; %d enums, %d records excluded; %d of unknown serializability), %d callback targets, %d edges added",
+		len(deserSites), deserFiltered, deserSummary.Classes, deserSummary.Externalizable, deserSummary.Enums, deserSummary.Records, deserSummary.Unknown, len(deserTargets), deserEdgesAdded)
+
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
 		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
@@ -862,6 +888,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		reflectInvokes: resolvedReflectInvokes, newInstances: resolvedReflectNewInstances, handles: resolvedHandles,
 		callbackSites: callbackSites, callbacks: resolvedCallbacks,
 		loadSites: svcLoadSites, consumptions: svcConsumptionSites, registrations: svcRegs,
+		deserialization: deserSites,
 	})
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
@@ -1032,6 +1059,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
 	data.Modules = moduleInventory
 	data.Components = components
+	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded}
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
