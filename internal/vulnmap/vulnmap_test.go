@@ -100,6 +100,7 @@ func TestResolve_fallsBackToFixCommitDiff(t *testing.T) {
 	r.HTTPClient = srv.Client()
 	r.GithubBaseURL = srv.URL
 	r.RawBaseURL = srv.URL
+	r.GithubAPIBaseURL = srv.URL
 
 	cve := cves.CVE{
 		ID: "CVE-2022-1471",
@@ -179,6 +180,7 @@ func TestResolve_diffSourceMapsNonMavenLayout(t *testing.T) {
 	r.HTTPClient = srv.Client()
 	r.GithubBaseURL = srv.URL
 	r.RawBaseURL = srv.URL
+	r.GithubAPIBaseURL = srv.URL
 
 	cve := cves.CVE{
 		ID: "CVE-2099-0002",
@@ -221,6 +223,7 @@ func TestResolveAll_onlyIncludesResolvedCVEs(t *testing.T) {
 	r.HTTPClient = srv.Client()
 	r.GithubBaseURL = srv.URL
 	r.RawBaseURL = srv.URL
+	r.GithubAPIBaseURL = srv.URL
 
 	list := []cves.CVE{
 		{ID: "CVE-1"}, // manual hit

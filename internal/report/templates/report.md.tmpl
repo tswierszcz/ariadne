@@ -66,7 +66,10 @@ Reasons are stable codes from docs/RESULTS_CONTRACT.MD §3: `METHOD_NOT_FOUND` �
 method exists in the analyzed graph (no verdict, not "not reachable");
 `MAPPING_ENTRYPOINT_ONLY` — the mapping names entry points into the vulnerable behavior, not
 the vulnerable code; `MAPPING_PARTIAL` — `NOT_REACHABLE` on a mapping not known to be
-complete; `CLASSPATH_CONFLICT` — the affected instance's copy of a mapped class lost to
+complete; `MAPPING_NEW_SIDE_ONLY` — the fix-diff mapping was read on the post-fix side
+only (no parent revision: metadata unavailable or a merge commit), so methods the fix removed
+may be missing and helpers it added may be included; `SOURCE_UNAVAILABLE` — the advisory's
+fix commits could not be read, so there is no mapping; `CLASSPATH_CONFLICT` — the affected instance's copy of a mapped class lost to
 another jar's copy, so its code is not in the graph; `MODEL_INCOMPLETE` (with counts by kind)
 — `NOT_REACHABLE` although reachable unresolved sites could dispatch into the affected
 component. The verdict is kept (report-only, docs/RESULTS_CONTRACT.MD §4): read it as "no

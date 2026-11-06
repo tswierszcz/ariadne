@@ -275,6 +275,11 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	if !ok {
 		return Result{CVE: cve.ID, Status: StatusUnknown}
 	}
+	if !entry.Mapped() {
+		// Fix-commit references existed but none could be read (CVE:F5).
+		return Result{CVE: cve.ID, Status: StatusUnknown, Reasons: []findings.ReasonCode{findings.SourceUnavailable},
+			Note: "mapping source unavailable: " + entry.SourceError}
+	}
 
 	entry = entry.WithDefaults()
 	var matched []uint32
@@ -290,6 +295,9 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	var reasons []findings.ReasonCode
 	if entry.Role == vulnmap.RoleEntrypoint {
 		reasons = append(reasons, findings.MappingEntrypointOnly)
+	}
+	if entry.Source == vulnmap.SourceDiff && entry.NewSideOnly() {
+		reasons = append(reasons, findings.MappingNewSideOnly)
 	}
 
 	if instances := e.affectedInstances(cve); len(instances) > 0 && len(entry.Variants) > 0 {
@@ -743,7 +751,7 @@ func (e *Engine) fillFindings(r *Result, cve cves.CVE) {
 	}
 	var reasons []findings.ReasonCode
 	for _, c := range r.Reasons {
-		if c != findings.MappingPartial && c != findings.MappingEntrypointOnly {
+		if !findings.MappingQualifier(c) {
 			reasons = append(reasons, c)
 		}
 	}

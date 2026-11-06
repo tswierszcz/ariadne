@@ -305,7 +305,7 @@ For each CVE, in priority order:
    CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
-   `<url>.diff`, keeps only `.java` files under a `src/main/` path
+   `<url>.diff`, keeps only non-test `.java` files
    (excluding test code), and for each one fetches the full file *as it
    existed at that commit* from `raw.githubusercontent.com`. A
    brace-aware scanner (`internal/javadiff`) — which first blanks out
@@ -316,6 +316,25 @@ For each CVE, in priority order:
    changed line inside one is attributed to the *enclosing* method); a
    method whose name matches its enclosing class is renamed to `<init>`,
    matching bytecode's own convention.
+
+   **Both sides of the fix (CVE:F5a).** The code in *your* release is the
+   code **before** the fix, so ariadne also reads the commit's metadata
+   from the GitHub REST API (`api.github.com/repos/<o>/<r>/commits/<sha>`
+   — full SHA and parent; set `GITHUB_TOKEN` for a higher rate limit,
+   the token is sent but never cached) and, for a single-parent commit,
+   fetches each file at the **parent** revision too (under its old path
+   for a renamed file). Every method the diff touched is then *changed*
+   (declared before and after), *removed* (before only — a deleted file's
+   methods included) or *added* (after only — a new helper or file). The
+   mapping is the changed + removed methods under their pre-fix class
+   name; added methods are not code of the vulnerable release and are
+   kept only as evidence (`-json-format v2`: `mapping.fix_commits`). When
+   the old side cannot be read — no metadata (e.g. an offline cache filled
+   before F5), a merge or root commit, an unreadable pre-fix file — that
+   commit falls back to the post-fix side and the row says so with
+   `MAPPING_NEW_SIDE_ONLY`. A fix commit that cannot be fetched no longer
+   fails the run: it is recorded, and an advisory none of whose commits
+   could be read is `UNKNOWN` + `SOURCE_UNAVAILABLE`.
 3. **An LLM (opt-in, `-llm`).** Only for a CVE sources 1 and 2 found
    nothing for. The model gets the advisory (summary + details) and,
    when the CVE links a fix commit, that commit's non-test `.java` diff;

@@ -561,7 +561,7 @@ entry.
 **Source 2 — a GitHub fix-commit diff.** For a reference shaped like
 `github.com/<owner>/<repo>/commit/<sha>`: download `<url>.diff`, keep
 only `.java` files under `src/main/` (excluding tests), for each one
-fetch its **full content** as it existed at the fix commit
+fetch its **full content** as it existed at the fix commit (and, since CVE:F5a, at its parent — see below)
 (`raw.githubusercontent.com`), and use a scanner (`internal/javadiff`) to
 find which method encloses each changed line. The scanner first blanks
 out comments/strings/text blocks (keeping line numbers intact) so a
@@ -569,6 +569,27 @@ stray `{` never desyncs brace matching, then tracks a stack of
 class/method/"something else" frames (`if`/`for`/lambda/anonymous-class
 bodies are transparent), and renames a method to `<init>` when its name
 matches the enclosing class (a constructor).
+
+**Why read the file before the fix, too (CVE:F5a)?** The analyzed
+application contains the *vulnerable* release, i.e. the code before the
+fix. Reading only the post-fix file had two failure modes: a method the
+fix **deleted** never became a candidate (it is not in the new file), and
+a helper the fix **added** (`checkInput`, a whole new firewall class)
+became one although the vulnerable release does not contain it — so a
+`NOT_REACHABLE` could rest on the wrong side of the diff. The `.diff`
+format does not name the commit's parent, so ariadne asks the GitHub REST
+API for it (metadata only — the patch still comes from the `.diff`, since
+the API may truncate per-file patches), reads the file at the parent, and
+maps changed + removed methods while keeping added ones as evidence.
+Without the parent (no API answer, a merge commit with two parents) it
+does not guess a base: it falls back to the post-fix side and marks the
+row `MAPPING_NEW_SIDE_ONLY`. On the CVE:F0 inputs this removed 232/402
+helper-only methods from petclinic/WebGoat mappings and added 120/116
+pre-fix ones; it turned logback's CVE-2024-12798 (the fix deletes the
+Janino evaluator) from `UNKNOWN` into a real `FRAMEWORK` path, and
+CVE-2024-38821 on WebGoat from a `REACHABLE` that ended in an *added*
+method into `FRAMEWORK` through the actually changed
+`WebFilterChainProxy#filter`.
 
 Source 3 is an LLM reading the advisory + fix diff, opt-in with `-llm`
 (design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It

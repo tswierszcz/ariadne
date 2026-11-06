@@ -128,6 +128,14 @@ type Mapping struct {
 	// MethodRoles: an LLM mapping's per-method roles (vulnerable /
 	// entry_point); bytecode presence does not confirm either.
 	MethodRoles map[string]string `json:"method_roles,omitempty"`
+	// FixCommits: a diff mapping's per-commit evidence (CVE:F5) — base
+	// revision ("parent" or "new_side_only" with its reason) and, per
+	// file, the methods the fix changed, removed or added. Added methods
+	// are not in Methods: they are not code of the vulnerable release.
+	FixCommits []vulnmap.FixCommit `json:"fix_commits,omitempty"`
+	// NewSideOnly: some fix commit or file was read on the post-fix side
+	// only (reason MAPPING_NEW_SIDE_ONLY on the v1 row).
+	NewSideOnly bool `json:"new_side_only,omitempty"`
 }
 
 // MappingVariant is one versioned method list.
@@ -334,7 +342,7 @@ func Build(in Inputs) Document {
 			adv.Mapping = &Mapping{
 				Methods: methods, MatchPrecision: vulnmap.MappingPrecision(methods), Source: e.Source,
 				Role: e.Role, Coverage: e.Coverage, Review: e.Review, Model: e.Model, Evidence: e.Evidence,
-				MethodRoles: e.MethodRoles,
+				MethodRoles: e.MethodRoles, FixCommits: e.FixCommits, NewSideOnly: e.Source == vulnmap.SourceDiff && e.NewSideOnly(),
 			}
 			for _, v := range e.Variants {
 				adv.Mapping.Variants = append(adv.Mapping.Variants, MappingVariant{Package: v.Package, Versions: v.Versions, Methods: v.Methods})
@@ -406,7 +414,7 @@ func checkApplicability(c cves.CVE, gav [2]string) *ApplicabilityCheck {
 func instanceReasons(rs []findings.ReasonCode) []findings.ReasonCode {
 	var out []findings.ReasonCode
 	for _, c := range rs {
-		if c != findings.MappingPartial && c != findings.MappingEntrypointOnly {
+		if !findings.MappingQualifier(c) {
 			out = append(out, c)
 		}
 	}

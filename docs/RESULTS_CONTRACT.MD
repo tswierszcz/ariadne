@@ -55,7 +55,10 @@ Stable, machine-readable codes (`internal/findings`). Once emitted they are part
 output contract: never renamed, never reused for another meaning; a superseded code is
 deprecated. CVE:F0 defines them. Since CVE:F1b, `METHOD_NOT_FOUND`, `CLASSPATH_CONFLICT`,
 `MAPPING_PARTIAL`, `MAPPING_ENTRYPOINT_ONLY` and `MODEL_INCOMPLETE` are emitted (v1 `reasons`);
-`VERSION_UNKNOWN`, `SOURCE_UNAVAILABLE` and `RUNTIME_UNSUPPORTED` are not set yet.
+CVE:F4 adds `VERSION_UNKNOWN`, `MAPPING_VERSION_UNCOVERED`, `MAPPING_CONFLICT`; CVE:F5 adds
+`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; `RUNTIME_UNSUPPORTED` is not set yet.
+`MAPPING_NEW_SIDE_ONLY`, like `MAPPING_PARTIAL`, qualifies the advisory row and stays off
+instance findings (v2 carries it as `mapping.new_side_only`).
 `MAPPING_PARTIAL` on v1 qualifies `NOT_REACHABLE` without changing it (F1b, "option B"): every
 mapping today is partial, so making it `UNKNOWN` would erase the state; v2 carries coverage as
 its own axis.
@@ -69,7 +72,8 @@ its own axis.
 | `METHOD_NOT_FOUND` | mapping | No mapped method exists in the analyzed graph | a method renamed in the analyzed version |
 | `MAPPING_VERSION_UNCOVERED` | mapping | (CVE:F4) The mapping is versioned and none of its variants covers this instance's version: there is no method list for it | a mapping for `[1.0,2.0)` and `[2.0,3.0)`; the input has 3.1 |
 | `MAPPING_CONFLICT` | mapping | (CVE:F4) Several variants of the mapping cover this instance's version with different methods; none is chosen | overlapping `[1.0,2.0]` and `[2.0,3.0)` for 2.0 |
-| `SOURCE_UNAVAILABLE` | mapping | The evidence needed for a mapping (fix commit, diff, advisory detail) could not be obtained | an OSV record without a fix reference |
+| `MAPPING_NEW_SIDE_ONLY` | mapping | (CVE:F5) A fix-diff mapping was read on the post-fix side only — commit metadata unavailable, a merge or root commit, or the pre-fix file unreadable — so methods the fix removed are missing and helpers it added may be included | a fix commit with two parents |
+| `SOURCE_UNAVAILABLE` | mapping | The evidence needed for a mapping (fix commit, diff, advisory detail) could not be obtained. (CVE:F5) Emitted when the advisory has fix-commit references and none could be read (finding `UNKNOWN`); an advisory with no fix reference at all is a plain unmapped `UNKNOWN` | every fix-commit diff answers HTTP 500 |
 | `MODEL_INCOMPLETE` | model | An explicit gap in the call-graph model (unresolved reflection, ServiceLoader, callback, …) is relevant to this finding | an unresolved `Method#invoke` in the affected package |
 | `RUNTIME_UNSUPPORTED` | runtime | The finding depends on runtime behavior ariadne does not model (JDK/JRE vulnerabilities, custom class loaders) | a CVE in the JDK itself |
 

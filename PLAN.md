@@ -416,6 +416,12 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
   `<url>.diff` → keep `.java` files under `src/main/` → fetch each at
   `raw.githubusercontent.com/.../<sha>/<path>` → map changed lines to methods. All fetches
   go through `internal/httpcache`.
+  **Since CVE:F5a (2026-11-06)** both sides of the fix are read: the commit's parent comes
+  from the GitHub REST API, each file is also fetched at the parent, and touched methods are
+  classified changed/removed/added — the mapping is changed + removed under the pre-fix class,
+  added helpers are evidence only; no parent (no metadata, merge commit) → post-fix side only
+  with `MAPPING_NEW_SIDE_ONLY`; an unreadable commit is per-CVE (`SOURCE_UNAVAILABLE`), not a
+  run failure. See README step 6 and RECOMMENDATION/IMPLEMENTATION_STATUS.MD (CVE:F5a).
   **Deviation from the plan's own description:** rather than a regex/`javalang` pass over
   the diff's `@@` hunk context, the implementation always fetches the full post-fix file
   and runs the same brace-aware scanner on it, using the diff only for *which lines*

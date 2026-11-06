@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 
 	"ariadne/internal/cves"
@@ -49,13 +50,24 @@ type Entry struct {
 	// ("vulnerable" / "entry_point").
 	Variants    []Variant         `json:"-"`
 	MethodRoles map[string]string `json:"-"`
+	// FixCommits is a diff mapping's per-commit evidence (CVE:F5): base
+	// revision, files, and which methods were changed, removed or added
+	// by the fix. Only changed and removed methods are in Methods.
+	FixCommits []FixCommit `json:"fix_commits,omitempty"`
+	// SourceError is set, with no Methods, when a CVE had fix-commit
+	// references but none could be read and no other source mapped it
+	// (reason SOURCE_UNAVAILABLE).
+	SourceError string `json:"source_error,omitempty"`
 }
+
+// Mapped reports whether the entry names at least one method.
+func (e Entry) Mapped() bool { return len(e.Methods) > 0 }
 
 // ResolverVersion versions the mapping resolution (manual → diff → LLM
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "2" // 2: CVE:F4 versioned manual variants, LLM per-method roles
+const ResolverVersion = "3" // 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5 both sides of a fix diff
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -71,11 +83,15 @@ type evidence struct {
 
 func noteEvidence(ctx context.Context, body []byte) {
 	if ev, ok := ctx.Value(evidenceKey{}).(*evidence); ok {
-		s := sha256.Sum256(body)
 		ev.mu.Lock()
-		ev.hashes[hex.EncodeToString(s[:])] = true
+		ev.hashes[sha256Hex(body)] = true
 		ev.mu.Unlock()
 	}
+}
+
+func sha256Hex(b []byte) string {
+	s := sha256.Sum256(b)
+	return hex.EncodeToString(s[:])
 }
 
 func noteReused(ctx context.Context) {
@@ -118,11 +134,15 @@ type Resolver struct {
 	HTTPClient *http.Client
 	Cache      *httpcache.Cache
 
-	// GithubBaseURL/RawBaseURL default to the real github.com/
-	// raw.githubusercontent.com and only need overriding in tests, so a
-	// fake HTTP server can stand in for both.
-	GithubBaseURL string
-	RawBaseURL    string
+	// GithubBaseURL/RawBaseURL/GithubAPIBaseURL default to the real
+	// github.com/raw.githubusercontent.com/api.github.com and only need
+	// overriding in tests, so a fake HTTP server can stand in for all.
+	GithubBaseURL    string
+	RawBaseURL       string
+	GithubAPIBaseURL string
+	// GithubToken, when set, authenticates commit-metadata requests
+	// (higher rate limit). It is sent, never cached.
+	GithubToken string
 
 	// LLM enables source 3; nil leaves it disabled. MethodExists grounds
 	// the model's answer in the analyzed bytecode (nil skips the check).
@@ -134,11 +154,12 @@ type Resolver struct {
 // LoadManual); httpClient may be nil to use http.DefaultClient.
 func NewResolver(manual map[string][]string, cache *httpcache.Cache) *Resolver {
 	return &Resolver{
-		Manual:        manual,
-		HTTPClient:    http.DefaultClient,
-		Cache:         cache,
-		GithubBaseURL: "https://github.com",
-		RawBaseURL:    "https://raw.githubusercontent.com",
+		Manual:           manual,
+		HTTPClient:       http.DefaultClient,
+		Cache:            cache,
+		GithubBaseURL:    "https://github.com",
+		RawBaseURL:       "https://raw.githubusercontent.com",
+		GithubAPIBaseURL: "https://api.github.com",
 	}
 }
 
@@ -167,19 +188,40 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 		}
 	}
 
-	methods, err := r.resolveFromDiffs(ctx, cve)
+	methods, commits, err := r.resolveFromDiffs(ctx, cve)
 	if err != nil {
 		return Entry{}, false, err
 	}
 	if len(methods) > 0 {
 		sort.Strings(methods)
-		return Entry{Methods: methods, Source: SourceDiff}.WithDefaults(), true, nil
+		return Entry{Methods: methods, Source: SourceDiff, FixCommits: commits}.WithDefaults(), true, nil
 	}
 
-	if r.LLM == nil {
-		return Entry{}, false, nil
+	if r.LLM != nil {
+		e, ok, err := r.resolveFromLLM(ctx, cve)
+		if ok || err != nil {
+			return e, ok, err
+		}
 	}
-	return r.resolveFromLLM(ctx, cve)
+	// No mapping. When every fix commit failed to be read, say so
+	// (SOURCE_UNAVAILABLE) rather than leave a bare "no mapping".
+	if len(commits) > 0 && allFailed(commits) {
+		msgs := make([]string, len(commits))
+		for i, c := range commits {
+			msgs[i] = c.Repo + "@" + c.SHA + ": " + c.Error
+		}
+		return Entry{SourceError: strings.Join(msgs, "; "), FixCommits: commits}, true, nil
+	}
+	return Entry{}, false, nil
+}
+
+func allFailed(commits []FixCommit) bool {
+	for _, c := range commits {
+		if c.Error == "" {
+			return false
+		}
+	}
+	return true
 }
 
 // ResolveAll resolves every CVE in list, in parallel (fix-commit/raw-file

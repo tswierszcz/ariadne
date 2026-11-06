@@ -152,12 +152,17 @@ func (r *Resolver) llmCommitDiffs(ctx context.Context, cve cves.CVE) (urls []str
 		// whatever GithubBaseURL a test points at, so the golden prompt
 		// text stays stable.
 		public := fmt.Sprintf("https://github.com/%s/%s/commit/%s", c.owner, c.repo, c.sha)
-		urls = append(urls, public)
 
-		body, err := r.fetch(ctx, url+".diff")
+		body, err := r.fetch(ctx, url+".diff", nil)
 		if err != nil {
-			return nil, nil, fmt.Errorf("fetching fix commit diff %s.diff: %w", public, err)
+			if isContractError(err) {
+				return nil, nil, fmt.Errorf("fetching fix commit diff %s.diff: %w", public, err)
+			}
+			// CVE:F5 task 10: an unreadable commit is left out of the
+			// prompt; the CVE is still asked about with what remains.
+			continue
 		}
+		urls = append(urls, public)
 		cd := commitDiff{url: public}
 		for _, f := range splitDiffFiles(string(body)) {
 			if keepForLLM(f.path) {

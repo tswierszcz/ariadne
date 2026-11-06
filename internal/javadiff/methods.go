@@ -54,7 +54,7 @@ type frame struct {
 // such lines too, and the caller simply gets fewer methods out of it.
 func FindMethodsForLines(src string, lines []int) []string {
 	cleaned := stripCommentsAndStrings(src)
-	lineOwner := computeLineOwners(cleaned)
+	lineOwner, _ := computeLineOwners(cleaned)
 
 	seen := make(map[string]bool)
 	var out []string
@@ -74,8 +74,9 @@ func FindMethodsForLines(src string, lines []int) []string {
 
 // computeLineOwners returns, for each 1-based line number, the name of
 // the innermost enclosing method/constructor active at that line ("" if
-// none).
-func computeLineOwners(cleaned string) []string {
+// none), and the set of every method/constructor name with a body.
+func computeLineOwners(cleaned string) ([]string, map[string]bool) {
+	declared := make(map[string]bool)
 	totalLines := 1
 	for i := 0; i < len(cleaned); i++ {
 		if cleaned[i] == '\n' {
@@ -108,11 +109,22 @@ func computeLineOwners(cleaned string) []string {
 	for i := 0; i < len(cleaned); i++ {
 		switch cleaned[i] {
 		case '\n':
-			lineOwner[currentLine] = topMethodName()
+			if lineOwner[currentLine] == "" {
+				lineOwner[currentLine] = topMethodName()
+			}
 			currentLine++
 		case '{':
 			header := cleaned[headerStart:i]
-			stack = append(stack, classifyHeader(header, currentClassName()))
+			f := classifyHeader(header, currentClassName())
+			if f.kind == frameMethod {
+				declared[f.name] = true
+				// A method opened on this line owns it even if it also
+				// closes on it ("void g() { bad(); }").
+				if lineOwner[currentLine] == "" {
+					lineOwner[currentLine] = f.name
+				}
+			}
+			stack = append(stack, f)
 			headerStart = i + 1
 		case '}':
 			if len(stack) > 0 {
@@ -123,8 +135,10 @@ func computeLineOwners(cleaned string) []string {
 			headerStart = i + 1
 		}
 	}
-	lineOwner[currentLine] = topMethodName()
-	return lineOwner
+	if lineOwner[currentLine] == "" {
+		lineOwner[currentLine] = topMethodName()
+	}
+	return lineOwner, declared
 }
 
 func classifyHeader(header, enclosingClass string) frame {
@@ -165,4 +179,14 @@ func trimSpace(s string) string {
 
 func isSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+// DeclaredMethods returns the name of every method/constructor with a
+// body declared in src ("<init>" for constructors), the same names
+// FindMethodsForLines returns — so a caller can tell whether a method a
+// diff touched on one side exists at all on the other (CVE:F5). Abstract
+// and interface methods without a body are not listed.
+func DeclaredMethods(src string) map[string]bool {
+	_, declared := computeLineOwners(stripCommentsAndStrings(src))
+	return declared
 }

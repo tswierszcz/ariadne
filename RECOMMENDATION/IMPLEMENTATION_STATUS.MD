@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. Następny krok: F5 (obie strony poprawki). |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: IN_PROGRESS (F5a DONE 2026-11-06); F6–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. Następny krok: F5b (bytecode/deskryptory, powiązanie z wydaniem). |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2207,6 +2207,109 @@ Przy dodawaniu kolejnego wpisu zapisz:
   na którą czekał JVM_GRAPH G2 (bridge/default) — poza zakresem F4.
 - **Następny krok (wymaga zgody):** CVE:F5 — obie strony poprawki i
   powiązanie z badanym wydaniem.
+
+### CVE:F5a — obie strony poprawki, kandydaci ze starego kodu — DONE for this slice; CVE:F5 IN_PROGRESS (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** zadania F5.1–F5.4, F5.6, F5.10 i
+  część F5.11 (klucze wyprowadzeń); źródło rodzica: GitHub REST API z
+  opcjonalnym tokenem i fallbackiem do `.diff`. F5.5/F5.8 (weryfikacja w
+  bytecode z deskryptorem), F5.7 (powiązanie commita z gałęzią/wydaniem),
+  F5.9 (heurystyka przemianowań metod), prompt LLM z obiema stronami — F5b.
+- **Zrealizowane:**
+  1. `internal/javadiff`: `FileDiff{OldPath, NewPath, Change, OldLines,
+     NewLines}` (added/modified/deleted/renamed; `rename from/to`,
+     `new/deleted file mode`, `/dev/null` po obu stronach); treść hunku
+     konsumowana według liczników z nagłówka (usunięta linia `-- x`
+     nie jest nagłówkiem pliku); pliki usunięte i czyste rename są
+     zwracane. `DeclaredMethods(src)`. Poprawka przy okazji: metoda
+     otwarta i zamknięta w jednej linii (`void g() { … }`) jest teraz
+     właścicielem tej linii (wcześniej linia nie miała właściciela).
+  2. `internal/vulnmap/diffsource.go`: metadane commita
+     `GithubAPIBaseURL/repos/{o}/{r}/commits/{sha}` (pełne SHA, rodzice;
+     patch nadal z `.diff`); `GITHUB_TOKEN` (cmd) wysyłany, nie
+     zapisywany w cache. Jeden rodzic → stara treść z
+     `raw/<parent>/<old-path>`, nowa z `raw/<sha>/<new-path>`;
+     klasyfikacja `changed`/`removed`/`added` po nazwie metody
+     zadeklarowanej po każdej stronie; mapowanie = changed + removed pod
+     nazwą klasy sprzed poprawki; `added` tylko w dowodach. Brak
+     metadanych, merge (≥2 rodziców), root commit, nieczytelny stary plik
+     → strona po poprawce (dawne zachowanie) i `BaseNewSideOnly` z
+     powodem. Dowody: `Entry.FixCommits` (repo, SHA, parent, base,
+     per plik ścieżki, zmiana, SHA-256 obu stron, metody z rodzajem).
+  3. Błędy źródła per CVE: nieczytelny diff → `FixCommit.Error`, reszta
+     commitów i CVE dalej; gdy żaden commit nie dał się odczytać i nie ma
+     innego źródła → `Entry{SourceError}` → `UNKNOWN` +
+     `SOURCE_UNAVAILABLE`. `ErrOffline`/`ErrTooOld`/`ErrNotInSnapshot`
+     na `.diff` nadal przerywają przebieg (`isContractError`). Ścieżka
+     LLM pomija nieczytelne commity zamiast przerywać.
+  4. Nowy kod `MAPPING_NEW_SIDE_ONLY` (kontrakt §3), kwalifikator wiersza
+     jak `MAPPING_PARTIAL` (`findings.MappingQualifier`, nie trafia do
+     ustaleń per instancja); `SOURCE_UNAVAILABLE` po raz pierwszy
+     emitowany. v2: `mapping.fix_commits`, `mapping.new_side_only`.
+     `vulnmap.ResolverVersion` 2→3 (klucze wyprowadzeń F3). Log CLI:
+     liczba mapowań tylko z nowej strony i nieczytelnych commitów.
+- **Weryfikacja:** `internal/javadiff` (obie strony, rename, plik
+  dodany/usunięty, hunk z samymi `-`, linia `--- x`, `DeclaredMethods`,
+  metoda jednolinijkowa); `internal/vulnmap/f5_test.go` na fałszywym
+  GitHubie: usunięta metoda jest kandydatem, helper nie; brak metadanych
+  → nowa strona z powodem; merge commit; rename + usunięty + dodany plik;
+  brak źródeł; nieczytelny commit per CVE i obok czytelnego; offline bez
+  `.diff` → `ErrOffline`; offline bez metadanych → nowa strona; token
+  wysyłany. `internal/reach/f5_test.go`: kody na wierszu i ich brak w
+  ustaleniach per instancja; `SOURCE_UNAVAILABLE`. Mutacje: mapowanie
+  także metod `added` (2 testy padają), parser ignorujący linie `-`
+  (5 testów padają). Istniejące testy nie sięgają już do prawdziwego
+  `api.github.com` (`GithubAPIBaseURL` wskazuje fałszywy serwer).
+  `go vet ./...`, `go test ./...` — PASS.
+- **Prawdziwe dane** (wejścia baseline CVE:F0, `-profile spring`):
+  - offline na dotychczasowym `.cache` (bez metadanych): każde mapowanie
+    z diffu dostaje `MAPPING_NEW_SIDE_ONLY` (petclinic 90, WebGoat 67);
+    listy metod bez zmian poza poprawką jednolinijkowych metod (3/4 CVE);
+  - metadane pobrane raz online (token z `gh auth token`, tylko w
+    środowisku) i przeniesione do kopii starego cache **wyłącznie** jako
+    wpisy `api.github.com` i `raw.githubusercontent.com` (OSV bez zmian,
+    ten sam zestaw CVE 148/160); potem offline: petclinic 234 commity
+    (227 z rodzicem, 7 merge), WebGoat 125 (110/15); metody: 232/402
+    tylko-dodane usunięte z mapowań, 120/116 sprzed poprawki dodane;
+    mapowanych CVE 91→92 i 104→105;
+  - zmiany werdyktów (każda sprawdzona w `fix_commits`):
+    CVE-2024-12798 UNKNOWN→FRAMEWORK na obu (logback usuwa
+    `JaninoEventEvaluator*`; ścieżka do `JaninoEventEvaluatorBase#evaluate`
+    — kryterium „usunięta metoda jest kandydatem”); CVE-2024-38821
+    REACHABLE→FRAMEWORK na WebGoat (stara ścieżka kończyła się w
+    `AbstractServerWebExchangeMatcherRegistry#matchers` z pliku *dodanego*
+    przez linkowany commit z 2017 r.; teraz zmieniona
+    `WebFilterChainProxy#filter` — kryterium „helper nie jest podatnym
+    kodem”); CVE-2026-50193 UNKNOWN→NOT_REACHABLE na obu (zmieniony
+    jednolinijkowy konstruktor `InternalNodeMapper#<init>` teraz
+    znaleziony; `push`/`popOrNull` to dodane helpery, nieobecne w
+    bytecode; wiersz ma `MAPPING_PARTIAL` i `MODEL_INCOMPLETE`);
+  - v2 bajtowo powtarzalny (dwa przebiegi petclinic);
+  - lokalny `.cache` uzupełniony o 1064 wpisy GitHub (API + raw), bez
+    zmiany wpisów OSV — baseline F0 nadal odtwarzalny z eksportu.
+- **Kryteria F5 a ten wycinek:** usunięta podatna metoda jest kandydatem —
+  tak (test + CVE-2024-12798); nowy helper nie jest uznany za istniejący
+  kod — tak (test + CVE-2024-38821); rename pliku, merge commit, brak
+  źródeł — odrębne wyniki tak; **dwie gałęzie — nie** (F5b, F5.7);
+  przypadki nierozstrzygnięte widoczne — tak (`MAPPING_NEW_SIDE_ONLY`,
+  `SOURCE_UNAVAILABLE`).
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz mapowań), README krok 6,
+  FAQ (krok 6), `docs/RESULTS_CONTRACT.MD` §3, legenda w szablonie
+  raportu, `testdata/cve-control/cases.yaml` (`v1` dla 0201–0203 i
+  CVE-2021-44228), PLAN.md (Phase 4), nagłówek F5 w planie CVE.
+- **Ograniczenia:** metody z diffu nadal po nazwie, bez deskryptora,
+  metody klas zagnieżdżonych przypisane do klasy najwyższego poziomu;
+  `added` jest względne wobec rodzica commita — commit z dawną funkcją
+  podlinkowany w advisory nadal może dać metody `changed`, które nie są
+  podatnym kodem (powiązanie z wydaniem: F5b); metody abstrakcyjne/
+  interfejsowe bez ciała nie są liczone jako zadeklarowane; bez tokena
+  limit API 60/h (wynik: nowa strona z powodem, nie błąd);
+  `MAPPING_NEW_SIDE_ONLY` nie zmienia werdyktu (jak `MAPPING_PARTIAL`).
+- **Następny krok (wymaga zgody):** CVE:F5b — weryfikacja kandydatów w
+  bytecode z deskryptorem i sources JAR (F5.5, F5.8), powiązanie commita
+  z gałęzią/wydaniem i odrębne rodzaje odnośników (F5.7), heurystyka
+  przemianowań (F5.9), obie strony w prompcie LLM bez uruchamiania LLM
+  (F5.11).
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

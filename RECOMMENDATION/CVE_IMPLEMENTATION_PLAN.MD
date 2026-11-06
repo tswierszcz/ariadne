@@ -188,7 +188,7 @@ Stosować właściwy zakres wersji, komponent i przeciążenie, nie wprowadzają
 - Wywołania odziedziczone zachowują dostęp do ciała właściwej metody.
 - Przypadki brakującej metody, nieznanej wersji i konfliktu pozostają nierozstrzygnięte z kodem powodu.
 
-## F5. Obie strony poprawki i powiązanie z badanym wydaniem
+## F5. Obie strony poprawki i powiązanie z badanym wydaniem — IN_PROGRESS (F5a DONE 2026-11-06: zadania 1–4, 6, 10, część 11; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

@@ -44,6 +44,7 @@ func main() {
 }
 
 type config struct {
+	githubToken     string // GITHUB_TOKEN: authenticates fix-commit metadata requests (CVE:F5)
 	app             string
 	deps            string
 	depsList        string
@@ -137,6 +138,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 		cfg.offline = true // a replay never touches the network
 	}
 
+	cfg.githubToken = getenv("GITHUB_TOKEN")
 	if cfg.llm || cfg.exploitCheck || cfg.frameworkCheck {
 		cfg.llmConfig = vulnmap.LLMConfigFromEnv(getenv)
 		if cfg.llmModel != "" {
@@ -709,6 +711,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("loading vuln_methods.yaml: %w", err)
 	}
 	resolver := vulnmap.NewResolver(manual, cache)
+	resolver.GithubToken = cfg.githubToken
 	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
 		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)
 	}
@@ -730,11 +733,20 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("mapping CVEs to vulnerable methods: %w", err)
 	}
 	bySource := map[string]int{}
+	mapped, newSideOnly := 0, 0
 	for _, e := range vm {
+		if !e.Mapped() {
+			bySource["unavailable"]++
+			continue
+		}
+		mapped++
 		bySource[e.Source]++
+		if e.Source == vulnmap.SourceDiff && e.NewSideOnly() {
+			newSideOnly++
+		}
 	}
-	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d)",
-		len(vm), len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM])
+	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d; diff read on the post-fix side only=%d; fix commits unreadable=%d)",
+		mapped, len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM], newSideOnly, bySource["unavailable"])
 	if llmSrc != nil {
 		st := llmSrc.Stats()
 		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode, %d previous answers reused for changed advisories",

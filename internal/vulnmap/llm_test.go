@@ -308,7 +308,7 @@ func llmFixture(t *testing.T, diff string, llm *fakeLLM) (*Resolver, *LLMSource)
 	t.Cleanup(gh.Close)
 
 	r := NewResolver(nil, mustCache(t))
-	r.GithubBaseURL, r.RawBaseURL = gh.URL, gh.URL
+	r.GithubBaseURL, r.RawBaseURL, r.GithubAPIBaseURL = gh.URL, gh.URL, gh.URL
 	r.MethodExists = func(c, m string) bool { return c == "org.example.Parser" && (m == "parse") }
 
 	src := NewLLMSource(LLMConfig{BaseURL: llm.srv.URL, Model: "test/model", APIKey: "test-key"}, mustCache(t), nil)

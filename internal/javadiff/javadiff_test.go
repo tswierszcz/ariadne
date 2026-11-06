@@ -48,16 +48,22 @@ index 3333333..4444444 100644
 
 	byPath := map[string]FileDiff{}
 	for _, f := range files {
-		byPath[f.Path] = f
+		byPath[f.Path()] = f
 	}
 
 	yaml, ok := byPath["src/main/java/org/yaml/snakeyaml/Yaml.java"]
 	if !ok {
 		t.Fatalf("Yaml.java not found in %+v", files)
 	}
-	sort.Ints(yaml.ChangedLines)
-	if want := []int{12, 13, 33}; !reflect.DeepEqual(yaml.ChangedLines, want) {
-		t.Errorf("Yaml.java ChangedLines = %v, want %v", yaml.ChangedLines, want)
+	sort.Ints(yaml.NewLines)
+	if want := []int{12, 13, 33}; !reflect.DeepEqual(yaml.NewLines, want) {
+		t.Errorf("Yaml.java NewLines = %v, want %v", yaml.NewLines, want)
+	}
+	if want := []int{12}; !reflect.DeepEqual(yaml.OldLines, want) {
+		t.Errorf("Yaml.java OldLines = %v, want %v", yaml.OldLines, want)
+	}
+	if yaml.Change != ChangeModified || yaml.OldPath != yaml.NewPath {
+		t.Errorf("Yaml.java = %+v, want modified in place", yaml)
 	}
 
 	if _, ok := byPath["src/test/java/org/yaml/snakeyaml/YamlTest.java"]; !ok {
@@ -65,7 +71,7 @@ index 3333333..4444444 100644
 	}
 }
 
-func TestParseUnifiedDiff_deletedFileSkipped(t *testing.T) {
+func TestParseUnifiedDiff_deletedFileKept(t *testing.T) {
 	diff := `diff --git a/Old.java b/Old.java
 deleted file mode 100644
 index 1111111..0000000
@@ -80,8 +86,82 @@ index 1111111..0000000
 	if err != nil {
 		t.Fatalf("ParseUnifiedDiff: %v", err)
 	}
-	if len(files) != 0 {
-		t.Fatalf("got %+v, want no files (pure deletion has nothing on the new side)", files)
+	want := []FileDiff{{OldPath: "Old.java", Change: ChangeDeleted, OldLines: []int{1, 2, 3}}}
+	if !reflect.DeepEqual(files, want) {
+		t.Fatalf("got %+v, want %+v (CVE:F5: a deleted file's old lines are the evidence)", files, want)
+	}
+}
+
+func TestParseUnifiedDiff_bothSides(t *testing.T) {
+	// An added file, a rename with a content change, a pure rename, a
+	// pure-deletion hunk, and a removed line whose content starts with
+	// "-- " (shown as "--- ...") that must not be read as a file header.
+	diff := `diff --git a/src/New.java b/src/New.java
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/New.java
+@@ -0,0 +1,2 @@
++class New {
++}
+diff --git a/src/a/Old.java b/src/b/Moved.java
+similarity index 90%
+rename from src/a/Old.java
+rename to src/b/Moved.java
+index 2222222..3333333 100644
+--- a/src/a/Old.java
++++ b/src/b/Moved.java
+@@ -3,4 +3,3 @@ class Old {
+     void m() {
+--- x;
+-        y();
++        z();
+     }
+diff --git a/src/P.java b/src/Q.java
+similarity index 100%
+rename from src/P.java
+rename to src/Q.java
+diff --git a/src/D.java b/src/D.java
+index 4444444..5555555 100644
+--- a/src/D.java
++++ b/src/D.java
+@@ -10,3 +10,2 @@
+ a
+-b
+ c
+@@ -20 +19 @@
+-x
++y
+`
+	files, err := ParseUnifiedDiff(diff)
+	if err != nil {
+		t.Fatalf("ParseUnifiedDiff: %v", err)
+	}
+	want := []FileDiff{
+		{NewPath: "src/New.java", Change: ChangeAdded, NewLines: []int{1, 2}},
+		{OldPath: "src/a/Old.java", NewPath: "src/b/Moved.java", Change: ChangeRenamed, OldLines: []int{4, 5}, NewLines: []int{4}},
+		{OldPath: "src/P.java", NewPath: "src/Q.java", Change: ChangeRenamed},
+		{OldPath: "src/D.java", NewPath: "src/D.java", Change: ChangeModified, OldLines: []int{11, 20}, NewLines: []int{19}},
+	}
+	if !reflect.DeepEqual(files, want) {
+		t.Fatalf("got\n%+v\nwant\n%+v", files, want)
+	}
+}
+
+func TestDeclaredMethods(t *testing.T) {
+	src := `package p;
+class A {
+    A() {}
+    void one() { int x = 1; }
+    abstract void noBody();
+    class Inner { void two() {
+    } }
+}
+`
+	got := DeclaredMethods(src)
+	want := map[string]bool{"<init>": true, "one": true, "two": true}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("DeclaredMethods = %v, want %v", got, want)
 	}
 }
 
@@ -189,5 +269,15 @@ func TestFQCN(t *testing.T) {
 		if !ok || got != tc.want {
 			t.Errorf("FQCN(%q) = (%q, %v), want (%q, true)", tc.path, got, ok, tc.want)
 		}
+	}
+}
+
+func TestFindMethodsForLines_oneLineMethod(t *testing.T) {
+	src := "class A {\n    void g() { bad(); }\n    void h() {\n    }\n}\n"
+	if got := FindMethodsForLines(src, []int{2}); !reflect.DeepEqual(got, []string{"g"}) {
+		t.Errorf("line 2 owner = %v, want [g]", got)
+	}
+	if got := FindMethodsForLines(src, []int{4}); len(got) != 0 {
+		t.Errorf("closing-brace line owner = %v, want none", got)
 	}
 }

@@ -30,7 +30,7 @@ func TestLLM_realEndpoint(t *testing.T) {
 	defer gh.Close()
 
 	r := NewResolver(nil, mustCache(t))
-	r.GithubBaseURL, r.RawBaseURL = gh.URL, gh.URL
+	r.GithubBaseURL, r.RawBaseURL, r.GithubAPIBaseURL = gh.URL, gh.URL, gh.URL
 	r.LLM = NewLLMSource(cfg, mustCache(t), nil)
 
 	entry, ok, err := r.Resolve(context.Background(), testCVE())

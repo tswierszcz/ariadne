@@ -25,6 +25,8 @@ const (
 	// CVE:F4: versioned mappings.
 	MappingVersionUncovered ReasonCode = "MAPPING_VERSION_UNCOVERED"
 	MappingConflict         ReasonCode = "MAPPING_CONFLICT"
+	// CVE:F5: a fix-diff mapping read on the post-fix side only.
+	MappingNewSideOnly ReasonCode = "MAPPING_NEW_SIDE_ONLY"
 
 	// Reachability-model axis.
 	ModelIncomplete ReasonCode = "MODEL_INCOMPLETE"
@@ -37,7 +39,15 @@ const (
 var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict,
 	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable,
-	MappingVersionUncovered, MappingConflict,
+	MappingVersionUncovered, MappingConflict, MappingNewSideOnly,
 	ModelIncomplete,
 	RuntimeUnsupported,
+}
+
+// MappingQualifier reports a code that describes the mapping itself (its
+// role, coverage or evidence) rather than a finding: v1 keeps it on the
+// advisory row, v2 carries it in the mapping, never on an instance
+// finding's reachability verdict.
+func MappingQualifier(c ReasonCode) bool {
+	return c == MappingPartial || c == MappingEntrypointOnly || c == MappingNewSideOnly
 }
