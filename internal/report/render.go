@@ -1,11 +1,11 @@
 package report
 
 import (
+	"ariadne/internal/atomicfile"
 	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"text/template"
 
@@ -34,17 +34,24 @@ func WriteMarkdown(path string, data Data) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, []byte(rendered), 0o644); err != nil {
-		return fmt.Errorf("writing %s: %w", path, err)
-	}
-	return nil
+	return atomicfile.WriteFile(path, []byte(rendered))
 }
 
-// WriteResultsJSON writes results to path as deterministic JSON: sorted
-// by CVE id, with each result's own Methods slice sorted too, matching
-// the plan's "results.json must be deterministic" requirement so two runs
-// against the same cache produce byte-identical output.
+// WriteResultsJSON writes results to path as deterministic JSON
+// (ResultsJSON), atomically.
 func WriteResultsJSON(path string, results []reach.Result) error {
+	b, err := ResultsJSON(results)
+	if err != nil {
+		return err
+	}
+	return atomicfile.WriteFile(path, b)
+}
+
+// ResultsJSON renders the v1 results as deterministic JSON: sorted by CVE
+// id, with each result's own Methods slice sorted too, matching the
+// plan's "results.json must be deterministic" requirement so two runs
+// against the same cache produce byte-identical output.
+func ResultsJSON(results []reach.Result) ([]byte, error) {
 	sorted := append([]reach.Result(nil), results...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].CVE < sorted[j].CVE })
 	for i := range sorted {
@@ -53,11 +60,7 @@ func WriteResultsJSON(path string, results []reach.Result) error {
 
 	b, err := json.MarshalIndent(sorted, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshaling results: %w", err)
+		return nil, fmt.Errorf("marshaling results: %w", err)
 	}
-	b = append(b, '\n')
-	if err := os.WriteFile(path, b, 0o644); err != nil {
-		return fmt.Errorf("writing %s: %w", path, err)
-	}
-	return nil
+	return append(b, '\n'), nil
 }

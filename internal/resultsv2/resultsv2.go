@@ -11,10 +11,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
+	"ariadne/internal/atomicfile"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
 	"ariadne/internal/findings"
@@ -31,13 +31,19 @@ const SchemaVersion = "2"
 
 // Document is the whole v2 output.
 type Document struct {
-	SchemaVersion string      `json:"schema_version"`
-	Tool          Tool        `json:"tool"`
-	Snapshot      Snapshot    `json:"snapshot"`
-	Components    []Component `json:"components"`
-	Advisories    []Advisory  `json:"advisories"`
-	Findings      []Finding   `json:"findings"`
-	Coverage      Coverage    `json:"coverage"`
+	SchemaVersion string `json:"schema_version"`
+	// AnalysisID (CVE:F9.9) identifies this analysis result: a SHA-256
+	// over the document's own content with this field empty. The report
+	// and a snapshot manifest written by the same run carry the same ID,
+	// so artifacts of different runs cannot be mixed unnoticed; the same
+	// inputs and data give the same ID (no time is part of it).
+	AnalysisID string      `json:"analysis_id"`
+	Tool       Tool        `json:"tool"`
+	Snapshot   Snapshot    `json:"snapshot"`
+	Components []Component `json:"components"`
+	Advisories []Advisory  `json:"advisories"`
+	Findings   []Finding   `json:"findings"`
+	Coverage   Coverage    `json:"coverage"`
 }
 
 // Tool identifies the analyzer build.
@@ -630,14 +636,32 @@ func CheckV1(doc Document, results []reach.Result) []string {
 	return out
 }
 
-// Write writes doc as indented JSON.
-func Write(path string, doc Document) error {
+// WithAnalysisID returns doc with AnalysisID set (CVE:F9.9).
+func WithAnalysisID(doc Document) (Document, error) {
+	doc.AnalysisID = ""
+	b, err := json.Marshal(doc)
+	if err != nil {
+		return doc, fmt.Errorf("marshaling v2 results: %w", err)
+	}
+	sum := sha256.Sum256(b)
+	doc.AnalysisID = "sha256:" + hex.EncodeToString(sum[:])
+	return doc, nil
+}
+
+// Marshal renders doc as the indented JSON written to -json.
+func Marshal(doc Document) ([]byte, error) {
 	b, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshaling v2 results: %w", err)
+		return nil, fmt.Errorf("marshaling v2 results: %w", err)
 	}
-	if err := os.WriteFile(path, append(b, '\n'), 0o644); err != nil {
-		return fmt.Errorf("writing %s: %w", path, err)
+	return append(b, '\n'), nil
+}
+
+// Write writes doc as indented JSON, atomically.
+func Write(path string, doc Document) error {
+	b, err := Marshal(doc)
+	if err != nil {
+		return err
 	}
-	return nil
+	return atomicfile.WriteFile(path, b)
 }

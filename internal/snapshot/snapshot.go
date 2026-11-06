@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"ariadne/internal/atomicfile"
 	"ariadne/internal/httpcache"
 )
 
@@ -53,6 +54,9 @@ type Manifest struct {
 	Verdicts     map[string]string       `json:"verdicts"` // advisory -> v1 status
 	// DataFreshness is the freshness state of the recorded run (CVE:F2).
 	DataFreshness string `json:"data_freshness,omitempty"`
+	// AnalysisID is the analysis_id of the results the recording run
+	// wrote with this manifest (CVE:F9.9).
+	AnalysisID string `json:"analysis_id,omitempty"`
 }
 
 // Tool identifies the analyzer build that made the snapshot.
@@ -210,15 +214,27 @@ func DataSetID(obs []httpcache.Observation) string {
 	return "sha256:" + HashBytes([]byte(strings.Join(lines, "\n")))
 }
 
-// Write writes m as dir/manifest.json, setting DataSetID.
-func Write(dir string, m Manifest) error {
+// ManifestPath is dir's manifest file.
+func ManifestPath(dir string) string { return filepath.Join(dir, "manifest.json") }
+
+// Marshal renders m as manifest JSON, setting its format and DataSetID.
+func Marshal(m Manifest) ([]byte, error) {
 	m.FormatVersion = FormatVersion
 	m.DataSetID = DataSetID(m.Observations)
 	b, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshaling snapshot manifest: %w", err)
+		return nil, fmt.Errorf("marshaling snapshot manifest: %w", err)
 	}
-	return os.WriteFile(filepath.Join(dir, "manifest.json"), append(b, '\n'), 0o644)
+	return append(b, '\n'), nil
+}
+
+// Write writes m as dir/manifest.json, setting DataSetID, atomically.
+func Write(dir string, m Manifest) error {
+	b, err := Marshal(m)
+	if err != nil {
+		return err
+	}
+	return atomicfile.WriteFile(ManifestPath(dir), b)
 }
 
 // Read loads dir/manifest.json.

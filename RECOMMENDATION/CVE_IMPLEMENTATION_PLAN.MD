@@ -304,7 +304,7 @@ F8c nie jest warunkiem pierwszego wydania oceny podatności JDK.
 - Nieznany vendor, niepełny build, brak danych historycznych i backport mają jawne rozstrzygnięcia lub brak rozstrzygnięcia.
 - Pierwszy adapter jest udokumentowany i nie udaje wsparcia całego ekosystemu OpenJDK.
 
-## F9. Integracja, migracja i kwalifikacja wydania
+## F9. Integracja, migracja i kwalifikacja wydania — IN_PROGRESS (F9a 2026-11-06: zadania 9, 8 dla błędów globalnych i zapisu, 4 i 5 dla drugiego przyrostu F6–F7; pozostają 1–3, 6–7 dla kolejnych punktów wydania i 8 dla rate limit/częściowego mapowania na poziomie CLI; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

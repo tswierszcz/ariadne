@@ -9,6 +9,9 @@
 - **App:** {{.App}}
 - **Generated:** {{.GeneratedAt.Format "2006-01-02 15:04:05 MST"}}
 - **ariadne version:** {{.AriadneVersion}}
+{{- if .AnalysisID}}
+- **Analysis ID:** `{{.AnalysisID}}` — results file `{{.ResultsFile}}` ({{.ResultsFormat}}, sha256 `{{.ResultsSHA256}}`); written together with this report (CVE:F9.9): a results file with another hash, or a v2 file / snapshot manifest with another `analysis_id`, is from a different run
+{{- end}}
 - **Profile:** {{.Profile}}
 - **Frameworks detected:** {{.FrameworksDetected}} — FRAMEWORKS F0: which profiles' own marker classes were actually found, independent of which one(s) got merged into the active Profile above (e.g. both `spring` and `jakarta` can be detected while only `spring` ends up selected by `-profile`)
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}

@@ -604,6 +604,16 @@ The underlying call graph also keeps every call site that produced an
 edge (not just the first one that happened to be seen) as evidence,
 even when several calls to the same target collapse into one edge.
 
+**Outputs are written together (CVE:F9a).** The report, the results
+file and a `-snapshot-out` manifest are rendered first and written only
+at the end of a successful run, all or nothing — a run that fails
+anywhere (an OSV lookup offline without cache, a broken snapshot, a
+results path that cannot be written) replaces none of them, so a report
+on disk is never a partial one. The report header shows an **analysis
+ID** (the v2 document's `analysis_id`, a hash of its content) and the
+results file's name, format and SHA-256: a report and a results file
+belong to the same run only when these match.
+
 `results.json` is the same analysis as structured data — sorted by CVE
 id, with each result's own method list sorted — so that two runs against
 the same cached inputs produce **byte-for-byte identical output**
