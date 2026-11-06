@@ -50,12 +50,18 @@ func jarBytes(t *testing.T, classes map[string][]byte) []byte {
 
 // fakeCentral serves reference jars by URL suffix and counts requests.
 type fakeCentral struct {
-	jars map[string][]byte // "group:artifact:version" -> jar
-	hits int
+	jars  map[string][]byte // "group:artifact:version" -> jar
+	files map[string][]byte // any other URL (poms, maven-metadata.xml)
+	hits  int
+	urls  []string
 }
 
 func (f *fakeCentral) fetch(_ context.Context, url string) ([]byte, error) {
 	f.hits++
+	f.urls = append(f.urls, url)
+	if b, ok := f.files[url]; ok {
+		return b, nil
+	}
 	for gav, b := range f.jars {
 		var g input.GAV
 		p := strings.Split(gav, ":")
@@ -192,8 +198,10 @@ func TestEmbeddedNotConfirmed(t *testing.T) {
 	if e := embeddedByGAV(inv, "org.host.modules:core:1.0"); e.Kind != EmbeddedModule || e.Status != "" {
 		t.Errorf("module = %+v", e)
 	}
-	if c.hits != 4 {
-		t.Errorf("Central asked %d times, want 4 (never for a module)", c.hits)
+	// 4 reference jars + the version list of the content_differs one
+	// (CVE:F6b; unavailable here, so its status stays content_differs).
+	if c.hits != 5 {
+		t.Errorf("Central asked %d times, want 5 (never for a module)", c.hits)
 	}
 	if len(inv.Instances) != 2 || len(inv.ConfirmedEmbeddedGAVs()) != 0 {
 		t.Errorf("instances = %d", len(inv.Instances))

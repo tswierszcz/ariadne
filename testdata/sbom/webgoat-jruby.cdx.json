@@ -1,0 +1,22 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:6f0e8a52-1b0e-4d6c-9a43-ariadne-f6b-control",
+  "version": 1,
+  "metadata": {
+    "component": {"type": "application", "bom-ref": "webgoat", "name": "webgoat"}
+  },
+  "components": [
+    {
+      "type": "library", "bom-ref": "jruby-core",
+      "group": "org.jruby", "name": "jruby-core", "version": "9.2.14.0",
+      "purl": "pkg:maven/org.jruby/jruby-core@9.2.14.0",
+      "hashes": [{"alg": "SHA-256", "content": "9c5bb862ec56eca639180c912107d1ad9e26c54fb76865c3ec2f2e8a1646ebdc"}],
+      "components": [
+        {"type": "library", "bom-ref": "jruby-core/jnr-ffi", "group": "com.github.jnr", "name": "jnr-ffi", "version": "2.2.1", "purl": "pkg:maven/com.github.jnr/jnr-ffi@2.2.1"},
+        {"type": "library", "bom-ref": "jruby-core/asm-util", "group": "org.ow2.asm", "name": "asm-util", "version": "9.1", "purl": "pkg:maven/org.ow2.asm/asm-util@9.1"}
+      ]
+    },
+    {"type": "library", "bom-ref": "listed-only", "group": "org.example", "name": "listed-only", "version": "1.0", "purl": "pkg:maven/org.example/listed-only@1.0"}
+  ]
+}

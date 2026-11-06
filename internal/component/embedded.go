@@ -63,7 +63,44 @@ const (
 	// EmbeddedRelocationConflict: the applicable relocation rules
 	// contradict each other (one package relocated to two places).
 	EmbeddedRelocationConflict = "relocation_conflict"
+	// EmbeddedVersionCandidates (CVE:F6b): the classes fit several of the
+	// published versions that were checked and none is singled out — an
+	// instance is created with that bounded set of candidate versions;
+	// advisories of any of them are reported, not as confirmed affected.
+	EmbeddedVersionCandidates = "version_candidates"
+	// EmbeddedVersionUnknown (CVE:F6b): the classes are there but no
+	// checked version fits (or no version could be checked): no instance,
+	// no advisory lookup — a coverage gap, never an "no CVE" result.
+	EmbeddedVersionUnknown = "version_unknown"
 )
+
+// Candidate sources (CVE:F6b): where a candidate was named.
+const (
+	SourcePOMProperties = "pom.properties" // a pom.properties inside the jar
+	SourceDeclared      = "declared"       // only the -embedded-components file
+	SourceBuildConfig   = "build-config"   // the jar's embedded pom.xml: shade includes ∩ dependencies
+	SourceSBOM          = "sbom"           // a CycloneDX component nested in the jar's SBOM component
+)
+
+// MaxVersionSearch bounds how many other published versions are compared
+// for one candidate (CVE:F6b): around the declared version, or — with no
+// version at all — every published version when there are at most this
+// many.
+const MaxVersionSearch = 8
+
+// VersionCheck is one published version compared with the host's
+// classes (CVE:F6b).
+type VersionCheck struct {
+	Version          string
+	ReferenceURL     string
+	ReferenceSHA256  string
+	ReferenceClasses int
+	Present          int
+	Identical        int
+	Fits             bool   // meets the confirmation thresholds
+	Declared         bool   // the candidate's own declared version
+	Error            string // reference unavailable
+}
 
 // Embedded is one embedded-component candidate and what was concluded.
 type Embedded struct {
@@ -88,6 +125,21 @@ type Embedded struct {
 	// under which its own classes were found (with their source).
 	Declared    bool
 	Relocations []relocate.Rule
+	// CVE:F6b. Source: where the candidate was named (Source*), with a
+	// detail (the pom.xml path and dependency chain, the SBOM bom-ref).
+	Source       string
+	SourceDetail string
+	// Version is the version the classes confirm (status confirmed; it
+	// may differ from GAV.Version when the declared one did not fit);
+	// VersionCandidates the fitting versions (status version_candidates).
+	Version           string
+	VersionCandidates []string
+	// VersionsChecked are every version compared, declared one first;
+	// VersionsPublished how many releases the version list had (0 = not
+	// read); VersionSearch says how the checked set was chosen.
+	VersionsChecked   []VersionCheck
+	VersionsPublished int
+	VersionSearch     string
 }
 
 // ReferenceFetcher returns the body at url (a Maven Central jar), through
@@ -161,17 +213,24 @@ func classFQCN(entry string) string {
 }
 
 // ResolveEmbedded examines every embedded candidate recorded by Build
-// (and those decls adds), confirms library candidates against their
-// reference jars, and adds an instance for each confirmed one: the host
-// jar's classes found in the reference are reassigned to it (class
-// counts, packages and class conflicts follow).
+// (and those decls, an SBOM and the host's build configuration add),
+// confirms library candidates against their reference jars, and adds an
+// instance for each confirmed one: the host jar's classes found in the
+// reference are reassigned to it (class counts, packages and class
+// conflicts follow).
 //
 // CVE:F7a: a candidate's classes are looked up under their relocated
 // names when relocation rules apply — the host jar's own maven-shade
 // configuration (its embedded pom.xml) and the user's declarations
 // (-embedded-components, pinned to the jar's SHA-256). Host-level rules
 // also normalize references: a class that only refers to a relocated
-// dependency compares equal to its original. A reference that cannot be
+// dependency compares equal to its original.
+//
+// CVE:F6b: a candidate whose declared version is not confirmed by its
+// classes (content_differs), or that has no version at all, is compared
+// with a bounded set of other published versions (searchVersions): one
+// fitting version confirms it, several make a version-candidates
+// instance, none leaves it version_unknown. A reference that cannot be
 // read is a per-candidate outcome, never an error; only an unreadable
 // host jar is.
 func (inv *Inventory) ResolveEmbedded(ctx context.Context, fetch ReferenceFetcher, base string, h *hierarchy.Hierarchy, decls *Declarations) error {
@@ -183,141 +242,98 @@ func (inv *Inventory) ResolveEmbedded(ctx context.Context, fetch ReferenceFetche
 	for i, in := range inv.Instances {
 		byID[in.ID] = i
 	}
-	type hostData struct {
-		classes map[string]*zip.File
-		zr      *zip.ReadCloser
-		rules   []relocate.Rule
-	}
 	hosts := map[string]*hostData{}
 	defer func() {
 		for _, hd := range hosts {
 			hd.zr.Close()
 		}
 	}()
-	claimed := map[string]string{} // host path + "\x00" + class entry -> claiming candidate GAV
+	openHost := func(host Instance) (*hostData, error) {
+		a := inv.artifact(host.ArtifactID)
+		if hd := hosts[a.ID]; hd != nil {
+			return hd, nil
+		}
+		zr, err := zip.OpenReader(a.Path)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s for embedded components: %w", a.Path, err)
+		}
+		hd := &hostData{path: a.Path, classes: classEntries(zr.File), zr: zr}
+		hd.rules, inv.BuildConfigNotes = shadeRelocations(zr.File, host.GAV, inv.BuildConfigNotes)
+		hosts[a.ID] = hd
+		return hd, nil
+	}
+	// CVE:F6b: candidates the host's build configuration names (shade
+	// artifactSet includes ∩ the pom's dependencies) — after the
+	// pom.properties and declared ones, so those win for the same package.
+	for i := 0; i < len(inv.Instances); i++ {
+		host := inv.Instances[i]
+		if host.Detection == DetectedApp || host.Detection == DetectedEmbedded || host.GAV == nil {
+			continue
+		}
+		hd, err := openHost(host)
+		if err != nil {
+			return err
+		}
+		inv.addBuildConfigCandidates(ctx, fetch, base, host, hd.zr.File)
+	}
+
+	cl := claims{}
 	var added []Instance
 	for i := range inv.Embedded {
 		e := &inv.Embedded[i]
 		host := inv.Instances[byID[e.HostInstance]]
-		if !e.Declared && host.GAV != nil && isModuleOf(e.GAV, *host.GAV) {
+		if e.Source == "" {
+			e.Source = SourcePOMProperties
+		}
+		if e.Source == SourcePOMProperties && !e.Declared && host.GAV != nil && isModuleOf(e.GAV, *host.GAV) {
 			e.Kind = EmbeddedModule
 			e.Reason = fmt.Sprintf("module of %s (same version, related group): part of the host, no separate lookup", host.GAV)
 			continue
 		}
 		e.Kind = EmbeddedLibrary
-		a := inv.artifact(host.ArtifactID)
-		hd := hosts[a.ID]
-		if hd == nil {
-			zr, err := zip.OpenReader(a.Path)
-			if err != nil {
-				return fmt.Errorf("reading %s for embedded components: %w", a.Path, err)
-			}
-			hd = &hostData{classes: classEntries(zr.File), zr: zr}
-			hd.rules, inv.BuildConfigNotes = shadeRelocations(zr.File, host.GAV, inv.BuildConfigNotes)
-			hosts[a.ID] = hd
+		hd, err := openHost(host)
+		if err != nil {
+			return err
 		}
 		rules, err := relocate.New(append(append([]relocate.Rule(nil), hd.rules...), declared[host.ID]...))
 		if err != nil {
 			e.Status, e.Reason = EmbeddedRelocationConflict, err.Error()
 			continue
 		}
-		inverse := rules.Inverse()
-
-		e.ReferenceURL = ReferenceURL(base, e.GAV)
-		body, err := fetch(ctx, e.ReferenceURL)
-		if err != nil {
-			e.Status, e.Reason = EmbeddedReferenceUnavailable, "reference jar unavailable: "+err.Error()
+		var best *versionCheck
+		if e.GAV.Version != "" {
+			c := compareVersion(ctx, fetch, base, e.GAV, hd, rules, cl)
+			e.recordCheck(c, true)
+			e.ReferenceURL, e.ReferenceSHA256 = c.url, c.sha
+			e.ReferenceClasses, e.Present, e.Identical = c.refClasses, c.present, c.identical
+			e.Status, e.Reason = c.status(e.GAV.Version, rules.Empty())
+			if e.Status == EmbeddedConfirmed {
+				best, e.Version = c, e.GAV.Version
+			}
+		} else {
+			e.Status, e.Reason = EmbeddedVersionUnknown, "no version declared for this candidate"
+		}
+		if best == nil && (e.Status == EmbeddedContentDiffers || e.GAV.Version == "") {
+			best = inv.searchVersions(ctx, fetch, base, e, hd, rules, cl)
+		}
+		if best == nil {
 			continue
 		}
-		sum := sha256.Sum256(body)
-		e.ReferenceSHA256 = hex.EncodeToString(sum[:])
-		rz, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
-		if err != nil {
-			e.Status, e.Reason = EmbeddedReferenceUnavailable, "reference jar unreadable: "+err.Error()
-			continue
-		}
-		ref := classEntries(rz.File)
-		e.ReferenceClasses = len(ref)
-		own := map[relocate.Rule]bool{}
-		var images []string
-		collisions := 0
-		for n, re := range ref {
-			orig := strings.TrimSuffix(n, ".class")
-			image := rules.Name(orig) + ".class"
-			he, ok := hd.classes[image]
-			if !ok {
-				continue
-			}
-			if r, under := rules.Under(rules.Name(orig)); under && image != n {
-				own[r] = true
-			}
-			if g, taken := claimed[a.Path+"\x00"+image]; taken && g != e.GAV.String() {
-				collisions++
-				continue
-			}
-			e.Present++
-			images = append(images, image)
-			if sameClass(he, re, inverse) {
-				e.Identical++
-			}
-		}
-		for r := range own {
+		for r := range best.own {
 			e.Relocations = append(e.Relocations, r)
 		}
 		sort.Slice(e.Relocations, func(i, j int) bool { return e.Relocations[i].From < e.Relocations[j].From })
-		sort.Strings(images)
-		switch {
-		case collisions > 0:
-			e.Status, e.Reason = EmbeddedCollision, fmt.Sprintf("%d of its classes are already attributed to another embedded component", collisions)
-		case e.ReferenceClasses == 0:
-			e.Status, e.Reason = EmbeddedClassesAbsent, "the reference jar has no classes"
-		case e.Present == 0 && rules.Empty():
-			e.Status, e.Reason = EmbeddedClassesAbsent, "none of the reference classes is in the jar: stale metadata or a relocated copy (declare the relocation, CVE:F7a)"
-		case e.Present == 0:
-			e.Status, e.Reason = EmbeddedClassesAbsent, "none of the reference classes is in the jar, also under the known relocations"
-		case e.Present*2 < e.ReferenceClasses:
-			e.Status, e.Reason = EmbeddedPartial, fmt.Sprintf("only %d of %d reference classes present (a minimized copy is not proof the rest is absent or safe)", e.Present, e.ReferenceClasses)
-		case e.Identical*10 < e.Present*9:
-			e.Status, e.Reason = EmbeddedContentDiffers, fmt.Sprintf("%d of %d present classes differ from version %s", e.Present-e.Identical, e.Present, e.GAV.Version)
-		default:
-			e.Status = EmbeddedConfirmed
-			e.Reason = fmt.Sprintf("%d of %d reference classes present, %d identical", e.Present, e.ReferenceClasses, e.Identical)
-			if len(e.Relocations) > 0 {
-				e.Reason += ", relocated"
-			}
+		if len(e.Relocations) > 0 && e.Status == EmbeddedConfirmed {
+			e.Reason += ", relocated"
 		}
-		if e.Status != EmbeddedConfirmed {
-			continue
-		}
-		for _, img := range images {
-			claimed[a.Path+"\x00"+img] = e.GAV.String()
-		}
-		g := e.GAV
-		path := strings.TrimSuffix(e.POMPath, "/pom.properties")
-		var evidence []IdentityEvidence
-		if e.POMPath != "" {
-			evidence = append(evidence, IdentityEvidence{Kind: "pom.properties", Detail: e.POMPath, GAV: &g})
-		} else {
-			path = "declared/" + g.Group + "/" + g.Artifact
-		}
-		if e.Declared {
-			evidence = append(evidence, IdentityEvidence{Kind: "declared", Detail: "-embedded-components entry for this jar's SHA-256", GAV: &g})
-		}
-		evidence = append(evidence, IdentityEvidence{Kind: "reference-classes", Detail: e.Reason + " (" + e.ReferenceURL + ")"})
-		for _, r := range e.Relocations {
-			evidence = append(evidence, IdentityEvidence{Kind: "relocation", Detail: r.From + " -> " + r.To + " (" + r.Source + ")"})
-		}
-		inst := Instance{
-			ID: "c-" + shortHash(host.ArtifactID, "embedded:"+g.String()), ArtifactID: host.ArtifactID,
-			GAV: &g, Detection: DetectedEmbedded, HostInstance: host.ID, EmbeddedPath: path,
-			Evidence: evidence, Relocations: e.Relocations,
-		}
+		cl.claim(hd.path, best.images, e.GAV.PackageName())
+		inst := inv.embeddedInstance(e, host, best)
 		e.Instance = inst.ID
 		if inv.byClass == nil {
 			inv.byClass = map[string]string{}
 		}
-		for _, n := range images {
-			inv.byClass[a.Path+"\x00"+classFQCN(n)] = inst.ID
+		for _, n := range best.images {
+			inv.byClass[hd.path+"\x00"+classFQCN(n)] = inst.ID
 		}
 		added = append(added, inst)
 	}
@@ -329,6 +345,167 @@ func (inv *Inventory) ResolveEmbedded(ctx context.Context, fetch ReferenceFetche
 	return nil
 }
 
+// hostData is one host jar opened for embedded-component checks.
+type hostData struct {
+	path    string
+	classes map[string]*zip.File
+	zr      *zip.ReadCloser
+	rules   []relocate.Rule
+}
+
+// claims records which candidate (package name) a confirmed instance's
+// classes went to, per host jar: a class is never given to two.
+type claims map[string]string
+
+func (c claims) owner(jar, entry string) (string, bool) {
+	g, ok := c[jar+"\x00"+entry]
+	return g, ok
+}
+
+func (c claims) claim(jar string, entries []string, pkg string) {
+	for _, n := range entries {
+		c[jar+"\x00"+n] = pkg
+	}
+}
+
+// versionCheck is one version's reference jar compared with the host.
+type versionCheck struct {
+	version                        string
+	url, sha                       string
+	err                            error
+	refClasses, present, identical int
+	collisions                     int
+	images                         []string
+	own                            map[relocate.Rule]bool
+}
+
+// fits: the F6a confirmation thresholds — at least half of the reference
+// classes present, at least 90% of those the same class, no collision.
+func (c *versionCheck) fits() bool {
+	return c.err == nil && c.collisions == 0 && c.refClasses > 0 && c.present > 0 &&
+		c.present*2 >= c.refClasses && c.identical*10 >= c.present*9
+}
+
+// status classifies one version's check (F6a statuses).
+func (c *versionCheck) status(version string, noRules bool) (string, string) {
+	switch {
+	case c.err != nil:
+		return EmbeddedReferenceUnavailable, c.err.Error()
+	case c.collisions > 0:
+		return EmbeddedCollision, fmt.Sprintf("%d of its classes are already attributed to another embedded component", c.collisions)
+	case c.refClasses == 0:
+		return EmbeddedClassesAbsent, "the reference jar has no classes"
+	case c.present == 0 && noRules:
+		return EmbeddedClassesAbsent, "none of the reference classes is in the jar: stale metadata or a relocated copy (declare the relocation, CVE:F7a)"
+	case c.present == 0:
+		return EmbeddedClassesAbsent, "none of the reference classes is in the jar, also under the known relocations"
+	case c.present*2 < c.refClasses:
+		return EmbeddedPartial, fmt.Sprintf("only %d of %d reference classes present (a minimized copy is not proof the rest is absent or safe)", c.present, c.refClasses)
+	case c.identical*10 < c.present*9:
+		return EmbeddedContentDiffers, fmt.Sprintf("%d of %d present classes differ from version %s", c.present-c.identical, c.present, version)
+	}
+	return EmbeddedConfirmed, fmt.Sprintf("%d of %d reference classes present, %d identical", c.present, c.refClasses, c.identical)
+}
+
+// compareVersion reads g's reference jar and compares it class by class
+// with the host jar, under rules.
+func compareVersion(ctx context.Context, fetch ReferenceFetcher, base string, g input.GAV, hd *hostData, rules relocate.Set, cl claims) *versionCheck {
+	c := &versionCheck{version: g.Version, url: ReferenceURL(base, g), own: map[relocate.Rule]bool{}}
+	body, err := fetch(ctx, c.url)
+	if err != nil {
+		c.err = fmt.Errorf("reference jar unavailable: %w", err)
+		return c
+	}
+	sum := sha256.Sum256(body)
+	c.sha = hex.EncodeToString(sum[:])
+	rz, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		c.err = fmt.Errorf("reference jar unreadable: %w", err)
+		return c
+	}
+	inverse := rules.Inverse()
+	ref := classEntries(rz.File)
+	c.refClasses = len(ref)
+	for n, re := range ref {
+		orig := strings.TrimSuffix(n, ".class")
+		image := rules.Name(orig) + ".class"
+		he, ok := hd.classes[image]
+		if !ok {
+			continue
+		}
+		if r, under := rules.Under(rules.Name(orig)); under && image != n {
+			c.own[r] = true
+		}
+		if owner, taken := cl.owner(hd.path, image); taken && owner != g.PackageName() {
+			c.collisions++
+			continue
+		}
+		c.present++
+		c.images = append(c.images, image)
+		if sameClass(he, re, inverse) {
+			c.identical++
+		}
+	}
+	sort.Strings(c.images)
+	return c
+}
+
+// recordCheck appends c to the candidate's checked versions.
+func (e *Embedded) recordCheck(c *versionCheck, declared bool) {
+	vc := VersionCheck{Version: c.version, ReferenceURL: c.url, ReferenceSHA256: c.sha,
+		ReferenceClasses: c.refClasses, Present: c.present, Identical: c.identical, Fits: c.fits(), Declared: declared}
+	if c.err != nil {
+		vc.Error = c.err.Error()
+	}
+	e.VersionsChecked = append(e.VersionsChecked, vc)
+}
+
+// embeddedInstance builds the instance of a confirmed or
+// version-candidates candidate.
+func (inv *Inventory) embeddedInstance(e *Embedded, host Instance, best *versionCheck) Instance {
+	g := e.GAV
+	g.Version = e.Version
+	var path string
+	var evidence []IdentityEvidence
+	switch e.Source {
+	case SourcePOMProperties:
+		path = strings.TrimSuffix(e.POMPath, "/pom.properties")
+		pg := e.GAV
+		evidence = append(evidence, IdentityEvidence{Kind: "pom.properties", Detail: e.POMPath, GAV: &pg})
+	case SourceBuildConfig:
+		path = "build-config/" + g.Group + "/" + g.Artifact
+		pg := e.GAV
+		evidence = append(evidence, IdentityEvidence{Kind: "build-config", Detail: e.SourceDetail, GAV: &pg})
+	case SourceSBOM:
+		path = "sbom/" + g.Group + "/" + g.Artifact
+		pg := e.GAV
+		evidence = append(evidence, IdentityEvidence{Kind: "sbom", Detail: e.SourceDetail, GAV: &pg})
+	default:
+		path = "declared/" + g.Group + "/" + g.Artifact
+	}
+	if e.Declared {
+		dg := e.GAV
+		evidence = append(evidence, IdentityEvidence{Kind: "declared", Detail: "-embedded-components entry for this jar's SHA-256", GAV: &dg})
+	}
+	if len(e.VersionCandidates) > 0 {
+		evidence = append(evidence, IdentityEvidence{Kind: "version-candidates", Detail: e.Reason})
+	} else {
+		evidence = append(evidence, IdentityEvidence{Kind: "reference-classes", Detail: e.Reason + " (" + best.url + ")"})
+	}
+	for _, r := range e.Relocations {
+		evidence = append(evidence, IdentityEvidence{Kind: "relocation", Detail: r.From + " -> " + r.To + " (" + r.Source + ")"})
+	}
+	key := "embedded:" + g.String()
+	if len(e.VersionCandidates) > 0 {
+		key = "embedded:" + g.PackageName() + ":{" + strings.Join(e.VersionCandidates, ",") + "}"
+	}
+	return Instance{
+		ID: "c-" + shortHash(host.ArtifactID, key), ArtifactID: host.ArtifactID,
+		GAV: &g, Detection: DetectedEmbedded, HostInstance: host.ID, EmbeddedPath: path,
+		Evidence: evidence, Relocations: e.Relocations, VersionCandidates: e.VersionCandidates,
+	}
+}
+
 // EmbeddedCounts returns confirmed library candidates, unconfirmed
 // library candidates and modules (CLI log line).
 func (inv *Inventory) EmbeddedCounts() (confirmed, unconfirmed, modules int) {
@@ -336,7 +513,7 @@ func (inv *Inventory) EmbeddedCounts() (confirmed, unconfirmed, modules int) {
 		switch {
 		case e.Kind == EmbeddedModule:
 			modules++
-		case e.Status == EmbeddedConfirmed:
+		case e.Status == EmbeddedConfirmed || e.Status == EmbeddedVersionCandidates:
 			confirmed++
 		default:
 			unconfirmed++
@@ -346,12 +523,22 @@ func (inv *Inventory) EmbeddedCounts() (confirmed, unconfirmed, modules int) {
 }
 
 // ConfirmedEmbeddedGAVs are the GAVs of confirmed embedded instances, for
-// the advisory lookup.
+// the advisory lookup — and, for a version-candidates instance, one GAV
+// per candidate version (CVE:F6b).
 func (inv *Inventory) ConfirmedEmbeddedGAVs() []input.GAV {
 	var out []input.GAV
 	for _, in := range inv.Instances {
-		if in.Detection == DetectedEmbedded && in.GAV != nil {
+		if in.Detection != DetectedEmbedded || in.GAV == nil {
+			continue
+		}
+		if len(in.VersionCandidates) == 0 {
 			out = append(out, *in.GAV)
+			continue
+		}
+		for _, v := range in.VersionCandidates {
+			g := *in.GAV
+			g.Version = v
+			out = append(out, g)
 		}
 	}
 	return out

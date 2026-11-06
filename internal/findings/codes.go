@@ -16,6 +16,9 @@ const (
 	// Component identity / version axis.
 	VersionUnknown    ReasonCode = "VERSION_UNKNOWN"
 	ClasspathConflict ReasonCode = "CLASSPATH_CONFLICT"
+	// CVE:F6b: the instance's version is one of a bounded candidate set
+	// its classes fit; the advisory affects at least one of them.
+	VersionCandidates ReasonCode = "VERSION_CANDIDATES"
 
 	// Mapping axis (which code the advisory concerns).
 	MappingPartial        ReasonCode = "MAPPING_PARTIAL"
@@ -37,7 +40,7 @@ const (
 
 // All lists every defined reason code, in documentation order.
 var All = []ReasonCode{
-	VersionUnknown, ClasspathConflict,
+	VersionUnknown, ClasspathConflict, VersionCandidates,
 	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable,
 	MappingVersionUncovered, MappingConflict, MappingNewSideOnly,
 	ModelIncomplete,

@@ -129,6 +129,24 @@ jar/WAR/EAR) is then resolved to a Maven coordinate, in priority order:
    advisory's methods are matched under their relocated names. A wrong
    map, contradicting rules, two candidates claiming the same classes
    (`collision`) or a minimized copy (`partial`) never confirm anything.
+
+   **Candidates without `pom.properties`, SBOM, candidate versions
+   (CVE:F6b).** Two more sources name candidates: the jar's own
+   `pom.xml` — every dependency (compile/runtime, not optional, and
+   transitively through its Central pom) that a maven-shade
+   `<artifactSet><includes>` pattern names, with `${…}` versions resolved
+   through parent poms and `dependencyManagement` (jruby-core's shaded
+   ASM 9.0 is found this way) — and an optional `-sbom` (CycloneDX JSON
+   1.4–1.6), whose components nested in a component carrying a jar's
+   SHA-256 become candidates of that jar (nothing else in the SBOM is
+   used). Every candidate is still confirmed only by its classes. When
+   the declared version does not fit the classes, or there is none, up
+   to 8 other published versions (Central's version list) are compared:
+   one fitting version is confirmed from the classes, several give an
+   instance with a set of candidate versions (`g:a:{v1,v2}`; advisories
+   of every candidate, findings marked `VERSION_CANDIDATES`, applicability
+   `undetermined` unless all are affected), none is `version_unknown` — a
+   coverage gap, not "no CVE".
 2. `-deps-list` (the output of `mvn dependency:list`), matched by file
    name (`artifactId-version[-classifier].jar`). The parser tolerates
    ANSI color codes and the ` -- module x [auto]` suffix newer versions
@@ -635,6 +653,7 @@ Flags:
 | `-deps-list` | no | `mvn dependency:list` output (or its Gradle equivalent, see `scripts/gradle-copy-deps.init.gradle`), used as a fallback for jars with no `pom.properties`. |
 | `-vuln-methods` | no | Override the embedded `vuln_methods.yaml`. |
 | `-embedded-components` | no | YAML file declaring components embedded in dependency jars and the package relocations they sit under, pinned to each jar's SHA-256 (CVE:F7a; example: `testdata/embedded/petclinic-ehcache.yaml`). Declarations are verified against the classes; one for a jar with another hash is reported and ignored. |
+| `-sbom` | no | CycloneDX JSON SBOM (spec 1.4–1.6; CVE:F6b; example: `testdata/sbom/webgoat-jruby.cdx.json`). A component whose SHA-256 is an analyzed dependency jar's is tied to it; Maven components nested in it become embedded candidates of that jar, verified by their classes. Untied components and the dependency graph are not used; a disagreeing identity is reported, never applied. |
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
@@ -1068,10 +1087,13 @@ report:
   packages and its `pom.properties` is detected and assessed separately
   (CVE:F6a), and so is a relocated one whose relocation is explicit — in
   the jar's own maven-shade configuration or in `-embedded-components`
-  (CVE:F7a). An unknown relocation is not discovered (`classes_absent`);
-  a library embedded without its `pom.properties` needs a declaration;
-  one embedded in a version other than the one its metadata declares is
-  `content_differs`. Diff-mapping verification (CVE:F5b) and LLM
+  (CVE:F7a). An unknown relocation is not discovered (`classes_absent`).
+  A library embedded without its `pom.properties` is found only when the
+  jar's maven-shade `artifactSet` includes, a hash-tied SBOM or a
+  declaration names it (CVE:F6b); a shade configuration without includes
+  names nothing. A copy of another version than declared is resolved by
+  comparing at most 8 published versions — several indistinguishable
+  ones stay a candidate set, none is `version_unknown`. Diff-mapping verification (CVE:F5b) and LLM
   grounding still look methods up under their original names.
 - **CHA over-approximates**: a virtual/interface call is treated as
   reaching every subtype that overrides it (as of JVM_GRAPH G2, matched

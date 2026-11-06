@@ -70,8 +70,7 @@ func shadeRelocations(files []*zip.File, host *input.GAV, notes []string) ([]rel
 // every <relocation> inside a <plugin> whose <artifactId> is
 // maven-shade-plugin.
 func parseShadeRelocations(r io.Reader) ([][2]string, error) {
-	dec := xml.NewDecoder(r)
-	dec.Strict = false
+	dec := newPOMDecoder(r)
 	type plugin struct {
 		artifact string
 		pairs    [][2]string

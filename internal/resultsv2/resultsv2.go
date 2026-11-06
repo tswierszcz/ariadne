@@ -92,6 +92,10 @@ type Component struct {
 	// instance's classes sit in its host (CVE:F7a) — original prefix,
 	// prefix in the artifact, and where the rule came from.
 	Relocations []Relocation `json:"relocations,omitempty"`
+	// VersionCandidates (CVE:F6b): an embedded instance whose classes fit
+	// several published versions — its version is one of these (identity
+	// "version_candidates", gav "group:artifact:{v1,v2}").
+	VersionCandidates []string `json:"version_candidates,omitempty"`
 }
 
 // Relocation is one package relocation (CVE:F7a).
@@ -128,6 +132,45 @@ type EmbeddedCandidate struct {
 	// Relocations: the rules its classes were found under.
 	Declared    bool         `json:"declared,omitempty"`
 	Relocations []Relocation `json:"relocations,omitempty"`
+	// CVE:F6b: where the candidate was named (pom.properties | declared |
+	// build-config | sbom) and how; the version its classes confirm
+	// (when not the declared one, or none was declared), the candidate
+	// versions they fit, every version compared, and how that set was
+	// chosen.
+	Source            string         `json:"source,omitempty"`
+	SourceDetail      string         `json:"source_detail,omitempty"`
+	Version           string         `json:"version,omitempty"`
+	VersionCandidates []string       `json:"version_candidates,omitempty"`
+	VersionsChecked   []VersionCheck `json:"versions_checked,omitempty"`
+	VersionsPublished int            `json:"versions_published,omitempty"`
+	VersionSearch     string         `json:"version_search,omitempty"`
+}
+
+// VersionCheck is one published version compared with a candidate's
+// classes (CVE:F6b).
+type VersionCheck struct {
+	Version          string `json:"version"`
+	ReferenceSHA256  string `json:"reference_sha256,omitempty"`
+	ReferenceClasses int    `json:"reference_classes"`
+	Present          int    `json:"present"`
+	Identical        int    `json:"identical"`
+	Fits             bool   `json:"fits"`
+	Declared         bool   `json:"declared,omitempty"`
+	Error            string `json:"error,omitempty"`
+}
+
+// SBOM is what -sbom contributed (CVE:F6b).
+type SBOM struct {
+	Path        string   `json:"path"`
+	SHA256      string   `json:"sha256"`
+	Format      string   `json:"format"`
+	SpecVersion string   `json:"spec_version"`
+	Serial      string   `json:"serial,omitempty"`
+	Components  int      `json:"components"`
+	Linked      int      `json:"linked"`
+	Candidates  int      `json:"candidates"`
+	Unlinked    int      `json:"unlinked"`
+	Issues      []string `json:"issues,omitempty"`
 }
 
 // Evidence is one identity fact of a component.
@@ -230,6 +273,8 @@ type Coverage struct {
 	// EmbeddedDeclarationIssues are -embedded-components entries that did
 	// not apply (no analyzed jar with that hash, hash mismatch).
 	EmbeddedDeclarationIssues []string `json:"embedded_declaration_issues,omitempty"`
+	// SBOM (CVE:F6b): the -sbom file and what was taken from it.
+	SBOM *SBOM `json:"sbom,omitempty"`
 	// AdvisoriesWithoutInstance were reported for a package/version no
 	// component instance carries; their verdict is the engine's
 	// whole-graph one (the v1 row).
@@ -327,6 +372,7 @@ func Build(in Inputs) Document {
 
 	identity := map[string]string{}
 	gavOf := map[string][2]string{} // instance -> package, version
+	candidatesOf := map[string][]string{}
 	if inv := in.Inventory; inv != nil {
 		doc.Snapshot = Snapshot{Kind: "inputs", ID: inputsID(inv), Offline: in.Offline, ClasspathOrder: inv.ClasspathOrder, DataSet: in.DataSet}
 		differing := map[string]int{}
@@ -345,10 +391,13 @@ func Build(in Inputs) Document {
 				ID: inst.ID, ArtifactID: a.ID, Location: inv.InstanceLocation(inst.ID), Role: string(a.Role), SHA256: a.SHA256, Bytes: a.Bytes,
 				Identity: "identified", Detection: string(inst.Detection), Classes: inst.Classes,
 				Shadowed: inst.Shadowed, ShadowedDiffering: differing[inst.ID], EmbeddedIn: inst.HostInstance,
-				Relocations: relocations(inst.Relocations),
+				Relocations: relocations(inst.Relocations), VersionCandidates: inst.VersionCandidates,
 			}
 			if inst.GAV != nil {
-				c.GAV = inst.GAV.String()
+				c.GAV = inst.Label()
+				if len(inst.VersionCandidates) > 0 {
+					c.Identity = "version_candidates"
+				}
 			} else if a.Role != component.RoleApp {
 				c.Identity = "unidentified"
 				doc.Coverage.UnidentifiedComponents = append(doc.Coverage.UnidentifiedComponents, inst.ID)
@@ -367,17 +416,39 @@ func Build(in Inputs) Document {
 			if inst.GAV != nil {
 				gavOf[inst.ID] = [2]string{inst.GAV.PackageName(), inst.GAV.Version}
 			}
+			if len(inst.VersionCandidates) > 0 {
+				candidatesOf[inst.ID] = inst.VersionCandidates
+			}
 			doc.Components = append(doc.Components, c)
 		}
 		for _, e := range inv.Embedded {
-			doc.Coverage.EmbeddedCandidates = append(doc.Coverage.EmbeddedCandidates, EmbeddedCandidate{
+			ec := EmbeddedCandidate{
 				Host: e.HostInstance, GAV: e.GAV.String(), Path: e.POMPath, Kind: e.Kind, Status: e.Status, Reason: e.Reason,
 				ReferenceURL: e.ReferenceURL, ReferenceSHA256: e.ReferenceSHA256, ReferenceClasses: e.ReferenceClasses,
 				Present: e.Present, Identical: e.Identical, Instance: e.Instance,
 				Declared: e.Declared, Relocations: relocations(e.Relocations),
-			})
+				Source: e.Source, SourceDetail: e.SourceDetail, VersionCandidates: e.VersionCandidates,
+				VersionsPublished: e.VersionsPublished, VersionSearch: e.VersionSearch,
+			}
+			if e.GAV.Version == "" {
+				ec.GAV = e.GAV.PackageName()
+			}
+			if e.Version != e.GAV.Version {
+				ec.Version = e.Version
+			}
+			if len(e.VersionsChecked) > 1 || (len(e.VersionsChecked) == 1 && !e.VersionsChecked[0].Declared) {
+				for _, vc := range e.VersionsChecked {
+					ec.VersionsChecked = append(ec.VersionsChecked, VersionCheck{Version: vc.Version, ReferenceSHA256: vc.ReferenceSHA256,
+						ReferenceClasses: vc.ReferenceClasses, Present: vc.Present, Identical: vc.Identical, Fits: vc.Fits, Declared: vc.Declared, Error: vc.Error})
+				}
+			}
+			doc.Coverage.EmbeddedCandidates = append(doc.Coverage.EmbeddedCandidates, ec)
 		}
 		doc.Coverage.EmbeddedDeclarationIssues = inv.DeclarationIssues
+		if sb := inv.SBOM; sb != nil {
+			doc.Coverage.SBOM = &SBOM{Path: sb.Path, SHA256: sb.SHA256, Format: sb.Format, SpecVersion: sb.SpecVersion, Serial: sb.Serial,
+				Components: sb.Components, Linked: sb.Linked, Candidates: sb.Candidates, Unlinked: sb.Unlinked, Issues: sb.Issues}
+		}
 	}
 
 	byID := map[string]reach.Result{}
@@ -419,9 +490,13 @@ func Build(in Inputs) Document {
 			continue
 		}
 		for _, f := range r.Findings {
+			applicability, check := "affected", checkApplicability(cve, gavOf[f.Instance])
+			if vs := candidatesOf[f.Instance]; len(vs) > 0 {
+				applicability, check = candidateApplicability(cve, gavOf[f.Instance][0], vs), nil
+			}
 			doc.Findings = append(doc.Findings, Finding{
 				AdvisoryID: cve.ID, ComponentInstanceID: f.Instance, Identity: identity[f.Instance],
-				Applicability: "affected", ApplicabilityCheck: checkApplicability(cve, gavOf[f.Instance]),
+				Applicability: applicability, ApplicabilityCheck: check,
 				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
 				ModelGaps: f.ModelGaps, Path: f.Path, Entry: f.Entry, Note: f.Note,
 			})
@@ -431,6 +506,25 @@ func Build(in Inputs) Document {
 	}
 	doc.Coverage.Counts = counts
 	return doc
+}
+
+// candidateApplicability (CVE:F6b): a version-candidates instance is
+// affected only when OSV reports every candidate version as affected;
+// when only some are, it is undetermined (which version it is, is not
+// known).
+func candidateApplicability(c cves.CVE, pkg string, versions []string) string {
+	affected := map[string]bool{}
+	for _, a := range c.Affected {
+		if a.Package == pkg {
+			affected[a.Version] = true
+		}
+	}
+	for _, v := range versions {
+		if !affected[v] {
+			return "undetermined"
+		}
+	}
+	return "affected"
 }
 
 // checkApplicability evaluates every range of the advisory's active source

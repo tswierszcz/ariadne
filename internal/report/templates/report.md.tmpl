@@ -192,26 +192,40 @@ below and has no lookup. Identifiers do not depend on temp paths.
 {{with .Components}}{{$inv := .}}
 | Instance | Identity | Detection | Location | SHA-256 | Classes | Packages | Shadowed | Evidence |
 |---|---|---|---|---|---|---|---|---|
-{{range .Instances}}| `{{.ID}}` | {{if .GAV}}`{{.GAV}}`{{else}}—{{end}} | {{.Detection}} | {{$inv.InstanceLocation .ID}} | `{{$inv.ArtifactShortHash .ArtifactID}}` | {{.Classes}} | {{len .Packages}} | {{.Shadowed}} | {{range $i, $e := .Evidence}}{{if $i}}; {{end}}{{$e.Kind}}: {{$e.Detail}}{{end}} |
+{{range .Instances}}| `{{.ID}}` | {{if .GAV}}`{{.Label}}`{{else}}—{{end}} | {{.Detection}} | {{$inv.InstanceLocation .ID}} | `{{$inv.ArtifactShortHash .ArtifactID}}` | {{.Classes}} | {{len .Packages}} | {{.Shadowed}} | {{range $i, $e := .Evidence}}{{if $i}}; {{end}}{{$e.Kind}}: {{$e.Detail}}{{end}} |
 {{end}}
 ### Embedded component candidates
 
 {{if not .Embedded}}
 None.
 {{else}}
-| In instance | Candidate | Kind | Status | Instance | Relocation (original → in jar) | Detail |
-|---|---|---|---|---|---|---|
-{{range .Embedded}}| `{{.HostInstance}}` | `{{.GAV}}`{{if .Declared}} (declared){{end}} | {{.Kind}} | {{if .Status}}{{.Status}}{{else}}—{{end}} | {{if .Instance}}`{{.Instance}}`{{else}}—{{end}} | {{range $i, $r := .Relocations}}{{if $i}}; {{end}}`{{$r.From}}` → `{{$r.To}}` ({{$r.Source}}){{else}}—{{end}} | {{.Reason}} |
+| In instance | Candidate | Named by | Kind | Status | Version (classes) | Instance | Relocation (original → in jar) | Detail |
+|---|---|---|---|---|---|---|---|---|
+{{range .Embedded}}| `{{.HostInstance}}` | `{{.GAV.Group}}:{{.GAV.Artifact}}{{if .GAV.Version}}:{{.GAV.Version}}{{end}}`{{if .Declared}} (declared){{end}} | {{if .Source}}{{.Source}}{{else}}—{{end}} | {{.Kind}} | {{if .Status}}{{.Status}}{{else}}—{{end}} | {{if .VersionCandidates}}one of {{range $i, $v := .VersionCandidates}}{{if $i}}, {{end}}{{$v}}{{end}}{{else if .Version}}{{.Version}}{{else}}—{{end}}{{with .VersionsChecked}} ({{len .}} checked){{end}} | {{if .Instance}}`{{.Instance}}`{{else}}—{{end}} | {{range $i, $r := .Relocations}}{{if $i}}; {{end}}`{{$r.From}}` → `{{$r.To}}` ({{$r.Source}}){{else}}—{{end}} | {{.Reason}}{{if .SourceDetail}} — {{.SourceDetail}}{{end}} |
 {{end}}
-Unconfirmed library candidates (any status other than `confirmed`) are a coverage gap:
-their advisories were not looked up. Modules of the host's own project are part of the
-host. Relocations (CVE:F7a) come from the jar's own maven-shade configuration or from
+Unconfirmed library candidates (any status other than `confirmed` and
+`version_candidates`) are a coverage gap: their advisories were not looked up. Modules of
+the host's own project are part of the host. A candidate is named by a `pom.properties`
+in the jar, by `-embedded-components`, by the jar's own build configuration (maven-shade
+`artifactSet` includes ∩ the pom's dependencies, CVE:F6b) or by an SBOM component nested
+in the jar's SBOM component (`-sbom`, tied by SHA-256) — always a claim the classes must
+confirm. When the declared version does not fit the classes, or there is none, up to
+8 other published versions are compared (CVE:F6b): one fitting version is confirmed from
+the classes; several give a `version_candidates` instance whose advisories (of any
+candidate) carry `VERSION_CANDIDATES` and applicability `undetermined` unless every
+candidate is affected; none is `version_unknown` — a gap, never "no CVE". Relocations (CVE:F7a) come from the jar's own maven-shade configuration or from
 `-embedded-components` (pinned to the jar's SHA-256); either way the classes decide, and
 a relocated instance's advisories are matched under its names in the jar.
 {{end}}
 {{with .DeclarationIssues}}
 `-embedded-components` entries not applied:
 {{range .}}- {{.}}
+{{end}}{{end}}{{with .SBOM}}
+SBOM (`-sbom`, CVE:F6b): `{{.Path}}` ({{.Format}} {{.SpecVersion}}, sha256 `{{.SHA256}}`):
+{{.Components}} components, {{.Linked}} tied to an analyzed jar by SHA-256, {{.Candidates}}
+nested candidates added, {{.Unlinked}} Maven components not tied to the input (not used:
+a listed dependency does not prove its code is in the input).
+{{range .Issues}}- {{.}}
 {{end}}{{end}}
 ### Class conflicts
 
@@ -787,8 +801,13 @@ None found.
   descriptors"); full module resolution and layers other than `ModuleLayer.boot()` are
   not modeled, and no exact dispatch edge follows an object created by a `provider()`
   method.
-- **Shaded/relocated dependencies**: a jar bundling relocated classes under a different
-  package than its own Maven coordinates is not detected as such.
+- **Shaded/relocated dependencies**: an embedded copy is recognized only when something
+  names it — a `pom.properties` in the jar, the jar's own maven-shade `artifactSet`
+  includes, a hash-tied SBOM, or `-embedded-components` — and its classes confirm it;
+  a relocation is applied only when explicit (the jar's maven-shade configuration or
+  `-embedded-components`). Unknown relocations are not discovered, and a copy whose
+  version cannot be fixed by its classes (up to 8 published versions compared) stays a
+  coverage gap.
 - **CHA over-approximates**: a virtual/interface call is treated as reaching every
   subtype that declares the same-named method, whether or not that specific override is
   ever actually invoked at runtime for that call site. This produces false positives,

@@ -94,6 +94,23 @@ type Instance struct {
 	// instance's classes sit in its host (CVE:F7a): a method selector of
 	// the original component is rewritten with them.
 	Relocations []relocate.Rule
+	// VersionCandidates (CVE:F6b) is set on an embedded instance whose
+	// classes fit several published versions: GAV.Version is then empty
+	// and the version is one of these, not known which.
+	VersionCandidates []string
+}
+
+// Label is the instance's GAV for display: "group:artifact:version", or
+// "group:artifact:{v1,v2}" for a version-candidates instance; "" when
+// unidentified.
+func (in Instance) Label() string {
+	if in.GAV == nil {
+		return ""
+	}
+	if len(in.VersionCandidates) > 0 {
+		return in.GAV.PackageName() + ":{" + strings.Join(in.VersionCandidates, ",") + "}"
+	}
+	return in.GAV.String()
 }
 
 // Conflict is one FQCN present in several artifacts: the copy selected
@@ -122,6 +139,8 @@ type Inventory struct {
 	// relocations read from, or skipped in, embedded pom.xml files.
 	DeclarationIssues []string
 	BuildConfigNotes  []string
+	// SBOM is what -sbom contributed (CVE:F6b), nil without one.
+	SBOM *SBOMSummary
 	// ClasspathOrder documents the order assumption conflicts follow.
 	ClasspathOrder string
 	byJar          map[string]string // run path -> instance ID

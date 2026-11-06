@@ -392,6 +392,22 @@ order:
    checks every claim against the classes. Guessing relocations from
    code similarity would be a heuristic without a version, so it is left
    to a later, experimental stage.
+
+   **Why read the build configuration and an SBOM, and why candidate
+   versions (CVE:F6b)?** jruby-core relocates ASM but ships no
+   `pom.properties` for it — yet its own `pom.xml` says which artifacts
+   the shade plugin copies (`org.ow2.asm:*`) and depends on asm,
+   asm-commons and asm-util at `${asm.version}`; the parent pom says
+   9.0, and asm-commons' own pom adds asm-tree and asm-analysis. All
+   five, 140 classes, match ASM 9.0 exactly. An SBOM is used the same
+   way, but only where it is tied to the input by a jar's SHA-256: a
+   list of dependencies says what the build used, not what is inside a
+   jar. Metadata can also name the wrong version. Then the classes are
+   compared with neighbouring releases instead of trusting the label —
+   and when several releases are indistinguishable (asm-util did not
+   change between 9.0-beta and 9.0), ariadne keeps both as candidates and
+   reports every candidate's advisories as `undetermined` rather than
+   picking one.
 2. If the jar has no `pom.properties`, match the file name
    (`artifactId-version[-classifier].jar`) against the `-deps-list`
    (`ParseDepsList` has to strip ANSI color codes and the

@@ -215,7 +215,7 @@ Wskazywać kod występujący w podatnym wydaniu, także gdy poprawka go usuwa lu
 - Zmiana nazwy pliku, dwie gałęzie, merge commit i brak źródeł mają odrębne oczekiwane wyniki.
 - Przypadki nierozstrzygnięte pozostają widoczne, zamiast poprawiać statystyki kosztem błędnego `NOT_REACHABLE`.
 
-## F6. Komponenty osadzone bez relokacji — IN_PROGRESS (F6a DONE 2026-11-06: zadania 1, 2, 4, 6, 8, 9 i 7 dla wersji potwierdzonych; pozostają 3 (SBOM) i 5 (zbiory wersji kandydujących); zob. IMPLEMENTATION_STATUS)
+## F6. Komponenty osadzone bez relokacji — DONE (F6a 2026-11-06: zadania 1, 2, 4, 6, 8, 9, 7 dla wersji potwierdzonych; F6b 2026-11-06: 3 — SBOM CycloneDX JSON, 5 — zbiory wersji kandydujących, 7 dla zbiorów i wersji nieznanych, kandydaci z konfiguracji builda; zob. IMPLEMENTATION_STATUS)
 
 ### Cel
 

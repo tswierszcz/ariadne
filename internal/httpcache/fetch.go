@@ -17,11 +17,12 @@ var fullSHA = regexp.MustCompile(`/[0-9a-f]{40}(\.diff|\.patch)?(/|$)`)
 
 // centralRelease matches a release (non-SNAPSHOT) artifact on Maven
 // Central: Central never changes a published release file (CVE:F6a
-// reference jars).
-var centralRelease = regexp.MustCompile(`^https://repo1\.maven\.org/maven2/.+/[^/]+/[^/]+/[^/]+\.jar$`)
+// reference jars, CVE:F6b release poms). maven-metadata.xml (the version
+// list) is not matched: it grows with every release.
+var centralRelease = regexp.MustCompile(`^https://repo1\.maven\.org/maven2/.+/[^/]+/[^/]+/[^/]+\.(jar|pom)$`)
 
 // KindForURL is KindPinned for a URL addressed by a full commit SHA or a
-// Maven Central release jar, and KindMutable otherwise.
+// Maven Central release jar or pom, and KindMutable otherwise.
 func KindForURL(url string) Kind {
 	if fullSHA.MatchString(url) || (centralRelease.MatchString(url) && !strings.Contains(url, "-SNAPSHOT")) {
 		return KindPinned

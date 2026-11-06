@@ -396,8 +396,20 @@ func (e *Engine) affectedInstances(cve cves.CVE) []component.Instance {
 	}
 	var out []component.Instance
 	for _, in := range e.components.Instances {
-		if in.GAV != nil && want[in.GAV.PackageName()+"@"+in.GAV.Version] {
+		if in.GAV == nil {
+			continue
+		}
+		if want[in.GAV.PackageName()+"@"+in.GAV.Version] {
 			out = append(out, in)
+			continue
+		}
+		// CVE:F6b: a version-candidates instance is affected when any of
+		// its candidate versions is (its finding says so).
+		for _, v := range in.VersionCandidates {
+			if want[in.GAV.PackageName()+"@"+v] {
+				out = append(out, in)
+				break
+			}
 		}
 	}
 	return out
@@ -482,7 +494,7 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 	const relatedNote = "mapped methods are in a related artifact, not in this instance"
 
 	for _, in := range instances {
-		f := InstanceFinding{Instance: in.ID, GAV: in.GAV.String()}
+		f := InstanceFinding{Instance: in.ID, GAV: in.Label()}
 		var r Result
 		switch own := byInstance[in.ID]; {
 		case len(own) > 0:
@@ -526,6 +538,7 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 			e.annotateGaps(&f.Reasons, &f.ModelGaps, map[string]bool{f.Instance: true})
 		}
 	}
+	markCandidates(result.Findings, instances)
 
 	// Aggregate (contract §5) from the findings, so v1 is an export of
 	// them. The row's path stays the shortest over every allowed node
@@ -539,6 +552,25 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 		result.Path, result.Entry = r.Path, r.Entry
 	case StatusNotReachable:
 		e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+	}
+}
+
+// markCandidates prefixes VERSION_CANDIDATES (CVE:F6b) to the findings of
+// version-candidates instances, once: the advisory affects at least one
+// candidate version, not necessarily the one present.
+func markCandidates(fs []InstanceFinding, instances []component.Instance) {
+	candidates := map[string]bool{}
+	for _, in := range instances {
+		if len(in.VersionCandidates) > 0 {
+			candidates[in.ID] = true
+		}
+	}
+	for i := range fs {
+		f := &fs[i]
+		if !candidates[f.Instance] || (len(f.Reasons) > 0 && f.Reasons[0] == findings.VersionCandidates) {
+			continue
+		}
+		f.Reasons = append([]findings.ReasonCode{findings.VersionCandidates}, f.Reasons...)
 	}
 }
 
@@ -556,38 +588,68 @@ func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances 
 	methodsOf := map[string][]string{}
 	var order []string
 	for _, in := range instances {
-		version, pkg := in.GAV.Version, in.GAV.PackageName()
-		f := InstanceFinding{Instance: in.ID, GAV: in.GAV.String(), Status: StatusUnknown}
-		if !mavenversion.Regular(version) {
+		pkg := in.GAV.PackageName()
+		versions := []string{in.GAV.Version}
+		if len(in.VersionCandidates) > 0 {
+			versions = in.VersionCandidates // CVE:F6b
+		}
+		f := InstanceFinding{Instance: in.ID, GAV: in.Label(), Status: StatusUnknown}
+		irregular := ""
+		for _, v := range versions {
+			if !mavenversion.Regular(v) {
+				irregular = v
+			}
+		}
+		if irregular != "" {
 			f.Reasons = []findings.ReasonCode{findings.VersionUnknown}
-			f.Note = fmt.Sprintf("version %q cannot be placed in the mapping's version ranges", version)
+			f.Note = fmt.Sprintf("version %q cannot be placed in the mapping's version ranges", irregular)
 			byInstance[in.ID] = f
 			continue
 		}
-		var chosen []vulnmap.Variant
-		for _, v := range entry.Variants {
-			if (v.Package == "" || v.Package == pkg) && v.Range.Contains(version) == mavenversion.In {
-				chosen = append(chosen, v)
+		// keysOf[v]: the distinct method lists of the variants covering v.
+		var chosenAll []vulnmap.Variant
+		keysOf := map[string]map[string]bool{}
+		for _, version := range versions {
+			keysOf[version] = map[string]bool{}
+			for _, v := range entry.Variants {
+				if (v.Package == "" || v.Package == pkg) && v.Range.Contains(version) == mavenversion.In {
+					chosenAll = append(chosenAll, v)
+					ms := append([]string(nil), v.Methods...)
+					sort.Strings(ms)
+					keysOf[version][strings.Join(ms, "\n")] = true
+				}
 			}
 		}
 		keys := map[string]bool{}
-		for _, v := range chosen {
-			ms := append([]string(nil), v.Methods...)
-			sort.Strings(ms)
-			keys[strings.Join(ms, "\n")] = true
+		uncovered, conflict := 0, false
+		for _, version := range versions {
+			if len(keysOf[version]) == 0 {
+				uncovered++
+			}
+			if len(keysOf[version]) > 1 {
+				conflict = true
+			}
+			for k := range keysOf[version] {
+				keys[k] = true
+			}
 		}
+		version := strings.Join(versions, ", ")
 		switch {
-		case len(chosen) == 0:
+		case uncovered == len(versions):
 			f.Reasons = []findings.ReasonCode{findings.MappingVersionUncovered}
 			f.Note = fmt.Sprintf("no variant of the mapping covers %s %s", pkg, version)
 			byInstance[in.ID] = f
-		case len(keys) > 1:
+		case conflict:
 			var ranges []string
-			for _, v := range chosen {
+			for _, v := range chosenAll {
 				ranges = append(ranges, v.Versions)
 			}
 			f.Reasons = []findings.ReasonCode{findings.MappingConflict}
 			f.Note = fmt.Sprintf("variants %s all cover %s with different methods", strings.Join(ranges, ", "), version)
+			byInstance[in.ID] = f
+		case uncovered > 0 || len(keys) > 1:
+			f.Reasons = []findings.ReasonCode{findings.VersionUnknown}
+			f.Note = fmt.Sprintf("the candidate versions %s select different variants of the mapping", version)
 			byInstance[in.ID] = f
 		default:
 			var key string
@@ -596,7 +658,7 @@ func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances 
 			}
 			if _, seen := groups[key]; !seen {
 				order = append(order, key)
-				methodsOf[key] = chosen[0].Methods
+				methodsOf[key] = chosenAll[0].Methods
 			}
 			groups[key] = append(groups[key], in)
 		}
@@ -615,6 +677,7 @@ func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances 
 	for _, in := range instances {
 		result.Findings = append(result.Findings, byInstance[in.ID])
 	}
+	markCandidates(result.Findings, instances)
 	result.Status, result.Reasons = Aggregate(result.Findings)
 	switch result.Status {
 	case StatusReachable, StatusFramework:
