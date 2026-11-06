@@ -125,7 +125,7 @@ func TestSites(t *testing.T) {
 			t.Errorf("%s = %+v, want filter %s", name, s, want)
 		}
 	}
-	if s := got["f"]; s.Model != "xstream:fromxml" || s.Coverage != CallbacksEntry {
+	if s := got["f"]; s.Model != "xstream:fromxml" || s.Format != FormatXStream {
 		t.Errorf("xstream = %+v", s)
 	}
 	edges := Edges(FindSites(h), []Target{{FQCN: "p.X", Name: "readObject", Desc: readObj, Kind: "readObject"}})
@@ -134,7 +134,7 @@ func TestSites(t *testing.T) {
 	}
 	for _, e := range edges {
 		if e.CallerName == "f" {
-			t.Errorf("entry-only XStream site got an edge")
+			t.Errorf("Edges (Java only) connected the XStream site")
 		}
 	}
 }

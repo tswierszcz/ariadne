@@ -164,17 +164,31 @@ type CandidateSummary struct {
 // specification exactly: a readObject with another descriptor, or not
 // private, or static, is not one.
 func Candidates(h *hierarchy.Hierarchy) ([]Target, CandidateSummary) {
+	byClass, sum := ClassTargets(h, FormatJava)
+	return union(byClass), sum
+}
+
+// Formats whose callbacks are modeled.
+const (
+	FormatJava    = "java"
+	FormatXStream = "xstream"
+)
+
+// ClassTargets returns, per concrete class of the input the format may
+// create, the methods it runs on it (a target may serve several
+// classes: a superclass's readObject). Java serialization (FormatJava)
+// creates only serializable classes; XStream (FormatXStream, 1.4.x
+// reflection converters) creates any class, calls readResolve declared
+// in its class or any superclass (any access), the private readObject
+// of each serializable class of the chain (SerializableConverter) and,
+// for Externalizable, the public no-arg constructor and readExternal; it
+// bypasses other constructors (its default reflection provider
+// allocates without one), so it gets no constructor targets.
+func ClassTargets(h *hierarchy.Hierarchy, format string) (map[string][]Target, CandidateSummary) {
 	c := &classifier{h: h, cache: map[string]int{}}
 	sum := CandidateSummary{ByKind: map[string]int{}, UnknownBases: map[string]int{}}
-	seen := map[Target]bool{}
-	var out []Target
-	add := func(t Target) {
-		if !seen[t] {
-			seen[t] = true
-			out = append(out, t)
-			sum.ByKind[t.Kind]++
-		}
-	}
+	out := map[string][]Target{}
+	counted := map[Target]bool{}
 	declared := func(ci *hierarchy.ClassInfo, name, desc string) (*hierarchy.Method, bool) {
 		for i := range ci.Methods {
 			m := &ci.Methods[i]
@@ -195,24 +209,45 @@ func Candidates(h *hierarchy.Hierarchy) ([]Target, CandidateSummary) {
 		if ci.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) != 0 {
 			continue
 		}
-		switch c.serializable(fqcn) {
-		case serUnknown:
-			sum.Unknown++
-			sum.UnknownBases[c.exitClass(fqcn)]++
-			continue
-		case serNo:
-			continue
+		var ts []Target
+		seen := map[Target]bool{}
+		add := func(t Target) {
+			if !seen[t] {
+				seen[t] = true
+				ts = append(ts, t)
+				if !counted[t] {
+					counted[t] = true
+					sum.ByKind[t.Kind]++
+				}
+			}
+		}
+		state := c.serializable(fqcn)
+		if format == FormatJava {
+			switch state {
+			case serUnknown:
+				sum.Unknown++
+				sum.UnknownBases[c.exitClass(fqcn)]++
+				continue
+			case serNo:
+				continue
+			}
 		}
 		if ci.AccessFlags&accEnum != 0 || ci.SuperClass == "java.lang.Enum" {
-			sum.Enums++
+			if format == FormatJava || state == serYes {
+				sum.Enums++
+			}
 			continue
 		}
 		if ci.SuperClass == "java.lang.Record" {
 			sum.Records++
 			continue
 		}
+		if format == FormatXStream && state == serUnknown {
+			sum.Unknown++
+			sum.UnknownBases[c.exitClass(fqcn)]++
+		}
 		sum.Classes++
-		if c.implements(fqcn, externalizableIface, map[string]bool{}) {
+		if state == serYes && c.implements(fqcn, externalizableIface, map[string]bool{}) {
 			sum.Externalizable++
 			if m, ok := declared(ci, "<init>", "()V"); ok && m.AccessFlags&classfile.AccPublic != 0 {
 				add(Target{FQCN: fqcn, Name: "<init>", Desc: "()V", Kind: "constructor"})
@@ -220,40 +255,50 @@ func Candidates(h *hierarchy.Hierarchy) ([]Target, CandidateSummary) {
 			if decl, ok := h.ResolveExact(fqcn, "readExternal", "(Ljava/io/ObjectInput;)V"); ok {
 				add(Target{FQCN: decl, Name: "readExternal", Desc: "(Ljava/io/ObjectInput;)V", Kind: "readExternal"})
 			}
+			out[fqcn] = ts
 			continue
 		}
-		// The serializable chain: fqcn and its serializable superclasses
-		// in the input; the first non-serializable superclass's no-arg
-		// constructor creates the object.
-		cur := ci
-		for depth := 0; cur != nil && depth < 64; depth++ {
-			for _, cb := range []struct{ name, desc string }{{"readObject", "(Ljava/io/ObjectInputStream;)V"}, {"readObjectNoData", "()V"}} {
-				if m, ok := declared(cur, cb.name, cb.desc); ok && m.AccessFlags&accPrivate != 0 && m.AccessFlags&accStatic == 0 {
-					add(Target{FQCN: cur.FQCN, Name: cb.name, Desc: cb.desc, Kind: cb.name})
-				}
-			}
-			sup := cur.SuperClass
-			if c.serializable(sup) != serYes {
-				if sci, ok := h.Lookup(sup); ok {
-					if _, ok := declared(sci, "<init>", "()V"); ok {
-						add(Target{FQCN: sup, Name: "<init>", Desc: "()V", Kind: "constructor"})
+		if state == serYes {
+			// The serializable chain: fqcn and its serializable
+			// superclasses in the input; for Java serialization the first
+			// non-serializable superclass's no-arg constructor creates
+			// the object.
+			cur := ci
+			for depth := 0; cur != nil && depth < 64; depth++ {
+				for _, cb := range []struct{ name, desc string }{{"readObject", "(Ljava/io/ObjectInputStream;)V"}, {"readObjectNoData", "()V"}} {
+					if format == FormatXStream && cb.name == "readObjectNoData" {
+						continue
+					}
+					if m, ok := declared(cur, cb.name, cb.desc); ok && m.AccessFlags&accPrivate != 0 && m.AccessFlags&accStatic == 0 {
+						add(Target{FQCN: cur.FQCN, Name: cb.name, Desc: cb.desc, Kind: cb.name})
 					}
 				}
-				break
+				sup := cur.SuperClass
+				if c.serializable(sup) != serYes {
+					if format == FormatJava {
+						if sci, ok := h.Lookup(sup); ok {
+							if _, ok := declared(sci, "<init>", "()V"); ok {
+								add(Target{FQCN: sup, Name: "<init>", Desc: "()V", Kind: "constructor"})
+							}
+						}
+					}
+					break
+				}
+				next, ok := h.Lookup(sup)
+				if !ok {
+					break
+				}
+				cur = next
 			}
-			next, ok := h.Lookup(sup)
-			if !ok {
-				break
-			}
-			cur = next
 		}
-		// readResolve: resolved like a virtual call with serialization's
-		// access rules.
+		// readResolve: Java serialization resolves it like a virtual
+		// call with serialization's access rules; XStream takes the first
+		// one declared in the class or a superclass, whatever its access.
 		for cur, depth := ci, 0; cur != nil && depth < 64; depth++ {
 			if m, ok := declared(cur, "readResolve", "()Ljava/lang/Object;"); ok && m.AccessFlags&accStatic == 0 {
 				private := m.AccessFlags&accPrivate != 0
 				pkgPrivate := m.AccessFlags&(classfile.AccPublic|0x0004|accPrivate) == 0
-				if cur.FQCN == fqcn || (!private && (!pkgPrivate || pkg(cur.FQCN) == pkg(fqcn))) {
+				if format == FormatXStream || cur.FQCN == fqcn || (!private && (!pkgPrivate || pkg(cur.FQCN) == pkg(fqcn))) {
 					add(Target{FQCN: cur.FQCN, Name: "readResolve", Desc: "()Ljava/lang/Object;", Kind: "readResolve"})
 				}
 				break
@@ -264,7 +309,30 @@ func Candidates(h *hierarchy.Hierarchy) ([]Target, CandidateSummary) {
 			}
 			cur = next
 		}
+		if len(ts) > 0 {
+			out[fqcn] = ts
+		}
 	}
+	return out, sum
+}
+
+// union is every distinct target of byClass, sorted.
+func union(byClass map[string][]Target) []Target {
+	seen := map[Target]bool{}
+	var out []Target
+	for _, ts := range byClass {
+		for _, t := range ts {
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+		}
+	}
+	sortTargets(out)
+	return out
+}
+
+func sortTargets(out []Target) {
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.FQCN != b.FQCN {
@@ -275,7 +343,6 @@ func Candidates(h *hierarchy.Hierarchy) ([]Target, CandidateSummary) {
 		}
 		return a.Desc < b.Desc
 	})
-	return out, sum
 }
 
 // Edge is one "may run" edge from an entry site to a target.
@@ -285,12 +352,57 @@ type Edge struct {
 	TargetFQCN, TargetName, TargetDesc string
 }
 
-// Edges connects every site of a model with modeled callbacks to every
-// target. Sites of an entry-only model (XStream) get none.
+// Connect returns the edges of every site whose model has modeled
+// callbacks: to the targets of every class the format may create there
+// and the site's evaluated policy (if any) does not reject. It records
+// on each site how many classes were candidates and how many were
+// rejected.
+func Connect(sites []Site, byFormat map[string]map[string][]Target) []Edge {
+	var out []Edge
+	for i := range sites {
+		s := &sites[i]
+		byClass := byFormat[s.Format]
+		if s.Format == "" || byClass == nil {
+			continue
+		}
+		classes := make([]string, 0, len(byClass))
+		for c := range byClass {
+			classes = append(classes, c)
+		}
+		sort.Strings(classes)
+		var ts []Target
+		seen := map[Target]bool{}
+		for _, c := range classes {
+			s.Candidates++
+			if s.allow != nil && !s.allow(c) {
+				s.Rejected++
+				if len(s.RejectedSample) < 5 {
+					s.RejectedSample = append(s.RejectedSample, c)
+				}
+				continue
+			}
+			for _, t := range byClass[c] {
+				if !seen[t] {
+					seen[t] = true
+					ts = append(ts, t)
+				}
+			}
+		}
+		sortTargets(ts)
+		for _, t := range ts {
+			out = append(out, Edge{CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc, PC: s.PC,
+				TargetFQCN: t.FQCN, TargetName: t.Name, TargetDesc: t.Desc})
+		}
+	}
+	return out
+}
+
+// Edges connects every Java serialization site to every target, with no
+// policy (Z1 behaviour; kept for callers that have no per-class targets).
 func Edges(sites []Site, targets []Target) []Edge {
 	var out []Edge
 	for _, s := range sites {
-		if s.Coverage != CallbacksModeled {
+		if s.Format != FormatJava {
 			continue
 		}
 		for _, t := range targets {

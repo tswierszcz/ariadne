@@ -70,6 +70,9 @@ type Model struct {
 	TypeRule  string
 	Callbacks []CallbackSpec
 	Coverage  string
+	// Format selects the callback rules (ClassTargets); "" when the
+	// callbacks are not modeled.
+	Format string
 	// Protections are the format's own type restrictions, by name.
 	Protections []string
 	Source      string
@@ -96,23 +99,33 @@ var Catalog = []Model{
 		},
 		Callbacks:   javaCallbacks,
 		Coverage:    CallbacksModeled,
+		Format:      FormatJava,
 		Protections: []string{"ObjectInputFilter (setObjectInputFilter, jdk.serialFilter)", "ObjectInputStream#resolveClass override"},
 		Source:      "Java Object Serialization Specification (docs.oracle.com/en/java/javase/21/docs/specs/serialization), java.io.ObjectInputStream javadoc",
 	},
 	{
 		ID:        "xstream:fromxml",
 		Component: "com.thoughtworks.xstream:xstream",
-		TypeRule:  "XStream's converters and its security framework decide; not modeled",
+		Versions:  models.VersionRange{Min: "1.4", Max: "1.4.21"},
+		TypeRule:  "any class (XStream's reflection converters), restricted by its security framework: none before 1.4.7; any type by default in 1.4.7–1.4.17; from 1.4.18 a default allowlist of JDK basic types; allowTypes*/denyTypes*/addPermission/setupDefaultSecurity on the same instance, the last added permission deciding first",
 		Entries: []models.Signature{
 			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/lang/String;)Ljava/lang/Object;"},
 			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/io/Reader;)Ljava/lang/Object;"},
 			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/io/InputStream;)Ljava/lang/Object;"},
 			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/net/URL;)Ljava/lang/Object;"},
 			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/io/File;)Ljava/lang/Object;"},
+			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/Object;"},
+			{Owner: "com.thoughtworks.xstream.XStream", Name: "fromXML", Desc: "(Ljava/io/Reader;Ljava/lang/Object;)Ljava/lang/Object;"},
 		},
-		Coverage:    CallbacksEntry,
-		Protections: []string{"XStream security framework (allowTypes/denyTypes, setupDefaultSecurity)"},
-		Source:      "x-stream.github.io/security.html; the manual mappings keep XStream as an entry point (testdata/cve-control/MANUAL_MAPPING_AUDIT.MD)",
+		Callbacks: []CallbackSpec{
+			{Name: "readResolve", Desc: "()Ljava/lang/Object;", Access: "any", Applies: "any", Note: "declared in the class or a superclass, any access"},
+			{Name: "readObject", Desc: "(Ljava/io/ObjectInputStream;)V", Access: "private", Applies: "serializable", Note: "SerializableConverter, per class of the serializable chain"},
+			{Name: "readExternal", Desc: "(Ljava/io/ObjectInput;)V", Access: "public", Applies: "externalizable", Note: "ExternalizableConverter, after the public no-arg constructor"},
+		},
+		Coverage:    CallbacksModeled,
+		Format:      FormatXStream,
+		Protections: []string{"XStream security framework (allowTypes*/denyTypes*/addPermission, setupDefaultSecurity; default allowlist from 1.4.18)"},
+		Source:      "x-stream.github.io/security.html and converters.html; XStream 1.4.x SecurityMapper, SerializationMembers; observed on the real JVM with 1.4.5 and 1.4.20 (scripts/prepare-xstream-demo.sh)",
 	},
 }
 

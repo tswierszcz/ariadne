@@ -289,11 +289,31 @@ records get none. The stream decides which classes appear (a cast after
 `readObject` does not bound it), so the edges say *may run*; whether the
 data is attacker-controlled is not modeled. A filter in the same method
 (`setObjectInputFilter`) or a `resolveClass`-overriding stream is shown,
-not evaluated (its edges are kept). Every entry is also an unbounded model
-gap (`deserialization`): the JDK's own callbacks (a `HashMap` hashing its
-keys) are not modeled. XStream `fromXML` is cataloged as an entry without
-callback edges. The report's "Deserialization entry points" section
-lists every site. Measured: petclinic 130 entry sites, 227 callback
+evaluated when it is a literal (DESERIALIZATION Z2, below). Every entry is
+also an unbounded model gap (`deserialization`): the JDK's own callbacks (a
+`HashMap` hashing its keys) are not modeled. The report's
+"Deserialization entry points" section lists every site with its policy.
+
+**Filters and XStream (DESERIALIZATION Z2).** Each entry gets a policy
+state. *Java serialization*: a literal
+`setObjectInputFilter(ObjectInputFilter.Config.createFilter("a.B;a.**;!*"))`
+on the same stream is evaluated with JEP 290 class patterns — rejected
+classes lose their edges — while a non-literal filter or a
+`resolveClass` override is `unknown` (edges kept). *XStream* `fromXML`
+connects to `readResolve` of any class (declared in it or a superclass),
+the private `readObject` of serializable classes and Externalizable's
+constructor/`readExternal`, restricted by its security framework as the
+release and the same instance's configuration in the entry's method say:
+none before 1.4.7 (`unrestricted`), any type by default in 1.4.7–1.4.17,
+a default allowlist of JDK basic types from 1.4.18
+(`default_allowlist`); `addPermission(NONE/ANY)`, `setupDefaultSecurity`,
+`allowTypes`/`denyTypes`, wildcards and type hierarchies with literal
+arguments are evaluated, the last added permission first; anything else
+is `unknown`. Checked on the real JVM against XStream 1.4.5, 1.4.10 and
+1.4.20 (`scripts/prepare-xstream-demo.sh`). On WebGoat the
+vulnerable-components lesson's `new XStream().fromXML(...)` on XStream
+1.4.5 is `unrestricted`; no verdict changed (its advisories were already
+reachable through the entry point). Measured: petclinic 130 entry sites, 227 callback
 targets; WebGoat 142 and 296. Two advisories whose code *is* a
 serialization callback became reachable on both apps — CVE-2021-46877
 (jackson-databind `NodeSerialization#readExternal`) and CVE-2023-6378
@@ -964,8 +984,10 @@ report:
   entries reach the callbacks of the input's own serializable classes
   (DESERIALIZATION Z1), not the JDK's callbacks nor what those call on the
   objects read (the classic `HashMap` → `hashCode` chain); filters are
-  detected, not evaluated (a process-wide `jdk.serialFilter` is not visible
-  at all); XStream and other deserializers get no callback edges; classes
+  evaluated only when literal and in the entry's own method (a process-wide
+  `jdk.serialFilter` is not visible at all); XStream's converters for JDK
+  types are not modeled, and other libraries' deserializers get no
+  callback edges; classes
   whose superclass chain leaves the input at a JDK class not in the
   built-in table are not candidates. **`web.xml`** (a WAR's own
   deployment descriptor, and an EAR's per-module ones) and **Spring

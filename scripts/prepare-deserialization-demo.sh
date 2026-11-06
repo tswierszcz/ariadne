@@ -164,6 +164,8 @@ public class Main {
             write(args[1]);
         } else if (args.length == 2 && args[0].equals("read")) {
             read(args[1]);
+        } else if (args.length == 2 && args[0].equals("readFiltered")) {
+            readFiltered(args[1]);
         } else {
             System.err.println("usage: write|read FILE");
         }
@@ -179,6 +181,19 @@ public class Main {
             out.writeObject(new Ext());
             out.writeObject(new Resolving());
             out.writeObject(LoggingEventVO.build(ev));
+        }
+    }
+
+    // A literal JEP 290 filter on this stream: only demo.Gadget passes.
+    static void readFiltered(String file) throws Exception {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+            in.setObjectInputFilter(java.io.ObjectInputFilter.Config.createFilter("demo.Gadget;!*"));
+            for (int i = 0; i < 5; i++) {
+                Object o = in.readObject();
+                System.out.println("read " + o.getClass().getName());
+            }
+        } catch (java.io.InvalidClassException e) {
+            System.out.println("refused: " + e.getMessage());
         }
     }
 
@@ -219,5 +234,11 @@ if grep -q "must not run" <<<"$out"; then
     exit 1
 fi
 grep -q "read ch.qos.logback.classic.spi.LoggingEventVO" <<<"$out" || { echo "LoggingEventVO not read" >&2; exit 1; }
+echo "--- readFiltered (createFilter(\"demo.Gadget;!*\"): expect Gadget.readObject, then demo.WrongSig refused):"
+out="$(java -cp "target/classes:target/dependency/*" demo.Main readFiltered "$stream")"
+echo "$out"
+grep -q "callback ran: Gadget.readObject" <<<"$out" || { echo "Gadget.readObject did not run under the filter" >&2; exit 1; }
+grep -q "refused: filter status: REJECTED" <<<"$out" || { echo "the filter did not reject" >&2; exit 1; }
+if grep -q "Ext\.\|Resolving" <<<"$out"; then echo "unexpected: a rejected class's callback ran" >&2; exit 1; fi
 
 echo "done: $work/{target/classes,target/dependency/,deps.txt}"

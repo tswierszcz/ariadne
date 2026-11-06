@@ -8,20 +8,6 @@ import (
 	"ariadne/internal/hierarchy"
 )
 
-// Filter states of an entry site (Z1 detects, Z2 decides).
-const (
-	// FilterNoneSeen: no filter in the site's own method and the stream
-	// type does not override resolveClass. A process-wide filter
-	// (jdk.serialFilter, ObjectInputFilter.Config) is not visible in the
-	// bytecode, so this is not "unfiltered".
-	FilterNoneSeen = "none_seen"
-	// FilterNotEvaluated: a filter is present (setObjectInputFilter in
-	// the same method, or a stream class of the input overriding
-	// resolveClass is the receiver or created in the same method); its
-	// policy is not evaluated — the edges are kept.
-	FilterNotEvaluated = "present_not_evaluated"
-)
-
 // Site is one call of a cataloged deserialization entry.
 type Site struct {
 	CallerFQCN, CallerName, CallerDesc string
@@ -30,10 +16,19 @@ type Site struct {
 	// be a subclass of ObjectInputStream).
 	Owner, Name, Desc string
 	Model             string // Model.ID
+	Format            string // Model.Format ("" when callbacks are not modeled)
 	Coverage          string // Model.Coverage
 	Filter            string
 	FilterDetail      string
 	IsApp             bool
+	// Version is the deserializer library's release (XStream), when read.
+	Version string
+	// Candidates/Rejected: classes the format may create here, and those
+	// the evaluated policy rejects (no edges for them); set by Connect.
+	Candidates, Rejected int
+	// RejectedSample lists up to 5 rejected classes, for the report.
+	RejectedSample []string
+	allow          policy
 }
 
 const (
@@ -108,7 +103,7 @@ func FindSites(h *hierarchy.Hierarchy) []Site {
 					continue
 				}
 				sites = append(sites, Site{CallerFQCN: fqcn, CallerName: m.Name, CallerDesc: m.Descriptor, PC: c.PC,
-					Owner: c.Owner, Name: c.Name, Desc: c.Desc, Model: model.ID, Coverage: model.Coverage, Filter: FilterNoneSeen, IsApp: ci.IsApp})
+					Owner: c.Owner, Name: c.Name, Desc: c.Desc, Model: model.ID, Format: model.Format, Coverage: model.Coverage, Filter: FilterNoneSeen, IsApp: ci.IsApp})
 			}
 			if len(sites) == 0 {
 				continue
@@ -131,7 +126,7 @@ func FindSites(h *hierarchy.Hierarchy) []Site {
 				if s.Owner != ois && s.Owner != objectInput && overridesResolveClass(h, s.Owner) {
 					d = append(d, "receiver "+s.Owner+" overrides resolveClass")
 				}
-				if len(d) > 0 && s.Coverage == CallbacksModeled {
+				if len(d) > 0 && s.Format == FormatJava {
 					sort.Strings(d)
 					s.Filter, s.FilterDetail = FilterNotEvaluated, strings.Join(d, "; ")
 				}

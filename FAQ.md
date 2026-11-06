@@ -794,8 +794,15 @@ type, every object in the stream has been created and its `readObject`,
 decides which classes appear, not the code that reads it, which is
 exactly what makes deserialization dangerous. So the honest static answer
 is "any concrete serializable class the input contains may run its
-callbacks here", unless a filter restricts it (detected, not yet
-evaluated). On WebGoat this made two advisories reachable whose
+callbacks here", unless a filter restricts it. Since DESERIALIZATION Z2 a
+filter (or XStream permission) written as a literal in the same method is
+evaluated, and a class it rejects loses its edges; one ariadne cannot
+read is reported as `unknown` and changes nothing — an unreadable policy
+is not evidence that a class is blocked. For XStream the release matters
+as much as the code: the same `new XStream().fromXML(xml)` admits every
+type on 1.4.5, still every type on 1.4.10 (calling `allowTypes` alone
+does not remove the default "any type" permission — observed on the real
+JVM), and none of the application's classes on 1.4.20. On WebGoat this made two advisories reachable whose
 vulnerable code is itself a serialization callback (jackson-databind's
 `NodeSerialization#readExternal`, logback's `LoggingEventVO#readObject`) —
 code no ordinary call ever reaches.
