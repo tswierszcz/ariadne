@@ -118,11 +118,15 @@ its own axis.
   hidden under `NOT_REACHABLE` — the row becomes `UNKNOWN`; `NOT_APPLICABLE` only when
   every instance is a WebJar. Counts of unique advisories and of per-component findings
   are reported separately.
+- **Writing (CVE:F9a):** the report, the results file and a snapshot manifest are
+  written together at the end of a run, all or nothing; a run that fails writes none of
+  them (an earlier run's files are left as they were).
 
 ### v2 schema (implemented by CVE:F1c, `schema_version: "2"`)
 
 | Field | Content |
 |---|---|
+| `analysis_id` | (CVE:F9a) `sha256:` over the document's own JSON with this field empty: identifies the result, not the moment — the same inputs, data and build give the same ID. The report header and a `-snapshot-out` manifest of the same run carry it; the report also names the results file's SHA-256 (for v1 as well) |
 | `tool` | `name`, `version` (the build) |
 | `snapshot` | `kind: "inputs"`, `id` = SHA-256 over every artifact's stable location and content hash (independent of temp paths), `offline`, `classpath_order`, and (CVE:F3) `data_set` when the run recorded or replayed a data snapshot: `id` (the manifest's `data_set_id`), `replayed`, `config_matches` |
 | `components[]` | one per component instance, inventory order: `id`, `artifact_id`, `location`, `role`, `sha256`, `bytes`, `gav`, `identity` (`identified`, `unidentified`, `conflict` = a shadowed class of this instance differs in content from the selected copy), `detection` (`pom.properties`, `deps-list`, `webjar`, `unidentified`, `app`, `embedded` — CVE:F6a, a library confirmed inside another jar; its `location` is `<host location>!/META-INF/maven/<g>/<a>`, `artifact_id`/`sha256` are the host's), `evidence[]`, `classes`, `shadowed`, `shadowed_differing`, `embedded_in` (the host instance of an embedded instance), `relocations[]` (CVE:F7a: `from` original package, `to` package in the jar, `source` `build-config: …pom.xml (maven-shade-plugin)` or `declared (-embedded-components)`), `version_candidates` (CVE:F6b: identity `version_candidates`, `gav` written `group:artifact:{v1,v2}`; an embedded instance named by build configuration or an SBOM has `location` `<host>!/build-config/<g>/<a>` or `<host>!/sbom/<g>/<a>`) |

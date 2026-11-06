@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8–F9: UNASSESSED | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: IN_PROGRESS (F9a 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2803,6 +2803,69 @@ Przy dodawaniu kolejnego wpisu zapisz:
   wybór pierwszego dostawcy JDK), CVE:F9 (kwalifikacja drugiego przyrostu
   F6–F7: m.in. atomowy zapis artefaktów i wspólny identyfikator analizy,
   błędy danych) albo obszar spoza CVE (GRAPH_PRECISION/RTA).
+
+### CVE:F9a — integralność artefaktów wyniku, błędy danych, kontrole drugiego przyrostu — DONE for this slice; CVE:F9 IN_PROGRESS (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** F9.9 (atomowy zapis, wspólny
+  identyfikator analizy), F9.8 (błędy danych — błąd globalny nie zostawia
+  raportu wyglądającego na kompletny), F9.4/F9.5 (eksport v1 dla wielu
+  instancji i wersji kandydujących; stabilność wyników). Praca na gałęzi
+  `cve-f9a-qualification`. Format v1 bez zmian (brak pola na ID).
+- **Zrealizowane:**
+  1. Nowy pakiet `internal/atomicfile`: `Set.Add/Commit` — każdy plik
+     zapisany w całości do pliku tymczasowego w swoim katalogu
+     (`Sync`, `Close`, `0644`), dopiero potem `rename` każdego; błąd zapisu
+     nie podmienia niczego i usuwa pliki tymczasowe; błąd między dwoma
+     `rename` wymienia pliki już podmienione. `WriteFile` dla jednego pliku.
+  2. `resultsv2`: pole `analysis_id` (SHA-256 treści dokumentu z pustym
+     polem, bez czasu), `WithAnalysisID`, `Marshal`; `Write` atomowy.
+     `report`: `ResultsJSON` (bajty v1), `Header.AnalysisID/ResultsFile/
+     ResultsFormat/ResultsSHA256`, linia „Analysis ID” w nagłówku raportu;
+     `WriteMarkdown`/`WriteResultsJSON` atomowe. `snapshot`: `Marshal`,
+     `ManifestPath`, `Manifest.AnalysisID`; `Write` atomowy.
+  3. `cmd/ariadne`: etap końcowy przebudowany — dokument v2 i kontrola
+     v1/v2, potem ID, bajty wyników, raport z ID i SHA-256 pliku wyników,
+     manifest snapshotu z ID, jeden `Commit`. **Naprawiony błąd:** wcześniej
+     raport był zapisywany przed kontrolą v1/v2 i przed plikiem wyników —
+     błąd w tych krokach zostawiał nowy raport bez pasującego JSON-a.
+- **Weryfikacja:** `internal/atomicfile/atomicfile_test.go` (zapis całości,
+  błąd zapisu nic nie podmienia i nie zostawia plików tymczasowych, błąd
+  `rename` wymienia podmienione), `cmd/ariadne/outputs_test.go`
+  (end-to-end na `testdata/reachfixture`: wspólne ID raportu/v2/manifestu i
+  SHA-256 pliku wyników, to samo ID i bajtowo ten sam v2 w dwóch
+  przebiegach, v1 z hashem w raporcie, nieudany zapis zostawia wcześniejszy
+  raport, błąd OSV offline i uszkodzony / nieobsługiwany manifest nie
+  zapisują nic), `internal/resultsv2/f6b_test.go` (`TestV1ExportWithCandidates`
+  — eksport v1 z instancją potwierdzoną i `version_candidates` zgodny z
+  agregatem silnika; `TestAnalysisID` — stabilne, zależne od treści).
+  `go vet ./...`, `go test ./...` — PASS.
+- **Prawdziwe dane** (offline na `.cache`, `-profile spring`, binarka z
+  `main` 7dfe6ac vs gałąź): petclinic (z deklaracją ehcache) i WebGoat — v1
+  bajtowo identyczny; v2 identyczny poza `analysis_id` i `tool.version`
+  (`+dirty`); v2 bajtowo identyczny w dwóch przebiegach nowej binarki;
+  ID w nagłówku raportu = `analysis_id`, SHA-256 w raporcie = hash pliku.
+- **Przegląd F9.8 (błędy danych):** uszkodzony obiekt i edytowany manifest
+  — odrzucane przez `-snapshot-in` (CVE:F3, testy `internal/snapshot`);
+  nieczytelny i nieobsługiwany format manifestu — nowe testy CLI; niezgodny
+  hash wejścia — CVE:F3; niedostępne OSV (offline bez cache, błąd sieci,
+  HTTP 429) — błąd globalny `resolving CVEs`, teraz bez zapisu artefaktów;
+  niedostępny commit poprawki — `SOURCE_UNAVAILABLE` per advisory (CVE:F5);
+  częściowe mapowanie — `MAPPING_PARTIAL` (CVE:F1b). Rate limit OSV nie ma
+  osobnego testu (ta sama ścieżka błędu co brak odpowiedzi).
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz raportów — także poprawiony
+  nieaktualny opis „brak v2”; wiersz cache — poprawiony nieaktualny opis
+  „brak TTL/snapshotów”), `docs/RESULTS_CONTRACT.MD` (`analysis_id`, zapis
+  wspólny), README (rozdział o raporcie), nagłówek F9 w planie CVE, ten
+  rejestr.
+- **Ograniczenia:** v1 nie ma pola na ID (powiązanie tylko przez SHA-256 w
+  raporcie); nieudany przebieg nie usuwa wcześniejszych plików (są starsze,
+  nie częściowe); atomowość per plik na POSIX, nie dla zestawu przy awarii
+  między `rename`; obiekty snapshotu zapisywane w trakcie (adresowane
+  treścią, atomowe), manifest na końcu.
+- **Następny krok (wymaga zgody):** reszta CVE:F9 przy kolejnym punkcie
+  wydania (migracja części ręcznych mapowań do v2 — F9.3, porównanie
+  aplikacji kontrolnych na wspólnym snapshotcie — F9.7), CVE:F8a (wymaga
+  wyboru dostawcy JDK) albo GRAPH_PRECISION.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

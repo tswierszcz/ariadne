@@ -18,6 +18,7 @@ import (
 
 	"ariadne/internal/analysis"
 	"ariadne/internal/aop"
+	"ariadne/internal/atomicfile"
 	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
@@ -1034,11 +1035,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
-	if err := report.WriteMarkdown(cfg.out, data); err != nil {
-		return fmt.Errorf("writing report: %w", err)
-	}
-	log("wrote %s", cfg.out)
-
+	// CVE:F9.9: every artifact is rendered in memory first and written
+	// at the end, all or nothing (internal/atomicfile): an error anywhere
+	// before — including the v1/v2 consistency check — leaves no new
+	// report that looks complete. The report, the v2 document and the
+	// snapshot manifest carry the same analysis_id; the report also names
+	// the results file's SHA-256 (v1 has no field for it).
+	//
 	// The v2 document is built on every run so that its v1 export is
 	// checked against the engine's v1 rows (contract §5) either way.
 	doc := resultsv2.Build(resultsv2.Inputs{
@@ -1054,21 +1057,49 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("results: %d advisories, %d findings per component instance (%d advisories without an instance); v1 export from v2 consistent",
 		doc.Coverage.Counts.Advisories, doc.Coverage.Counts.Findings, len(doc.Coverage.AdvisoriesWithoutInstance))
-	if cfg.jsonFormat == "v2" {
-		if err := resultsv2.Write(cfg.jsonOut, doc); err != nil {
-			return err
-		}
-	} else if err := report.WriteResultsJSON(cfg.jsonOut, results); err != nil {
-		return fmt.Errorf("writing results JSON: %w", err)
+	if doc, err = resultsv2.WithAnalysisID(doc); err != nil {
+		return err
 	}
-	log("wrote %s", cfg.jsonOut)
-
+	var resultsBytes []byte
+	if cfg.jsonFormat == "v2" {
+		resultsBytes, err = resultsv2.Marshal(doc)
+	} else {
+		resultsBytes, err = report.ResultsJSON(results)
+	}
+	if err != nil {
+		return fmt.Errorf("rendering results JSON: %w", err)
+	}
+	data.AnalysisID = doc.AnalysisID
+	data.ResultsFile = filepath.Base(cfg.jsonOut)
+	data.ResultsFormat = cfg.jsonFormat
+	if data.ResultsFormat == "" {
+		data.ResultsFormat = "v1"
+	}
+	data.ResultsSHA256 = snapshot.HashBytes(resultsBytes)
+	rendered, err := report.RenderMarkdown(data)
+	if err != nil {
+		return fmt.Errorf("writing report: %w", err)
+	}
+	var outputs atomicfile.Set
+	outputs.Add(cfg.out, []byte(rendered))
+	outputs.Add(cfg.jsonOut, resultsBytes)
 	if sr.recorder != nil {
-		if err := snapshot.Write(cfg.snapshotOut, current); err != nil {
+		current.AnalysisID = doc.AnalysisID
+		manifest, err := snapshot.Marshal(current)
+		if err != nil {
 			return fmt.Errorf("writing snapshot: %w", err)
 		}
+		outputs.Add(snapshot.ManifestPath(cfg.snapshotOut), manifest)
+	}
+	if err := outputs.Commit(); err != nil {
+		return err
+	}
+	log("wrote %s", cfg.out)
+	log("wrote %s", cfg.jsonOut)
+	if sr.recorder != nil {
 		log("wrote snapshot %s (data set %s, %d observations)", cfg.snapshotOut, snapshot.DataSetID(observations), len(observations))
 	}
+	log("analysis %s", doc.AnalysisID)
 	return nil
 }
 

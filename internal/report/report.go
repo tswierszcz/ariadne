@@ -27,7 +27,15 @@ type Header struct {
 	App            string
 	GeneratedAt    time.Time
 	AriadneVersion string
-	Profile        string
+	// AnalysisID and the results file it was written with (CVE:F9.9):
+	// the v2 document's analysis_id and the -json file's name, format and
+	// SHA-256 — a report and a results file belong together only when
+	// these match.
+	AnalysisID    string
+	ResultsFile   string
+	ResultsFormat string
+	ResultsSHA256 string
+	Profile       string
 	// FrameworksDetected is FRAMEWORKS F0's own separated fact: a
 	// space-joined list of every profile whose own marker classes were
 	// found, independent of which one(s) Profile above actually merges
