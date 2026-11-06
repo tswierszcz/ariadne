@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"ariadne/internal/callback"
+	"ariadne/internal/deserialize"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/reach"
@@ -22,6 +23,10 @@ type gapInputs struct {
 	loadSites      []serviceload.ServiceLoadSite
 	consumptions   []serviceload.ServiceConsumptionSite
 	registrations  []serviceload.ServiceRegistration
+	// deserialization entries (DESERIALIZATION Z1): unbounded — the
+	// format's own JDK callbacks (e.g. HashMap#readObject hashing its
+	// keys) can call into any class, which Z1 does not model.
+	deserialization []deserialize.Site
 }
 
 // collectGapSites turns every unresolved site into a reach.GapSite with
@@ -86,6 +91,9 @@ func collectGapSites(h *hierarchy.Hierarchy, in gapInputs) []reach.GapSite {
 		if s.UnresolvedReason != "" {
 			out = append(out, reach.GapSite{Kind: "serviceloader", CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc, Owners: providers})
 		}
+	}
+	for _, s := range in.deserialization {
+		out = append(out, reach.GapSite{Kind: "deserialization", CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc})
 	}
 	return out
 }

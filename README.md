@@ -274,6 +274,35 @@ explicitly: every transitive subtype of a marker interface gets an edge,
 for each method it declares, to the same-named method on the real
 implementation class.
 
+**Deserialization edges** (DESERIALIZATION Z1, `internal/deserialize`):
+every Java serialization entry — a call of `ObjectInputStream#readObject`/
+`#readUnshared` (also on a subclass) or `ObjectInput#readObject` — gets a
+"may run" edge (basis `deserialization`) to every callback serialization
+may run on a concrete serializable class of the input: a private,
+non-static `readObject(ObjectInputStream)`/`readObjectNoData()` of each
+class of the serializable chain, `readResolve()` resolved with
+serialization's access rules, an Externalizable class's public no-arg
+constructor and `readExternal(ObjectInput)`, and the no-arg constructor
+of the first non-serializable superclass. A method with another
+descriptor, or a public/static `readObject`, is not a callback; enums and
+records get none. The stream decides which classes appear (a cast after
+`readObject` does not bound it), so the edges say *may run*; whether the
+data is attacker-controlled is not modeled. A filter in the same method
+(`setObjectInputFilter`) or a `resolveClass`-overriding stream is shown,
+not evaluated (its edges are kept). Every entry is also an unbounded model
+gap (`deserialization`): the JDK's own callbacks (a `HashMap` hashing its
+keys) are not modeled. XStream `fromXML` is cataloged as an entry without
+callback edges. The report's "Deserialization entry points" section
+lists every site. Measured: petclinic 130 entry sites, 227 callback
+targets; WebGoat 142 and 296. Two advisories whose code *is* a
+serialization callback became reachable on both apps — CVE-2021-46877
+(jackson-databind `NodeSerialization#readExternal`) and CVE-2023-6378
+(logback `LoggingEventVO#readObject`) — through Spring's
+`DefaultDeserializer` (petclinic, FRAMEWORK) and JRuby's
+`JavaProxy#marshal_load` (WebGoat, REACHABLE); on petclinic also
+CVE-2022-45868 (H2, through `JdbcDataSource#readObject` and a long CHA
+path, FRAMEWORK). Control app: `scripts/prepare-deserialization-demo.sh`.
+
 ### 5. CVE resolution (`internal/cves`)
 
 Every unique `(groupId:artifactId, version)` pair is queried against
@@ -447,7 +476,7 @@ found:
 |---|---|
 | `REACHABLE` | Found in pass 1: a path exists that never has to pass *through* framework-internal code to get there. The shortest such path is recorded, along with the first app → dependency edge on it (the "entry call"). |
 | `FRAMEWORK` | Found only in pass 2: the only path runs through framework code the static graph can't follow past. Needs manual review. |
-| `NOT_REACHABLE` | vulnmap has methods for this CVE, at least one of them exists in the analyzed graph, but neither pass ever visits any of them. Since CVE:F1b the row carries `reasons`: `MAPPING_PARTIAL` when the mapping is not known to be complete (every mapping today), and `MODEL_INCOMPLETE` plus `model_gaps` (counts by kind) when reachable unresolved reflection/MethodHandle/callback/ServiceLoader sites could dispatch into the affected component. That gap rule is **report-only**: on the reference apps it applies to every `NOT_REACHABLE` row (19 of 19 petclinic, 12 of 12 WebGoat), so turning them into `UNKNOWN` would carry no information ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §4). Read the verdict as "no path in the model", not "safe". |
+| `NOT_REACHABLE` | vulnmap has methods for this CVE, at least one of them exists in the analyzed graph, but neither pass ever visits any of them. Since CVE:F1b the row carries `reasons`: `MAPPING_PARTIAL` when the mapping is not known to be complete (every mapping today), and `MODEL_INCOMPLETE` plus `model_gaps` (counts by kind) when reachable unresolved reflection/MethodHandle/callback/ServiceLoader sites or deserialization entries could dispatch into the affected component. That gap rule is **report-only**: on the reference apps it applies to every `NOT_REACHABLE` finding (16 of 16 petclinic, 10 of 10 WebGoat, after DESERIALIZATION Z1), so turning them into `UNKNOWN` would carry no information ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §4). Read the verdict as "no path in the model", not "safe". |
 | `UNKNOWN` | vulnmap has no entry for this CVE at all; or (CVE:F1b, with `reasons`) **none of the mapped methods exists in the analyzed graph** (`METHOD_NOT_FOUND` — e.g. a diff-derived method absent under that name in the analyzed version; 7 petclinic and 6 WebGoat rows that v1 used to report as `NOT_REACHABLE`), or the affected instance's own copy of a mapped class lost to another jar's copy under the classpath order (`CLASSPATH_CONFLICT` — a path through the other copy is not that instance's code). |
 | `NOT_APPLICABLE` | Every affected dependency is a WebJar (no `.class` file, assets under `META-INF/resources/webjars/`): client-side JavaScript/CSS a call graph cannot analyze. Checked before everything else. **Not** a verdict that the app is safe: the code runs in the browser. An empty jar alone does not qualify, since Maven aggregators such as `spring-boot-starter-web` are class-free too and CVEs filed against them (Spring4Shell) concern JVM code in other jars. |
 
@@ -593,7 +622,8 @@ all; `model`: a reachable call site connected to a modeled target
 `callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged` registration connected to the
 callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
 a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,
-DYNAMIC_LINKAGE L2) and, when there
+DYNAMIC_LINKAGE L2; `deserialization`: a Java serialization entry
+connected to a serialization callback, DESERIALIZATION Z1) and, when there
 is one, the bytecode offset of the actual invoke
 instruction — e.g. `(virtual call, resolution: direct, pc=77)` — so a
 reader can jump straight to `javap -c -p` output instead of trusting the
@@ -930,7 +960,14 @@ report:
   (`CompletionStage`, listeners, reactive operators), and a lambda whose
   own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
   left unresolved rather than guessed at.
-- **Serialization gadgets** are not modeled. **`web.xml`** (a WAR's own
+- **Serialization gadget chains** are not modeled: Java serialization
+  entries reach the callbacks of the input's own serializable classes
+  (DESERIALIZATION Z1), not the JDK's callbacks nor what those call on the
+  objects read (the classic `HashMap` → `hashCode` chain); filters are
+  detected, not evaluated (a process-wide `jdk.serialFilter` is not visible
+  at all); XStream and other deserializers get no callback edges; classes
+  whose superclass chain leaves the input at a JDK class not in the
+  built-in table are not candidates. **`web.xml`** (a WAR's own
   deployment descriptor, and an EAR's per-module ones) and **Spring
   classic XML bean definitions** (`<bean id="..." class="...">`,
   wherever a `<beans>`-rooted `.xml` resource is found on the app's own

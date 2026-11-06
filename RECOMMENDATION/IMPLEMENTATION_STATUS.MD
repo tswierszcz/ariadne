@@ -21,7 +21,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
-| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Role entry point/mapowanie CVE i wspólny model obiektów. |
+| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1: DONE (2026-11-06); Z2–Z4: UNASSESSED | `internal/deserialize`: katalog modeli (Java serialization, XStream jako samo wejście), krawędzie „może wykonać” z wejść Java serialization do callbacków klas serializowalnych wejścia; filtry wykrywane, nieoceniane (Z2). Szczegóły we wpisie DESERIALIZATION:Z0+Z1. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
@@ -2866,6 +2866,88 @@ Przy dodawaniu kolejnego wpisu zapisz:
   wydania (migracja części ręcznych mapowań do v2 — F9.3, porównanie
   aplikacji kontrolnych na wspólnym snapshotcie — F9.7), CVE:F8a (wymaga
   wyboru dostawcy JDK) albo GRAPH_PRECISION.
+
+### DESERIALIZATION:Z0+Z1 — katalog modeli i callbacki Java serialization — DONE (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** Z0 (kontrakt: katalog
+  `DeserializerModel`, rodzaje dowodów, rola XStream bez zmian) i Z1
+  (wejścia `ObjectInputStream`/`ObjectInput`, callbacki o dokładnych
+  sygnaturach, konstrukcja według reguł serializacji, nieznany zbiór typów
+  widoczny), aplikacja kontrolna z prawdziwym JVM. Gałąź
+  `deserialization-z0-z1`. Ocena alternatyw: FRAMEWORKS:F3 (zmierzony
+  zerowy efekt dispatchu proxy) i ASYNC_CALLBACKS:A3 (wymaga reszty
+  DATA_FLOW:D3) odłożone.
+- **Zrealizowane:**
+  1. `internal/deserialize/model.go` (Z0): `Model` (ID, komponent, zakres
+     wersji, wejścia jako `models.Signature`, reguła typów, `CallbackSpec`
+     z dostępem i zakresem, pokrycie `modeled`/`entry-only`, zabezpieczenia,
+     źródło), `EvidenceKind` (api-use, type-candidate, callback, filter,
+     chain-candidate — Z1 tworzy trzy pierwsze, filtr wykrywa). `Catalog`:
+     `jdk:java-serialization` (3 wejścia, 4 rodzaje callbacków) i
+     `xstream:fromxml` (5 przeciążeń, entry-only).
+  2. `sites.go`: `FindSites` — dokładne wejścia + `readObject`/
+     `readUnshared` na podklasie `ObjectInputStream`; filtr
+     `present_not_evaluated`, gdy w tej samej metodzie jest
+     `setObjectInputFilter`, gdy odbiorca nadpisuje `resolveClass` albo gdy
+     metoda tworzy taki strumień (`new`).
+  3. `callbacks.go`: `Candidates` — klasy konkretne serializowalne (przez
+     interfejsy/nadklasy wejścia, tabela klas JDK, JDK `*Exception`/`*Error`;
+     reszta „unknown”, licznik z klasą wyjścia), bez enumów i rekordów;
+     cele: prywatny niestatyczny `readObject`/`readObjectNoData` każdej klasy
+     łańcucha, `readResolve` z regułami dostępu serializacji, Externalizable
+     — publiczny konstruktor bezargumentowy i `readExternal`, konstruktor
+     bezargumentowy pierwszej nieserializowalnej nadklasy. `Edges` — tylko
+     dla modeli `modeled`.
+  4. `internal/callgraph`: `BasisDeserialization`,
+     `ApplyDeserializationEdges`. `cmd/ariadne`: krawędzie, log, każde
+     wejście jako luka modelu `deserialization` (nieograniczona — callbacki
+     JDK niemodelowane), raport „Deserialization entry points”, poprawione
+     ograniczenie w szablonie.
+  5. `scripts/prepare-deserialization-demo.sh` — aplikacja kontrolna
+     (`Gadget` z prywatnym `readObject`, `WrongSig` z publicznym, `Ext`
+     Externalizable, `Resolving` z `readResolve`, logback 1.2.3
+     `LoggingEventVO`), uruchamiana na prawdziwym JVM (zapis, odczyt,
+     asercje, które callbacki zadziałały).
+- **Weryfikacja:** `internal/deserialize/deserialize_test.go` (callbacki:
+  dokładne sygnatury i dostęp, łańcuch, konstruktor, dostęp `readResolve`
+  między pakietami, Externalizable, enum/rekord/unknown; miejsca na OIS,
+  ObjectInput, podklasie, filtry, XStream entry-only, odrzucone metody o tej
+  samej nazwie; katalog), `internal/callgraph/deserialization_edges_test.go`.
+  JVM (OpenJDK 25): odczyt uruchamia `Gadget.readObject`, `Ext.<init>`,
+  `Ext.readExternal`, `Resolving.readResolve`, nie uruchamia
+  `WrongSig.readObject` — dokładnie zgodnie z celami ariadne. ariadne na
+  demo: CVE-2023-6378 NOT_REACHABLE → REACHABLE (`Main#read →
+  LoggingEventVO#readObject`); CVE-2021-42550, -12798, -12801 → REACHABLE
+  przez `Logger#readResolve` (w logback woła `LoggerFactory.getLogger`, czyli
+  auto-konfigurację — realne zachowanie, krawędź „może wykonać”, strumień
+  demo nie zawiera Loggera); strumienie `Hardened*InputStream` logback
+  pokazane jako filtrowane. `go test ./...` (sieć zablokowana proxy) i
+  `go vet ./...` — PASS.
+- **Prawdziwe dane** (offline, `.cache`, `-profile spring`, main e8ee758 vs
+  gałąź): petclinic 130 wejść (11 z filtrem), 2957 klas kandydatów, 227
+  celów, 15436 krawędzi; WebGoat 142 (13), 3466, 296, 24272. Zmiany:
+  CVE-2021-46877 (jackson-databind `NodeSerialization#readExternal`) i
+  CVE-2023-6378 (logback `LoggingEventVO#readObject`) NOT_REACHABLE →
+  FRAMEWORK na petclinic (wejście Spring `DefaultDeserializer` przez
+  konwertery) i → REACHABLE na WebGoat (wejście JRuby
+  `JavaProxy#marshal_load`); CVE-2022-45868 → FRAMEWORK na petclinic (H2
+  `JdbcDataSource#readObject`, dalej długa ścieżka CHA). Nic więcej;
+  reguła luk nadal obejmuje wszystkie NOT_REACHABLE (16/16, 10/10); v2
+  bajtowo powtarzalny.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz deserializacji: Not
+  implemented → Partial, z zakresem i dowodami), README (krawędzie
+  deserializacji, baza `deserialization`, reguła luk, ograniczenia), FAQ
+  (dlaczego nie ogranicza rzutowanie), `docs/RESULTS_CONTRACT.MD` §4,
+  szablon raportu, plan DESERIALIZATION, ten rejestr.
+- **Ograniczenia:** nie analiza łańcuchów gadżetów (Z3); callbacki JDK i
+  to, co wołają na odczytanych obiektach, niemodelowane; kontrola danych
+  wejściowych przez atakującego niemodelowana; filtry i `jdk.serialFilter`
+  nieoceniane (Z2); `validateObject`, kanoniczne konstruktory rekordów,
+  `readObjectOverride` poza zakresem; tabela JDK niepełna (910 / 553 klas
+  „unknown”); XStream bez krawędzi callbacków.
+- **Następny krok (wymaga zgody):** DESERIALIZATION:Z2 (ocena filtrów
+  `ObjectInputFilter`/`resolveClass` dla znanych wzorców, pierwszy model
+  biblioteki — XStream w wybranych wydaniach) albo inny obszar.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

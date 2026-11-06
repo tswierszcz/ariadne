@@ -740,7 +740,7 @@ func Aggregate(fs []InstanceFinding) (Status, []findings.ReasonCode) {
 // MethodHandle, callback registration, ServiceLoader), for the model-gap
 // rule of docs/RESULTS_CONTRACT.MD §4.
 type GapSite struct {
-	Kind                               string // "reflection", "methodhandle", "callback", "serviceloader"
+	Kind                               string // "reflection", "methodhandle", "callback", "serviceloader", "deserialization"
 	CallerFQCN, CallerName, CallerDesc string
 	// Owners is the bounded set of classes the site could dispatch into;
 	// nil when the site has no bounded candidate set at all.

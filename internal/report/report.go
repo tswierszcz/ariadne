@@ -13,6 +13,7 @@ import (
 	"ariadne/internal/callback"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
+	"ariadne/internal/deserialize"
 	"ariadne/internal/findings"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/profile"
@@ -156,6 +157,10 @@ type Data struct {
 	// Components is CVE:F1a's artifact/component-instance inventory
 	// (nil in reports built without it, e.g. tests).
 	Components *component.Inventory
+
+	// Deserialization is DESERIALIZATION Z1's entry sites, candidate
+	// summary and edge counts (nil in reports built without it).
+	Deserialization *Deserialization
 
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
 	// every call site matching (or nearly matching) a cataloged
@@ -638,6 +643,15 @@ func GapCounts(gaps map[string]int) string {
 		parts[i] = fmt.Sprintf("%s %d", k, gaps[k])
 	}
 	return strings.Join(parts, ", ")
+}
+
+// Deserialization is the report's view of DESERIALIZATION Z0–Z1.
+type Deserialization struct {
+	Models     []deserialize.Model
+	Sites      []deserialize.Site
+	Summary    deserialize.CandidateSummary
+	Targets    int
+	EdgesAdded int
 }
 
 // showPerInstance: several instances, or an instance finding that says
