@@ -149,6 +149,14 @@ vulnerable code. The per-entry audit is in
 [testdata/cve-control/MANUAL_MAPPING_AUDIT.MD](../testdata/cve-control/MANUAL_MAPPING_AUDIT.MD).
 Diff- and LLM-derived mappings keep their existing source labels.
 
+**Migration to v2 (CVE:F9b).** Three entries are versioned (schema v2, exact selectors):
+CVE-2022-1471 (CVE:F4), CVE-2021-44228 and CVE-2022-42889. The migration of the latter two
+is documented in the audit (bytecode of every listed release checked; variants follow
+where the declared methods change). Migration changes the precision of the selectors and
+adds the version span; it does **not** change their role or coverage (`sink`/`entrypoint`,
+`partial`) — a v2 entry is not a complete mapping by its format. The other 36 entries
+(the XStream anchor) stay legacy, name-only.
+
 ## 7. Reference data
 
 - **Control set:** [testdata/cve-control/](../testdata/cve-control/README.MD) — fictional

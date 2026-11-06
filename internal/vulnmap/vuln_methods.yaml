@@ -42,18 +42,53 @@ CVE-2022-1471: # SnakeYAML, unsafe Constructor deserialization (RCE)
         - org.yaml.snakeyaml.constructor.Constructor#<init>
 
 CVE-2021-44228: # Log4Shell
+  # Migrated to schema v2 (CVE:F9b). OSV: log4j-core [2.0-beta9,2.3.1),
+  # [2.4,2.12.2), [2.13.0,2.15.0). Checked in the bytecode of 17 releases
+  # (2.0-beta9, -rc1, -rc2, 2.0, 2.0.1, 2.0.2, 2.1, 2.2, 2.3, 2.3.1, 2.8.2,
+  # 2.11.1, 2.12.1, 2.12.2, 2.13.0, 2.14.1, 2.15.0): up to 2.0.2 JndiLookup
+  # declares both lookup(String) and lookup(LogEvent, String); from 2.1 it
+  # extends AbstractLookup, whose lookup(String) delegates to the
+  # LogEvent overload, and declares only that one.
   role: sink
   coverage: partial
   review: reviewed
-  methods:
-    - org.apache.logging.log4j.core.lookup.JndiLookup#lookup
+  variants:
+    - package: org.apache.logging.log4j:log4j-core
+      versions: "[2.0-beta9,2.1)"
+      methods:
+        - org.apache.logging.log4j.core.lookup.JndiLookup#lookup(Ljava/lang/String;)Ljava/lang/String;
+        - org.apache.logging.log4j.core.lookup.JndiLookup#lookup(Lorg/apache/logging/log4j/core/LogEvent;Ljava/lang/String;)Ljava/lang/String;
+    - package: org.apache.logging.log4j:log4j-core
+      versions: "[2.1,2.15.0)"
+      methods:
+        - org.apache.logging.log4j.core.lookup.JndiLookup#lookup(Lorg/apache/logging/log4j/core/LogEvent;Ljava/lang/String;)Ljava/lang/String;
 
 CVE-2022-42889: # Text4Shell
+  # Migrated to schema v2 (CVE:F9b). OSV: commons-text [1.5,1.10.0).
+  # Checked in the bytecode of 1.4–1.10.0: StringSubstitutor declares the
+  # same 14 replace overloads in every release. The 11 instance overloads
+  # are the entry points (an interpolating substitutor's replace runs the
+  # script/dns/url lookups); the 3 static replace(Object, Map|Properties…)
+  # build a substitutor over a plain map lookup and are left out — the
+  # name-only selector used before matched them too.
   role: entrypoint
   coverage: partial
   review: reviewed
-  methods:
-    - org.apache.commons.text.StringSubstitutor#replace
+  variants:
+    - package: org.apache.commons:commons-text
+      versions: "[1.5,1.10.0)"
+      methods:
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;II)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/CharSequence;)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/CharSequence;II)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/Object;)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/StringBuffer;)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/StringBuffer;II)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Lorg/apache/commons/text/TextStringBuilder;)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace(Lorg/apache/commons/text/TextStringBuilder;II)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace([C)Ljava/lang/String;
+        - org.apache.commons.text.StringSubstitutor#replace([CII)Ljava/lang/String;
 
 # XStream (WebGoat's control case). An unconfigured XStream's
 # fromXML/fromXML-family entry points are the shared attack surface for

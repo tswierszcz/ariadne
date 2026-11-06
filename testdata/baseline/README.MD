@@ -11,6 +11,7 @@ Results of the analyzer at the CVE:F0 commit on the prepared petclinic and WebGo
 | `<app>/responses.tsv` | every cached network response the run read (OSV, GitHub, …): cache key, SHA-256, size |
 | `tool.txt` | analyzer commit, Go version, flags |
 | `VERDICT_CHANGE_ESTIMATE.MD` | which v1 verdicts F1's contract rules would change |
+| `F9_COMPARISON.MD` | CVE:F9b: every v1 verdict change from this baseline to the F0–F7 increments, with its cause (`scripts/cve-compare.sh`) |
 
 The responses are **not** in the repository (petclinic 1083 + WebGoat 896 entries, 1405
 distinct, 35 MB; 5.3 MB compressed). Regenerate and export them with:

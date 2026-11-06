@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: IN_PROGRESS (F9a 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -2866,6 +2866,70 @@ Przy dodawaniu kolejnego wpisu zapisz:
   wydania (migracja części ręcznych mapowań do v2 — F9.3, porównanie
   aplikacji kontrolnych na wspólnym snapshotcie — F9.7), CVE:F8a (wymaga
   wyboru dostawcy JDK) albo GRAPH_PRECISION.
+
+### CVE:F9b — porównanie aplikacji kontrolnych, migracja mapowań do v2, rate limit, testy bez sieci — DONE; CVE:F9 DONE dla F0–F7 (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** F9.7 (porównanie z bazą F0 na tych
+  samych danych, każda zmiana wyjaśniona), F9.3 (CVE-2021-44228 i
+  CVE-2022-42889 do schematu v2 z dokładnymi deskryptorami, weryfikacja w
+  bytecode wydań z Central), F9.8 (rate limit / niedostępne OSV), F9.6
+  (testy bez sieci). Gałąź `cve-f9b-qualification`.
+- **Zrealizowane:**
+  1. `scripts/cve-compare.sh OLD [NEW]` — buduje dwie wersje (worktree),
+     uruchamia offline na tym samym `.cache` petclinic i WebGoat, wypisuje
+     advisory tylko po jednej stronie i każdą zmianę statusu v1.
+     Snapshot nie może być wspólnym źródłem (`-snapshot-in` odrzuca inną
+     wersję analizatora), więc wspólnym źródłem danych jest cache; F0 na
+     obecnym cache odtwarza bajtowo zapisaną bazę.
+  2. `testdata/baseline/F9_COMPARISON.MD` — 45045d6 (F0) vs main e8ee758:
+     petclinic 9 zmian + 5 nowych advisory, WebGoat 11 + 4; **wszystkie
+     wyjaśnione**: (a) dane — nowe advisory pochodzą z nowszej odpowiedzi
+     OSV, bo lista GAV (z komponentami osadzonymi F6/F7) zmienia klucz
+     `querybatch`; potwierdzone na zapisanych odpowiedziach (dokładnie te
+     GHSA, nic nie ubyło); (b) F1b `METHOD_NOT_FOUND` — dokładnie 7/6
+     wierszy przewidzianych w `VERDICT_CHANGE_ESTIMATE.MD`; (c) F5 —
+     CVE-2024-12798 (strona sprzed poprawki: usunięty plik), CVE-2023-20873
+     (klasy zagnieżdżone), CVE-2024-38821 i CVE-2026-41848 REACHABLE →
+     FRAMEWORK (zbyt szerokie mapowanie nazwami: 227 i 7 metod, ścieżki do
+     metod niezwiązanych z poprawką; teraz 1 metoda zweryfikowana w
+     bytecode, osiągalna przez framework). Żadna zmiana z grafu ani z
+     komponentów osadzonych.
+  3. `vuln_methods.yaml`: CVE-2021-44228 — warianty `[2.0-beta9,2.1)` (oba
+     przeciążenia `JndiLookup#lookup`) i `[2.1,2.15.0)` (tylko
+     `lookup(LogEvent,String)`); CVE-2022-42889 — `[1.5,1.10.0)`, 11
+     instancyjnych przeciążeń `StringSubstitutor#replace` (3 statyczne nad
+     mapą odrzucone). Sprawdzone w bytecode 17 wydań log4j-core i 7
+     commons-text (jednorazowa sonda na `internal/classfile`, usunięta).
+     `internal/vulnmap/f9b_test.go` przypina wybór wariantu dla każdej
+     sprawdzonej wersji i brak pokrycia poza zakresem.
+  4. `internal/cves/f9b_test.go`: HTTP 429 i 503 z OSV → błąd (nigdy pusta
+     odpowiedź), błędna odpowiedź nie trafia do cache, po powrocie usługi
+     advisory są.
+- **Weryfikacja:** `go test ./...` z `HTTPS_PROXY`/`HTTP_PROXY` na
+  zamknięty port i pustymi kluczami LLM/GitHub — PASS (żaden test nie
+  sięga do sieci przez domyślny transport; testy httptest idą na
+  127.0.0.1, wyłączony z proxy), `go vet ./...` — PASS. Petclinic i WebGoat
+  v1 bajtowo identyczne z main (migracja ich nie dotyczy).
+  `work/jpms-demo`: CVE-2022-42889 classpath NOT_REACHABLE / module-path
+  REACHABLE jak przed migracją, `match_precision` name → exact.
+- **Kryteria wydania F9 (przyrosty 1–2):** scenariusze kontrolne mają
+  wyjaśnione wyniki (F9_COMPARISON, cases.yaml); niepewność nie jest
+  bezpieczeństwem (`UNKNOWN`/`METHOD_NOT_FOUND`, `version_unknown`,
+  `undetermined`); brak sieci offline i LLM w testach (sprawdzone);
+  dowody i wejścia rozstrzygnięć (snapshot, `analysis_id`, evidence);
+  dokumentacja rozróżnia działające/eksperymentalne/nieobsługiwane
+  (SUPPORT).
+- **Dokumentacja:** `docs/SUPPORT.MD` (mapowania wersjonowane),
+  `docs/RESULTS_CONTRACT.MD` §6, `MANUAL_MAPPING_AUDIT.MD` (sekcja
+  migracji), `testdata/baseline/README.MD`, `F9_COMPARISON.MD`, komentarze w
+  `vuln_methods.yaml`, nagłówek F9 w planie CVE, ten rejestr.
+- **Ograniczenia:** porównanie zależy od zawartości `.cache` (przy
+  odświeżonym cache część „dane” trzeba wyjaśnić na nowo); proxy-test nie
+  wykryje klienta z własnym transportem ignorującym zmienne proxy; 36
+  wpisów XStream pozostaje w formacie legacy.
+- **Następny krok (wymaga zgody):** CVE:F8a (docelowy runtime JDK —
+  potrzebny wybór pierwszego dostawcy), po nim F9 dla trzeciego przyrostu;
+  albo obszar spoza CVE (GRAPH_PRECISION/RTA).
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 
