@@ -30,13 +30,19 @@ zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 (`COMPLETION.md` tam: co dostarczono, wyrocznia JVM, pomiar historyczny, jawne
 ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
 
+**Deserializacja i kandydaci łańcuchów gadgetów — DONE (2026-11-07), wszystkie fazy
+Z0–Z4.** Dawne `DESERIALIZATION.MD`/`DESERIALIZATION_IMPLEMENTATION_PLAN.MD` są
+zarchiwizowane w
+[`archive/2026-11-07/deserialization/`](../archive/2026-11-07/deserialization/COMPLETION.md)
+(`COMPLETION.md` tam: co dostarczono, wyrocznia JVM, zestaw CVE, aplikacje kontrolne,
+jawne ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
+
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
 | Refleksja i rozpoznawanie nazw klas/metod | [REFLECTION.MD](REFLECTION.MD) | [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD) |
 | Frameworki: proxy, AOP, DI, konfiguracja i zewnętrzne wejścia | [FRAMEWORKS.MD](FRAMEWORKS.MD) | [FRAMEWORKS_IMPLEMENTATION_PLAN.MD](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) |
 | Callbacki i wykonywanie asynchroniczne | [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD) | [ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) |
 | MethodHandle, invokedynamic i dynamiczne stałe | [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD) | [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) |
-| Deserializacja i kandydaci łańcuchów gadgetów | [DESERIALIZATION.MD](DESERIALIZATION.MD) | [DESERIALIZATION_IMPLEMENTATION_PLAN.MD](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) |
 | Precyzja grafu: RTA i analiza możliwych obiektów | [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD) | [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) |
 | Przepływ wartości i danych kontrolowanych przez użytkownika | [DATA_FLOW.MD](DATA_FLOW.MD) | [DATA_FLOW_IMPLEMENTATION_PLAN.MD](DATA_FLOW_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
@@ -54,7 +60,7 @@ ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
 | Proxy, AOP i dependency injection | FRAMEWORKS |
 | Callbacki i kod asynchroniczny | ASYNC_CALLBACKS |
 | MethodHandle i pozostałe invokedynamic | DYNAMIC_LINKAGE |
-| Deserializacja | DESERIALIZATION |
+| Deserializacja | DESERIALIZATION — **DONE, zarchiwizowane** (Z0–Z4); dopływ danych z DATA_FLOW D4 |
 | Konfiguracja i wejścia frameworka | FRAMEWORKS |
 | Dynamiczne ładowanie klas i JNI | RUNTIME_NATIVE; statyczne nazwy klas obsługuje również REFLECTION |
 | RTA i analiza możliwych obiektów | GRAPH_PRECISION |
