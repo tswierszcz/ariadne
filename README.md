@@ -357,6 +357,24 @@ WebGoat the XStream EventHandler chain is a `candidate_chain` at the
 vulnerable-components lesson's entry (XStream 1.4.5); the other four are
 `classes_absent` on both apps.
 
+**What the data read depends on (DATA_FLOW D3).** Each deserialization
+entry also states what the data it reads depends on *within its own
+method*: for Java serialization the stream object (with whatever was
+wrapped into it — `new ObjectInputStream(new ByteArrayInputStream(
+Base64.getDecoder().decode(p)))` depends on `p`), for XStream `fromXML`'s
+argument — expressed as the method's parameters, `this`, fields, or
+results of calls the analysis does not model. It comes from dependency
+summaries (`internal/flowsum`): per method, what its return value, field
+writes and call arguments depend on, applied at each call site with that
+site's own arguments (two calls of one helper do not mix), through a
+single analyzed target (exact, or the one CHA implementation), a small
+JDK catalog, or a conservative rule (depends on everything it is given,
+recorded as widened). Recursion is iterated to a fixed point with a
+limit; an incomplete summary is marked `?`. Where those parameters come
+from — an HTTP request — is the next step (taint, DATA_FLOW:D4). On
+WebGoat the vulnerable-components lesson's `fromXML` reads its `String`
+parameter. Control app: `scripts/prepare-dataflow-demo.sh`.
+
 **Qualification and v2 (DESERIALIZATION Z4).** A chain is evaluated once
 per copy of its classes — the original names and each confirmed embedded
 instance carrying them relocated — so a shaded copy blocked by its guard

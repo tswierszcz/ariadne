@@ -28,7 +28,16 @@ type Site struct {
 	Candidates, Rejected int
 	// RejectedSample lists up to 5 rejected classes, for the report.
 	RejectedSample []string
-	allow          policy
+	// DataFrom (DATA_FLOW D3): what the data this entry reads depends on
+	// within its method (AttachArgumentFlow); DataFromRaw the same as
+	// flowsum sources; DataFlowIncomplete why it may be incomplete;
+	// DataFlowWidened how many calls of the method were answered by the
+	// conservative policy.
+	DataFrom           []string
+	DataFromRaw        []string
+	DataFlowIncomplete []string
+	DataFlowWidened    int
+	allow              policy
 }
 
 const (

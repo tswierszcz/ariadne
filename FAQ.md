@@ -824,6 +824,17 @@ catalog chain is not "safe". The demo `scripts/prepare-deserialization-chains-de
 shows each guard on the real JVM by round-tripping just the guarded class;
 no chain is ever built.
 
+**What does "Data read depends on: parameter 0" mean — is that taint?**
+Not yet. It says the bytes or XML a deserialization entry reads are
+computed from the method's parameter 0 (directly, or through decoding,
+wrapping and helper calls), found by dependency summaries that follow
+each call with that call's own arguments. It does not say who calls the
+method with what — whether parameter 0 is an HTTP request parameter is
+the taint analysis of DATA_FLOW:D4. "result of X#m" means the data passes
+through a call ariadne does not model, and it conservatively assumes the
+result depends on everything that call was given; "—" means the data
+depends on nothing the summary sees (a constant).
+
 **How do I know the deserialization model is right?** Partly by running
 it against the real JVM: `testdata/deserialize/oracle` writes one object
 of each scenario (private and public `readObject`, Externalizable, a
