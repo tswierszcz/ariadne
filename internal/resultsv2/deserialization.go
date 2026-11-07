@@ -6,6 +6,7 @@ import (
 
 	"ariadne/internal/cves"
 	"ariadne/internal/deserialize"
+	"ariadne/internal/taint"
 )
 
 // DESERIALIZATION Z4: the deserialization model of the run in v2, as
@@ -15,8 +16,11 @@ import (
 // Deserialization is the run's deserialization entries and catalog
 // chains.
 type Deserialization struct {
-	ModelCatalog string             `json:"model_catalog"`
-	ChainCatalog string             `json:"chain_catalog"`
+	ModelCatalog string `json:"model_catalog"`
+	ChainCatalog string `json:"chain_catalog"`
+	// TaintCatalog (DATA_FLOW D4, additive): the taint catalog when
+	// -taint ran; absent otherwise (no entry carries a taint result).
+	TaintCatalog string             `json:"taint_catalog,omitempty"`
 	Entries      []DeserEntry       `json:"entries"`
 	Chains       []DeserChain       `json:"chains"`
 	Summary      DeserializationSum `json:"summary"`
@@ -26,6 +30,8 @@ type Deserialization struct {
 type DeserializationSum struct {
 	EntriesByPolicy map[string]int `json:"entries_by_policy"`
 	ChainsByState   map[string]int `json:"chains_by_state"`
+	// EntriesByTaint (DATA_FLOW D4, -taint): entries by taint state.
+	EntriesByTaint map[string]int `json:"entries_by_taint,omitempty"`
 }
 
 // DeserEntry is one entry site.
@@ -47,6 +53,10 @@ type DeserEntry struct {
 	DataDependsOn      []string `json:"data_depends_on,omitempty"`
 	DataFlowIncomplete []string `json:"data_flow_incomplete,omitempty"`
 	DataFlowWidened    int      `json:"data_flow_widened,omitempty"`
+	// Taint (DATA_FLOW D4, -taint, additive): whether request data
+	// reaches the data the entry reads — a separate flow assessment,
+	// never a reachability verdict and never proof of exploitability.
+	Taint *taint.Result `json:"taint,omitempty"`
 }
 
 // DeserChain is one catalog chain evaluated on one copy of its classes.
@@ -102,7 +112,7 @@ func buildDeserialization(in Inputs) *Deserialization {
 	if in.DeserModelCatalog == "" {
 		return nil
 	}
-	d := &Deserialization{ModelCatalog: in.DeserModelCatalog, ChainCatalog: in.DeserChainCatalog,
+	d := &Deserialization{ModelCatalog: in.DeserModelCatalog, ChainCatalog: in.DeserChainCatalog, TaintCatalog: in.TaintCatalog,
 		Entries: []DeserEntry{}, Chains: []DeserChain{},
 		Summary: DeserializationSum{EntriesByPolicy: map[string]int{}, ChainsByState: map[string]int{}}}
 	for i := range in.DeserSites {
@@ -111,6 +121,13 @@ func buildDeserialization(in Inputs) *Deserialization {
 			App: s.IsApp, Policy: s.Filter, PolicyDetail: s.FilterDetail, Candidates: s.Candidates, Rejected: s.Rejected,
 			DataDependsOn: s.DataFromRaw, DataFlowIncomplete: s.DataFlowIncomplete, DataFlowWidened: s.DataFlowWidened})
 		d.Summary.EntriesByPolicy[s.Filter]++
+		if in.TaintCatalog != "" && s.Taint != nil {
+			d.Entries[len(d.Entries)-1].Taint = s.Taint
+			if d.Summary.EntriesByTaint == nil {
+				d.Summary.EntriesByTaint = map[string]int{}
+			}
+			d.Summary.EntriesByTaint[s.Taint.State]++
+		}
 	}
 	for _, p := range in.DeserChains {
 		c := DeserChain{ID: p.Spec.ID, Copy: p.Copy, ComponentInstanceID: p.Instance, Format: p.Spec.Format, State: p.State,

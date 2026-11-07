@@ -816,8 +816,9 @@ commons-collections 3.2.2's `InvokerTransformer#readObject` refuses
 unless a system property is set; a shaded copy carries the guard or not
 regardless of its version string), the target JDK allows it, and the
 entry's own policy does not reject any of its classes. It cannot know
-whether an attacker controls the bytes read at that entry (that is data
-flow, DATA_FLOW:D4), whether a process-wide `jdk.serialFilter` is set, or
+whether an attacker controls the bytes read at that entry (the opt-in
+`-taint` pilot, DATA_FLOW:D4, answers that separately for the entry, not
+for the chain), whether a process-wide `jdk.serialFilter` is set, or
 whether some chain outside its five-entry catalog exists. So a blocked
 chain clears only that chain — never the advisory — and an entry with no
 catalog chain is not "safe". The demo `scripts/prepare-deserialization-chains-demo.sh`
@@ -825,15 +826,40 @@ shows each guard on the real JVM by round-tripping just the guarded class;
 no chain is ever built.
 
 **What does "Data read depends on: parameter 0" mean — is that taint?**
-Not yet. It says the bytes or XML a deserialization entry reads are
+No. It says the bytes or XML a deserialization entry reads are
 computed from the method's parameter 0 (directly, or through decoding,
 wrapping and helper calls), found by dependency summaries that follow
 each call with that call's own arguments. It does not say who calls the
 method with what — whether parameter 0 is an HTTP request parameter is
-the taint analysis of DATA_FLOW:D4. "result of X#m" means the data passes
+the taint pilot's job (`-taint`, next question). "result of X#m" means the data passes
 through a call ariadne does not model, and it conservatively assumes the
 result depends on everything that call was given; "—" means the data
 depends on nothing the summary sees (a constant).
+
+**What does `-taint` add, and how far can I trust `flow_found`?**
+With `-taint` (DATA_FLOW D4, off by default) each deserialization entry
+also gets a taint result: does data from a cataloged request source — a
+Spring MVC handler parameter such as `@RequestParam`, a JAX-RS
+`@QueryParam`, a `ServletRequest#getParameter` result — reach the data the
+entry reads? ariadne starts from the entry's "data read depends on"
+inputs and walks to every call site of that method in the application,
+following the argument passed *there*, until it meets a source (`flow_found`,
+with the path), only constants or inputs outside the catalog
+(`no_flow_in_model`), or something it cannot follow — a field, a call it
+does not model, a lambda caller, a depth limit (`undetermined`, with the
+gaps listed). The guard column is specific to deserialization: only the
+entry's own type policy (an evaluated filter rejecting every candidate
+class, XStream's default allowlist) is `effective`; `String#replace`,
+HTML escaping or an `isEmpty()` check on the way are listed as
+`unrelated` — they change or test the text, they do not restrict what
+classes the stream creates, and a check deciding one branch never clears
+a flow. `flow_found` means the model sees request data reaching the
+entry; it is not a demonstrated exploit (a working gadget chain and the
+right classes are still needed — see the chain results). `no_flow_in_model`
+is not proof of safety either: it is relative to the source catalog and
+to callers in the application's own classes. The demo
+`scripts/prepare-taint-demo.sh` has one entry per case and runs on the
+real JVM.
 
 **How do I know the deserialization model is right?** Partly by running
 it against the real JVM: `testdata/deserialize/oracle` writes one object

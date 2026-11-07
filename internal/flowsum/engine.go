@@ -20,6 +20,13 @@ type Options struct {
 	// method on average; recursion that has not converged by then marks
 	// every summary incomplete.
 	MaxRounds int
+	// Opaque, when set, names calls (by the owner the bytecode names and
+	// the method name) that are never resolved into their bodies: they
+	// are answered by the conservative policy, so their result stays a
+	// `call:` source. DATA_FLOW D4 uses it for its source accessors
+	// (ServletRequest#getParameter…), which must stay sources even when
+	// the input holds a single implementation.
+	Opaque func(owner, name string) bool
 }
 
 // DefaultOptions are the CLI's bounds.
@@ -179,6 +186,10 @@ func (e *Engine) resolveUncached(op classfile.LocalOp) target {
 	return target{reason: strconv.Itoa(len(found)) + " implementations (CHA)"}
 }
 
+func (e *Engine) opaque(op classfile.LocalOp) bool {
+	return e.opts.Opaque != nil && e.opts.Opaque(op.CallOwner, op.CallName)
+}
+
 func (e *Engine) answer() callAnswer {
 	return func(op classfile.LocalOp, recv Dep, args []Dep) callEffect {
 		if op.CallKind == classfile.CallDynamic {
@@ -195,7 +206,12 @@ func (e *Engine) answer() callAnswer {
 			return callEffect{result: c.result.apply(recv, args), intoReceiver: c.intoRecv.apply(recv, args)}
 		}
 		name := op.CallOwner + "#" + op.CallName + op.CallDesc
-		t := e.resolve(op)
+		var t target
+		if e.opaque(op) {
+			t = target{reason: "opaque (a taint source)"}
+		} else {
+			t = e.resolve(op)
+		}
 		reason := t.reason
 		if t.ok {
 			if s := e.sums[t.key]; s != nil && e.inSet[t.key] {
@@ -262,7 +278,7 @@ func (e *Engine) Summarize(roots []MethodKey) Stats {
 			if op.Kind != classfile.LocalOpCall || op.CallKind == classfile.CallDynamic {
 				continue
 			}
-			if _, ok := lookupCatalog(op.CallOwner, op.CallName); ok {
+			if _, ok := lookupCatalog(op.CallOwner, op.CallName); ok || e.opaque(op) {
 				continue
 			}
 			if t := e.resolve(op); t.ok {

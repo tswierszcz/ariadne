@@ -626,13 +626,38 @@ was wrapped into it) or the XML (XStream: `fromXML`'s argument) depends on *with
 its parameters, `this`, fields, or the result of a call the dependency summaries do not model (`result of …`).
 Calls into the input are followed through their summaries, separately per call site; a call with no single
 analyzed target uses the conservative rule (depends on everything it is given). Where the method's own inputs
-come from — a request, a file — is not analyzed (DATA_FLOW:D4); "—" means the data depends on nothing the
+come from — a request, a file — is assessed only with `-taint` (DATA_FLOW:D4, below); "—" means the data depends on nothing the
 summary sees (a constant), "?" that the summary is incomplete.
 
 | Caller | Entry | Model | Policy | Classes rejected | Data read depends on |
 |---|---|---|---|---|---|
 {{range .Sites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}){{if .IsApp}} — app{{end}} | `{{.Owner}}#{{.Name}}` | {{.Model}}{{if .Version}} {{.Version}}{{end}} | {{.Filter}}{{if .FilterDetail}}: {{.FilterDetail}}{{end}} | {{if .Rejected}}{{.Rejected}} of {{.Candidates}} (e.g. {{range $i, $c := .RejectedSample}}{{if $i}}, {{end}}`{{$c}}`{{end}}){{else}}—{{end}} | {{if .DataFlowIncomplete}}? {{end}}{{if .DataFrom}}{{range $i, $d := .DataFrom}}{{if $i}}, {{end}}{{$d}}{{end}}{{else}}—{{end}} |
 {{end}}{{end}}
+
+### Request data reaching the entries (taint)
+
+{{if not .TaintCatalog}}Not assessed: run with `-taint` (DATA_FLOW D4, opt-in) to search whether request data reaches the data each entry reads.
+{{else}}DATA_FLOW D4, catalog `{{.TaintCatalog}}` (opt-in, report-only — never changes a verdict, never proof that a CVE is
+exploitable). Sources: Spring MVC handler parameters bound by `@RequestParam`, `@RequestBody`, `@RequestHeader`,
+`@PathVariable`, `@CookieValue`, `@RequestPart`, `@MatrixVariable` (and unannotated `String`/`String[]`/`byte[]`/
+stream/`MultipartFile` parameters of a handler), JAX-RS `@QueryParam`/`@FormParam`/`@PathParam`/`@HeaderParam`/
+`@CookieParam`/`@MatrixParam`/`@BeanParam`, and the results of `ServletRequest` accessors (`getParameter`,
+`getInputStream`, `getHeader`, …). The search runs backwards from the entry over the dependency summaries, per call
+site of each method in application code, at most 8 calls deep. **State**: `flow_found` — a source reaches the
+data; `no_flow_in_model` — every input ends at a constant or at an input outside the catalog (a parameter of a method
+no application code calls); `undetermined` — an input could not be followed (a field, an unmodeled call's result, a
+lambda, a limit, an incomplete summary); `not_assessed` — a library entry not called from application code.
+**Guard**: only the entry's own type policy (Z2) protects a deserialization entry — `effective` when it rejects every
+candidate class, `partial`, `unknown` (not evaluated); `unrelated` means the data only passes string replacement,
+escaping/encoding or a check deciding a branch, none of which restricts what is deserialized; `none`. Control
+dependence is not tracked: a check on one branch never clears a flow.
+
+{{if .TaintNotAssessed}}{{.TaintNotAssessed}} entries in library code not called from application code are `not_assessed` and not listed.
+{{end}}
+| Entry | State | Guard | Flow (source → … → entry) | Gaps |
+|---|---|---|---|---|
+{{range .Sites}}{{if and .Taint (ne .Taint.State "not_assessed")}}| `{{.CallerFQCN}}#{{.CallerName}}` (pc={{.PC}}) `{{.Owner}}#{{.Name}}` | {{with .Taint}}{{.State}}{{if .Reason}}: {{.Reason}}{{end}} | {{if .GuardState}}{{.GuardState}}{{range .Guards}}<br>{{.Kind}}: {{.Detail}}{{end}}{{else}}—{{end}} | {{if .Flows}}{{range $i, $f := .Flows}}{{if $i}}<br>{{end}}**{{$f.Source}}**{{range $f.Steps}} → `{{.Method}}` {{.Input}}{{end}}{{end}}{{if gt .FlowCount (len .Flows)}}<br>… {{.FlowCount}} flows in all{{end}}{{else if .Outside}}ends at: {{range $i, $o := .Outside}}{{if $i}}; {{end}}{{$o}}{{end}}{{else}}—{{end}} | {{if not .Gaps}}—{{else if .Flows}}{{.GapCount}} (listed in the JSON){{else}}{{range $i, $g := .Gaps}}{{if lt $i 5}}{{if $i}}; {{end}}{{$g}}{{end}}{{end}}{{if gt .GapCount 5}}; … {{.GapCount}} in all{{end}}{{end}}{{end}} |
+{{end}}{{end}}{{end}}
 
 ### Candidate gadget chains
 

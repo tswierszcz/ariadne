@@ -343,6 +343,9 @@ type Inputs struct {
 	DeserModelCatalog, DeserChainCatalog string
 	DeserSites                           []deserialize.Site
 	DeserChains                          []deserialize.ChainPresence
+	// TaintCatalog (DATA_FLOW D4): the taint catalog when -taint ran
+	// ("" = not run: entries carry no taint result).
+	TaintCatalog string
 }
 
 // DataFreshness is the run's data-freshness state (CVE:F2): State is
