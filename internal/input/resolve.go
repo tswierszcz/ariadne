@@ -50,12 +50,21 @@ func resolveOne(path, name string, byFileStem map[string]GAV) (DepJar, error) {
 		// modules that were never published under their own coordinates,
 		// so picking an arbitrary one (gavs[0]) can produce a GAV that OSV
 		// has no record of at all.
-		best := 0
+		best, matched := 0, false
 		for i, g := range gavs {
 			if g.Artifact+"-"+g.Version == stem {
-				best = i
+				best, matched = i, true
 				break
 			}
+		}
+		// No pom.properties is the jar's own, and the dependency list
+		// names this exact file: the entries are embedded components
+		// (groovy 2.4.x carries only commons-cli's, repackaged), so
+		// taking one would query the wrong artifact.
+		if gav, ok := byFileStem[stem]; ok && !matched {
+			g := gav
+			return DepJar{Path: path, GAV: &g, Source: SourceDepsList, WebAssetsOnly: webAssetsOnly,
+				Warnings: []string{fmt.Sprintf("pom.properties inside this jar name %v, not the jar itself; using %s from the dependency list (embedded components?)", gavs, g)}}, nil
 		}
 		dj := DepJar{Path: path, GAV: &gavs[best], Source: SourcePOMProperties, WebAssetsOnly: webAssetsOnly}
 		if len(gavs) > 1 {

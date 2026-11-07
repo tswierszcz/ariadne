@@ -178,3 +178,30 @@ func TestResolveDepJars_webAssetsOnly(t *testing.T) {
 		t.Errorf("got %d jars, want %d", len(jars), len(want))
 	}
 }
+
+// TestResolveDepJars_depsListBeatsForeignPOMProperties: a jar whose only
+// pom.properties is an embedded component's (groovy 2.4.3 carries
+// commons-cli's) is identified by the dependency list entry that names
+// the file, not as the embedded component.
+func TestResolveDepJars_depsListBeatsForeignPOMProperties(t *testing.T) {
+	dir := t.TempDir()
+	writeJar(t, filepath.Join(dir, "groovy-2.4.3.jar"), map[string]string{
+		"META-INF/maven/commons-cli/commons-cli/pom.properties": "groupId=commons-cli\nartifactId=commons-cli\nversion=1.2\n",
+	})
+	want := GAV{Group: "org.codehaus.groovy", Artifact: "groovy", Version: "2.4.3"}
+	got, err := ResolveDepJars(dir, []GAV{want})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].GAV == nil || *got[0].GAV != want || got[0].Source != SourceDepsList || len(got[0].Warnings) != 1 {
+		t.Fatalf("got %+v, want %s from the dependency list with one warning", got, want)
+	}
+	// Without a dependency list the pom.properties is all there is.
+	got, err = ResolveDepJars(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].GAV == nil || got[0].GAV.Artifact != "commons-cli" {
+		t.Errorf("without a list: %+v", got[0].GAV)
+	}
+}
