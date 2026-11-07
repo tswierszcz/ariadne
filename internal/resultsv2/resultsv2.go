@@ -7,6 +7,7 @@
 package resultsv2
 
 import (
+	"ariadne/internal/callgraph"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -48,6 +49,17 @@ type Document struct {
 	// Deserialization (DESERIALIZATION Z4, additive): entries, policies
 	// and catalog chains of the run.
 	Deserialization *Deserialization `json:"deserialization,omitempty"`
+	// CallGraph (GRAPH_PRECISION P0, additive): the call graph's settings
+	// and size, and the comparison with an earlier graph (-graph-compare).
+	CallGraph *CallGraph `json:"callgraph,omitempty"`
+}
+
+// CallGraph describes the run's call graph.
+type CallGraph struct {
+	callgraph.Config
+	Nodes      int                   `json:"nodes"`
+	Edges      int                   `json:"edges"`
+	Comparison *callgraph.Comparison `json:"comparison,omitempty"`
 }
 
 // Tool identifies the analyzer build.
@@ -346,6 +358,8 @@ type Inputs struct {
 	// TaintCatalog (DATA_FLOW D4): the taint catalog when -taint ran
 	// ("" = not run: entries carry no taint result).
 	TaintCatalog string
+	// CallGraph (GRAPH_PRECISION P0): rendered as is when set.
+	CallGraph *CallGraph
 }
 
 // DataFreshness is the run's data-freshness state (CVE:F2): State is
@@ -528,6 +542,7 @@ func Build(in Inputs) Document {
 	}
 	doc.Coverage.Counts = counts
 	doc.Deserialization = buildDeserialization(in)
+	doc.CallGraph = in.CallGraph
 	return doc
 }
 

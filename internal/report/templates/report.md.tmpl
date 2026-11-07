@@ -16,7 +16,7 @@
 - **Frameworks detected:** {{.FrameworksDetected}} — FRAMEWORKS F0: which profiles' own marker classes were actually found, independent of which one(s) got merged into the active Profile above (e.g. both `spring` and `jakarta` can be detected while only `spring` ends up selected by `-profile`)
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}
 - **JPMS scenario:** {{if .JPMSScenario}}{{.JPMSScenario}}{{else}}classpath{{end}} (see "JPMS module descriptors")
-- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model)
+- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model); mode `{{.GraphConfig.Mode}}` (builder {{.GraphConfig.Builder}}; {{.GraphConfig.SkipRule}}; unknown allocations: `{{.GraphConfig.UnknownAllocationPolicy}}`; roots `{{.GraphConfig.Roots}}`{{if .GraphConfig.TargetJava}}; target Java {{.GraphConfig.TargetJava}}{{end}})
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
 - **Data freshness:** {{.DataFreshness}}{{range .FreshnessLines}}; {{.}}{{end}}
 - **Model gaps:** {{.GapSites}} unresolved reflection/MethodHandle/callback/ServiceLoader sites, {{.GapsReachable}} reachable from the roots ({{.GapsUnbounded}} with no bounded candidate set) — see `MODEL_INCOMPLETE` below
@@ -108,7 +108,31 @@ None.
 {{end}}
 {{end}}
 {{end}}
-## Withdrawn advisories
+{{with .GraphComparison}}
+## Call graph compared with {{$.GraphCompareFile}}
+
+GRAPH_PRECISION P0. Edges are compared by identity (source and target method, call kind, basis), never by
+node number or graph size; fewer edges or fewer REACHABLE results are not by themselves an improvement.
+**Settings:** {{if .ConfigDifferences}}**different** — {{range $i, $d := .ConfigDifferences}}{{if $i}}; {{end}}{{$d}}{{end}} (the graphs were not built under the same settings: the differences below may come from these){{else}}identical{{end}}.
+Edges: {{.EdgesBefore}} → {{.EdgesAfter}}; added {{len .Added}} ({{.AddedText}}), removed {{len .Removed}} ({{.RemovedText}}); {{.EvidenceChanged}} kept edges with other call-site evidence.
+{{if .Findings}}
+| Finding | Before | After | Path changed | Explained by |
+|---|---|---|---|---|
+{{range .Findings}}| {{.ID}} | {{.Old}} | {{.New}} | {{if .PathChanged}}yes{{else}}no{{end}} | {{if .Because}}{{range $i, $b := .Because}}{{if $i}}<br>{{end}}`{{$b}}`{{end}}{{else}}— (no added/removed edge on either path: a change elsewhere, e.g. roots or mappings){{end}} |
+{{end}}{{else}}
+No finding changed its verdict or path.
+{{end}}{{if .FindingsOnlyBefore}}
+Only in the earlier graph: {{range $i, $f := .FindingsOnlyBefore}}{{if $i}}, {{end}}{{$f}}{{end}}.
+{{end}}{{if .FindingsOnlyAfter}}
+Only in this run: {{range $i, $f := .FindingsOnlyAfter}}{{if $i}}, {{end}}{{$f}}{{end}}.
+{{end}}{{if .Added}}
+Added edges{{if gt (len .Added) 30}} (first 30){{end}}:
+{{range .AddedSample}}- `{{.}}`
+{{end}}{{end}}{{if .Removed}}
+Removed edges{{if gt (len .Removed) 30}} (first 30){{end}}:
+{{range .RemovedSample}}- `{{.}}`
+{{end}}{{end}}
+{{end}}## Withdrawn advisories
 
 Advisories whose every OSV source record is withdrawn are not analyzed (CVE:F2). A withdrawn
 record whose alias still has an active record stays an active advisory above.

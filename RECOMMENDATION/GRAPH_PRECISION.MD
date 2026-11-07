@@ -1,6 +1,6 @@
 # Precyzja grafu: RTA i points-to — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 dostarczone (2026-11-07: tryb `-callgraph-mode cha`, ustawienia i porównanie grafów); RTA/points-to — plan. Fazy: [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
 
 ## Cel i stan obecny
 

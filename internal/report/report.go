@@ -4,6 +4,7 @@
 package report
 
 import (
+	"ariadne/internal/callgraph"
 	"fmt"
 	"sort"
 	"strings"
@@ -47,7 +48,11 @@ type Header struct {
 	MaxBytecodeVer     int
 	// JPMSScenario is the -jpms-scenario the ServiceLoader model used
 	// (SERVICE_LOADING S3); "" renders as the classpath default.
-	JPMSScenario    string
+	JPMSScenario string
+	// GraphConfig is the call graph's construction metadata
+	// (GRAPH_PRECISION P0): mode, builder, skip rule, allocation policy,
+	// roots, target JDK.
+	GraphConfig     callgraph.Config
 	GraphNodes      int
 	GraphEdges      int
 	PreCHAEdges     int
@@ -163,7 +168,11 @@ type Data struct {
 
 	// Deserialization is DESERIALIZATION Z1's entry sites, candidate
 	// summary and edge counts (nil in reports built without it).
-	Deserialization *Deserialization
+	// GraphComparison (GRAPH_PRECISION P0, -graph-compare): how this
+	// run's call graph differs from GraphCompareFile; nil without it.
+	GraphComparison  *callgraph.Comparison
+	GraphCompareFile string
+	Deserialization  *Deserialization
 
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
 	// every call site matching (or nearly matching) a cataloged

@@ -80,6 +80,9 @@ type config struct {
 	jpmsScenario   string
 	jpmsModulePath string
 	taint          bool
+	callgraphMode  string
+	graphOut       string
+	graphCompare   string
 
 	llm        bool
 	llmModel   string
@@ -126,6 +129,9 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.snapshotIn, "snapshot-in", "", "replay a data snapshot: every lookup is answered from it (no cache, no network); inputs, analyzer and algorithm versions must match it")
 	fs.StringVar(&cfg.snapshotCompare, "snapshot-compare", "", "compare this run with an earlier snapshot: list the advisories whose derived results were invalidated, and why")
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
+	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0): "cha" (class hierarchy analysis, the default and today's only mode)`)
+	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
+	fs.StringVar(&cfg.graphCompare, "graph-compare", "", "compare this run's call graph with one written earlier by -graph-out: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any difference in the graph settings")
 	fs.BoolVar(&cfg.taint, "taint", false, "DATA_FLOW D4 (opt-in, report-only): assess whether request data (Spring MVC/JAX-RS handler parameters, ServletRequest accessors) reaches the data each deserialization entry reads; adds a taint result per entry, never changes a verdict")
 	fs.BoolVar(&cfg.allowStale, "allow-stale", false, "when an online refresh fails, use the cached copy and mark the report as built on stale data (never past -max-data-age)")
 	fs.DurationVar(&cfg.dataTTL, "data-ttl", httpcache.DefaultTTL, "how long a fetched OSV/advisory response counts as fresh before it is fetched again (CVE:F2)")
@@ -208,6 +214,9 @@ func validate(cfg config) error {
 	if cfg.roots != "all" && cfg.roots != "profile" {
 		return fmt.Errorf("-roots must be %q or %q, got %q", "all", "profile", cfg.roots)
 	}
+	if _, err := callgraph.StrategyFor(cfg.callgraphMode); err != nil {
+		return fmt.Errorf("-callgraph-mode: %w", err)
+	}
 	if cfg.targetJava < 0 {
 		return fmt.Errorf("-target-java must be a positive Java feature version, got %d", cfg.targetJava)
 	}
@@ -234,6 +243,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	sr, err := newSnapshotRun(cfg)
 	if err != nil {
 		return err
+	}
+	// GRAPH_PRECISION P0: the earlier graph is read first, so a bad file
+	// fails before the analysis.
+	var graphBefore *callgraph.Export
+	if cfg.graphCompare != "" {
+		f, err := os.Open(cfg.graphCompare)
+		if err != nil {
+			return fmt.Errorf("-graph-compare: %w", err)
+		}
+		ex, err := callgraph.Read(f)
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("-graph-compare %s: %w", cfg.graphCompare, err)
+		}
+		graphBefore = &ex
 	}
 	if sr.replay != nil {
 		log("snapshot: replaying %s (data set %s, created %s)", cfg.snapshotIn, sr.replay.DataSetID, sr.replay.CreatedAt.Format(time.RFC3339))
@@ -597,8 +621,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("frameworks: %d InvocationHandler implementations found", len(proxyHandlers))
 	}
 
-	log("building call graph")
-	g := callgraph.Build(h, nil)
+	strategy, _ := callgraph.StrategyFor(cfg.callgraphMode) // validated in parseFlags
+	log("building call graph (mode %s)", strategy.Mode())
+	g := callgraph.BuildWith(h, strategy)
+	g.SetAnalysis(cfg.roots, cfg.targetJava)
 	log("call graph: %d nodes, %d edges (%d direct, %d added by CHA, %d class-init), %d unresolved dynamic call sites, %d calls resolved outside the analyzed input (informational, see report)",
 		g.NodeCount(), g.EdgeCount(), g.PreCHAEdgeCount(), g.CHAEdgeCount(), g.InitEdgeCount(), g.UnresolvedDynamicCount(), g.UnresolvedOwnerCount())
 
@@ -1075,6 +1101,20 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
 	}
+	// GRAPH_PRECISION P0: the final graph (every model edge added) with
+	// the findings' paths, for -graph-out and -graph-compare.
+	var graphFindings []callgraph.FindingPath
+	for _, r := range results {
+		graphFindings = append(graphFindings, callgraph.FindingPath{ID: r.CVE, Status: string(r.Status), Path: r.Path})
+	}
+	graphNow := callgraph.Snapshot(g, graphFindings)
+	var graphCmp *callgraph.Comparison
+	if graphBefore != nil {
+		c := callgraph.Compare(*graphBefore, graphNow)
+		graphCmp = &c
+		log("call graph comparison with %s: %d → %d edges, %d added, %d removed, %d with other call-site evidence; %d findings changed; settings: %s",
+			cfg.graphCompare, c.EdgesBefore, c.EdgesAfter, len(c.Added), len(c.Removed), c.EvidenceChanged, len(c.Findings), graphSettings(c.ConfigDifferences))
+	}
 	header := report.Header{
 		App:                cfg.app,
 		GeneratedAt:        time.Now(),
@@ -1085,6 +1125,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		FrameworksDetected: strings.Join(detected, ", "),
 		MaxBytecodeVer:     maxBytecode,
 		JPMSScenario:       string(jpmsScenario),
+		GraphConfig:        g.Config(),
 		GraphNodes:         g.NodeCount(),
 		GraphEdges:         g.EdgeCount(),
 		PreCHAEdges:        g.PreCHAEdgeCount(),
@@ -1122,6 +1163,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded,
 		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
 		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(cfg.taint)}
+	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(cfg.graphCompare)
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
@@ -1143,6 +1185,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
 		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
+		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp},
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
@@ -1203,6 +1246,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var outputs atomicfile.Set
 	outputs.Add(cfg.out, []byte(rendered))
 	outputs.Add(cfg.jsonOut, resultsBytes)
+	if cfg.graphOut != "" {
+		var gb strings.Builder
+		if err := callgraph.Write(&gb, graphNow); err != nil {
+			return fmt.Errorf("writing call graph: %w", err)
+		}
+		outputs.Add(cfg.graphOut, []byte(gb.String()))
+	}
 	if sr.recorder != nil {
 		current.AnalysisID = doc.AnalysisID
 		manifest, err := snapshot.Marshal(current)
@@ -1216,6 +1266,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("wrote %s", cfg.out)
 	log("wrote %s", cfg.jsonOut)
+	if cfg.graphOut != "" {
+		log("wrote call graph %s (%d edges, %s)", cfg.graphOut, len(graphNow.Edges), callgraph.ExportFormat)
+	}
 	if sr.recorder != nil {
 		log("wrote snapshot %s (data set %s, %d observations)", cfg.snapshotOut, snapshot.DataSetID(observations), len(observations))
 	}
@@ -1354,4 +1407,12 @@ func taintCatalog(on bool) string {
 		return taint.CatalogVersion
 	}
 	return ""
+}
+
+// graphSettings renders a comparison's settings differences.
+func graphSettings(diffs []string) string {
+	if len(diffs) == 0 {
+		return "identical"
+	}
+	return "DIFFERENT — " + strings.Join(diffs, "; ")
 }

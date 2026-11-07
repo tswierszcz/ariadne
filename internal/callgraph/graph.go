@@ -217,6 +217,17 @@ type Graph struct {
 	// it. It is not, on its own, evidence of a bug or a gap worth
 	// chasing; see UnresolvedOwnerCount's own doc comment.
 	unresolvedOwner int
+	// config is the construction metadata (GRAPH_PRECISION P0).
+	config Config
+}
+
+// Config returns the graph's construction metadata.
+func (g *Graph) Config() Config { return g.config }
+
+// SetAnalysis records the caller's own parameters (roots mode, target
+// JDK) in the graph's metadata.
+func (g *Graph) SetAnalysis(roots string, targetJava int) {
+	g.config.Roots, g.config.TargetJava = roots, targetJava
 }
 
 // NodeCount is the number of distinct methods in the graph.

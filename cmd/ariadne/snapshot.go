@@ -87,7 +87,7 @@ func analysisConfig(cfg config) map[string]string {
 		"llm": strconv.FormatBool(cfg.llm), "llm-model": cfg.llmConfig.Model, "llm-reask-changed": strconv.FormatBool(cfg.llmReaskChanged),
 		"exploit-check": strconv.FormatBool(cfg.exploitCheck), "framework-check": strconv.FormatBool(cfg.frameworkCheck),
 		"data-ttl": cfg.dataTTL.String(), "max-data-age": cfg.maxDataAge.String(),
-		"refresh": strconv.FormatBool(cfg.refresh), "taint": strconv.FormatBool(cfg.taint), "allow-stale": strconv.FormatBool(cfg.allowStale),
+		"refresh": strconv.FormatBool(cfg.refresh), "taint": strconv.FormatBool(cfg.taint), "callgraph-mode": cfg.callgraphMode, "allow-stale": strconv.FormatBool(cfg.allowStale),
 	}
 }
 

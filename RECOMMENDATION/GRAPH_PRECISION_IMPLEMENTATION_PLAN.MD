@@ -1,8 +1,8 @@
 # Precyzja grafu — fazy P0–P4
 
-Status: plan. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 DONE (2026-11-07: strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
 
-## P0. Uczciwy baseline i tryby porównania
+## P0. Uczciwy baseline i tryby porównania — DONE (2026-11-07)
 
 Zależności: JVM G0–G4, B0–B1, CVE F1–F4 dla porównywalnych wyników.
 
@@ -12,6 +12,8 @@ Zależności: JVM G0–G4, B0–B1, CVE F1–F4 dla porównywalnych wyników.
 - Zdefiniować politykę nieznanej alokacji: np. konserwatywny fallback do uzasadnionego zbioru typów dla dotkniętego miejsca, a jeśli nie ma dostatecznej podstawy — niekompletność i ograniczenie wyniku negatywnego.
 
 Gotowe: porównanie krawędzi ma stabilne identyfikatory i wyjaśnia zmiany, a nie tylko rozmiar grafu.
+
+Wykonano (2026-11-07): `internal/callgraph/strategy.go` (`Strategy`, `CHA`, `BuildWith`; `Build` jako adapter — wynik identyczny z `main`), `-callgraph-mode cha`, `Config` grafu w nagłówku raportu, v2 `callgraph` i snapshotcie; `-graph-out`/`-graph-compare` (tożsamość krawędzi: metoda źródłowa i docelowa, rodzaj, podstawa; zmiany werdyktów/ścieżek z krawędziami wyjaśniającymi; różnice ustawień zawsze ujawnione); `testdata/callgraph` z wyrocznią prawdziwego JVM (`scripts/callgraph-oracle.sh`, `TestKnownTargets`) — bez błędów deskryptorów do skorygowania; polityka nieznanej alokacji: CHA `all-subtypes`, dla RTA ustalona `cha-fallback-with-gap`. Szczegóły: IMPLEMENTATION_STATUS, wpis GRAPH_PRECISION:P0.
 
 ## P1. Katalog typów tworzonych jawnie i pośrednio
 
