@@ -21,7 +21,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
-| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3–Z4: UNASSESSED | `internal/deserialize`: katalog modeli (Java serialization, XStream jako samo wejście), krawędzie „może wykonać” z wejść Java serialization do callbacków klas serializowalnych wejścia; filtry wykrywane, nieoceniane (Z2). Szczegóły we wpisie DESERIALIZATION:Z0+Z1. |
+| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3a: DONE (2026-11-07, kandydaci łańcuchów bez dopływu danych); Z3 (dopływ danych, wymaga DATA_FLOW:D4), Z4: UNASSESSED | `internal/deserialize`: katalog modeli (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3a-1` oceniany per wejście (Z3a, tylko raport). Szczegóły we wpisach DESERIALIZATION:Z0+Z1, Z2, Z3a. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
@@ -3082,6 +3082,89 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - **Następny krok (wymaga zgody):** DESERIALIZATION:Z3 (dane zewnętrzne i
   kandydaci łańcuchów), międzyproceduralne polityki (instancja XStream /
   filtr z pola lub parametru — wymaga DATA_FLOW:D3), albo inny obszar.
+  (Zrealizowano Z3a — wpis niżej.)
+
+### DESERIALIZATION:Z3a — kandydaci łańcuchów gadżetów (bez dopływu danych) — DONE (2026-11-07)
+
+- **Zakres zatwierdzony (2026-11-07):** wersjonowany katalog kandydatów
+  łańcuchów, stany `candidate_chain`/`conditions_unresolved`/
+  `candidate_blocked` (+ `classes_absent`, `no_entry`), tożsamość klas przez
+  inwentarz komponentów (F6/F7), strażniki z bytecode, budżet = jawnie
+  skończony katalog; dopływ danych świadomie poza zakresem (wymaga
+  DATA_FLOW:D4) i raportowany jako `not_analyzed`. Gałąź
+  `deserialization-z3a` (odgałęziona od `deserialization-z2`, PR #5 jeszcze
+  niescalony).
+- **Zrealizowane:**
+  1. `internal/deserialize/chains.go`: `ChainCatalog` (`z3a-1`) —
+     CommonsCollections6 (commons-collections 3.x), CommonsCollections2/4
+     (commons-collections4 4.0), CommonsBeanutils1, Groovy1, XStream
+     `java.beans.EventHandler` (CVE-2013-7285); per łańcuch: komponenty,
+     klasy wymagane, klasy JDK (wyzwalacz pierwszy), wyzwalacz, ujście,
+     wydania, strażniki (`declares-method` z opcjonalnym wywołaniem,
+     `not-serializable`, `declares-field`), limit JDK, warunki
+     niesprawdzane, advisory, źródło. `EvaluateChains`: klasy po nazwie lub
+     pod relokacją potwierdzonej instancji (F7a), tożsamość (inny/nieznany
+     właściciel → unresolved), strażnik czytany z analizowanej klasy (także
+     relokowanej), `-target-java` (Groovy1 ≤ 8 z niepewnym 8, CB1 ≤ 15),
+     potem per wejście formatu: polityka Z2 (oceniona odrzucająca którąkolwiek
+     klasę łańcucha, także JDK → blocked tylko tam; `unknown`/
+     `version_unknown` → unresolved).
+  2. `cmd/ariadne/deserchains.go` (adapter inwentarza), wywołanie po F6a/F7a,
+     linia logu; raport „Candidate gadget chains” (wejścia aplikacji i z
+     własnym powodem w tabeli, biblioteczne zliczone), ograniczenia w
+     szablonie. Bez krawędzi, bez wpływu na werdykty, bez JSON v2.
+  3. Poprawka tożsamości (osobny commit, wykryta tym demem):
+     `input.resolveOne` — gdy żaden `pom.properties` w jarze nie pasuje do
+     nazwy pliku, a `-deps-list` ma dokładnie ten plik, wygrywa lista.
+     groovy 2.4.3 (jedyny `pom.properties`: przepakowany commons-cli 1.2) był
+     odpytywany w OSV jako commons-cli 1.2 — jego advisory (m.in.
+     CVE-2015-3253, CVE-2016-6814) w ogóle nie były sprawdzane.
+  4. `scripts/prepare-deserialization-chains-demo.sh` — dwa buildy
+     (vulnerable: cc 3.2.1, cc4 4.0, groovy 2.4.3, beanutils 1.9.4,
+     XStream 1.4.6; fixed: 3.2.2, 4.1, 2.4.4, 1.9.4, 1.4.7); na prawdziwym
+     JVM tylko round-trip pojedynczej klasy strażnika (żaden łańcuch nie jest
+     budowany), z asercjami.
+- **Weryfikacja:** `internal/deserialize/chains_test.go` (kandydat; strażnik
+  3.2.2 i readObject bez wywołania strażnika; 4.0 vs 4.1; nieznany
+  właściciel; kopia relokowana potwierdzona, jej strażnik, relokacja innego
+  komponentu; JDK 0/7/8/11 i groovy 2.4.4; XStream ze strażnikiem / bez /
+  bez klasy; filtr per wejście, allowlista; brak wejścia; poprawność
+  katalogu), `internal/input` (lista wygrywa z obcym `pom.properties`, bez
+  listy bez zmian). Strażniki potwierdzone najpierw na bytecode prawdziwych
+  JAR-ów (3.2.1/3.2.2, 4.0/4.1, groovy 2.4.3/2.4.4, XStream 1.4.6/1.4.7,
+  beanutils 1.9.4). JVM (OpenJDK 25): vulnerable — wszystkie round-tripy
+  przechodzą; fixed — `UnsupportedOperationException` (cc3),
+  `NotSerializableException` (cc4), `UnsupportedOperationException`
+  (groovy), `ConversionException` (XStream), beanutils przechodzi (brak
+  poprawki). ariadne: vulnerable — CC6, CC2/4 `candidate_chain` na
+  `Main#read`, `candidate_blocked` na `Main#readFiltered`
+  (`createFilter("demo.*;!*")` odrzuca `HashMap`/`PriorityQueue`), XStream
+  `candidate_chain` na `readXml`, Groovy1 i CB1 `conditions_unresolved` bez
+  `-target-java`, `candidate_blocked` z `-target-java 17`; fixed — wszystko
+  `candidate_blocked` oprócz CB1. Przed poprawką tożsamości Groovy1 w
+  vulnerable był `conditions_unresolved` z powodem „found in
+  commons-cli:commons-cli, not identified” — mechanizm tożsamości zadziałał
+  poprawnie i ujawnił błąd F1a. `go test ./...`, `go vet ./...` — PASS.
+- **Prawdziwe dane** (offline, `.cache`, `-profile spring`, HEAD 87baaa6 vs
+  gałąź): werdykty i JSON v2 bajtowo identyczne na petclinic i WebGoat (także
+  po poprawce tożsamości — żaden ich jar nie miał tego wzorca); dwa przebiegi
+  gałęzi bajtowo identyczne. petclinic: 4 łańcuchy Java `classes_absent`,
+  XStream `no_entry`. WebGoat: 4 łańcuchy Java `classes_absent`, XStream
+  EventHandler `candidate_chain` na 4 wejściach XStream 1.4.5, w tym
+  `VulnerableComponentsLesson#completed` — exploit samej lekcji.
+- **Dokumentacja:** `docs/SUPPORT.MD` (deserializacja, tożsamość Maven),
+  README (tożsamość jarów, akapit Z3a, ograniczenia), FAQ („candidate” vs
+  „exploitable”), `docs/RESULTS_CONTRACT.MD` §4, szablon raportu, komentarze
+  `model.go`, plan DESERIALIZATION, ten rejestr.
+- **Ograniczenia:** katalog pięciu łańcuchów, nie wyszukiwanie; brak
+  dopływu danych (D4); `jdk.serialFilter` niewidoczny; kopia relokowana
+  znajdowana tylko przy relokacjach potwierdzonej instancji; warunki typu
+  „komparator w strumieniu” tylko opisane; stany łańcuchów nie trafiają do
+  JSON v2 ani nie łączą się z wierszem advisory (Z4); łańcuchy XStream inne
+  niż EventHandler (konwertery typów JDK, CVE-2021-*) poza katalogiem.
+- **Następny krok (wymaga zgody):** DESERIALIZATION:Z4 (raportowanie: stany
+  łańcuchów w JSON v2 i snapshot, powiązanie z wierszem advisory), DATA_FLOW:D3
+  → D4 (dopływ danych — reszta Z3), albo inny obszar.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

@@ -105,8 +105,12 @@ jar/WAR/EAR) is then resolved to a Maven coordinate, in priority order:
    itself** — works regardless of which build tool produced it. If a jar
    contains more than one such file (a shaded/uber jar bundling other
    libraries' poms), the one whose own `artifact-version` matches the
-   jar's file name is preferred, and the rest are recorded as a warning
-   — and examined as **embedded components** (CVE:F6a): a module of the
+   jar's file name is preferred, and the rest are recorded as a warning.
+   When *none* of them matches the file name but the `-deps-list` entry
+   for that exact file does, the list wins (groovy 2.4.x carries only
+   commons-cli's `pom.properties`, repackaged inside it; taking it would
+   query OSV for the wrong artifact). The other entries are examined as
+   **embedded components** (CVE:F6a): a module of the
    jar's own project (same version, related group) is part of the jar; a
    separate library is compared class by class with its jar of exactly
    that version from Maven Central (`ARIADNE_MAVEN_CENTRAL` overrides the
@@ -322,6 +326,36 @@ serialization callback became reachable on both apps — CVE-2021-46877
 `JavaProxy#marshal_load` (WebGoat, REACHABLE); on petclinic also
 CVE-2022-45868 (H2, through `JdbcDataSource#readObject` and a long CHA
 path, FRAMEWORK). Control app: `scripts/prepare-deserialization-demo.sh`.
+
+**Candidate gadget chains (DESERIALIZATION Z3a).** A small, versioned
+catalog of documented chains (`internal/deserialize/chains.go`, catalog
+`z3a-1`): CommonsCollections6 (commons-collections 3.x), CommonsCollections2/4
+(commons-collections4 4.0), CommonsBeanutils1, Groovy1 and XStream's
+`java.beans.EventHandler` dynamic proxy (CVE-2013-7285). For each, the
+required classes are looked up by name or under a relocation of a
+confirmed embedded component (CVE:F7a), and must belong to the expected
+component (a class with the right name in an unidentified or other jar
+is *not confirmed*); the fixed release's **guard is read from the
+analyzed bytecode**, not from a version string (3.2.2's
+`InvokerTransformer#readObject` calling `FunctorUtils#checkUnsafeSerialization`,
+4.1's non-Serializable `InvokerTransformer`, 2.4.4's `MethodClosure#readResolve`,
+1.4.7's `ReflectionConverter.eventHandlerType`); a JDK-bound chain uses
+`-target-java` (Groovy1 needs ≤ 8u71, CommonsBeanutils1's `TemplatesImpl`
+sink ≤ 15). Then, per entry site of the chain's format, the site's Z2
+policy: an evaluated policy rejecting any class of the chain (JDK trigger
+included) blocks it there. States: `candidate_chain`, `conditions_unresolved`
+(an undecided premise: unconfirmed identity, policy `unknown`, no
+`-target-java`), `candidate_blocked` (this chain only — never the advisory),
+`classes_absent`, `no_entry`. Report-only: no edge and no verdict changes,
+and none of it is a proof of exploitability — the data flow into the
+entry is `not_analyzed` (DATA_FLOW:D4), a process-wide `jdk.serialFilter`
+is invisible, and an entry with no catalog chain is not free of chains.
+Control app: `scripts/prepare-deserialization-chains-demo.sh` (a vulnerable
+and a fixed build; the guards are observed on the real JVM by
+round-tripping the single guarded class — no chain is built). On
+WebGoat the XStream EventHandler chain is a `candidate_chain` at the
+vulnerable-components lesson's entry (XStream 1.4.5); the other four are
+`classes_absent` on both apps.
 
 ### 5. CVE resolution (`internal/cves`)
 
@@ -980,7 +1014,10 @@ report:
   (`CompletionStage`, listeners, reactive operators), and a lambda whose
   own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
   left unresolved rather than guessed at.
-- **Serialization gadget chains** are not modeled: Java serialization
+- **Serialization gadget chains** are only matched against a five-chain
+  catalog (DESERIALIZATION Z3a: present classes, guards, JDK, site policy
+  — never the data flow, never a search for new chains); otherwise not
+  modeled: Java serialization
   entries reach the callbacks of the input's own serializable classes
   (DESERIALIZATION Z1), not the JDK's callbacks nor what those call on the
   objects read (the classic `HashMap` → `hashCode` chain); filters are
