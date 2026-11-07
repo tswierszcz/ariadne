@@ -1,6 +1,6 @@
 # Przepływ wartości i danych — fazy D0–D5
 
-Status: D0–D2 DONE; D3 DONE (wartości: pięć wycinków 2026-10-22…11-05; zależności: `internal/flowsum` 2026-11-07 — pola instancyjne per obiekt (points-to) poza zakresem); D4 DONE (pilotaż 2026-11-07: `internal/taint`, katalog `taint-1`, `-taint` opt-in, request → wejścia deserializacji); D5 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: D0–D2 DONE; D3 DONE (wartości: pięć wycinków 2026-10-22…11-05; zależności: `internal/flowsum` 2026-11-07 — pola instancyjne per obiekt (points-to) poza zakresem); D4 DONE (pilotaż 2026-11-07, zarchiwizowane: [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data_flow/DATA_FLOW_D4.md)); D5 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
 
 ## D0. Kontrakt IR, wartości i zakresów
 
@@ -47,19 +47,13 @@ Zależności: D2, rejestr B3 i dokładny graf JVM G2.
 
 Gotowe: fabryka zwraca właściwą wartość, dwa call sites nie tworzą nieuzasadnionej ścieżki, rekurencja zbiega lub ujawnia limit.
 
-## D4. Pierwsza analiza taint — DONE (2026-11-07; pilotaż: źródła Spring MVC/JAX-RS/Servlet → dane czytane przez wejścia deserializacji; `-taint` opt-in, tylko raport)
+## D4. Pierwsza analiza taint — DONE (zarchiwizowane 2026-11-07)
 
-Zależności: D3, CVE F4–F5 dla mapowania, FRAMEWORK F1–F2 dla źródeł scenariusza.
-
-- Dodać `internal/taint`: osobny graf danych, fakty źródeł/sinków, zakres argumentów i podstawę zaufania.
-- Zdefiniować jeden pilotaż, np. request parameter → argument wybranego API deserializacji, bez deklarowania dowodu dla wszystkich CVE tej biblioteki.
-- Wprowadzić reguły propagacji i zabezpieczeń specyficzne dla modelu. Warunkowy check tylko na jednej gałęzi nie oczyszcza danych w całej metodzie.
-- Rekonstruować ścieżkę danych z parametrami i krokami transformacji, zachowując poprawne powiązanie wywołania z powrotem.
-- W JSON v2 dodać osobną ocenę flow, powody luk i identyfikatory reguł; zachować dotychczasową ocenę LLM jako odrębny typ dowodu.
-
-Gotowe: dane użytkownika docierające do sinka, stała, właściwe zabezpieczenie, zabezpieczenie niezwiązane z podatnością i nieznany fragment mają odrębne oczekiwane wyniki.
-
-Wykonano (2026-11-07): `flow_found`/guard `none`, `no_flow_in_model`, `flow_found`/guard `effective` (polityka Z2), `flow_found`/guard `unrelated` (escaping + sprawdzenie na gałęzi), `undetermined` (interfejs z dwiema implementacjami) — aplikacja kontrolna `scripts/prepare-taint-demo.sh` i fixture `testdata/taint`. Ścieżka ma poziom metod (bez kroków transformacji wewnątrz metody); przepływy przez pola, wywołujący spoza aplikacji i lambdy są lukami. Szczegóły i pomiar: IMPLEMENTATION_STATUS, wpis DATA_FLOW:D4.
+Pilotaż (dane żądania Spring MVC/JAX-RS/Servlet → dane czytane przez wejścia
+deserializacji, `-taint` opt-in, tylko raport) zrealizowany i zweryfikowany;
+zobacz [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data_flow/DATA_FLOW_D4.md)
+po pełny zapis (co zrobione, dowody, co celowo odłożone — m.in. kroki
+transformacji wewnątrz metody) i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## D5. Pomiar i wydanie
 
