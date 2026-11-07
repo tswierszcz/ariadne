@@ -1,6 +1,6 @@
 # Przepływ wartości i danych — fazy D0–D5
 
-Status: plan. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: D0–D2 DONE; D3 DONE (wartości: pięć wycinków 2026-10-22…11-05; zależności: `internal/flowsum` 2026-11-07 — pola instancyjne per obiekt (points-to) poza zakresem); D4–D5 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
 
 ## D0. Kontrakt IR, wartości i zakresów
 
@@ -35,7 +35,7 @@ Zależności: D1.
 
 Gotowe: literał przez zmienną, dwa warianty gałęzi i nieznany parametr dają właściwe fakty. Pierwszy przyrost B2 można wydać bez D4.
 
-## D3. Przepływ między metodami i streszczenia
+## D3. Przepływ między metodami i streszczenia — DONE (2026-11-07; streszczenia zależności `internal/flowsum`; points-to dla pól instancyjnych poza zakresem)
 
 Zależności: D2, rejestr B3 i dokładny graf JVM G2.
 

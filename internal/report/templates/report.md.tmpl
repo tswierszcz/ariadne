@@ -621,9 +621,17 @@ Model catalog `{{.ModelCatalogVersion}}`. Java serialization: {{.Summary.Classes
 {{if not .Sites}}
 No entry site found.
 {{else}}
-| Caller | Entry | Model | Policy | Classes rejected |
-|---|---|---|---|---|
-{{range .Sites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}){{if .IsApp}} — app{{end}} | `{{.Owner}}#{{.Name}}` | {{.Model}}{{if .Version}} {{.Version}}{{end}} | {{.Filter}}{{if .FilterDetail}}: {{.FilterDetail}}{{end}} | {{if .Rejected}}{{.Rejected}} of {{.Candidates}} (e.g. {{range $i, $c := .RejectedSample}}{{if $i}}, {{end}}`{{$c}}`{{end}}){{else}}—{{end}} |
+**Data read** (DATA_FLOW D3): what the stream (Java serialization: the `ObjectInputStream`'s receiver, with what
+was wrapped into it) or the XML (XStream: `fromXML`'s argument) depends on *within the entry's own method* —
+its parameters, `this`, fields, or the result of a call the dependency summaries do not model (`result of …`).
+Calls into the input are followed through their summaries, separately per call site; a call with no single
+analyzed target uses the conservative rule (depends on everything it is given). Where the method's own inputs
+come from — a request, a file — is not analyzed (DATA_FLOW:D4); "—" means the data depends on nothing the
+summary sees (a constant), "?" that the summary is incomplete.
+
+| Caller | Entry | Model | Policy | Classes rejected | Data read depends on |
+|---|---|---|---|---|---|
+{{range .Sites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}){{if .IsApp}} — app{{end}} | `{{.Owner}}#{{.Name}}` | {{.Model}}{{if .Version}} {{.Version}}{{end}} | {{.Filter}}{{if .FilterDetail}}: {{.FilterDetail}}{{end}} | {{if .Rejected}}{{.Rejected}} of {{.Candidates}} (e.g. {{range $i, $c := .RejectedSample}}{{if $i}}, {{end}}`{{$c}}`{{end}}){{else}}—{{end}} | {{if .DataFlowIncomplete}}? {{end}}{{if .DataFrom}}{{range $i, $d := .DataFrom}}{{if $i}}, {{end}}{{$d}}{{end}}{{else}}—{{end}} |
 {{end}}{{end}}
 
 ### Candidate gadget chains

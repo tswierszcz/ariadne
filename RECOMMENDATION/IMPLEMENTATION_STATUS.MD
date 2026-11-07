@@ -15,7 +15,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: częściowe (pola statyczne, pola `final`, wyniki wywołań, parametry od wywołujących, pola `final` z parametru konstruktora — 2026-11-05); D3 (reszta), D4–D5: UNASSESSED | D3's pierwszy wycinek (streszczenia zapisów pól statycznych między metodami) jest realny i przetestowany, ale **zmierzony efekt na petclinic/WebGoat jest zerowy** — rzeczywiste miejsca `MethodHandle.invoke` na obu aplikacjach używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych. Odnotowane szczerze, nie skryte. |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: DONE (wartości — pięć wycinków 2026-10-22…11-05; zależności — `internal/flowsum` 2026-11-07; points-to pól instancyjnych poza zakresem); D4–D5: UNASSESSED | Streszczenia zależności (parametr/`this`/pole/wynik niemodelowanego wywołania → wynik, pola, argumenty wywołań, obiekty), podstawiane per miejsce wywołania, SCC do punktu stałego, katalog JDK, polityka konserwatywna; pierwszy odbiorca: wejścia deserializacji („Data read depends on”, v2). WebGoat 2420 metod / 6,7 s, petclinic 1252 / 1,8 s, werdykty bez zmian. Następny: D4 (taint). Szczegóły we wpisie DATA_FLOW:D3 (streszczenia zależności). |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
@@ -1665,6 +1665,77 @@ Przy dodawaniu kolejnego wpisu zapisz:
   PrivilegedExceptionAction)` → wynik `run()` (ASYNC_CALLBACKS lub
   model B3) — jedyny brakujący element, żeby te rozwiązane miejsca
   dały krawędzie; albo SERVICE_LOADING:S4.
+
+### DATA_FLOW:D3 — streszczenia zależności (`internal/flowsum`) — DONE (2026-11-07)
+
+- **Zakres zatwierdzony (2026-11-07):** zależności parametr/`this`/pole →
+  wynik/pole/argument wywołania, klucz kontekstu przez podstawienie per
+  miejsce wywołania, jawna polityka konserwatywna dla nieznanych metod z
+  pochodzeniem poszerzenia, rekurencja z limitem, wersjonowanie w
+  snapshotcie, mały katalog JDK pod D4, pierwszy odbiorca w deserializacji
+  (raport + v2). Pola instancyjne per obiekt (points-to) poza zakresem.
+  Gałąź `data-flow-d3-summaries` od `main` (ca0a761).
+- **Zrealizowane:**
+  1. `internal/flowsum/dep.go`: domena — posortowane zbiory internowanych
+     źródeł (`param:i`, `this`, `field:Owner.name`, `call:Owner#name desc`,
+     wewnętrzne `new@pc`), `substitute` (param → argument miejsca, this →
+     odbiorca), limit 32 źródeł `call:` → `call:*` (monotoniczny top).
+     `SummaryVersion = "d3-1"`.
+  2. `method.go`: interpreter na CFG i `LocalOp` z D1 — stos/zmienne,
+     `dup*` wg kategorii, tablice i obiekty (alokacja wchłania argumenty
+     konstruktora/mutatora/`putfield`; `getfield` zależy od pola i obiektu),
+     krawędzie wyjątków (zmienne z wejścia ∪ wyjścia bloku), bez zależności
+     sterowania; streszczenie: `Return`, `Fields`, `Calls[pc]`, `IntoThis`,
+     `IntoParams`, `Widened`, `Incomplete`.
+  3. `engine.go`: odkrywanie od korzeni (budżet 20 000 metod), cel
+     wywołania: `invokestatic`/`invokespecial` dokładnie, virtual/interface
+     przy jednej implementacji CHA w wejściu; SCC (Tarjan, iteracyjnie,
+     najpierw wywoływane), w SCC kolejka z najmniejszą metodą najpierw, limit
+     30 ewaluacji na członka → `Incomplete`; niekompletność wywoływanego
+     przechodzi na wywołujących. `catalog.go`: StringBuilder/StringBuffer,
+     String, Base64, opakowania strumieni/readerów i ich `read*`, Optional,
+     Objects, `parse*`/`valueOf`, URLDecoder, `Object#<init>`,
+     `setObjectInputFilter`/`createFilter`; invokedynamic → argumenty.
+  4. Odbiorca: `deserialize.AttachArgumentFlow` (Java: odbiorca
+     `readObject`; XStream: argument 0) → `Site.DataFrom*`; raport (kolumna
+     „Data read depends on”), v2 `entries[].data_depends_on`/
+     `data_flow_incomplete`/`data_flow_widened`; snapshot `algorithms`
+     `flowsum.summaries`; log z liczbami i czasem.
+  5. Fixture `testdata/flowsum` (`scripts/build-flowsum-fixture.sh`, `ext.Lib`
+     kompilowane, ale poza JAR-em = metoda zewnętrzna); aplikacja kontrolna
+     `scripts/prepare-dataflow-demo.sh` (sześć kształtów, uruchamiana na
+     JVM).
+- **Weryfikacja:** `flowsum_test.go` — tożsamość, transformacja z katalogu
+  (bez nowego źródła), stała (pusto), konkatenacja (indy), konstruktor +
+  getter, CHA 1 cel / 2 cele (poszerzenie z powodem), opakowanie strumienia,
+  mutacja przez metodę użytkownika, rekurencja (zbieżna), handler wyjątku,
+  pole statyczne, metoda zewnętrzna, **dwa miejsca wywołania helpera bez
+  mieszania**, budżet (poszerzenie „summary budget”), limit rekurencji
+  (`Incomplete`). `argflow_test.go`: wejścia fixture'u wyroczni zależą od
+  parametru `InputStream`. Demo: `fromBytes`/`fromBase64` → parametr 0,
+  `fromField` → this + pole, `fromConstant` → nic, `fromSource` → oba
+  parametry + wynik `Source#bytes` (2 implementacje), `twoSites` → tylko
+  parametr 1. Prawdziwe dane (offline, main ca0a761 vs gałąź): werdykty
+  petclinic 3/71/16/57/6, WebGoat 42/51/10/61/0 bez zmian; v2 identyczny poza
+  nowymi polami; dwa przebiegi bajtowo identyczne; petclinic 1252 metod, 1317
+  ewaluacji, 1,8 s, 119/130 wejść zależnych od parametru; WebGoat 2420 metod,
+  3484 ewaluacje, 6,7 s, 134/143 (`VulnerableComponentsLesson#completed` →
+  parametr 0 `String`). Wydajność: pierwsza wersja 47 s na WebGoat
+  (olbrzymia metoda JRuby `Sprintf#rubySprintfToBuffer`, 2605 instrukcji, w
+  SCC 153 metod) → slice zamiast mapy zmiennych, brak alokacji przy
+  niezmienionym scalaniu, internowanie źródeł, SCC i kolejność „najmniejsza
+  najpierw” → 6,7 s. `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz Data flow), README, FAQ,
+  `docs/RESULTS_CONTRACT.MD`, plan DATA_FLOW, ten rejestr.
+- **Ograniczenia:** to nie taint (skąd biorą się parametry — D4); brak
+  zależności sterowania; pola per pole, nie per obiekt; katalog JDK mały,
+  reszta konserwatywna (nadmiar, nigdy brak); odbiorcą są tylko wejścia
+  deserializacji; streszczenia nie zasilają jeszcze `internal/dataflow`
+  (wartości) ani innych modeli.
+- **Następny krok (wymaga zgody):** DATA_FLOW:D4 — pierwszy taint (źródła:
+  parametry handlerów Spring MVC/servletów, `getParameter`/`getInputStream`;
+  propagacja przez streszczenia D3 w górę po wywołujących; ujście: wejścia
+  deserializacji) — domyka resztę DESERIALIZATION:Z3.
 
 ### ASYNC_CALLBACKS + DATA_FLOW:D3 — model `AccessController.doPrivileged` — DONE for this scope (2026-11-05)
 

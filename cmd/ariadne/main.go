@@ -3,6 +3,7 @@
 package main
 
 import (
+	"ariadne/internal/flowsum"
 	"bytes"
 	"context"
 	"flag"
@@ -783,6 +784,27 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// site, with the identity of the classes from the component
 	// inventory (after F6a/F7a, so embedded and relocated copies have
 	// their owner). Report-only: no edge, no verdict changes.
+	// DATA_FLOW D3: dependency summaries of the methods with entries (and
+	// what they call), so each entry states what the data it reads
+	// depends on in its method. Report-only.
+	flowStart := time.Now()
+	flowEngine := flowsum.New(h, flowsum.DefaultOptions)
+	flowStats := flowEngine.Summarize(deserialize.SummaryRoots(deserSites))
+	deserialize.AttachArgumentFlow(deserSites, flowEngine)
+	flowEngine.Close()
+	withParams := 0
+	for _, s := range deserSites {
+		for _, d := range s.DataFromRaw {
+			if strings.HasPrefix(d, "param:") {
+				withParams++
+				break
+			}
+		}
+	}
+	log("dependency summaries (DATA_FLOW D3, %s): %d methods, %d evaluations (converged %v, %d cut by the budget, %d incomplete, %d calls answered conservatively) in %s; %d of %d deserialization entries read data depending on a parameter of their method",
+		flowsum.SummaryVersion, flowStats.Methods, flowStats.Evaluations, flowStats.Converged, flowStats.BudgetCut, flowStats.Incomplete, flowStats.Widened,
+		time.Since(flowStart).Round(time.Millisecond), withParams, len(deserSites))
+
 	deserChains := deserialize.EvaluateChains(chainInputs(h, components, cfg.targetJava), deserSites)
 	log("deserialization chains (DESERIALIZATION Z3a, catalog %s, %d chains): %s; data flow into the entries not analyzed",
 		deserialize.ChainCatalogVersion, len(deserialize.ChainCatalog), report.GapCounts(deserialize.ChainStateCounts(deserChains)))

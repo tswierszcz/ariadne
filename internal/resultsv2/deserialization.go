@@ -39,6 +39,14 @@ type DeserEntry struct {
 	PolicyDetail string `json:"policy_detail,omitempty"`
 	Candidates   int    `json:"candidate_classes"`
 	Rejected     int    `json:"rejected_classes"`
+	// DataDependsOn (DATA_FLOW D3, additive): what the data the entry
+	// reads depends on within its method, as dependency-summary sources
+	// (param:i, this, field:…, call:… for an unmodeled call's result);
+	// DataFlowIncomplete why that may be incomplete; DataFlowWidened how
+	// many calls of the method were answered conservatively.
+	DataDependsOn      []string `json:"data_depends_on,omitempty"`
+	DataFlowIncomplete []string `json:"data_flow_incomplete,omitempty"`
+	DataFlowWidened    int      `json:"data_flow_widened,omitempty"`
 }
 
 // DeserChain is one catalog chain evaluated on one copy of its classes.
@@ -100,7 +108,8 @@ func buildDeserialization(in Inputs) *Deserialization {
 	for i := range in.DeserSites {
 		s := &in.DeserSites[i]
 		d.Entries = append(d.Entries, DeserEntry{ID: entryID(s), Call: s.Owner + "#" + s.Name + s.Desc, Model: s.Model, Version: s.Version,
-			App: s.IsApp, Policy: s.Filter, PolicyDetail: s.FilterDetail, Candidates: s.Candidates, Rejected: s.Rejected})
+			App: s.IsApp, Policy: s.Filter, PolicyDetail: s.FilterDetail, Candidates: s.Candidates, Rejected: s.Rejected,
+			DataDependsOn: s.DataFromRaw, DataFlowIncomplete: s.DataFlowIncomplete, DataFlowWidened: s.DataFlowWidened})
 		d.Summary.EntriesByPolicy[s.Filter]++
 	}
 	for _, p := range in.DeserChains {

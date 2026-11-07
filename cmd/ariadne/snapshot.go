@@ -2,6 +2,7 @@ package main
 
 import (
 	"ariadne/internal/deserialize"
+	"ariadne/internal/flowsum"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -51,6 +52,8 @@ func algorithmVersions() map[string]string {
 		// gadget-chain catalog the run's deserialization results come from.
 		"deserialize.models": deserialize.ModelCatalogVersion,
 		"deserialize.chains": deserialize.ChainCatalogVersion,
+		// DATA_FLOW D3: the dependency-summary rules.
+		"flowsum.summaries": flowsum.SummaryVersion,
 	}
 }
 
