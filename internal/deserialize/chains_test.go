@@ -276,3 +276,57 @@ func TestChainCatalogWellFormed(t *testing.T) {
 		}
 	}
 }
+
+// TestChainTwoInstances: the chain's classes under their original names
+// and a relocated copy in a confirmed embedded instance are two results;
+// the shaded copy's guard blocks it alone, the plain copy stays a
+// candidate (and the other way round).
+func TestChainTwoInstances(t *testing.T) {
+	shaded := "shaded.cc."
+	emb := ClassOwner{Instance: "emb", Component: ccComp, Version: "3.2.2",
+		Relocations: []relocate.Rule{{From: "org.apache.commons.collections", To: "shaded.cc"}}}
+	owner := func(ci *hierarchy.ClassInfo) ClassOwner {
+		if strings.HasPrefix(ci.FQCN, shaded) {
+			return emb
+		}
+		return ClassOwner{Instance: "plain", Component: ccComp, Version: "3.2.1"}
+	}
+	sites := []Site{javaSite("app.Open", FilterNoneSeen)}
+	for _, c := range []struct {
+		plainGuard, shadedGuard bool
+		want                    map[string]string
+	}{
+		{false, true, map[string]string{"": ChainCandidate, "emb": ChainBlocked}},
+		{true, false, map[string]string{"": ChainBlocked, "emb": ChainCandidate}},
+	} {
+		classes := append(cc3(ccPkg, c.plainGuard), cc3(shaded, c.shadedGuard)...)
+		h := hierarchy.NewForTesting(classes)
+		got := map[string]string{}
+		for _, p := range EvaluateChains(ChainInputs{H: h, Owner: owner, Relocated: []ClassOwner{emb}}, sites) {
+			if p.Spec.ID == "java:commons-collections3:lazymap" {
+				got[p.Copy] = p.State
+				wantInst := map[string]string{"": "plain", "emb": "emb"}[p.Copy]
+				if p.Instance != wantInst || len(p.Sites) != 1 {
+					t.Errorf("copy %q: instance %q, %d sites", p.Copy, p.Instance, len(p.Sites))
+				}
+			}
+		}
+		if len(got) != 2 || got[""] != c.want[""] || got["emb"] != c.want["emb"] {
+			t.Errorf("guards plain=%v shaded=%v: got %v, want %v", c.plainGuard, c.shadedGuard, got, c.want)
+		}
+	}
+	// Only the shaded copy: one result, no absent original.
+	h := hierarchy.NewForTesting(cc3(shaded, false))
+	n := 0
+	for _, p := range EvaluateChains(ChainInputs{H: h, Owner: owner, Relocated: []ClassOwner{emb}}, sites) {
+		if p.Spec.ID == "java:commons-collections3:lazymap" {
+			n++
+			if p.Copy != "emb" || p.State != ChainCandidate {
+				t.Errorf("shaded only: copy %q state %s", p.Copy, p.State)
+			}
+		}
+	}
+	if n != 1 {
+		t.Errorf("shaded only: %d results, want 1", n)
+	}
+}

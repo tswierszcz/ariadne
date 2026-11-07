@@ -1,0 +1,5 @@
+# entry	callback	reason
+# A callback the real JVM ran that the model does not connect. Each must be a
+# declared gap of the model (docs/SUPPORT.MD), counted in the report.
+sc.Entries#plain	sc.Point#<init>	records are deserialized through their canonical constructor, not modeled (SUPPORT.MD); counted as excluded records
+sc.Entries#plain	sc.Queue#readObject	serializable only through java.util.concurrent.LinkedBlockingQueue, a JDK base outside the built-in table: unknown serializability, counted, never a candidate
