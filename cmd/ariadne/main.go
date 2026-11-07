@@ -806,9 +806,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	flowStats := flowEngine.Summarize(flowRoots)
 	deserialize.AttachArgumentFlow(deserSites, flowEngine)
 	if taintAnalyzer != nil {
+		taintStart := time.Now()
 		deserialize.AttachTaint(deserSites, taintAnalyzer, flowEngine)
-		log("taint (DATA_FLOW D4, %s, opt-in): %d deserialization entries assessed: %s",
-			taint.CatalogVersion, len(deserSites), report.GapCounts(deserialize.TaintStateCounts(deserSites)))
+		ts := taintAnalyzer.Stats
+		log("taint (DATA_FLOW D4, %s, opt-in): %d deserialization entries assessed: %s; %d searches, %d inputs visited, %d depth-limit and %d search-limit stops, in %s (summaries above)",
+			taint.CatalogVersion, len(deserSites), report.GapCounts(deserialize.TaintStateCounts(deserSites)),
+			ts.Sinks, ts.Nodes, ts.DepthLimits, ts.NodeLimits, time.Since(taintStart).Round(time.Microsecond))
 	}
 	flowEngine.Close()
 	withParams := 0

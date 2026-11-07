@@ -1,6 +1,6 @@
 # Przepływ wartości i danych — fazy D0–D5
 
-Status: D0–D2 DONE; D3 DONE (wartości: pięć wycinków 2026-10-22…11-05; zależności: `internal/flowsum` 2026-11-07 — pola instancyjne per obiekt (points-to) poza zakresem); D4 DONE (pilotaż 2026-11-07, zarchiwizowane: [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data_flow/DATA_FLOW_D4.md)); D5 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: D0–D2 DONE; D3 DONE (wartości: pięć wycinków 2026-10-22…11-05; zależności: `internal/flowsum` 2026-11-07 — pola instancyjne per obiekt (points-to) poza zakresem); D4 DONE (pilotaż 2026-11-07, zarchiwizowane: [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data_flow/DATA_FLOW_D4.md)); D5 DONE (2026-11-07: wyrocznia JVM, kształty, pomiar, `docs/TAINT_QUALIFICATION.MD`; `-taint` pozostaje opt-in); zob. IMPLEMENTATION_STATUS. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
 
 ## D0. Kontrakt IR, wartości i zakresów
 
@@ -55,11 +55,13 @@ zobacz [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data
 po pełny zapis (co zrobione, dowody, co celowo odłożone — m.in. kroki
 transformacji wewnątrz metody) i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
-## D5. Pomiar i wydanie
+## D5. Pomiar i wydanie — DONE (2026-11-07; pilotaż taint: wyrocznia JVM `scripts/taint-oracle.sh`, `TestTaintOracle`/`TestShapes`, pomiar w `docs/TAINT_QUALIFICATION.MD`; `-taint` opt-in)
 
 - Fixtures obejmują aliasing, pola, tablice, wyjątki, dwie instancje, overload, callback i brak źródeł. Zapisane artefakty pozwalają testować Go bez JDK.
 - Dla konkretnej wersji biblioteki i konkretnego pilota mierzyć błędne przepływy, pominięcia, unknown, czas oraz pamięć. Nie wyprowadzać globalnego procentu skuteczności z kilku fixtures.
 - Porównać z kontrolowanym uruchomieniem lub niezależnie sprawdzonym przykładem; brak zaobserwowanego flow nie dowodzi jego niemożliwości.
 - Zastosować B4; opublikować obsługiwane instrukcje, biblioteki i granice. Nowy tryb taint pozostaje opt-in do kwalifikacji.
+
+Wykonano (2026-11-07): osiem kształtów w `testdata/taint` (aliasing, pola, tablice, wyjątki, dwie instancje, overload, callback, brak źródeł); wyrocznia prawdziwego JVM (kanarek jako dane żądania, filtr procesowy) — 21 wejść: 0 pominięć, 0 niepotwierdzonych `flow_found`, 4 zaobserwowane przepływy jako `undetermined`; XStream sprawdzony na przykładach niezależnie zweryfikowanych (WebGoat, demo łańcuchów); czas i pamięć na 5 wejściach. Decyzja użytkownika: `-taint` pozostaje opt-in. Szczegóły: IMPLEMENTATION_STATUS, wpis DATA_FLOW:D5.
 
 Zaawansowane heap/context sensitivity i analiza wszystkich interleavingów wątków są dalszymi etapami wymagającymi osobnego pomiaru, a nie ukrytym warunkiem MVP.

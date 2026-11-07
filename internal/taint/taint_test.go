@@ -16,6 +16,18 @@ const fxJar = "../../testdata/taint/app.jar"
 // candidate/rejected counts), summaries with opaque sources, taint.
 func run(t *testing.T, opts taint.Options) map[string]*deserialize.Site {
 	t.Helper()
+	sites := runSites(t, opts)
+	out := map[string]*deserialize.Site{}
+	for i := range sites {
+		s := &sites[i]
+		out[s.CallerFQCN+"#"+s.CallerName] = s
+	}
+	return out
+}
+
+// runSites returns every entry with its taint result.
+func runSites(t *testing.T, opts taint.Options) []deserialize.Site {
+	t.Helper()
 	h, _, err := hierarchy.Build(fxJar, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -32,12 +44,7 @@ func run(t *testing.T, opts taint.Options) map[string]*deserialize.Site {
 	t.Cleanup(func() { e.Close() })
 	e.Summarize(deserialize.TaintRoots(sites, a))
 	deserialize.AttachTaint(sites, a, e)
-	out := map[string]*deserialize.Site{}
-	for i := range sites {
-		s := &sites[i]
-		out[s.CallerFQCN+"#"+s.CallerName] = s
-	}
-	return out
+	return sites
 }
 
 func get(t *testing.T, sites map[string]*deserialize.Site, k string) *taint.Result {

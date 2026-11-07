@@ -424,7 +424,14 @@ WebGoat the vulnerable-components lesson's `fromXML` is `flow_found` from
 `@RequestParam payload` through five `String#replace` calls (guard
 `unrelated`, policy `unrestricted`); petclinic has no application entry.
 Control app: `scripts/prepare-taint-demo.sh` (nine entries, one per case,
-each with its expected state).
+each with its expected state). Qualification (DATA_FLOW D5):
+[docs/TAINT_QUALIFICATION.MD](docs/TAINT_QUALIFICATION.MD) — a real-JVM
+oracle (`scripts/taint-oracle.sh`: every fixture handler is called with a
+serialized canary and a process-wide filter records which entries read it)
+finds no flow the model calls "no flow" and no `flow_found` the JVM did not
+show, with four observed flows the model reports `undetermined` (depth
+limit, a field, a lambda caller, an exception's message); the search costs
+under a millisecond per run. `-taint` stays opt-in.
 
 **Qualification and v2 (DESERIALIZATION Z4).** A chain is evaluated once
 per copy of its classes — the original names and each confirmed embedded
@@ -1026,6 +1033,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/prepare-quarkus-demo.sh     /path/to/jdk17-or-later/JAVA_HOME # Quarkus, control case
 ./scripts/prepare-jpms-demo.sh        /path/to/jdk11-or-later/JAVA_HOME # JPMS provides/provider(), -jpms-scenario control case
 ./scripts/prepare-taint-demo.sh       /path/to/jdk11-or-later/JAVA_HOME # request data → deserialization entries, -taint control case
+./scripts/taint-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for the -taint fixture (testdata/taint/oracle)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 
