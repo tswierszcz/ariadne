@@ -74,9 +74,13 @@ type DeserChain struct {
 	Blocks              []string          `json:"blocks,omitempty"`
 	Unresolved          []string          `json:"unresolved,omitempty"`
 	UncheckedConditions []string          `json:"unchecked_conditions,omitempty"`
-	Flow                string            `json:"flow"`
-	Sites               []DeserChainSite  `json:"sites,omitempty"`
-	SitesByState        map[string]int    `json:"sites_by_state,omitempty"`
+	// Flow (Z3): the strongest taint state among the chain's sites where
+	// it is not blocked (all sites when blocked everywhere); not_analyzed
+	// without -taint. FlowsByState counts the sites per taint state.
+	Flow         string           `json:"flow"`
+	FlowsByState map[string]int   `json:"flows_by_state,omitempty"`
+	Sites        []DeserChainSite `json:"sites,omitempty"`
+	SitesByState map[string]int   `json:"sites_by_state,omitempty"`
 }
 
 // DeserChainClass is one required class as found.
@@ -93,6 +97,8 @@ type DeserChainSite struct {
 	Entry   string   `json:"entry"`
 	State   string   `json:"state"`
 	Reasons []string `json:"reasons,omitempty"`
+	// Flow (Z3): the entry's taint state, not_analyzed without -taint.
+	Flow string `json:"flow"`
 }
 
 // ChainRef links a finding to a catalog chain naming its advisory on the
@@ -101,6 +107,8 @@ type ChainRef struct {
 	Chain string `json:"chain"`
 	Copy  string `json:"copy,omitempty"`
 	State string `json:"state"`
+	// Flow (Z3): the chain's flow summary (DeserChain.Flow).
+	Flow string `json:"flow"`
 }
 
 func entryID(s *deserialize.Site) string {
@@ -132,7 +140,7 @@ func buildDeserialization(in Inputs) *Deserialization {
 	for _, p := range in.DeserChains {
 		c := DeserChain{ID: p.Spec.ID, Copy: p.Copy, ComponentInstanceID: p.Instance, Format: p.Spec.Format, State: p.State,
 			Advisories: p.Spec.Advisories, Missing: p.Missing, Blocks: p.Blocks, Unresolved: p.Unresolved,
-			UncheckedConditions: p.Spec.Conditions, Flow: deserialize.FlowNotAnalyzed}
+			UncheckedConditions: p.Spec.Conditions, Flow: p.Flow, FlowsByState: p.FlowCounts}
 		for _, cc := range p.Classes {
 			if cc.Found == "" {
 				continue
@@ -140,7 +148,7 @@ func buildDeserialization(in Inputs) *Deserialization {
 			c.Classes = append(c.Classes, DeserChainClass{Name: cc.Name, Found: cc.Found, ComponentInstanceID: cc.Owner.Instance, Confirmed: cc.Confirmed})
 		}
 		for _, cs := range p.Sites {
-			c.Sites = append(c.Sites, DeserChainSite{Entry: entryID(cs.Site), State: cs.State, Reasons: cs.Own})
+			c.Sites = append(c.Sites, DeserChainSite{Entry: entryID(cs.Site), State: cs.State, Reasons: cs.Own, Flow: cs.Flow})
 		}
 		if len(p.Counts) > 0 {
 			c.SitesByState = p.Counts
@@ -168,7 +176,7 @@ func chainRefs(chains []deserialize.ChainPresence, cve cves.CVE, instance string
 		}
 		for _, a := range p.Spec.Advisories {
 			if names[a] {
-				out = append(out, ChainRef{Chain: p.Spec.ID, Copy: p.Copy, State: p.State})
+				out = append(out, ChainRef{Chain: p.Spec.ID, Copy: p.Copy, State: p.State, Flow: p.Flow})
 				break
 			}
 		}

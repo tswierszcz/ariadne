@@ -327,9 +327,9 @@ serialization callback became reachable on both apps — CVE-2021-46877
 CVE-2022-45868 (H2, through `JdbcDataSource#readObject` and a long CHA
 path, FRAMEWORK). Control app: `scripts/prepare-deserialization-demo.sh`.
 
-**Candidate gadget chains (DESERIALIZATION Z3a).** A small, versioned
+**Candidate gadget chains (DESERIALIZATION Z3).** A small, versioned
 catalog of documented chains (`internal/deserialize/chains.go`, catalog
-`z3a-1`): CommonsCollections6 (commons-collections 3.x), CommonsCollections2/4
+`z3-1`): CommonsCollections6 (commons-collections 3.x), CommonsCollections2/4
 (commons-collections4 4.0), CommonsBeanutils1, Groovy1 and XStream's
 `java.beans.EventHandler` dynamic proxy (CVE-2013-7285). For each, the
 required classes are looked up by name or under a relocation of a
@@ -347,14 +347,27 @@ included) blocks it there. States: `candidate_chain`, `conditions_unresolved`
 (an undecided premise: unconfirmed identity, policy `unknown`, no
 `-target-java`), `candidate_blocked` (this chain only — never the advisory),
 `classes_absent`, `no_entry`. Report-only: no edge and no verdict changes,
-and none of it is a proof of exploitability — the data flow into the
-entry is `not_analyzed` in the chain result (the entry's own `-taint` result, below, is separate), a process-wide `jdk.serialFilter`
+and none of it is a proof of exploitability. **Data flow (Z3):** each
+chain × entry carries that entry's taint result as `flow` — `flow_found`,
+`no_flow_in_model`, `undetermined`, `not_assessed` with `-taint` (see
+"Request data reaching the entries" below), `not_analyzed` without it — and
+the chain's own `flow` is the strongest among the entries where it is not
+blocked (all entries when it is blocked everywhere). Flow is a separate
+reason: it never changes a chain's state, and `candidate_chain` with
+`flow_found` still leaves the object graph, field values and runtime
+configuration unchecked; only request data is checked (files, sockets,
+queues are not). A process-wide `jdk.serialFilter`
 is invisible, and an entry with no catalog chain is not free of chains.
 Control app: `scripts/prepare-deserialization-chains-demo.sh` (a vulnerable
 and a fixed build; the guards are observed on the real JVM by
-round-tripping the single guarded class — no chain is built). On
+round-tripping the single guarded class — no chain is built; with `-taint`
+its request-fed `demo.Web` entries are `flow_found` — vulnerable build:
+CC6/CC2-4/XStream `candidate_chain` with request data; fixed build:
+blocked with request data). On
 WebGoat the XStream EventHandler chain is a `candidate_chain` at the
-vulnerable-components lesson's entry (XStream 1.4.5); the other four are
+vulnerable-components lesson's entry (XStream 1.4.5) — with `-taint`
+also `flow_found` (`@RequestParam payload`), so the CVE-2013-7285 row reads
+"xstream:eventhandler candidate_chain, request data flow_found"; the other four are
 `classes_absent` on both apps.
 
 **What the data read depends on (DATA_FLOW D3).** Each deserialization
@@ -418,11 +431,12 @@ per copy of its classes — the original names and each confirmed embedded
 instance carrying them relocated — so a shaded copy blocked by its guard
 does not hide a plain vulnerable one (or the reverse). With
 `-json-format v2` the run's deserialization model is in the document:
-`deserialization` (model catalog `z2-1`, chain catalog `z3a-1`, every
-entry with its policy, every chain copy with its classes, reasons and
-per-entry states) and, on a finding whose advisory a chain names on the
+`deserialization` (model catalog `z2-1`, chain catalog `z3-1`, every
+entry with its policy, every chain copy with its classes, reasons,
+per-entry states and flows, `flow`/`flows_by_state`) and, on a finding whose advisory a chain names on the
 same instance, `deserialization_chains`; the same link is shown on the
-advisory's row of the report's CVE table ("gadget chain: …"). Evidence
+advisory's row of the report's CVE table ("gadget chain: …", with
+", request data flow_found" etc. when `-taint` ran). Evidence
 only: no verdict and no v1 field changes. A data snapshot records both
 catalog versions (`deserialize.models`, `deserialize.chains`), so a rule
 change invalidates a replay or shows up in `-snapshot-compare`.

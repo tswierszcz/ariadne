@@ -7,6 +7,7 @@ import (
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/relocate"
+	"ariadne/internal/taint"
 )
 
 const (
@@ -328,5 +329,82 @@ func TestChainTwoInstances(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("shaded only: %d results, want 1", n)
+	}
+}
+
+// withTaint gives a site a taint result in state st.
+func withTaint(s Site, st string) Site {
+	s.Taint = &taint.Result{State: st}
+	return s
+}
+
+// TestChainFlow (Z3): each site × chain carries its entry's taint state,
+// not_analyzed without -taint; the chain's flow is the strongest among
+// the sites where it is not blocked (all sites when blocked everywhere);
+// flow never changes a state.
+func TestChainFlow(t *testing.T) {
+	owner := ownedBy(map[string]string{ccPkg: ccComp})
+	id := "java:commons-collections3:lazymap"
+	filteredSite := func(st string) Site {
+		s := javaSite("app.Filtered", FilterEvaluated)
+		pats, _ := parseJavaFilter("app.*;!*")
+		s.allow = javaFilterPolicy(pats)
+		if st != "" {
+			s = withTaint(s, st)
+		}
+		return s
+	}
+
+	// No -taint: every site and the chain are not_analyzed.
+	p := evalChains(t, cc3(ccPkg, false), owner, nil, 0, []Site{javaSite("app.Open", FilterNoneSeen)})[id]
+	if p.Flow != FlowNotAnalyzed || p.Sites[0].Flow != FlowNotAnalyzed || p.FlowCounts[FlowNotAnalyzed] != 1 {
+		t.Errorf("without taint: chain %s site %s counts %v", p.Flow, p.Sites[0].Flow, p.FlowCounts)
+	}
+
+	// Request data at the open site, a constant at another: the chain is a
+	// candidate with flow_found; states unchanged by the flow.
+	open := withTaint(javaSite("app.Open", FilterNoneSeen), taint.FlowFound)
+	constant := withTaint(javaSite("app.Const", FilterNoneSeen), taint.NoFlow)
+	p = evalChains(t, cc3(ccPkg, false), owner, nil, 0, []Site{open, constant})[id]
+	if p.State != ChainCandidate || p.Flow != taint.FlowFound {
+		t.Errorf("open+constant: %s flow %s", p.State, p.Flow)
+	}
+	if s := siteState(t, p, "app.Const"); s.State != ChainCandidate || s.Flow != taint.NoFlow {
+		t.Errorf("constant site: %s flow %s", s.State, s.Flow)
+	}
+	if p.FlowCounts[taint.FlowFound] != 1 || p.FlowCounts[taint.NoFlow] != 1 {
+		t.Errorf("flow counts %v", p.FlowCounts)
+	}
+
+	// Request data only where the chain is blocked: the chain's flow is
+	// taken from the unblocked site (no flow there).
+	p = evalChains(t, cc3(ccPkg, false), owner, nil, 0, []Site{filteredSite(taint.FlowFound), constant})[id]
+	if s := siteState(t, p, "app.Filtered"); s.State != ChainBlocked || s.Flow != taint.FlowFound {
+		t.Errorf("filtered site: %s flow %s", s.State, s.Flow)
+	}
+	if p.Flow != taint.NoFlow {
+		t.Errorf("blocked flow_found + open no_flow: chain flow %s, want %s", p.Flow, taint.NoFlow)
+	}
+
+	// Blocked everywhere (the fixed release's guard): the flow is still
+	// reported, from all sites, and the state stays blocked.
+	p = evalChains(t, cc3(ccPkg, true), owner, nil, 0, []Site{open})[id]
+	if p.State != ChainBlocked || p.Flow != taint.FlowFound {
+		t.Errorf("guarded: %s flow %s", p.State, p.Flow)
+	}
+
+	// An undetermined site outranks a no-flow one.
+	und := withTaint(javaSite("app.Und", FilterNoneSeen), taint.Undetermined)
+	p = evalChains(t, cc3(ccPkg, false), owner, nil, 0, []Site{constant, und})[id]
+	if p.Flow != taint.Undetermined {
+		t.Errorf("undetermined + no flow: %s", p.Flow)
+	}
+
+	// A library site request data reaches is listed in the report.
+	lib := withTaint(javaSite("lib.L", FilterNoneSeen), taint.FlowFound)
+	quiet := javaSite("lib.Q", FilterNoneSeen)
+	p = evalChains(t, cc3(ccPkg, false), owner, nil, 0, []Site{lib, quiet})[id]
+	if len(p.ShownSites()) != 1 || p.ShownSites()[0].Site.CallerFQCN != "lib.L" || p.HiddenSites() != 1 {
+		t.Errorf("shown sites %+v", p.ShownSites())
 	}
 }

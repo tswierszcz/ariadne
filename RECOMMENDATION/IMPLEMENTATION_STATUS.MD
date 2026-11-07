@@ -21,7 +21,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
-| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3a: DONE (2026-11-07, kandydaci łańcuchów bez dopływu danych); Z4: DONE (2026-11-07); Z3 (dopływ danych): READY — DATA_FLOW:D4 daje wynik taint per wejście (`-taint`), brak powiązania z łańcuchami (`flow: not_analyzed`) | `internal/deserialize`: katalog modeli (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3a-1` oceniany per wejście i per kopia klas (Z3a/Z4), v2 `deserialization` + powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE (Z4). Szczegóły we wpisach DESERIALIZATION:Z0+Z1, Z2, Z3a, Z4. |
+| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3a: DONE (2026-11-07, kandydaci łańcuchów bez dopływu danych); Z4: DONE (2026-11-07); Z3: DONE (2026-11-07; Z3a + dopływ danych: `flow` per wejście × łańcuch z `-taint`, katalog `z3-1`) — wszystkie fazy Z0–Z4 DONE; archiwizacja obszaru po merge | `internal/deserialize`: katalog modeli (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3a-1` oceniany per wejście i per kopia klas (Z3a/Z4), v2 `deserialization` + powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE (Z4). Szczegóły we wpisach DESERIALIZATION:Z0+Z1, Z2, Z3a, Z4. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
@@ -3352,6 +3352,65 @@ Przy dodawaniu kolejnego wpisu zapisz:
   łańcuchów w JSON v2 i snapshot, powiązanie z wierszem advisory), DATA_FLOW:D3
   → D4 (dopływ danych — reszta Z3), albo inny obszar.
   (Zrealizowano Z4 — wpis niżej.)
+
+### DESERIALIZATION:Z3 — dopływ danych do kandydatów łańcuchów — DONE (2026-11-07)
+
+- **Zakres zatwierdzony (2026-11-07):** ostatni punkt Z3 („powiązać źródła
+  danych z argumentem wejścia; osobno pokazać brak analizy flow i znalezioną
+  ścieżkę”): wynik DATA_FLOW:D4 wejścia przenoszony na każdy wynik łańcuch ×
+  wejście i na łańcuch; stan łańcucha bez zmian; v2, raport, wiersz CVE;
+  wersja katalogu `z3a-1` → `z3-1`; aplikacja kontrolna łańcuchów
+  rozszerzona o wejścia zasilane z żądania. Gałąź `deserialization-z3-flow`
+  od `archive-data-flow-d4` (PR #10).
+- **Zrealizowane:**
+  1. `internal/deserialize/chains.go`: `ChainSite.Flow` = stan taint wejścia
+     (`siteFlow`; `not_analyzed` bez `-taint`); `ChainPresence.Flow`
+     (`chainFlow`: najmocniejszy stan — `flow_found` > `undetermined` >
+     `no_flow_in_model` > `not_assessed` — wśród wejść, na których łańcuch
+     nie jest zablokowany; gdy zablokowany wszędzie — wśród wszystkich) i
+     `FlowCounts`; `ShownSites` pokazuje też wejście biblioteczne z
+     `flow_found`; `ChainFlowCounts` do logu; warunki „attacker-controlled”
+     w katalogu przeredagowane: sprawdzane tylko dla danych żądania.
+     `ChainCatalogVersion = "z3-1"`.
+  2. v2: `chains[].flow` (już nie stała), `chains[].flows_by_state`,
+     `chains[].sites[].flow`, `findings[].deserialization_chains[].flow`.
+  3. Raport: kolumna Flow w tabeli wejść łańcucha, „flow: …” w nagłówku
+     łańcucha, opis znaczenia; wiersz CVE „gadget chain: … , request data
+     flow_found” (tylko z `-taint`); log „flow per chain”.
+  4. `scripts/prepare-deserialization-chains-demo.sh`: stuby `@RequestParam`/
+     `@PostMapping` o nazwach Springa i `demo.Web` (`upload` → Base64 →
+     `readObject`, `uploadXml` → `fromXML`), wywoływane z `main`.
+- **Weryfikacja:** `TestChainFlow` (bez `-taint` wszystko `not_analyzed`;
+  kandydat z wejściem `flow_found` i wejściem ze stałą; `flow_found` tylko na
+  zablokowanym wejściu → łańcuch bierze stan z niezablokowanego; zablokowany
+  wszędzie → `flow_found` zachowany, stan `candidate_blocked`; `undetermined`
+  > `no_flow_in_model`; biblioteczne `flow_found` pokazane w raporcie),
+  `TestChainFlowInV2`. Demo łańcuchów na OpenJDK 25 (obie wersje działają,
+  sondy strażników jak dotąd), ariadne `-taint -offline`: podatna — CC6,
+  CC2/4, XStream `candidate_chain` + `flow_found` przy `Web#upload`/
+  `Web#uploadXml`, CB1/Groovy1 `conditions_unresolved` + `flow_found`,
+  `Main#readXml` `no_flow_in_model`, `Main#read`/`readFiltered`
+  `undetermined` (bajty z `ByteArrayOutputStream#toByteArray`, poza
+  katalogiem D3 — luka uczciwie zgłoszona, nie „brak przepływu”); poprawiona
+  — wszystkie łańcuchy zablokowane poza CB1, przepływy bez zmian. WebGoat:
+  `xstream:eventhandler` `candidate_chain` + `flow_found` (wewnętrzne
+  `XStream#fromXML` i `VulnerableComponentsLesson#completed`), wiersz
+  CVE-2013-7285 „xstream:eventhandler candidate_chain, request data
+  flow_found”. Werdykty WebGoat 42/51/10/61/0 i petclinic 3/71/16/57/6 bez
+  zmian; v2 względem binarki `main`: tylko `chain_catalog`, nowe pola
+  `flow`/`flows_by_state` (oraz `analysis_id`/wersja); z `-taint` względem
+  bez: tylko pola flow/taint; dwa przebiegi z `-taint` bajtowo identyczne.
+  `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz Deserialization), README
+  (sekcje łańcuchów i v2), `FAQ.md`, `docs/RESULTS_CONTRACT.MD`, szablon
+  raportu, plan DESERIALIZATION, ten rejestr. `FAQ_PL.MD` nietknięty.
+- **Ograniczenia:** tylko dane żądania (źródła D4); `flow_found` przy
+  kandydacie nie sprawdza grafu obiektów, wartości pól ani konfiguracji
+  środowiska; `no_flow_in_model` nie oznacza zaufanych bajtów; ograniczenia
+  D4 (pola, lambdy, wywołujący spoza aplikacji) przechodzą na łańcuchy.
+- **Następny krok:** po merge'u — archiwizacja całego obszaru DESERIALIZATION
+  (wszystkie fazy Z0–Z4 DONE). Potem DATA_FLOW:D5 albo inny obszar (CVE:F8,
+  ROADMAP:B3, GRAPH_PRECISION:P0) — wymaga zgody.
 
 ### DESERIALIZATION:Z4 — kwalifikacja i raportowanie — DONE (2026-11-07)
 

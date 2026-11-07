@@ -661,7 +661,7 @@ dependence is not tracked: a check on one branch never clears a flow.
 
 ### Candidate gadget chains
 
-DESERIALIZATION Z3a/Z4, chain catalog `{{.ChainCatalogVersion}}` ({{len .Chains}} results: one per chain and copy of its
+DESERIALIZATION Z3/Z4, chain catalog `{{.ChainCatalogVersion}}` ({{len .Chains}} results: one per chain and copy of its
 classes — the original names and each confirmed embedded instance carrying them relocated; a gadget chain
 linked to an advisory's finding is also named on its row in the CVE table, as evidence only). Each
 documented chain is checked against the input: its required classes (by original name, or
@@ -673,21 +673,25 @@ site of its format — the site's policy. States: `candidate_chain` — nothing 
 it and every modeled premise holds; `conditions_unresolved` — nothing blocks it but a
 premise is undecided; `candidate_blocked` — a guard, the target JDK or the site's evaluated
 policy rules out **this chain only**; `classes_absent` — a required class is not in the
-input; `no_entry` — no entry site of the chain's format. **None of these is a proof of exploitability**: whether the data read at the entry
-is attacker-controlled is not analyzed (data flow: `not_analyzed`, DATA_FLOW:D4), a
+input; `no_entry` — no entry site of the chain's format. **Flow** (Z3) is each entry's own taint result
+(see "Request data reaching the entries"): `flow_found` — request data reaches the data the entry reads;
+`no_flow_in_model`, `undetermined`, `not_assessed` as there; `not_analyzed` — the run had no `-taint`. A
+chain's flow is the strongest among the entries where it is not blocked; it is a separate reason and never
+changes the chain's state. **None of these is a proof of exploitability**: even `candidate_chain` with
+`flow_found` leaves the object graph, field values and runtime configuration unchecked, a
 process-wide `jdk.serialFilter` is not visible, and the catalog is a fixed list — an entry
 with no catalog chain is not free of gadget chains, and a blocked chain does not clear the
 advisory.
 {{range .Chains}}
-**{{.Spec.Name}}**{{if .Copy}} — relocated copy in instance `{{.Copy}}`{{end}} (`{{.Spec.ID}}`; affected {{.Spec.Affected}}, fixed {{.Spec.Fixed}}{{if .Spec.Advisories}}; {{range $i, $a := .Spec.Advisories}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}) — **{{.State}}**{{if eq .State "classes_absent"}}: missing {{range $i, $m := .Missing}}{{if $i}}, {{end}}`{{$m}}`{{end}}.{{else if eq .State "no_entry"}}: no {{.Spec.Format}} entry site.{{else}}; {{.Spec.Format}} entry sites: {{.CountsText}}.
+**{{.Spec.Name}}**{{if .Copy}} — relocated copy in instance `{{.Copy}}`{{end}} (`{{.Spec.ID}}`; affected {{.Spec.Affected}}, fixed {{.Spec.Fixed}}{{if .Spec.Advisories}}; {{range $i, $a := .Spec.Advisories}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}) — **{{.State}}**{{if eq .State "classes_absent"}}: missing {{range $i, $m := .Missing}}{{if $i}}, {{end}}`{{$m}}`{{end}}.{{else if eq .State "no_entry"}}: no {{.Spec.Format}} entry site.{{else}}; {{.Spec.Format}} entry sites: {{.CountsText}}; flow: **{{.Flow}}**.
 {{range .Classes}}- class `{{.Found}}`{{if ne .Found .Name}} (relocated `{{.Name}}`){{end}} — {{if .Owner.Component}}{{.Owner.Component}}{{if .Owner.Version}}:{{.Owner.Version}}{{end}}{{else}}unidentified component{{end}}{{if not .Confirmed}} (**not confirmed**){{end}}
 {{end}}{{range .Blocks}}- blocked: {{.}}
 {{end}}{{range .Unresolved}}- unresolved: {{.}}
 {{end}}{{range .Spec.Conditions}}- not checked: {{.}}
 {{end}}{{if .ShownSites}}
-| Entry | Policy | State | Site-specific reason |
-|---|---|---|---|
-{{range .ShownSites}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}` (pc={{.Site.PC}}){{if .Site.IsApp}} — app{{end}} | {{.Site.Filter}} | {{.State}} | {{.SiteReason}} |
+| Entry | Policy | State | Flow | Site-specific reason |
+|---|---|---|---|---|
+{{range .ShownSites}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}` (pc={{.Site.PC}}){{if .Site.IsApp}} — app{{end}} | {{.Site.Filter}} | {{.State}} | {{.Flow}} | {{.SiteReason}} |
 {{end}}{{end}}{{if .HiddenSites}}
 {{.HiddenSites}} other (library) entry sites share the chain's state.
 {{end}}{{end}}
