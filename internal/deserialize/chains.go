@@ -21,12 +21,14 @@ import (
 // What this is NOT: a proof of exploitability, or a search for chains.
 // A site with no matching catalog chain is not free of chains — the
 // catalog is a fixed list (CatalogVersion), never exhaustive. Whether
-// the data read at the entry is attacker-controlled is not analyzed
-// (DATA_FLOW:D4): every result carries Flow = FlowNotAnalyzed.
+// the data read at the entry is attacker-controlled comes from the
+// entry's own taint result (DATA_FLOW D4, -taint; Z3): each site × chain
+// carries it as Flow, FlowNotAnalyzed when -taint did not run. Flow is a
+// separate reason: it never changes a chain's state.
 
 // ChainCatalogVersion versions the chain catalog; bump it when a chain,
 // a guard or a condition changes.
-const ChainCatalogVersion = "z3a-1"
+const ChainCatalogVersion = "z3-1"
 
 // Chain states (per site × chain, and the chain-wide Presence).
 const (
@@ -50,10 +52,46 @@ const (
 	ChainNoEntry = "no_entry"
 )
 
-// FlowNotAnalyzed: the data flow into the entry's argument is not
-// analyzed (DATA_FLOW:D4); a chain result never says the stream is
-// attacker-controlled.
+// FlowNotAnalyzed: the data flow into the entry's argument was not
+// analyzed (the run had no -taint); otherwise Flow is the entry's taint
+// state (taint.FlowFound, NoFlow, Undetermined, NotAssessed).
 const FlowNotAnalyzed = "not_analyzed"
+
+// flowRank orders flow states for a chain's summary: request data found
+// at some entry is the strongest statement, then an open question, then
+// a model without a flow, then entries not assessed.
+var flowRank = map[string]int{"flow_found": 4, "undetermined": 3, "no_flow_in_model": 2, "not_assessed": 1, FlowNotAnalyzed: 0}
+
+// siteFlow is a site's flow state for chains.
+func siteFlow(s *Site) string {
+	if s.Taint == nil {
+		return FlowNotAnalyzed
+	}
+	return s.Taint.State
+}
+
+// chainFlow summarizes the sites' flows: the strongest among the sites
+// where the chain is not blocked, or among all sites when it is blocked
+// everywhere; FlowNotAnalyzed with no site or no taint run.
+func chainFlow(sites []ChainSite) string {
+	best, found := FlowNotAnalyzed, false
+	pick := func(blockedToo bool) {
+		for _, cs := range sites {
+			if !blockedToo && cs.State == ChainBlocked {
+				continue
+			}
+			found = true
+			if flowRank[cs.Flow] > flowRank[best] {
+				best = cs.Flow
+			}
+		}
+	}
+	pick(false)
+	if !found {
+		pick(true)
+	}
+	return best
+}
 
 // Guard is a bytecode fact of a fixed release that blocks a chain.
 type Guard struct {
@@ -122,7 +160,7 @@ var ChainCatalog = []ChainSpec{
 		Guards: []Guard{{Kind: "declares-method", Class: "org.apache.commons.collections.functors.InvokerTransformer",
 			Name: "readObject", Desc: readObjectDesc, Calls: "org.apache.commons.collections.functors.FunctorUtils#checkUnsafeSerialization",
 			Description: "InvokerTransformer#readObject refuses to deserialize (FunctorUtils#checkUnsafeSerialization) unless the system property org.apache.commons.collections.enableUnsafeSerialization=true"}},
-		Conditions: []string{"the stream is attacker-controlled", "no process-wide jdk.serialFilter rejects the classes"},
+		Conditions: []string{"the stream is attacker-controlled — checked only for request data (Flow, with -taint); files, sockets, queues and other inputs are not", "no process-wide jdk.serialFilter rejects the classes"},
 		Advisories: []string{"CVE-2015-7501", "CVE-2015-4852"},
 		Source:     "ysoserial CommonsCollections6; COLLECTIONS-580; commons-collections 3.2.2 release notes; bytecode of 3.2.1 and 3.2.2",
 	},
@@ -142,7 +180,7 @@ var ChainCatalog = []ChainSpec{
 		Affected:   "4.0", Fixed: "4.1",
 		Guards: []Guard{{Kind: "not-serializable", Class: "org.apache.commons.collections4.functors.InvokerTransformer",
 			Description: "InvokerTransformer is not Serializable (4.1+), so Java serialization cannot create it"}},
-		Conditions: []string{"the stream is attacker-controlled", "no process-wide jdk.serialFilter rejects the classes"},
+		Conditions: []string{"the stream is attacker-controlled — checked only for request data (Flow, with -taint); files, sockets, queues and other inputs are not", "no process-wide jdk.serialFilter rejects the classes"},
 		Advisories: []string{"CVE-2015-7501"},
 		Source:     "ysoserial CommonsCollections2/4; COLLECTIONS-580; bytecode of 4.0 and 4.1",
 	},
@@ -157,7 +195,7 @@ var ChainCatalog = []ChainSpec{
 		Affected:   "every 1.x release in the catalog's knowledge", Fixed: "none known (the gadget is BeanComparator itself)",
 		MaxJava:  15,
 		JavaNote: "from JDK 16 the strong encapsulation of com.sun.org.apache.xalan.internal stops PropertyUtils' reflective call unless the package is opened",
-		Conditions: []string{"the stream is attacker-controlled", "the comparator the stream carries is serializable: BeanComparator's default ComparableComparator comes from commons-collections, a variant uses String.CASE_INSENSITIVE_ORDER",
+		Conditions: []string{"the stream is attacker-controlled — checked only for request data (Flow, with -taint); files, sockets, queues and other inputs are not", "the comparator the stream carries is serializable: BeanComparator's default ComparableComparator comes from commons-collections, a variant uses String.CASE_INSENSITIVE_ORDER",
 			"no process-wide jdk.serialFilter rejects the classes"},
 		Source: "ysoserial CommonsBeanutils1; bytecode of commons-beanutils 1.9.4",
 	},
@@ -175,7 +213,7 @@ var ChainCatalog = []ChainSpec{
 		MaxJava:             8,
 		JavaUpdateDependent: true,
 		JavaNote:            "AnnotationInvocationHandler#readObject no longer calls the proxied map from JDK 8u72 (and every JDK 9+); a JDK 8 target is not decided (the update is unknown)",
-		Conditions:          []string{"the stream is attacker-controlled", "no process-wide jdk.serialFilter rejects the classes"},
+		Conditions:          []string{"the stream is attacker-controlled — checked only for request data (Flow, with -taint); files, sockets, queues and other inputs are not", "no process-wide jdk.serialFilter rejects the classes"},
 		Advisories:          []string{"CVE-2015-3253"},
 		Source:              "ysoserial Groovy1; GROOVY-7504; bytecode of groovy 2.4.3 and 2.4.4",
 	},
@@ -188,7 +226,7 @@ var ChainCatalog = []ChainSpec{
 		Affected:   "XStream before 1.4.7", Fixed: "1.4.7",
 		Guards: []Guard{{Kind: "declares-field", Class: "com.thoughtworks.xstream.converters.reflection.ReflectionConverter", Name: "eventHandlerType",
 			Description: "XStream's ReflectionConverter refuses java.beans.EventHandler (1.4.7+)"}},
-		Conditions: []string{"the XML is attacker-controlled", "the runtime has the java.desktop module (java.beans)"},
+		Conditions: []string{"the XML is attacker-controlled — checked only for request data (Flow, with -taint); files, sockets, queues and other inputs are not", "the runtime has the java.desktop module (java.beans)"},
 		Advisories: []string{"CVE-2013-7285"},
 		Source:     "XStream security advisory CVE-2013-7285 (x-stream.github.io/CVE-2013-7285.html); bytecode of XStream 1.4.6 and 1.4.7",
 	},
@@ -249,6 +287,10 @@ type ChainPresence struct {
 	Sites []ChainSite
 	// Counts per state over Sites.
 	Counts map[string]int
+	// Flow (Z3) summarizes the sites' Flow (chainFlow); FlowCounts counts
+	// the sites per flow state (nil without sites).
+	Flow       string
+	FlowCounts map[string]int
 }
 
 // ChainSite is one site × chain result.
@@ -258,7 +300,9 @@ type ChainSite struct {
 	Blocks, Unresolved []string
 	// Own are the reasons specific to this site (its policy); the rest
 	// are the chain's.
-	Own  []string
+	Own []string
+	// Flow is the site's taint state (siteFlow): whether request data
+	// reaches the data it reads; FlowNotAnalyzed without -taint.
 	Flow string
 }
 
@@ -272,13 +316,13 @@ func (cs ChainSite) SiteReason() string {
 }
 
 // ShownSites are the sites the report lists one by one: the
-// application's own entries and any site whose state is its own (its
-// policy); HiddenSites counts the others (library entries sharing the
+// application's own entries, any site whose state is its own (its
+// policy) and any site request data reaches (Z3); HiddenSites counts the others (library entries sharing the
 // chain's state).
 func (p ChainPresence) ShownSites() []ChainSite {
 	var out []ChainSite
 	for _, s := range p.Sites {
-		if s.Site.IsApp || len(s.Own) > 0 {
+		if s.Site.IsApp || len(s.Own) > 0 || s.Flow == "flow_found" {
 			out = append(out, s)
 		}
 	}
@@ -354,7 +398,7 @@ func EvaluateChains(in ChainInputs, sites []Site) []ChainPresence {
 }
 
 func evaluateCopy(in ChainInputs, c *classifier, spec ChainSpec, comps map[string]bool, cp chainCopy, sites []Site) ChainPresence {
-	p := ChainPresence{Spec: spec, Copy: cp.label, Counts: map[string]int{}}
+	p := ChainPresence{Spec: spec, Copy: cp.label, Counts: map[string]int{}, Flow: FlowNotAnalyzed}
 	name := func(n string) string { return cp.rules.Name(n) }
 	for _, orig := range spec.Required {
 		cc := ChainClass{Name: orig}
@@ -423,7 +467,7 @@ func evaluateCopy(in ChainInputs, c *classifier, spec ChainSpec, comps map[strin
 		if s.Format != spec.Format {
 			continue
 		}
-		cs := ChainSite{Site: s, Flow: FlowNotAnalyzed}
+		cs := ChainSite{Site: s, Flow: siteFlow(s)}
 		cs.Blocks = append(cs.Blocks, p.Blocks...)
 		cs.Unresolved = append(cs.Unresolved, p.Unresolved...)
 		switch s.Filter {
@@ -447,8 +491,13 @@ func evaluateCopy(in ChainInputs, c *classifier, spec ChainSpec, comps map[strin
 		}
 		cs.State = stateOf(cs.Blocks, cs.Unresolved)
 		p.Counts[cs.State]++
+		if p.FlowCounts == nil {
+			p.FlowCounts = map[string]int{}
+		}
+		p.FlowCounts[cs.Flow]++
 		p.Sites = append(p.Sites, cs)
 	}
+	p.Flow = chainFlow(p.Sites)
 	if len(p.Sites) == 0 {
 		p.State = ChainNoEntry
 	}
@@ -500,6 +549,18 @@ func guardHolds(h *hierarchy.Hierarchy, c *classifier, g Guard, name string, rul
 		return false, true
 	}
 	return false, false
+}
+
+// ChainFlowCounts counts the chains with entry sites by their Flow (for
+// the log line).
+func ChainFlowCounts(ps []ChainPresence) map[string]int {
+	out := map[string]int{}
+	for _, p := range ps {
+		if len(p.Sites) > 0 {
+			out[p.Flow]++
+		}
+	}
+	return out
 }
 
 // ChainStateCounts sums site states over every chain present (for the

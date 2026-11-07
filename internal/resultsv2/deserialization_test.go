@@ -43,8 +43,8 @@ func TestBuildDeserialization(t *testing.T) {
 	}
 	sites := []deserialize.Site{{CallerFQCN: "app.M", CallerName: "read", CallerDesc: "()V", PC: 7, Owner: "java.io.ObjectInputStream",
 		Name: "readObject", Desc: "()Ljava/lang/Object;", Model: "jdk:java-serialization", Filter: deserialize.FilterNoneSeen, IsApp: true}}
-	chains := []deserialize.ChainPresence{{Spec: deserialize.ChainSpec{ID: "java:x", Format: deserialize.FormatJava}, State: deserialize.ChainCandidate,
-		Sites: []deserialize.ChainSite{{Site: &sites[0], State: deserialize.ChainCandidate}}, Counts: map[string]int{deserialize.ChainCandidate: 1}}}
+	chains := []deserialize.ChainPresence{{Spec: deserialize.ChainSpec{ID: "java:x", Format: deserialize.FormatJava}, State: deserialize.ChainCandidate, Flow: deserialize.FlowNotAnalyzed,
+		Sites: []deserialize.ChainSite{{Site: &sites[0], State: deserialize.ChainCandidate, Flow: deserialize.FlowNotAnalyzed}}, Counts: map[string]int{deserialize.ChainCandidate: 1}}}
 	d := buildDeserialization(Inputs{DeserModelCatalog: "m", DeserChainCatalog: "c", DeserSites: sites, DeserChains: chains})
 	if len(d.Entries) != 1 || d.Entries[0].ID != "app.M#read()V@7" || !d.Entries[0].App {
 		t.Errorf("entries %+v", d.Entries)
@@ -69,5 +69,24 @@ func TestBuildDeserializationTaint(t *testing.T) {
 	on := buildDeserialization(Inputs{DeserModelCatalog: "m", DeserSites: sites, TaintCatalog: taint.CatalogVersion})
 	if on.TaintCatalog != taint.CatalogVersion || on.Entries[0].Taint == nil || on.Summary.EntriesByTaint[taint.FlowFound] != 1 {
 		t.Errorf("with -taint: %+v", on)
+	}
+}
+
+// TestChainFlowInV2 (DESERIALIZATION Z3): a chain's flow, its per-state
+// counts, each site's flow and the finding link carry the taint result.
+func TestChainFlowInV2(t *testing.T) {
+	sites := []deserialize.Site{{CallerFQCN: "app.M", CallerName: "read", CallerDesc: "()V", PC: 7, Filter: deserialize.FilterNoneSeen}}
+	spec := deserialize.ChainSpec{ID: "java:x", Format: deserialize.FormatJava, Advisories: []string{"CVE-1"}}
+	chains := []deserialize.ChainPresence{{Spec: spec, Instance: "a", State: deserialize.ChainCandidate, Flow: taint.FlowFound,
+		FlowCounts: map[string]int{taint.FlowFound: 1},
+		Sites:      []deserialize.ChainSite{{Site: &sites[0], State: deserialize.ChainCandidate, Flow: taint.FlowFound}}}}
+	d := buildDeserialization(Inputs{DeserModelCatalog: "m", DeserChainCatalog: "c", DeserSites: sites, DeserChains: chains, TaintCatalog: taint.CatalogVersion})
+	c := d.Chains[0]
+	if c.Flow != taint.FlowFound || c.FlowsByState[taint.FlowFound] != 1 || c.Sites[0].Flow != taint.FlowFound {
+		t.Errorf("chain %+v", c)
+	}
+	refs := chainRefs(chains, cves.CVE{ID: "CVE-1"}, "a")
+	if len(refs) != 1 || refs[0].Flow != taint.FlowFound {
+		t.Errorf("refs %+v", refs)
 	}
 }

@@ -808,17 +808,21 @@ vulnerable code is itself a serialization callback (jackson-databind's
 code no ordinary call ever reaches.
 
 **Why does ariadne say "candidate chain" and not "exploitable"?** Because
-DESERIALIZATION Z3a checks only what the bytecode can settle: the chain's
+DESERIALIZATION Z3 checks only what the bytecode can settle: the chain's
 classes are there, they belong to the component the chain is about (a
 class with the right name inside another, unidentified jar does not
 count), the fixed release's guard is absent (read from the class itself —
 commons-collections 3.2.2's `InvokerTransformer#readObject` refuses
 unless a system property is set; a shaded copy carries the guard or not
 regardless of its version string), the target JDK allows it, and the
-entry's own policy does not reject any of its classes. It cannot know
-whether an attacker controls the bytes read at that entry (the opt-in
-`-taint` pilot, DATA_FLOW:D4, answers that separately for the entry, not
-for the chain), whether a process-wide `jdk.serialFilter` is set, or
+entry's own policy does not reject any of its classes. With `-taint` it
+also says whether request data reaches the bytes read at each entry: the
+chain carries that entry's taint result as its *flow* (`flow_found`,
+`no_flow_in_model`, `undetermined`), so "candidate chain with request data
+flow_found" is the strongest statement it makes — still not an exploit:
+the object graph, the field values and the runtime configuration are not
+checked, and only request data is (a file or a message queue is not a
+source). It cannot know whether a process-wide `jdk.serialFilter` is set, or
 whether some chain outside its five-entry catalog exists. So a blocked
 chain clears only that chain — never the advisory — and an entry with no
 catalog chain is not "safe". The demo `scripts/prepare-deserialization-chains-demo.sh`

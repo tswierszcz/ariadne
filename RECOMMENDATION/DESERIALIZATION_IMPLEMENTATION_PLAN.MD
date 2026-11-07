@@ -1,6 +1,6 @@
 # Deserializacja — fazy Z0–Z4
 
-Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3: Z3a DONE (katalog kandydatów łańcuchów bez dopływu danych, 2026-11-07), reszta Z3 nierozpoczęta (DATA_FLOW:D4 już dostępne: wynik taint per wejście; brak powiązania z łańcuchami); Z4 DONE (2026-11-07); zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3 DONE (Z3a: katalog kandydatów łańcuchów, 2026-11-07; dopływ danych: wynik DATA_FLOW:D4 per wejście × łańcuch, katalog `z3-1`, 2026-11-07); Z4 DONE (2026-11-07); zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
 
 ## Z0. Kontrakt modeli i ról — DONE (kontrakt, 2026-11-06)
 
@@ -35,7 +35,7 @@ Zależności: DATA_FLOW D3, FRAMEWORK F1 w używanych scenariuszach konfiguracji
 
 Gotowe: filtr accept/reject/unknown, dwie konfiguracje deserializatora i różne wersje modelu są rozróżnione.
 
-## Z3. Dane zewnętrzne i kandydaci łańcuchów — Z3a DONE (2026-11-07: katalog `z3a-1`, tożsamość, strażniki w bytecode, JDK, polityka per wejście); dopływ danych: DATA_FLOW:D4 dostępne od 2026-11-07 (`-taint`, wynik per wejście), powiązanie z wynikami łańcuchów nierozpoczęte
+## Z3. Dane zewnętrzne i kandydaci łańcuchów — DONE (2026-11-07: Z3a — katalog `z3a-1`, tożsamość, strażniki w bytecode, JDK, polityka per wejście; dopływ danych — `flow` per wejście × łańcuch z wyniku DATA_FLOW:D4 `-taint`, katalog `z3-1`)
 
 Zależności: DATA_FLOW D4, CVE F5 dla dowodów konkretnych CVE.
 
@@ -46,6 +46,8 @@ Zależności: DATA_FLOW D4, CVE F5 dla dowodów konkretnych CVE.
 - Określić budżet wyszukiwania i zachować informację o niekompletności; nie twierdzić, że katalog zawiera wszystkie łańcuchy.
 
 Gotowe: wymagana brakująca klasa, zablokowany kandydat, nieznany filtr i znaleziony dopływ danych mają osobne uzasadnienia. Nie jest to pełny dowód exploitability.
+
+Wykonano (2026-11-07): `classes_absent` z brakującymi klasami, `candidate_blocked` z powodem (strażnik/JDK/polityka wejścia), `conditions_unresolved` przy polityce `unknown`, a dopływ danych jako osobne pole `flow` (`flow_found`/`no_flow_in_model`/`undetermined`/`not_assessed`/`not_analyzed`), które nigdy nie zmienia stanu łańcucha. Tylko dane żądania (katalog D4); pliki, gniazda, kolejki nie są źródłami. Szczegóły: IMPLEMENTATION_STATUS, wpis DESERIALIZATION:Z3.
 
 ## Z4. Kwalifikacja i raportowanie — DONE (2026-11-07: wyrocznia JVM `testdata/deserialize/oracle`, zestaw CVE `cves.yaml` + `QUALIFICATION.MD`, v2 `deserialization`, snapshot, łańcuchy per kopia)
 

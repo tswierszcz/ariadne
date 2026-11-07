@@ -7,11 +7,17 @@
 #   work/chains-demo-fixed/       commons-collections 3.2.2, commons-collections4 4.1,
 #                                 groovy 2.4.4, commons-beanutils 1.9.4, XStream 1.4.7
 #
-# Entries (demo.Main), none of them fed by a request — the data flow is
-# not analyzed anyway (DATA_FLOW:D4):
-#   read          new ObjectInputStream(...).readObject()           policy none_seen
-#   readFiltered  the same, with setObjectInputFilter(createFilter("demo.*;!*"))
-#   readXml       new XStream().fromXML(...)
+# Entries: demo.Main's are called only from main and the probe (with
+# -taint: readXml no_flow_in_model; read/readFiltered undetermined — their
+# bytes come from ByteArrayOutputStream#toByteArray, which the dependency
+# summaries do not model); demo.Web's are fed by a request parameter (a stub
+# @RequestParam with Spring's name; with -taint: flow_found, so each
+# chain at them is reported with request data — DESERIALIZATION Z3):
+#   Main.read          new ObjectInputStream(...).readObject()           policy none_seen
+#   Main.readFiltered  the same, with setObjectInputFilter(createFilter("demo.*;!*"))
+#   Main.readXml       new XStream().fromXML(...)
+#   Web.upload         @RequestParam token → Base64 → readObject()       policy none_seen
+#   Web.uploadXml      @RequestParam xml → new XStream().fromXML(xml)
 #
 # No gadget chain is ever built or run. The probe only round-trips, on
 # the real JVM, the single class each catalog guard is about, harmless
@@ -28,7 +34,8 @@
 #
 # Run ariadne on each with
 #   -app target/classes -deps target/dependency -deps-list deps.txt -profile generic -roots profile
-# (and -target-java 17 to see the JDK-bound chains blocked).
+# (and -target-java 17 to see the JDK-bound chains blocked; -taint for
+# the data flow into each entry).
 #
 # Usage: scripts/prepare-deserialization-chains-demo.sh [JAVA_HOME]
 set -euo pipefail
@@ -45,7 +52,7 @@ jvm_opts=(--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java
 build() { # variant cc3 cc4 groovy xstream
     local variant=$1 cc3=$2 cc4=$3 groovy=$4 xstream=$5 work="$root/work/chains-demo-$1"
     rm -rf "$work/src"
-    mkdir -p "$work/src/main/java/demo"
+    mkdir -p "$work/src/main/java/demo" "$work/src/main/java/org/springframework/web/bind/annotation"
     cd "$work"
     cat > pom.xml <<EOF
 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -92,6 +99,9 @@ public class Main {
         System.out.println(read(bytes("hello")));
         System.out.println(readFiltered(bytes("hello")));
         System.out.println(readXml("<string>hello</string>"));
+        Web web = new Web();
+        System.out.println(web.upload(java.util.Base64.getEncoder().encodeToString(bytes("hello"))));
+        System.out.println(web.uploadXml("<string>hello</string>"));
     }
 
     static byte[] bytes(Object o) throws Exception {
@@ -114,6 +124,47 @@ public class Main {
     }
 
     static Object readXml(String xml) {
+        XStream x = new XStream();
+        return x.fromXML(xml);
+    }
+}
+EOF
+    for a in RequestParam PostMapping; do
+        target=PARAMETER
+        [ "$a" = PostMapping ] && target=METHOD
+        cat > "src/main/java/org/springframework/web/bind/annotation/$a.java" <<EOF
+package org.springframework.web.bind.annotation;
+
+import java.lang.annotation.*;
+
+/** Stub of the Spring MVC annotation (same name, for the demo only). */
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.$target)
+public @interface $a {
+    String[] value() default {};
+}
+EOF
+    done
+    cat > src/main/java/demo/Web.java <<'EOF'
+package demo;
+
+import com.thoughtworks.xstream.XStream;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+import java.util.Base64;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+// Handlers whose entries read request data (stub Spring annotations).
+public class Web {
+    @PostMapping("/upload")
+    public Object upload(@RequestParam("token") String token) throws Exception {
+        ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(token)));
+        return in.readObject();
+    }
+
+    @PostMapping("/upload-xml")
+    public Object uploadXml(@RequestParam("xml") String xml) {
         XStream x = new XStream();
         return x.fromXML(xml);
     }

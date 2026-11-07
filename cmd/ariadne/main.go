@@ -825,8 +825,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		time.Since(flowStart).Round(time.Millisecond), withParams, len(deserSites))
 
 	deserChains := deserialize.EvaluateChains(chainInputs(h, components, cfg.targetJava), deserSites)
-	log("deserialization chains (DESERIALIZATION Z3a, catalog %s, %d chains): %s; data flow into the entries not analyzed",
-		deserialize.ChainCatalogVersion, len(deserialize.ChainCatalog), report.GapCounts(deserialize.ChainStateCounts(deserChains)))
+	chainFlow := "data flow into the entries not analyzed (no -taint)"
+	if cfg.taint {
+		chainFlow = "flow per chain: none with an entry site"
+		if fc := deserialize.ChainFlowCounts(deserChains); len(fc) > 0 {
+			chainFlow = "flow per chain: " + report.GapCounts(fc)
+		}
+	}
+	log("deserialization chains (DESERIALIZATION Z3, catalog %s, %d chains): %s; %s",
+		deserialize.ChainCatalogVersion, len(deserialize.ChainCatalog), report.GapCounts(deserialize.ChainStateCounts(deserChains)), chainFlow)
 
 	var gavs []input.GAV
 	seenGAV := map[input.GAV]bool{}
@@ -1167,6 +1174,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			n := c.Chain + " " + c.State
 			if c.Copy != "" {
 				n = c.Chain + " (copy in " + c.Copy + ") " + c.State
+			}
+			if c.Flow != "" && c.Flow != deserialize.FlowNotAnalyzed {
+				n += ", request data " + c.Flow // DESERIALIZATION Z3 (-taint)
 			}
 			k := f.AdvisoryID + "\x00" + pkgOf[f.ComponentInstanceID]
 			chainNotes[k] = append(chainNotes[k], n)
