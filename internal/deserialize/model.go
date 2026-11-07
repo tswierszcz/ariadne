@@ -9,7 +9,7 @@
 // evidence (Evidence*): an API use, a candidate type, a callback that may
 // run, a filter decision, and a chain candidate. Z1 produces the first
 // three; filters are detected and reported as not evaluated (Z2); chain
-// candidates are Z3. The existing manual XStream mappings keep their
+// candidates are Z3a (chains.go). The existing manual XStream mappings keep their
 // entry-point role — XStream is cataloged here as an entry API whose
 // callbacks are not modeled.
 package deserialize
@@ -35,8 +35,9 @@ const (
 	// Z1 only detects one (ObjectInputFilter set in the same method, or a
 	// resolveClass-overriding stream); its decision is Z2.
 	EvidenceFilter EvidenceKind = "filter"
-	// EvidenceChainCandidate: a candidate gadget chain from an entry to
-	// the advisory's code — Z3, never produced here.
+	// EvidenceChainCandidate: a catalog gadget chain evaluated at an
+	// entry (Z3a, chains.go) — present classes, guard, JDK, site policy;
+	// never a proof of exploitability.
 	EvidenceChainCandidate EvidenceKind = "chain-candidate"
 )
 

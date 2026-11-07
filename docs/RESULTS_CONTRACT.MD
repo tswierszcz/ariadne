@@ -84,7 +84,11 @@ its own axis.
 - A **global gap** is any incomplete-model fact of the run (today's "model analysis: …"
   warnings, unresolved reflection/callback/ServiceLoader sites, and — since
   DESERIALIZATION Z1 — every deserialization entry, kind `deserialization`, unbounded:
-  the JDK's own serialization callbacks are not modeled).
+  the JDK's own serialization callbacks are not modeled). DESERIALIZATION Z3a's chain
+  states (`candidate_chain`, `conditions_unresolved`, `candidate_blocked`,
+  `classes_absent`, `no_entry`) are report-only evidence of kind `chain-candidate`: they
+  neither close nor narrow that gap and never change a verdict — a blocked chain rules
+  out only that chain, not the advisory.
 - A gap is **relevant** to a finding when the unresolved site is in a method that is
   **reachable from the roots** *and* its possible targets could include the affected
   component (its candidate owners lie in the affected artifact, or the site has no

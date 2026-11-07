@@ -779,6 +779,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		warnings = append(warnings, "-embedded-components: "+issue)
 	}
 
+	// DESERIALIZATION Z3a: catalog gadget chains against every entry
+	// site, with the identity of the classes from the component
+	// inventory (after F6a/F7a, so embedded and relocated copies have
+	// their owner). Report-only: no edge, no verdict changes.
+	deserChains := deserialize.EvaluateChains(chainInputs(h, components, cfg.targetJava), deserSites)
+	log("deserialization chains (DESERIALIZATION Z3a, catalog %s, %d chains): %s; data flow into the entries not analyzed",
+		deserialize.ChainCatalogVersion, len(deserialize.ChainCatalog), report.GapCounts(deserialize.ChainStateCounts(deserChains)))
+
 	var gavs []input.GAV
 	seenGAV := map[input.GAV]bool{}
 	for _, dj := range depJars {
@@ -1060,7 +1068,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
 	data.Modules = moduleInventory
 	data.Components = components
-	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded}
+	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded,
+		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion}
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 

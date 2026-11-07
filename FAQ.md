@@ -807,6 +807,23 @@ vulnerable code is itself a serialization callback (jackson-databind's
 `NodeSerialization#readExternal`, logback's `LoggingEventVO#readObject`) —
 code no ordinary call ever reaches.
 
+**Why does ariadne say "candidate chain" and not "exploitable"?** Because
+DESERIALIZATION Z3a checks only what the bytecode can settle: the chain's
+classes are there, they belong to the component the chain is about (a
+class with the right name inside another, unidentified jar does not
+count), the fixed release's guard is absent (read from the class itself —
+commons-collections 3.2.2's `InvokerTransformer#readObject` refuses
+unless a system property is set; a shaded copy carries the guard or not
+regardless of its version string), the target JDK allows it, and the
+entry's own policy does not reject any of its classes. It cannot know
+whether an attacker controls the bytes read at that entry (that is data
+flow, DATA_FLOW:D4), whether a process-wide `jdk.serialFilter` is set, or
+whether some chain outside its five-entry catalog exists. So a blocked
+chain clears only that chain — never the advisory — and an entry with no
+catalog chain is not "safe". The demo `scripts/prepare-deserialization-chains-demo.sh`
+shows each guard on the real JVM by round-tripping just the guarded class;
+no chain is ever built.
+
 `results.json` is the same list of results as indented JSON, with no
 rendering logic — easy to diff between runs or load into another tool.
 

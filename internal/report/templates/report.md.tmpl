@@ -625,6 +625,38 @@ No entry site found.
 |---|---|---|---|---|
 {{range .Sites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}){{if .IsApp}} — app{{end}} | `{{.Owner}}#{{.Name}}` | {{.Model}}{{if .Version}} {{.Version}}{{end}} | {{.Filter}}{{if .FilterDetail}}: {{.FilterDetail}}{{end}} | {{if .Rejected}}{{.Rejected}} of {{.Candidates}} (e.g. {{range $i, $c := .RejectedSample}}{{if $i}}, {{end}}`{{$c}}`{{end}}){{else}}—{{end}} |
 {{end}}{{end}}
+
+### Candidate gadget chains
+
+DESERIALIZATION Z3a, chain catalog `{{.ChainCatalogVersion}}` ({{len .Chains}} chains). Each
+documented chain is checked against the input: its required classes (by original name, or
+under a relocation of a confirmed embedded component), the identity of the component they
+belong to (a class with the right name in an unidentified or other component is not
+confirmed), the **guard** a fixed release has in its bytecode (read from the class actually
+analyzed, not from a version string), the JDK it needs (`-target-java`), and — per entry
+site of its format — the site's policy. States: `candidate_chain` — nothing modeled blocks
+it and every modeled premise holds; `conditions_unresolved` — nothing blocks it but a
+premise is undecided; `candidate_blocked` — a guard, the target JDK or the site's evaluated
+policy rules out **this chain only**; `classes_absent` — a required class is not in the
+input; `no_entry` — no entry site of the chain's format. **None of these is a proof of exploitability**: whether the data read at the entry
+is attacker-controlled is not analyzed (data flow: `not_analyzed`, DATA_FLOW:D4), a
+process-wide `jdk.serialFilter` is not visible, and the catalog is a fixed list — an entry
+with no catalog chain is not free of gadget chains, and a blocked chain does not clear the
+advisory.
+{{range .Chains}}
+**{{.Spec.Name}}** (`{{.Spec.ID}}`; affected {{.Spec.Affected}}, fixed {{.Spec.Fixed}}{{if .Spec.Advisories}}; {{range $i, $a := .Spec.Advisories}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}) — **{{.State}}**{{if eq .State "classes_absent"}}: missing {{range $i, $m := .Missing}}{{if $i}}, {{end}}`{{$m}}`{{end}}.{{else if eq .State "no_entry"}}: no {{.Spec.Format}} entry site.{{else}}; {{.Spec.Format}} entry sites: {{.CountsText}}.
+{{range .Classes}}- class `{{.Found}}`{{if ne .Found .Name}} (relocated `{{.Name}}`){{end}} — {{if .Owner.Component}}{{.Owner.Component}}{{if .Owner.Version}}:{{.Owner.Version}}{{end}}{{else}}unidentified component{{end}}{{if not .Confirmed}} (**not confirmed**){{end}}
+{{end}}{{range .Blocks}}- blocked: {{.}}
+{{end}}{{range .Unresolved}}- unresolved: {{.}}
+{{end}}{{range .Spec.Conditions}}- not checked: {{.}}
+{{end}}{{if .ShownSites}}
+| Entry | Policy | State | Site-specific reason |
+|---|---|---|---|
+{{range .ShownSites}}| `{{.Site.CallerFQCN}}#{{.Site.CallerName}}` (pc={{.Site.PC}}){{if .Site.IsApp}} — app{{end}} | {{.Site.Filter}} | {{.State}} | {{.SiteReason}} |
+{{end}}{{end}}{{if .HiddenSites}}
+{{.HiddenSites}} other (library) entry sites share the chain's state.
+{{end}}{{end}}
+{{end}}
 {{else}}
 Not available in this report.
 {{end}}
@@ -838,7 +870,7 @@ None found.
   implementation at all — Spring generates it at runtime — so a call to one can only be
   seen as reaching the interface method itself, never the generated proxy's body.
 - **Serialization gadget chains and config-driven behavior** (XML wiring, `web.xml`)
-  are not modeled — Java serialization and XStream entries reach the callbacks of the
+  are not modeled beyond a five-chain catalog (see "Candidate gadget chains") — Java serialization and XStream entries reach the callbacks of the
   input's own classes (see "Deserialization entry points"), not the JDK's own callbacks,
   XStream's converters for JDK types, nor what those call on the objects read; only
   literal filters and XStream permissions in the entry's own method are evaluated; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only reflects direct and

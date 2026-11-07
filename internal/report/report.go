@@ -652,6 +652,9 @@ type Deserialization struct {
 	Summary    deserialize.CandidateSummary
 	Targets    int
 	EdgesAdded int
+	// Chains are DESERIALIZATION Z3a's catalog chains, evaluated.
+	Chains              []deserialize.ChainPresence
+	ChainCatalogVersion string
 }
 
 // showPerInstance: several instances, or an instance finding that says
