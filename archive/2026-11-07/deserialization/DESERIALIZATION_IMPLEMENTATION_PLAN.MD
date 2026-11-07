@@ -1,6 +1,6 @@
 # Deserializacja — fazy Z0–Z4
 
-Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3 DONE (Z3a: katalog kandydatów łańcuchów, 2026-11-07; dopływ danych: wynik DATA_FLOW:D4 per wejście × łańcuch, katalog `z3-1`, 2026-11-07); Z4 DONE (2026-11-07); zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: **DONE (Z0–Z4), zarchiwizowane 2026-11-07** — zob. [COMPLETION.md](COMPLETION.md). Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD). Szczegółowe wpisy faz: [IMPLEMENTATION_STATUS.MD](../../../RECOMMENDATION/IMPLEMENTATION_STATUS.MD).
 
 ## Z0. Kontrakt modeli i ról — DONE (kontrakt, 2026-11-06)
 
