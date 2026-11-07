@@ -863,7 +863,12 @@ right classes are still needed — see the chain results). `no_flow_in_model`
 is not proof of safety either: it is relative to the source catalog and
 to callers in the application's own classes. The demo
 `scripts/prepare-taint-demo.sh` has one entry per case and runs on the
-real JVM.
+real JVM. How it was measured — a real-JVM oracle that sends a
+serialized canary through every handler of the test fixture and records
+which entries read it — is in `docs/TAINT_QUALIFICATION.MD`: no observed
+flow was reported as "no flow", every `flow_found` was observed, and the
+four observed flows the model cannot follow (a depth limit, a field, a
+lambda caller, an exception's message) come out `undetermined`.
 
 **How do I know the deserialization model is right?** Partly by running
 it against the real JVM: `testdata/deserialize/oracle` writes one object

@@ -10,5 +10,5 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fx="$root/testdata/taint"
-java "$root/scripts/JavaBuild.java" "$fx/src" "$fx/app.jar" 11
+java "$root/scripts/JavaBuild.java" "$fx/src" "$fx/app.jar" 17
 echo "wrote $fx/app.jar"

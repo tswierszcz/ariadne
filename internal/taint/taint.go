@@ -129,6 +129,14 @@ type Analyzer struct {
 	dynamic  map[flowsum.MethodKey]bool
 	callers  map[flowsum.MethodKey][]callRef
 	subtypes map[string]map[string]bool
+	// Stats accumulate over every Analyze call (DATA_FLOW D5 measurement).
+	Stats Stats
+}
+
+// Stats count the work of the searches: sinks assessed, (method, input)
+// pairs visited, and how often a limit stopped a search.
+type Stats struct {
+	Sinks, Nodes, DepthLimits, NodeLimits int
 }
 
 // New indexes the calls of h's application classes.
@@ -420,7 +428,11 @@ func (s *search) trace(path []hop, depth int) {
 	}
 	s.visited[key] = true
 	s.nodes++
+	s.a.Stats.Nodes++
 	if s.nodes > s.a.opts.MaxNodes {
+		if !s.gaps["search limit: more than "+strconv.Itoa(s.a.opts.MaxNodes)+" inputs visited"] {
+			s.a.Stats.NodeLimits++
+		}
 		s.gap("search limit: more than " + strconv.Itoa(s.a.opts.MaxNodes) + " inputs visited")
 		return
 	}
@@ -465,6 +477,7 @@ func (s *search) trace(path []hop, depth int) {
 		return
 	}
 	if depth >= s.a.opts.MaxDepth {
+		s.a.Stats.DepthLimits++
 		s.gap("depth limit (" + strconv.Itoa(s.a.opts.MaxDepth) + " calls) at " + cur.m.String())
 		return
 	}
@@ -503,6 +516,7 @@ func (s *search) trace(path []hop, depth int) {
 // on Closure of the sinks' methods).
 func (a *Analyzer) Analyze(e *flowsum.Engine, sk Sink) Result {
 	res := Result{Catalog: CatalogVersion, Rule: sk.Rule}
+	a.Stats.Sinks++
 	sum := e.Summary(sk.Method)
 	if sum == nil {
 		res.State, res.Reason = NotAssessed, "the sink's method was not summarized"
