@@ -1,6 +1,6 @@
 # Przepływ wartości i danych — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [DATA_FLOW_IMPLEMENTATION_PLAN.MD](DATA_FLOW_IMPLEMENTATION_PLAN.MD). Zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: **DONE (D0–D5), zarchiwizowane 2026-11-07** — zob. [COMPLETION.md](COMPLETION.md). Fazy: [DATA_FLOW_IMPLEMENTATION_PLAN.MD](DATA_FLOW_IMPLEMENTATION_PLAN.MD). Zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## Cel i punkt wyjścia
 
@@ -32,7 +32,7 @@ Proponowana osobna ocena: `flow_found`, `no_flow_in_model`, `undetermined` lub `
 
 Przykłady: dopływ do jednego przeciążenia nie oznacza dopływu do drugiego; stała przekazana do sinka pozostaje różna od danych żądania; nieznane native wywołanie na ścieżce daje niepewność, a nie dowód odcięcia przepływu.
 
-MVP obejmuje ograniczony przepływ lokalny i jawne streszczenia prostych metod, a pierwszy taint — mały katalog źródeł i sinków dla wybranego scenariusza. Dostarczony pilotaż (DATA_FLOW:D4, 2026-11-07): źródła żądania Spring MVC/JAX-RS/Servlet → dane czytane przez wejścia deserializacji, flaga `-taint`; opis w [SUPPORT.MD](../docs/SUPPORT.MD) (wiersz „Data flow and taint”). Pełna analiza współbieżności, wszystkich pól, refleksji i bibliotek nie jest warunkiem pierwszego przyrostu. Każda luka lub limit jest widoczny.
+MVP obejmuje ograniczony przepływ lokalny i jawne streszczenia prostych metod, a pierwszy taint — mały katalog źródeł i sinków dla wybranego scenariusza. Dostarczony pilotaż (DATA_FLOW:D4, 2026-11-07): źródła żądania Spring MVC/JAX-RS/Servlet → dane czytane przez wejścia deserializacji, flaga `-taint`; opis w [SUPPORT.MD](../../../docs/SUPPORT.MD) (wiersz „Data flow and taint”). Pełna analiza współbieżności, wszystkich pól, refleksji i bibliotek nie jest warunkiem pierwszego przyrostu. Każda luka lub limit jest widoczny.
 
 ## Relacje z innymi planami
 

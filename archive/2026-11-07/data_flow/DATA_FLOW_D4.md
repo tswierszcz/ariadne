@@ -6,7 +6,7 @@ przez wejścia deserializacji), flaga `-taint` opt-in, wynik tylko w raporcie.
 Jedno kryterium planu spełnione częściowo — patrz „Co nie zostało zrobione”.
 
 Oryginalny tekst fazy D4 (poniżej, sprzed implementacji, z dopiskiem
-„Wykonano”) był w `RECOMMENDATION/DATA_FLOW_IMPLEMENTATION_PLAN.MD`; zastąpiony
+„Wykonano”) był w `RECOMMENDATION/DATA_FLOW_IMPLEMENTATION_PLAN.MD` (od zamknięcia obszaru w tym katalogu); zastąpiony
 tam wskaźnikiem do tego pliku. Bieżący opis zachowania: `docs/SUPPORT.MD`
 (wiersz „Data flow and taint”); pełny wpis z weryfikacją:
 `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`, „DATA_FLOW:D4 — pierwsza analiza
