@@ -234,10 +234,15 @@ type ChainClass struct {
 
 // ChainPresence is a chain's evaluation independent of a site.
 type ChainPresence struct {
-	Spec    ChainSpec
-	State   string // ChainAbsent, ChainNoEntry, ChainBlocked, ChainUnresolved, ChainCandidate
-	Classes []ChainClass
-	Missing []string
+	Spec ChainSpec
+	// Copy is "" for the classes under their original names, else the
+	// ID of the instance whose relocations name them.
+	Copy string
+	// Instance owns the chain's (first) class; "" when absent.
+	Instance string
+	State    string // ChainAbsent, ChainNoEntry, ChainBlocked, ChainUnresolved, ChainCandidate
+	Classes  []ChainClass
+	Missing  []string
 	// Blocks and Unresolved are the reasons for the state.
 	Blocks, Unresolved []string
 	// Sites are the per-site results (none when absent).
@@ -295,131 +300,159 @@ func (p ChainPresence) CountsText() string {
 	return strings.Join(parts, ", ")
 }
 
+// chainCopy is one naming of a chain's classes: the original names
+// (rules empty) or a confirmed instance's relocations.
+type chainCopy struct {
+	label string // "" for the original names, else the instance ID
+	rules relocate.Set
+}
+
 // EvaluateChains evaluates every catalog chain against the input and
-// every site of its format. Results are in catalog order, sites in the
-// order given.
+// every site of its format, once per copy of the chain's classes: the
+// classes under their original names, and each confirmed instance of the
+// chain's component that carries them under its relocations (CVE:F7a).
+// Two copies are two results: one may be blocked by its guard while the
+// other is a candidate. Results are in catalog order, the original copy
+// first; sites in the order given.
 func EvaluateChains(in ChainInputs, sites []Site) []ChainPresence {
 	c := &classifier{h: in.H, cache: map[string]int{}}
 	var out []ChainPresence
 	for _, spec := range ChainCatalog {
-		p := ChainPresence{Spec: spec, Counts: map[string]int{}}
 		comps := map[string]bool{}
 		for _, comp := range spec.Components {
 			comps[comp] = true
 		}
-		for _, name := range spec.Required {
-			cc := ChainClass{Name: name}
-			ci, ok := in.H.Lookup(name)
-			if !ok {
-				// A relocated copy of one of the chain's components.
-				for _, r := range in.Relocated {
-					if !comps[r.Component] {
-						continue
-					}
-					set, err := relocate.New(r.Relocations)
-					if err != nil || !set.Changes(name) {
-						continue
-					}
-					if rci, rok := in.H.Lookup(set.Name(name)); rok {
-						ci, ok = rci, true
-						break
-					}
+		copies := []chainCopy{{}}
+		if len(spec.Required) > 0 {
+			for _, r := range in.Relocated {
+				if !comps[r.Component] {
+					continue
 				}
-			}
-			if !ok {
-				p.Missing = append(p.Missing, name)
-				p.Classes = append(p.Classes, cc)
-				continue
-			}
-			cc.Found = ci.FQCN
-			if in.Owner != nil {
-				cc.Owner = in.Owner(ci)
-			}
-			cc.Confirmed = comps[cc.Owner.Component]
-			if !cc.Confirmed {
-				who := "an unidentified component"
-				if cc.Owner.Component != "" {
-					who = cc.Owner.Component
+				set, err := relocate.New(r.Relocations)
+				if err != nil || !set.Changes(spec.Required[0]) {
+					continue
 				}
-				p.Unresolved = append(p.Unresolved, fmt.Sprintf("%s found in %s, not identified as %s", cc.Found, who, strings.Join(spec.Components, " or ")))
-			}
-			p.Classes = append(p.Classes, cc)
-		}
-		if len(p.Missing) > 0 {
-			p.State = ChainAbsent
-			out = append(out, p)
-			continue
-		}
-		found := map[string]string{} // original → name in the input
-		for _, cc := range p.Classes {
-			found[cc.Name] = cc.Found
-		}
-		for _, g := range spec.Guards {
-			name := g.Class
-			if f, ok := found[name]; ok {
-				name = f
-			}
-			blocked, decided := guardHolds(in.H, c, g, name)
-			switch {
-			case !decided:
-				p.Unresolved = append(p.Unresolved, "guard class "+name+" not in the input: "+g.Description+" — not checked")
-			case blocked:
-				p.Blocks = append(p.Blocks, g.Description)
+				copies = append(copies, chainCopy{label: r.Instance, rules: set})
 			}
 		}
-		if spec.MaxJava > 0 {
-			switch {
-			case in.TargetJava == 0:
-				p.Unresolved = append(p.Unresolved, "needs JDK <= "+strconv.Itoa(spec.MaxJava)+"; the target JDK is not given (-target-java): "+spec.JavaNote)
-			case in.TargetJava > spec.MaxJava:
-				p.Blocks = append(p.Blocks, "target JDK "+strconv.Itoa(in.TargetJava)+" > "+strconv.Itoa(spec.MaxJava)+": "+spec.JavaNote)
-			case in.TargetJava == spec.MaxJava && spec.JavaUpdateDependent:
-				p.Unresolved = append(p.Unresolved, "target JDK "+strconv.Itoa(in.TargetJava)+": "+spec.JavaNote)
+		var ps []ChainPresence
+		for _, cp := range copies {
+			p := evaluateCopy(in, c, spec, comps, cp, sites)
+			if cp.label != "" && len(p.Missing) == len(spec.Required) {
+				continue // this instance does not carry the chain at all
 			}
+			ps = append(ps, p)
 		}
-		p.State = stateOf(p.Blocks, p.Unresolved)
-		classes := make([]string, 0, len(p.Classes)+len(spec.JDKClasses))
-		for _, cc := range p.Classes {
-			classes = append(classes, cc.Found)
+		// The original names are reported as absent only when no copy
+		// exists at all.
+		if len(ps) > 1 && ps[0].State == ChainAbsent && len(ps[0].Missing) == len(spec.Required) {
+			ps = ps[1:]
 		}
-		classes = append(classes, spec.JDKClasses...)
-		for i := range sites {
-			s := &sites[i]
-			if s.Format != spec.Format {
-				continue
-			}
-			cs := ChainSite{Site: s, Flow: FlowNotAnalyzed}
-			cs.Blocks = append(cs.Blocks, p.Blocks...)
-			cs.Unresolved = append(cs.Unresolved, p.Unresolved...)
-			switch s.Filter {
-			case FilterUnknown, FilterVersionUnknown:
-				r := "site policy " + s.Filter + " (not evaluated)"
-				cs.Unresolved = append(cs.Unresolved, r)
-				cs.Own = append(cs.Own, r)
-			}
-			if s.allow != nil {
-				var rejected []string
-				for _, cl := range classes {
-					if !s.allow(cl) {
-						rejected = append(rejected, cl)
-					}
-				}
-				if len(rejected) > 0 {
-					r := "site policy (" + s.Filter + ") rejects " + strings.Join(rejected, ", ")
-					cs.Blocks = append(cs.Blocks, r)
-					cs.Own = append(cs.Own, r)
-				}
-			}
-			cs.State = stateOf(cs.Blocks, cs.Unresolved)
-			p.Counts[cs.State]++
-			p.Sites = append(p.Sites, cs)
-		}
-		if len(p.Sites) == 0 {
-			p.State = ChainNoEntry
-		}
-		out = append(out, p)
+		out = append(out, ps...)
 	}
 	return out
+}
+
+func evaluateCopy(in ChainInputs, c *classifier, spec ChainSpec, comps map[string]bool, cp chainCopy, sites []Site) ChainPresence {
+	p := ChainPresence{Spec: spec, Copy: cp.label, Counts: map[string]int{}}
+	name := func(n string) string { return cp.rules.Name(n) }
+	for _, orig := range spec.Required {
+		cc := ChainClass{Name: orig}
+		ci, ok := in.H.Lookup(name(orig))
+		if !ok {
+			p.Missing = append(p.Missing, name(orig))
+			p.Classes = append(p.Classes, cc)
+			continue
+		}
+		cc.Found = ci.FQCN
+		if in.Owner != nil {
+			cc.Owner = in.Owner(ci)
+		}
+		cc.Confirmed = comps[cc.Owner.Component]
+		if !cc.Confirmed {
+			who := "an unidentified component"
+			if cc.Owner.Component != "" {
+				who = cc.Owner.Component
+			}
+			p.Unresolved = append(p.Unresolved, fmt.Sprintf("%s found in %s, not identified as %s", cc.Found, who, strings.Join(spec.Components, " or ")))
+		}
+		if p.Instance == "" {
+			p.Instance = cc.Owner.Instance
+		}
+		p.Classes = append(p.Classes, cc)
+	}
+	if len(p.Missing) > 0 {
+		p.State = ChainAbsent
+		return p
+	}
+	for _, g := range spec.Guards {
+		gname := name(g.Class)
+		blocked, decided := guardHolds(in.H, c, g, gname, cp.rules)
+		switch {
+		case !decided:
+			p.Unresolved = append(p.Unresolved, "guard class "+gname+" not in the input: "+g.Description+" — not checked")
+		case blocked:
+			p.Blocks = append(p.Blocks, g.Description)
+		}
+		// A chain of JDK classes only (XStream's) belongs to the
+		// deserializer whose guard decides it.
+		if p.Instance == "" && in.Owner != nil {
+			if ci, ok := in.H.Lookup(gname); ok {
+				p.Instance = in.Owner(ci).Instance
+			}
+		}
+	}
+	if spec.MaxJava > 0 {
+		switch {
+		case in.TargetJava == 0:
+			p.Unresolved = append(p.Unresolved, "needs JDK <= "+strconv.Itoa(spec.MaxJava)+"; the target JDK is not given (-target-java): "+spec.JavaNote)
+		case in.TargetJava > spec.MaxJava:
+			p.Blocks = append(p.Blocks, "target JDK "+strconv.Itoa(in.TargetJava)+" > "+strconv.Itoa(spec.MaxJava)+": "+spec.JavaNote)
+		case in.TargetJava == spec.MaxJava && spec.JavaUpdateDependent:
+			p.Unresolved = append(p.Unresolved, "target JDK "+strconv.Itoa(in.TargetJava)+": "+spec.JavaNote)
+		}
+	}
+	p.State = stateOf(p.Blocks, p.Unresolved)
+	classes := make([]string, 0, len(p.Classes)+len(spec.JDKClasses))
+	for _, cc := range p.Classes {
+		classes = append(classes, cc.Found)
+	}
+	classes = append(classes, spec.JDKClasses...)
+	for i := range sites {
+		s := &sites[i]
+		if s.Format != spec.Format {
+			continue
+		}
+		cs := ChainSite{Site: s, Flow: FlowNotAnalyzed}
+		cs.Blocks = append(cs.Blocks, p.Blocks...)
+		cs.Unresolved = append(cs.Unresolved, p.Unresolved...)
+		switch s.Filter {
+		case FilterUnknown, FilterVersionUnknown:
+			r := "site policy " + s.Filter + " (not evaluated)"
+			cs.Unresolved = append(cs.Unresolved, r)
+			cs.Own = append(cs.Own, r)
+		}
+		if s.allow != nil {
+			var rejected []string
+			for _, cl := range classes {
+				if !s.allow(cl) {
+					rejected = append(rejected, cl)
+				}
+			}
+			if len(rejected) > 0 {
+				r := "site policy (" + s.Filter + ") rejects " + strings.Join(rejected, ", ")
+				cs.Blocks = append(cs.Blocks, r)
+				cs.Own = append(cs.Own, r)
+			}
+		}
+		cs.State = stateOf(cs.Blocks, cs.Unresolved)
+		p.Counts[cs.State]++
+		p.Sites = append(p.Sites, cs)
+	}
+	if len(p.Sites) == 0 {
+		p.State = ChainNoEntry
+	}
+	return p
 }
 
 func stateOf(blocks, unresolved []string) string {
@@ -434,7 +467,7 @@ func stateOf(blocks, unresolved []string) string {
 
 // guardHolds reads guard g on class name: blocked (the fixed form is
 // present) and decided (the class is in the input).
-func guardHolds(h *hierarchy.Hierarchy, c *classifier, g Guard, name string) (blocked, decided bool) {
+func guardHolds(h *hierarchy.Hierarchy, c *classifier, g Guard, name string, rules relocate.Set) (blocked, decided bool) {
 	ci, ok := h.Lookup(name)
 	if !ok {
 		return false, false
@@ -458,9 +491,9 @@ func guardHolds(h *hierarchy.Hierarchy, c *classifier, g Guard, name string) (bl
 			return true, true
 		}
 		owner, mname, _ := strings.Cut(g.Calls, "#")
-		// The callee may itself be relocated with the guard's class.
+		owner = rules.Name(owner) // relocated with the guard's class
 		for _, call := range m.Calls {
-			if call.Name == mname && (call.Owner == owner || strings.HasSuffix(call.Owner, owner[strings.LastIndexByte(owner, '.'):])) {
+			if call.Name == mname && call.Owner == owner {
 				return true, true
 			}
 		}

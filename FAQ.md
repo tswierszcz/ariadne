@@ -824,6 +824,22 @@ catalog chain is not "safe". The demo `scripts/prepare-deserialization-chains-de
 shows each guard on the real JVM by round-tripping just the guarded class;
 no chain is ever built.
 
+**How do I know the deserialization model is right?** Partly by running
+it against the real JVM: `testdata/deserialize/oracle` writes one object
+of each scenario (private and public `readObject`, Externalizable, a
+record, a class serializable only through an unlisted JDK base, the same
+library class plain and relocated) and reads it back through a plain and
+a filtered stream on a real JDK; a test compares what ran with what
+ariadne connects. Today: no edge the JVM did not run, and exactly two
+callbacks the JVM ran that the model does not connect — the record's
+canonical constructor and the unknown-serializability class — both
+declared gaps, counted in the report. And partly by sources:
+`testdata/deserialize/cves.yaml` writes down, from each advisory's own
+references, what should happen for seven cases, and
+`testdata/deserialize/QUALIFICATION.MD` compares that with ariadne's
+output. Neither proves the model complete; they pin down where it agrees
+and where it knowingly does not.
+
 `results.json` is the same list of results as indented JSON, with no
 rendering logic — easy to diff between runs or load into another tool.
 

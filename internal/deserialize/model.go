@@ -88,6 +88,10 @@ var javaCallbacks = []CallbackSpec{
 	{Name: "readExternal", Desc: "(Ljava/io/ObjectInput;)V", Access: "public", Applies: "externalizable", Note: "after the public no-arg constructor"},
 }
 
+// ModelCatalogVersion versions Catalog and its callback, type and
+// policy rules (Z1–Z2); bump it when any of them changes.
+const ModelCatalogVersion = "z2-1"
+
 // Catalog is the deserializer model catalog.
 var Catalog = []Model{
 	{

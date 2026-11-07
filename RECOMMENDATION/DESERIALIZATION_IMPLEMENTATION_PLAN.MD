@@ -1,6 +1,6 @@
 # Deserializacja — fazy Z0–Z4
 
-Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3: Z3a DONE (katalog kandydatów łańcuchów bez dopływu danych, 2026-11-07), reszta Z3 i Z4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3: Z3a DONE (katalog kandydatów łańcuchów bez dopływu danych, 2026-11-07), reszta Z3 nierozpoczęta (wymaga DATA_FLOW:D4); Z4 DONE (2026-11-07); zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
 
 ## Z0. Kontrakt modeli i ról — DONE (kontrakt, 2026-11-06)
 
@@ -47,7 +47,7 @@ Zależności: DATA_FLOW D4, CVE F5 dla dowodów konkretnych CVE.
 
 Gotowe: wymagana brakująca klasa, zablokowany kandydat, nieznany filtr i znaleziony dopływ danych mają osobne uzasadnienia. Nie jest to pełny dowód exploitability.
 
-## Z4. Kwalifikacja i raportowanie
+## Z4. Kwalifikacja i raportowanie — DONE (2026-11-07: wyrocznia JVM `testdata/deserialize/oracle`, zestaw CVE `cves.yaml` + `QUALIFICATION.MD`, v2 `deserialization`, snapshot, łańcuchy per kopia)
 
 - Przygotować nieszkodliwe fixtures demonstrujące callbacki i przepływ sterowania, z zapisanym oczekiwanym modelem, oraz osobny źródłowo opisany zestaw CVE.
 - Pokazać w raporcie wejście, wersję modelu, filtry i przesłanki łańcucha; snapshot obejmuje wszystkie użyte reguły i konfiguracje.

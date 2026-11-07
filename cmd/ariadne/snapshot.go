@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ariadne/internal/deserialize"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -46,6 +47,10 @@ func algorithmVersions() map[string]string {
 		"framework_check.prompt": strconv.Itoa(exploit.FrameworkPromptVersion),
 		"results.v2":             resultsv2.SchemaVersion,
 		"snapshot.format":        strconv.Itoa(snapshot.FormatVersion),
+		// DESERIALIZATION Z4: the deserializer models/policy rules and the
+		// gadget-chain catalog the run's deserialization results come from.
+		"deserialize.models": deserialize.ModelCatalogVersion,
+		"deserialize.chains": deserialize.ChainCatalogVersion,
 	}
 }
 

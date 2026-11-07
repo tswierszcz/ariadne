@@ -357,6 +357,27 @@ WebGoat the XStream EventHandler chain is a `candidate_chain` at the
 vulnerable-components lesson's entry (XStream 1.4.5); the other four are
 `classes_absent` on both apps.
 
+**Qualification and v2 (DESERIALIZATION Z4).** A chain is evaluated once
+per copy of its classes — the original names and each confirmed embedded
+instance carrying them relocated — so a shaded copy blocked by its guard
+does not hide a plain vulnerable one (or the reverse). With
+`-json-format v2` the run's deserialization model is in the document:
+`deserialization` (model catalog `z2-1`, chain catalog `z3a-1`, every
+entry with its policy, every chain copy with its classes, reasons and
+per-entry states) and, on a finding whose advisory a chain names on the
+same instance, `deserialization_chains`; the same link is shown on the
+advisory's row of the report's CVE table ("gadget chain: …"). Evidence
+only: no verdict and no v1 field changes. A data snapshot records both
+catalog versions (`deserialize.models`, `deserialize.chains`), so a rule
+change invalidates a replay or shows up in `-snapshot-compare`.
+Verified against the real JVM with `testdata/deserialize/oracle`
+(`scripts/deserialize-oracle.sh`: private callbacks, a public look-alike,
+Externalizable, a record, an unknown-serializability class, two
+instances, a filter — no model edge the JVM did not run, two declared
+gaps) and against a source-documented CVE set
+(`testdata/deserialize/cves.yaml`, compared in
+`testdata/deserialize/QUALIFICATION.MD`).
+
 ### 5. CVE resolution (`internal/cves`)
 
 Every unique `(groupId:artifactId, version)` pair is queried against

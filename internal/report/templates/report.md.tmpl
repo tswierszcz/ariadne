@@ -62,7 +62,7 @@ the affected component.
 | CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source | Reasons |
 |---|---|---|---|---|---|---|---|
 {{range .Rows -}}
-| {{.CVE}} | {{.Package}} | {{.Version}} | {{.Severity}} | {{.Status}} | {{.Methods}} | {{.Source}} | {{.Reasons}} |
+| {{.CVE}} | {{.Package}} | {{.Version}} | {{.Severity}} | {{.Status}} | {{.Methods}} | {{.Source}} | {{.Reasons}}{{if .Chains}}{{if .Reasons}}; {{end}}gadget chain: {{.Chains}}{{end}} |
 {{end}}
 
 Reasons are stable codes from docs/RESULTS_CONTRACT.MD §3: `METHOD_NOT_FOUND` — no mapped
@@ -617,7 +617,7 @@ classes (a `HashMap` hashing its keys while being read) and XStream's own conver
 JDK types (the classic gadget chains) are not modeled, so every entry is also an
 unbounded model gap.
 {{with .Deserialization}}
-Java serialization: {{.Summary.Classes}} concrete serializable candidate classes ({{.Summary.Externalizable}} Externalizable; {{.Summary.Enums}} enums and {{.Summary.Records}} records excluded; {{.Summary.Unknown}} of unknown serializability — their superclass chain leaves the input at a JDK class not in the built-in table — not counted), {{.Targets}} callback targets. {{.EdgesAdded}} edges added in all.
+Model catalog `{{.ModelCatalogVersion}}`. Java serialization: {{.Summary.Classes}} concrete serializable candidate classes ({{.Summary.Externalizable}} Externalizable; {{.Summary.Enums}} enums and {{.Summary.Records}} records excluded; {{.Summary.Unknown}} of unknown serializability — their superclass chain leaves the input at a JDK class not in the built-in table — not counted), {{.Targets}} callback targets. {{.EdgesAdded}} edges added in all.
 {{if not .Sites}}
 No entry site found.
 {{else}}
@@ -628,7 +628,9 @@ No entry site found.
 
 ### Candidate gadget chains
 
-DESERIALIZATION Z3a, chain catalog `{{.ChainCatalogVersion}}` ({{len .Chains}} chains). Each
+DESERIALIZATION Z3a/Z4, chain catalog `{{.ChainCatalogVersion}}` ({{len .Chains}} results: one per chain and copy of its
+classes — the original names and each confirmed embedded instance carrying them relocated; a gadget chain
+linked to an advisory's finding is also named on its row in the CVE table, as evidence only). Each
 documented chain is checked against the input: its required classes (by original name, or
 under a relocation of a confirmed embedded component), the identity of the component they
 belong to (a class with the right name in an unidentified or other component is not
@@ -644,7 +646,7 @@ process-wide `jdk.serialFilter` is not visible, and the catalog is a fixed list 
 with no catalog chain is not free of gadget chains, and a blocked chain does not clear the
 advisory.
 {{range .Chains}}
-**{{.Spec.Name}}** (`{{.Spec.ID}}`; affected {{.Spec.Affected}}, fixed {{.Spec.Fixed}}{{if .Spec.Advisories}}; {{range $i, $a := .Spec.Advisories}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}) — **{{.State}}**{{if eq .State "classes_absent"}}: missing {{range $i, $m := .Missing}}{{if $i}}, {{end}}`{{$m}}`{{end}}.{{else if eq .State "no_entry"}}: no {{.Spec.Format}} entry site.{{else}}; {{.Spec.Format}} entry sites: {{.CountsText}}.
+**{{.Spec.Name}}**{{if .Copy}} — relocated copy in instance `{{.Copy}}`{{end}} (`{{.Spec.ID}}`; affected {{.Spec.Affected}}, fixed {{.Spec.Fixed}}{{if .Spec.Advisories}}; {{range $i, $a := .Spec.Advisories}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}) — **{{.State}}**{{if eq .State "classes_absent"}}: missing {{range $i, $m := .Missing}}{{if $i}}, {{end}}`{{$m}}`{{end}}.{{else if eq .State "no_entry"}}: no {{.Spec.Format}} entry site.{{else}}; {{.Spec.Format}} entry sites: {{.CountsText}}.
 {{range .Classes}}- class `{{.Found}}`{{if ne .Found .Name}} (relocated `{{.Name}}`){{end}} — {{if .Owner.Component}}{{.Owner.Component}}{{if .Owner.Version}}:{{.Owner.Version}}{{end}}{{else}}unidentified component{{end}}{{if not .Confirmed}} (**not confirmed**){{end}}
 {{end}}{{range .Blocks}}- blocked: {{.}}
 {{end}}{{range .Unresolved}}- unresolved: {{.}}

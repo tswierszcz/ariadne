@@ -1069,7 +1069,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data.Modules = moduleInventory
 	data.Components = components
 	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded,
-		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion}
+		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
+		ModelCatalogVersion: deserialize.ModelCatalogVersion}
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
@@ -1084,11 +1085,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// checked against the engine's v1 rows (contract §5) either way.
 	doc := resultsv2.Build(resultsv2.Inputs{
 		ToolVersion: version(), Offline: cfg.offline, Inventory: components, CVEs: cveList, Mappings: vm, Results: results,
-		Freshness: resultsv2.DataFreshness{State: freshnessState, TTL: cfg.dataTTL.String(), MaxAge: maxAgeString(cfg.maxDataAge), Kinds: freshness},
-		Withdrawn: resolution.Withdrawn,
-		DataSet:   dataSetRef(sr, cfg, observations),
-		Changes:   changes,
-		Gaps:      resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
+		Freshness:         resultsv2.DataFreshness{State: freshnessState, TTL: cfg.dataTTL.String(), MaxAge: maxAgeString(cfg.maxDataAge), Kinds: freshness},
+		Withdrawn:         resolution.Withdrawn,
+		DataSet:           dataSetRef(sr, cfg, observations),
+		Changes:           changes,
+		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
+		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
+		DeserSites: deserSites, DeserChains: deserChains,
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
@@ -1108,6 +1111,31 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("rendering results JSON: %w", err)
 	}
 	data.AnalysisID = doc.AnalysisID
+	// DESERIALIZATION Z4: the advisory row names the catalog chains
+	// linked to its findings (same advisory, same instance).
+	// Rows are per advisory and package; key the notes the same way.
+	pkgOf := map[string]string{}
+	for _, c := range doc.Components {
+		if parts := strings.Split(c.GAV, ":"); len(parts) >= 2 {
+			pkgOf[c.ID] = parts[0] + ":" + parts[1]
+		}
+	}
+	chainNotes := map[string][]string{}
+	for _, f := range doc.Findings {
+		for _, c := range f.DeserializationChains {
+			n := c.Chain + " " + c.State
+			if c.Copy != "" {
+				n = c.Chain + " (copy in " + c.Copy + ") " + c.State
+			}
+			k := f.AdvisoryID + "\x00" + pkgOf[f.ComponentInstanceID]
+			chainNotes[k] = append(chainNotes[k], n)
+		}
+	}
+	for i := range data.Rows {
+		if ns := chainNotes[data.Rows[i].CVE+"\x00"+data.Rows[i].Package]; len(ns) > 0 {
+			data.Rows[i].Chains = strings.Join(ns, "; ")
+		}
+	}
 	data.ResultsFile = filepath.Base(cfg.jsonOut)
 	data.ResultsFormat = cfg.jsonFormat
 	if data.ResultsFormat == "" {

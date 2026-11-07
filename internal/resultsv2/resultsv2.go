@@ -17,6 +17,7 @@ import (
 	"ariadne/internal/atomicfile"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
+	"ariadne/internal/deserialize"
 	"ariadne/internal/findings"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/mavenversion"
@@ -44,6 +45,9 @@ type Document struct {
 	Advisories []Advisory  `json:"advisories"`
 	Findings   []Finding   `json:"findings"`
 	Coverage   Coverage    `json:"coverage"`
+	// Deserialization (DESERIALIZATION Z4, additive): entries, policies
+	// and catalog chains of the run.
+	Deserialization *Deserialization `json:"deserialization,omitempty"`
 }
 
 // Tool identifies the analyzer build.
@@ -264,6 +268,9 @@ type Finding struct {
 	Path               []string              `json:"path,omitempty"`
 	Entry              *reach.EntryEdge      `json:"entry,omitempty"`
 	Note               string                `json:"note,omitempty"`
+	// DeserializationChains (DESERIALIZATION Z4): catalog chains naming
+	// this advisory on this instance — evidence only, never a verdict.
+	DeserializationChains []ChainRef `json:"deserialization_chains,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -331,6 +338,11 @@ type Inputs struct {
 	Withdrawn   []cves.CVE
 	DataSet     *DataSet
 	Changes     []snapshot.Change
+	// DESERIALIZATION Z4: the run's entries and evaluated chains, with
+	// the catalog versions ("" = not rendered).
+	DeserModelCatalog, DeserChainCatalog string
+	DeserSites                           []deserialize.Site
+	DeserChains                          []deserialize.ChainPresence
 }
 
 // DataFreshness is the run's data-freshness state (CVE:F2): State is
@@ -505,12 +517,14 @@ func Build(in Inputs) Document {
 				Applicability: applicability, ApplicabilityCheck: check,
 				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
 				ModelGaps: f.ModelGaps, Path: f.Path, Entry: f.Entry, Note: f.Note,
+				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
 			})
 			counts.Findings++
 			counts.FindingsByReachability[string(f.Status)]++
 		}
 	}
 	doc.Coverage.Counts = counts
+	doc.Deserialization = buildDeserialization(in)
 	return doc
 }
 

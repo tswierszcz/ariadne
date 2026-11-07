@@ -94,6 +94,9 @@ type Row struct {
 	Methods  string
 	Source   string
 	Reasons  string // CVE:F1b reason codes, comma-separated
+	// Chains (DESERIALIZATION Z4): catalog gadget chains linked to the
+	// advisory's findings, with their states; evidence only.
+	Chains string
 }
 
 // Data is everything the Markdown/JSON templates need, already computed
@@ -655,6 +658,7 @@ type Deserialization struct {
 	// Chains are DESERIALIZATION Z3a's catalog chains, evaluated.
 	Chains              []deserialize.ChainPresence
 	ChainCatalogVersion string
+	ModelCatalogVersion string
 }
 
 // showPerInstance: several instances, or an instance finding that says
