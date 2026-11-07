@@ -659,6 +659,22 @@ type Deserialization struct {
 	Chains              []deserialize.ChainPresence
 	ChainCatalogVersion string
 	ModelCatalogVersion string
+	// TaintCatalog (DATA_FLOW D4): the taint catalog when -taint ran,
+	// else "" (the report then says taint was not assessed).
+	TaintCatalog string
+}
+
+// TaintNotAssessed counts the entries -taint did not assess (library
+// entries not called from application code); the report lists only the
+// assessed ones.
+func (d *Deserialization) TaintNotAssessed() int {
+	n := 0
+	for _, s := range d.Sites {
+		if s.Taint != nil && s.Taint.State == "not_assessed" {
+			n++
+		}
+	}
+	return n
 }
 
 // showPerInstance: several instances, or an instance finding that says

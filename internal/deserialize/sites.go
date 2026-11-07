@@ -6,6 +6,7 @@ import (
 
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/taint"
 )
 
 // Site is one call of a cataloged deserialization entry.
@@ -37,7 +38,10 @@ type Site struct {
 	DataFromRaw        []string
 	DataFlowIncomplete []string
 	DataFlowWidened    int
-	allow              policy
+	// Taint (DATA_FLOW D4, -taint): whether request data reaches the
+	// data this entry reads; nil when not run.
+	Taint *taint.Result
+	allow policy
 }
 
 const (

@@ -348,7 +348,7 @@ included) blocks it there. States: `candidate_chain`, `conditions_unresolved`
 `-target-java`), `candidate_blocked` (this chain only — never the advisory),
 `classes_absent`, `no_entry`. Report-only: no edge and no verdict changes,
 and none of it is a proof of exploitability — the data flow into the
-entry is `not_analyzed` (DATA_FLOW:D4), a process-wide `jdk.serialFilter`
+entry is `not_analyzed` in the chain result (the entry's own `-taint` result, below, is separate), a process-wide `jdk.serialFilter`
 is invisible, and an entry with no catalog chain is not free of chains.
 Control app: `scripts/prepare-deserialization-chains-demo.sh` (a vulnerable
 and a fixed build; the guards are observed on the real JVM by
@@ -371,9 +371,47 @@ single analyzed target (exact, or the one CHA implementation), a small
 JDK catalog, or a conservative rule (depends on everything it is given,
 recorded as widened). Recursion is iterated to a fixed point with a
 limit; an incomplete summary is marked `?`. Where those parameters come
-from — an HTTP request — is the next step (taint, DATA_FLOW:D4). On
+from — an HTTP request — is assessed with `-taint` (below). On
 WebGoat the vulnerable-components lesson's `fromXML` reads its `String`
 parameter. Control app: `scripts/prepare-dataflow-demo.sh`.
+
+**Request data reaching the entries (DATA_FLOW D4, opt-in `-taint`).**
+A first taint pilot (`internal/taint`, catalog `taint-1`): does request
+data reach the data a deserialization entry reads? Sources are Spring MVC
+handler parameters bound from the request (`@RequestParam`,
+`@RequestBody`, `@RequestHeader`, `@PathVariable`, `@CookieValue`,
+`@RequestPart`, `@MatrixVariable`, and unannotated `String`/`String[]`/
+`byte[]`/stream/`MultipartFile` parameters of a mapped method), JAX-RS
+`@QueryParam`/`@FormParam`/`@PathParam`/`@HeaderParam`/`@CookieParam`/
+`@MatrixParam`/`@BeanParam`, and the results of `ServletRequest` accessors
+(`getParameter*`, `getInputStream`, `getReader`, `getHeader(s)`,
+`getQueryString`, `getCookies`, `getPart(s)`, `getRequestURI`/`URL`,
+`getPathInfo`; `javax` and `jakarta`). The search starts at the entry's
+data in D3's terms and walks backwards: a parameter (or `this`) of the
+method leads to every call site of that method in application classes,
+where that site's argument is followed in the caller's terms — so a helper
+called once with request data and once with a literal does not mix them —
+at most 8 calls deep. Each entry gets a state: `flow_found` (with the path
+from the source to the entry), `no_flow_in_model` (every input ends at a
+constant or at a parameter of a method no application code calls — e.g.
+`main`'s arguments, which are not a cataloged source), `undetermined`
+(something on the way could not be followed: a field, an unmodeled call's
+result, a lambda caller, a limit; listed as gaps), or `not_assessed` (a
+library entry no application code calls). Only the entry's own Z2 type
+policy can protect a deserialization entry: the guard is `effective` when
+it rejects every candidate class (or XStream's default allowlist applies),
+`partial` or `unknown` otherwise; string replacement, escaping/encoding
+and checks that only decide a branch are listed but give `unrelated` —
+they never clear a flow. With `-json-format v2`: `deserialization.taint_catalog`,
+`entries[].taint` (state, rule, flows with steps, guard state, guards, gaps,
+outside inputs) and `summary.entries_by_taint`; the report adds "Request
+data reaching the entries (taint)". Report-only: no verdict changes, and a
+flow is not proof of exploitability (nor is "no flow" proof of safety). On
+WebGoat the vulnerable-components lesson's `fromXML` is `flow_found` from
+`@RequestParam payload` through five `String#replace` calls (guard
+`unrelated`, policy `unrestricted`); petclinic has no application entry.
+Control app: `scripts/prepare-taint-demo.sh` (nine entries, one per case,
+each with its expected state).
 
 **Qualification and v2 (DESERIALIZATION Z4).** A chain is evaluated once
 per copy of its classes — the original names and each confirmed embedded
@@ -794,6 +832,7 @@ Flags:
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
+| `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
 | `-json-format` | no | `v1` (default: one row per advisory) or `v2` (CVE:F1c: components, one finding per advisory × component instance, coverage, inputs reference — schema in [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §5). |
@@ -972,6 +1011,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/prepare-micronaut-demo.sh   /path/to/jdk11-or-later/JAVA_HOME # Micronaut, control case
 ./scripts/prepare-quarkus-demo.sh     /path/to/jdk17-or-later/JAVA_HOME # Quarkus, control case
 ./scripts/prepare-jpms-demo.sh        /path/to/jdk11-or-later/JAVA_HOME # JPMS provides/provider(), -jpms-scenario control case
+./scripts/prepare-taint-demo.sh       /path/to/jdk11-or-later/JAVA_HOME # request data → deserialization entries, -taint control case
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 
@@ -1065,7 +1105,13 @@ report:
   types are not modeled, and other libraries' deserializers get no
   callback edges; classes
   whose superclass chain leaves the input at a JDK class not in the
-  built-in table are not candidates. **`web.xml`** (a WAR's own
+  built-in table are not candidates. **Taint** (`-taint`, DATA_FLOW D4) is
+  a pilot: deserialization entries are its only sinks, its sources are a
+  small Spring MVC / JAX-RS / Servlet catalog, callers are searched in
+  application classes only (8 calls deep), flows through fields, lambda
+  callers and unmodeled calls are gaps (`undetermined`), control
+  dependence is not tracked, and a path lists methods, not the steps
+  inside each method. **`web.xml`** (a WAR's own
   deployment descriptor, and an EAR's per-module ones) and **Spring
   classic XML bean definitions** (`<bean id="..." class="...">`,
   wherever a `<beans>`-rooted `.xml` resource is found on the app's own

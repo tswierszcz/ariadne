@@ -1,6 +1,6 @@
 # Deserializacja — fazy Z0–Z4
 
-Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3: Z3a DONE (katalog kandydatów łańcuchów bez dopływu danych, 2026-11-07), reszta Z3 nierozpoczęta (wymaga DATA_FLOW:D4); Z4 DONE (2026-11-07); zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3: Z3a DONE (katalog kandydatów łańcuchów bez dopływu danych, 2026-11-07), reszta Z3 nierozpoczęta (DATA_FLOW:D4 już dostępne: wynik taint per wejście; brak powiązania z łańcuchami); Z4 DONE (2026-11-07); zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
 
 ## Z0. Kontrakt modeli i ról — DONE (kontrakt, 2026-11-06)
 
@@ -35,7 +35,7 @@ Zależności: DATA_FLOW D3, FRAMEWORK F1 w używanych scenariuszach konfiguracji
 
 Gotowe: filtr accept/reject/unknown, dwie konfiguracje deserializatora i różne wersje modelu są rozróżnione.
 
-## Z3. Dane zewnętrzne i kandydaci łańcuchów — Z3a DONE (2026-11-07: katalog `z3a-1`, tożsamość, strażniki w bytecode, JDK, polityka per wejście); dopływ danych (wymaga DATA_FLOW:D4) nierozpoczęty
+## Z3. Dane zewnętrzne i kandydaci łańcuchów — Z3a DONE (2026-11-07: katalog `z3a-1`, tożsamość, strażniki w bytecode, JDK, polityka per wejście); dopływ danych: DATA_FLOW:D4 dostępne od 2026-11-07 (`-taint`, wynik per wejście), powiązanie z wynikami łańcuchów nierozpoczęte
 
 Zależności: DATA_FLOW D4, CVE F5 dla dowodów konkretnych CVE.
 

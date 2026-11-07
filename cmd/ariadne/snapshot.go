@@ -22,6 +22,7 @@ import (
 	"ariadne/internal/reach"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/snapshot"
+	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
 )
 
@@ -54,6 +55,8 @@ func algorithmVersions() map[string]string {
 		"deserialize.chains": deserialize.ChainCatalogVersion,
 		// DATA_FLOW D3: the dependency-summary rules.
 		"flowsum.summaries": flowsum.SummaryVersion,
+		// DATA_FLOW D4: the taint sources, guards and rules (-taint).
+		"taint.catalog": taint.CatalogVersion,
 	}
 }
 
@@ -84,7 +87,7 @@ func analysisConfig(cfg config) map[string]string {
 		"llm": strconv.FormatBool(cfg.llm), "llm-model": cfg.llmConfig.Model, "llm-reask-changed": strconv.FormatBool(cfg.llmReaskChanged),
 		"exploit-check": strconv.FormatBool(cfg.exploitCheck), "framework-check": strconv.FormatBool(cfg.frameworkCheck),
 		"data-ttl": cfg.dataTTL.String(), "max-data-age": cfg.maxDataAge.String(),
-		"refresh": strconv.FormatBool(cfg.refresh), "allow-stale": strconv.FormatBool(cfg.allowStale),
+		"refresh": strconv.FormatBool(cfg.refresh), "taint": strconv.FormatBool(cfg.taint), "allow-stale": strconv.FormatBool(cfg.allowStale),
 	}
 }
 

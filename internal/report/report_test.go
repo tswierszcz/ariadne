@@ -8,8 +8,10 @@ import (
 
 	"ariadne/internal/classfile"
 	"ariadne/internal/cves"
+	"ariadne/internal/deserialize"
 	"ariadne/internal/reach"
 	"ariadne/internal/serviceload"
+	"ariadne/internal/taint"
 )
 
 func TestBuildAndRenderMarkdown(t *testing.T) {
@@ -215,5 +217,45 @@ func TestRenderJPMSModuleInventory(t *testing.T) {
 		if !strings.Contains(md, want) {
 			t.Errorf("report is missing %q", want)
 		}
+	}
+}
+
+// TestRenderTaint (DATA_FLOW D4): without -taint the section says so;
+// with it, assessed entries are listed with state, guard and flow, and
+// library entries not called from the application are only counted.
+func TestRenderTaint(t *testing.T) {
+	render := func(d *Deserialization) string {
+		data := Build(Header{App: "app", GeneratedAt: time.Now()}, nil, nil, nil,
+			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", WebXMLInput{}, nil, nil,
+			nil, nil, nil, nil, nil, nil, nil, nil)
+		data.Deserialization = d
+		md, err := RenderMarkdown(data)
+		if err != nil {
+			t.Fatalf("RenderMarkdown: %v", err)
+		}
+		return md
+	}
+	site := deserialize.Site{CallerFQCN: "app.C", CallerName: "h", CallerDesc: "(Ljava/lang/String;)V", PC: 5,
+		Owner: "java.io.ObjectInputStream", Name: "readObject", Filter: deserialize.FilterNoneSeen, IsApp: true}
+	off := render(&Deserialization{Sites: []deserialize.Site{site}})
+	if !strings.Contains(off, "Not assessed: run with `-taint`") {
+		t.Errorf("without -taint the report does not say so")
+	}
+	found := site
+	found.Taint = &taint.Result{State: taint.FlowFound, GuardState: taint.GuardOnlyOther, FlowCount: 1,
+		Guards: []taint.Guard{{Kind: taint.GuardUnrelated, Detail: "java.lang.String#replace: string replacement"}},
+		Flows:  []taint.Flow{{Rule: taint.RuleSpringParam, Source: "@RequestParam", Steps: []taint.Step{{Method: "app.C#h(Ljava/lang/String;)V", Input: "parameter 0 (java.lang.String)", CallPC: -1}}}}}
+	lib := site
+	lib.IsApp, lib.CallerFQCN = false, "lib.L"
+	lib.Taint = &taint.Result{State: taint.NotAssessed, Reason: "library"}
+	on := render(&Deserialization{Sites: []deserialize.Site{found, lib}, TaintCatalog: taint.CatalogVersion})
+	for _, want := range []string{"catalog `taint-1`", "| `app.C#h` (pc=5)", "| flow_found |", "unrelated<br>unrelated_sanitizer: java.lang.String#replace",
+		"**@RequestParam** → `app.C#h(Ljava/lang/String;)V` parameter 0", "1 entries in library code not called from application code"} {
+		if !strings.Contains(on, want) {
+			t.Errorf("report is missing %q", want)
+		}
+	}
+	if strings.Contains(on, "`lib.L#h`") {
+		t.Errorf("a not_assessed library entry is listed")
 	}
 }

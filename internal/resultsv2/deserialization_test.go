@@ -6,6 +6,7 @@ import (
 
 	"ariadne/internal/cves"
 	"ariadne/internal/deserialize"
+	"ariadne/internal/taint"
 )
 
 // TestChainRefs: a finding links to the chains naming its advisory (by
@@ -53,5 +54,20 @@ func TestBuildDeserialization(t *testing.T) {
 	}
 	if d.Summary.EntriesByPolicy[deserialize.FilterNoneSeen] != 1 || d.Summary.ChainsByState[deserialize.ChainCandidate] != 1 {
 		t.Errorf("summary %+v", d.Summary)
+	}
+}
+
+// TestBuildDeserializationTaint (DATA_FLOW D4): entries carry their taint
+// result and the summary counts them only when -taint ran.
+func TestBuildDeserializationTaint(t *testing.T) {
+	sites := []deserialize.Site{{CallerFQCN: "app.M", CallerName: "read", CallerDesc: "()V", PC: 7, Filter: deserialize.FilterNoneSeen,
+		Taint: &taint.Result{State: taint.FlowFound, Catalog: taint.CatalogVersion}}}
+	off := buildDeserialization(Inputs{DeserModelCatalog: "m", DeserSites: sites})
+	if off.TaintCatalog != "" || off.Entries[0].Taint != nil || off.Summary.EntriesByTaint != nil {
+		t.Errorf("without -taint: %+v", off)
+	}
+	on := buildDeserialization(Inputs{DeserModelCatalog: "m", DeserSites: sites, TaintCatalog: taint.CatalogVersion})
+	if on.TaintCatalog != taint.CatalogVersion || on.Entries[0].Taint == nil || on.Summary.EntriesByTaint[taint.FlowFound] != 1 {
+		t.Errorf("with -taint: %+v", on)
 	}
 }

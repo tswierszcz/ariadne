@@ -15,13 +15,13 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE for overloads/inheritance, bridge/default-method real-bytecode verification still pending (needs a JDK, absent here) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty, z jednym odnotowanym, czekającym na JDK ograniczeniem w G2. Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
-| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: DONE (wartości — pięć wycinków 2026-10-22…11-05; zależności — `internal/flowsum` 2026-11-07; points-to pól instancyjnych poza zakresem); D4–D5: UNASSESSED | Streszczenia zależności (parametr/`this`/pole/wynik niemodelowanego wywołania → wynik, pola, argumenty wywołań, obiekty), podstawiane per miejsce wywołania, SCC do punktu stałego, katalog JDK, polityka konserwatywna; pierwszy odbiorca: wejścia deserializacji („Data read depends on”, v2). WebGoat 2420 metod / 6,7 s, petclinic 1252 / 1,8 s, werdykty bez zmian. Następny: D4 (taint). Szczegóły we wpisie DATA_FLOW:D3 (streszczenia zależności). |
+| DATA_FLOW | [D0–D5](DATA_FLOW_IMPLEMENTATION_PLAN.MD) | D0–D2: DONE; D3: DONE (wartości — pięć wycinków 2026-10-22…11-05; zależności — `internal/flowsum` 2026-11-07; points-to pól instancyjnych poza zakresem); D4: DONE (pilotaż taint 2026-11-07, `-taint` opt-in); D5: UNASSESSED | D4: `internal/taint` (katalog `taint-1`) — źródła Spring MVC/JAX-RS/`ServletRequest` → dane czytane przez wejścia deserializacji; wyszukiwanie wstecz po streszczeniach D3 per miejsce wywołania w klasach aplikacji (≤ 8 poziomów); stany `flow_found`/`no_flow_in_model`/`undetermined`/`not_assessed`, ścieżka, zabezpieczenia (tylko polityka Z2 jest skuteczna), luki; v2 `entries[].taint`, raport, snapshot. Demo `scripts/prepare-taint-demo.sh` 9/9 zgodnie z oczekiwaniem; WebGoat: lekcja vulnerable-components `flow_found` (guard `unrelated`); werdykty bez zmian, brak mierzalnego narzutu. Następny: D5 (pomiar i wydanie) albo DESERIALIZATION:Z3 (powiązanie taint z łańcuchami). Szczegóły we wpisie DATA_FLOW:D4. |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05 | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
-| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3a: DONE (2026-11-07, kandydaci łańcuchów bez dopływu danych); Z4: DONE (2026-11-07); Z3 (dopływ danych, wymaga DATA_FLOW:D4): UNASSESSED | `internal/deserialize`: katalog modeli (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3a-1` oceniany per wejście i per kopia klas (Z3a/Z4), v2 `deserialization` + powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE (Z4). Szczegóły we wpisach DESERIALIZATION:Z0+Z1, Z2, Z3a, Z4. |
+| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3a: DONE (2026-11-07, kandydaci łańcuchów bez dopływu danych); Z4: DONE (2026-11-07); Z3 (dopływ danych): READY — DATA_FLOW:D4 daje wynik taint per wejście (`-taint`), brak powiązania z łańcuchami (`flow: not_analyzed`) | `internal/deserialize`: katalog modeli (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3a-1` oceniany per wejście i per kopia klas (Z3a/Z4), v2 `deserialization` + powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE (Z4). Szczegóły we wpisach DESERIALIZATION:Z0+Z1, Z2, Z3a, Z4. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
@@ -1736,6 +1736,116 @@ Przy dodawaniu kolejnego wpisu zapisz:
   parametry handlerów Spring MVC/servletów, `getParameter`/`getInputStream`;
   propagacja przez streszczenia D3 w górę po wywołujących; ujście: wejścia
   deserializacji) — domyka resztę DESERIALIZATION:Z3.
+
+### DATA_FLOW:D4 — pierwsza analiza taint (pilotaż: żądanie → wejścia deserializacji) — DONE (2026-11-07)
+
+- **Zakres zatwierdzony (2026-11-07):** `internal/taint` z wersjonowanym
+  katalogiem źródeł i zabezpieczeń; jeden pilotaż: dane żądania HTTP →
+  dane czytane przez wejścia deserializacji (Java: odbiorca `readObject`;
+  XStream: argument 0 `fromXML`); propagacja wstecz po streszczeniach D3
+  per miejsce wywołania; ścieżka danych; stany `flow_found`/
+  `no_flow_in_model`/`undetermined`/`not_assessed`; zabezpieczenia
+  specyficzne dla modelu (polityka Z2 skuteczna, reszta niezwiązana);
+  osobna ocena w v2 i raporcie; **flaga `-taint`, domyślnie wyłączona**
+  (decyzja użytkownika: opt-in, zgodnie z D5). Gałąź `data-flow-d4-taint`
+  od `main` (d683dd7 + merge PR #8).
+- **Zrealizowane:**
+  1. `internal/taint/catalog.go` (`CatalogVersion = "taint-1"`): źródła —
+     parametry handlerów Spring MVC z `@RequestParam`/`@RequestBody`/
+     `@RequestHeader`/`@PathVariable`/`@CookieValue`/`@RequestPart`/
+     `@MatrixVariable` (`src:spring-mvc-param`), nieadnotowane
+     `String`/`String[]`/`byte[]`/`InputStream`/`Reader`/`MultipartFile`
+     metody z adnotacją mapowania (`src:spring-mvc-implicit`), JAX-RS
+     `@QueryParam`/`@FormParam`/`@PathParam`/`@HeaderParam`/`@CookieParam`/
+     `@MatrixParam`/`@BeanParam` (`src:jaxrs-param`), wyniki akcesorów
+     `ServletRequest`/`HttpServletRequest`/wrapperów (`javax`/`jakarta`,
+     `src:servlet-request`); katalog „zabezpieczeń” niezwiązanych
+     (zamiana napisów, escaping/encoding Spring/commons/OWASP/Jsoup) i
+     sprawdzeń sterujących (`isEmpty`/`isBlank`/`matches`/`startsWith`/
+     `contains`/`equals`, `StringUtils`, `Pattern.matches`).
+  2. `internal/taint/taint.go`: indeks wywołań klas aplikacji (po nazwie +
+     deskryptorze; dokładnie przez `ResolveExact`, virtual/interface gdy
+     klasa metody jest podtypem nazwanego właściciela), `Closure` (metody
+     z ujściami + wywołujący do głębokości 8 → korzenie streszczeń),
+     `Analyze`: wyszukiwanie wstecz — `param:i`/`this` → źródło albo każde
+     miejsce wywołania (argument/odbiorca tego miejsca w terminach
+     wywołującego), `call:` → źródło servletowe albo luka, `field:`/
+     `call:*` → luka, brak wywołujących → wejście spoza katalogu, metoda z
+     invokedynamic → luka; limity: głębokość 8, 2000 węzłów, 5 ścieżek
+     (licznik dokładny), 20 luk (licznik dokładny). Zabezpieczenia na
+     ścieżce: wywołania z katalogu, których odbiorca/argument zależy od
+     wejścia danej metody (scalane per metoda, lista PC).
+  3. `internal/flowsum`: nowa opcja `Options.Opaque` — wskazane wywołania
+     (akcesory żądania) nigdy nie są rozwijane w ciało jedynej
+     implementacji, więc ich wynik zostaje źródłem `call:`; bez opcji
+     zachowanie D3 niezmienione (`SummaryVersion` bez zmian).
+  4. `internal/deserialize/taint.go`: ujścia (`sink:deser-java-stream`,
+     `sink:xstream-fromxml`), polityka Z2 → stan zabezpieczenia (`evaluated`
+     odrzucająca wszystkie kandydatki lub `default_allowlist` → `effective`;
+     częściowo → `partial`; `unknown`/`version_unknown` → `unknown`),
+     `TaintRoots`, `AttachTaint` (wejście biblioteczne bez wywołujących z
+     aplikacji → `not_assessed`), `Site.Taint`.
+  5. CLI: `-taint`; korzenie streszczeń = domknięcie wywołujących (jeden
+     przebieg `Summarize`), log ze stanami; snapshot `algorithms`
+     `taint.catalog`, konfiguracja `taint`. v2: `deserialization.
+     taint_catalog`, `entries[].taint`, `summary.entries_by_taint` (tylko
+     z `-taint`). Raport: podsekcja „Request data reaching the entries
+     (taint)” (bez `-taint`: jawne „Not assessed”; wejścia `not_assessed`
+     tylko liczone).
+  6. Fixture `testdata/taint` (`scripts/build-taint-fixture.sh`) i
+     aplikacja kontrolna `scripts/prepare-taint-demo.sh` (stuby adnotacji
+     Spring, `HtmlUtils`, `ServletRequest` o prawdziwych nazwach — bez
+     zależności, offline).
+- **Weryfikacja:** `internal/taint/taint_test.go` (pełny potok jak w CLI na
+  fixture): dane żądania przez dwa poziomy wywołań (`flow_found`, guard
+  `none`, ścieżka z PC), stała (`no_flow_in_model`), helper wywołany z
+  danymi żądania i z literałem — czytany tylko literał (`no_flow_in_model`,
+  brak mieszania miejsc), filtr `createFilter("java.lang.String;!*")`
+  (`effective`), `isEmpty` + `HtmlUtils.htmlEscape` (`unrelated`, żadne
+  zabezpieczenie nieskuteczne), interfejs z dwiema implementacjami
+  (`undetermined`), `ServletRequest#getParameter` przy jednej
+  implementacji w wejściu (`src:servlet-request`), parametr niejawny,
+  argument `main` (`no_flow_in_model` + `outside_inputs`), pole
+  (`undetermined`), wywołujący przez lambdę (luka), limit głębokości
+  (`undetermined`) i ta sama ścieżka z limitem 12 (`flow_found`, 11
+  kroków), wspólny helper z wywołującym z żądania i z literałem (jedna
+  ścieżka, bez luk). `resultsv2`: taint tylko z `-taint`. `report`:
+  renderowanie z i bez `-taint`, wejścia biblioteczne tylko liczone.
+  Demo na OpenJDK 25: aplikacja działa (filtr odrzuca `Payload` w czasie
+  wykonania), ariadne: 9/9 wejść w oczekiwanym stanie (`flow_found` 5,
+  `no_flow_in_model` 3, `undetermined` 1). Prawdziwe dane (offline, binarka
+  `main` vs gałąź): werdykty WebGoat 42/51/10/61/0 i petclinic 3/71/16/57/6
+  bez zmian; bez `-taint` v2 identyczny z `main` poza `analysis_id`/wersją;
+  z `-taint` identyczny z przebiegiem bez niej poza polami taint; dwa
+  przebiegi z `-taint` bajtowo identyczne. WebGoat: 143 wejścia —
+  `VulnerableComponentsLesson#completed` i wewnętrzne `XStream#fromXML`
+  `flow_found` z `@RequestParam payload` (guard `unrelated`: 5×
+  `String#replace`, `StringUtils#isEmpty`; polityka `unrestricted`), 141
+  bibliotecznych `not_assessed`; petclinic: 130 `not_assessed` (brak wejść
+  w aplikacji). Lekcja insecure-deserialization WebGoat nie jest w tym
+  wejściu (brak w `app-classes.jar`), więc przypadek Java pokrywa demo.
+  Czas: WebGoat 22,6 s z i bez `-taint`, petclinic 12,5 s / 12,4 s
+  (streszczenia 6,5 s / 1,7 s, ta sama liczba metod — domknięcie
+  wywołujących mieści się w już streszczanych). `go test ./...`,
+  `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersze Data flow and taint,
+  Deserialization), README (sekcja D4, flaga, demo, ograniczenia),
+  `FAQ.md` (nowe pytanie o `-taint`), `docs/RESULTS_CONTRACT.MD`, szablon
+  raportu, plany DATA_FLOW/DESERIALIZATION, `DATA_FLOW.MD`, ten rejestr.
+  `FAQ_PL.MD` celowo nietknięty (stała decyzja użytkownika).
+- **Ograniczenia:** jedna rodzina ujść (wejścia deserializacji); mały
+  katalog źródeł; wywołujący szukani tylko w klasach aplikacji; przepływy
+  przez pola (statyczne i instancyjne), wywołujący przez lambdy/referencje
+  metod i niemodelowane wywołania → `undetermined`; brak zależności
+  sterowania; ścieżka na poziomie metod (bez kroków transformacji wewnątrz
+  metody); źródła z Spring rozpoznawane po adnotacjach (bez `@ModelAttribute`
+  i konwerterów); `no_flow_in_model` względne wobec katalogu; wyniki
+  łańcuchów (Z3a) nadal mają `flow: not_analyzed`.
+- **Następny krok (wymaga zgody):** DATA_FLOW:D5 (pomiar: błędne przepływy,
+  pominięcia, `undetermined`, czas/pamięć na konkretnej bibliotece i
+  pilotażu; kwalifikacja przed ewentualnym włączeniem domyślnym) albo
+  DESERIALIZATION:Z3 — powiązanie wyniku taint wejścia z wynikami łańcuchów
+  (`flow` per wejście zamiast `not_analyzed`).
 
 ### ASYNC_CALLBACKS + DATA_FLOW:D3 — model `AccessController.doPrivileged` — DONE for this scope (2026-11-05)
 

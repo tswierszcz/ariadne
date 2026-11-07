@@ -39,6 +39,7 @@ import (
 	"ariadne/internal/serviceload"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/springxml"
+	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
 	"ariadne/internal/webxml"
 )
@@ -78,6 +79,7 @@ type config struct {
 	activeProfiles string
 	jpmsScenario   string
 	jpmsModulePath string
+	taint          bool
 
 	llm        bool
 	llmModel   string
@@ -124,6 +126,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.snapshotIn, "snapshot-in", "", "replay a data snapshot: every lookup is answered from it (no cache, no network); inputs, analyzer and algorithm versions must match it")
 	fs.StringVar(&cfg.snapshotCompare, "snapshot-compare", "", "compare this run with an earlier snapshot: list the advisories whose derived results were invalidated, and why")
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
+	fs.BoolVar(&cfg.taint, "taint", false, "DATA_FLOW D4 (opt-in, report-only): assess whether request data (Spring MVC/JAX-RS handler parameters, ServletRequest accessors) reaches the data each deserialization entry reads; adds a taint result per entry, never changes a verdict")
 	fs.BoolVar(&cfg.allowStale, "allow-stale", false, "when an online refresh fails, use the cached copy and mark the report as built on stale data (never past -max-data-age)")
 	fs.DurationVar(&cfg.dataTTL, "data-ttl", httpcache.DefaultTTL, "how long a fetched OSV/advisory response counts as fresh before it is fetched again (CVE:F2)")
 	fs.DurationVar(&cfg.maxDataAge, "max-data-age", 0, "hard limit on the age of any OSV/advisory data used, offline included; data of unknown age (cached before CVE:F2) fails it. 0 = no limit")
@@ -788,9 +791,25 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// what they call), so each entry states what the data it reads
 	// depends on in its method. Report-only.
 	flowStart := time.Now()
-	flowEngine := flowsum.New(h, flowsum.DefaultOptions)
-	flowStats := flowEngine.Summarize(deserialize.SummaryRoots(deserSites))
+	flowOpts := flowsum.DefaultOptions
+	flowRoots := deserialize.SummaryRoots(deserSites)
+	// DATA_FLOW D4 (-taint): the entries' methods and their application
+	// callers, within the search depth, are summarized in the same run;
+	// the source accessors stay opaque (their results are sources).
+	var taintAnalyzer *taint.Analyzer
+	if cfg.taint {
+		taintAnalyzer = taint.New(h, taint.DefaultOptions)
+		flowRoots = deserialize.TaintRoots(deserSites, taintAnalyzer)
+		flowOpts.Opaque = taint.Opaque
+	}
+	flowEngine := flowsum.New(h, flowOpts)
+	flowStats := flowEngine.Summarize(flowRoots)
 	deserialize.AttachArgumentFlow(deserSites, flowEngine)
+	if taintAnalyzer != nil {
+		deserialize.AttachTaint(deserSites, taintAnalyzer, flowEngine)
+		log("taint (DATA_FLOW D4, %s, opt-in): %d deserialization entries assessed: %s",
+			taint.CatalogVersion, len(deserSites), report.GapCounts(deserialize.TaintStateCounts(deserSites)))
+	}
 	flowEngine.Close()
 	withParams := 0
 	for _, s := range deserSites {
@@ -1092,7 +1111,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data.Components = components
 	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded,
 		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
-		ModelCatalogVersion: deserialize.ModelCatalogVersion}
+		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(cfg.taint)}
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
@@ -1113,7 +1132,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Changes:           changes,
 		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
-		DeserSites: deserSites, DeserChains: deserChains,
+		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
@@ -1314,4 +1333,12 @@ func releaseLineSummary(vm map[string]vulnmap.Entry) string {
 	}
 	return fmt.Sprintf("descends from its tag=%d, already in it=%d, another line=%d, unknown=%d; left out of mappings: by release line=%d, by release fit=%d",
 		descends, inRelease, other, unknown, exLine, exFit)
+}
+
+// taintCatalog is the taint catalog version when -taint ran, else "".
+func taintCatalog(on bool) string {
+	if on {
+		return taint.CatalogVersion
+	}
+	return ""
 }
