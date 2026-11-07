@@ -21,7 +21,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
-| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1: DONE (2026-11-06); Z2–Z4: UNASSESSED | `internal/deserialize`: katalog modeli (Java serialization, XStream jako samo wejście), krawędzie „może wykonać” z wejść Java serialization do callbacków klas serializowalnych wejścia; filtry wykrywane, nieoceniane (Z2). Szczegóły we wpisie DESERIALIZATION:Z0+Z1. |
+| DESERIALIZATION | [Z0–Z4](DESERIALIZATION_IMPLEMENTATION_PLAN.MD) | Z0: DONE (kontrakt, 2026-11-06); Z1, Z2: DONE (2026-11-06; Z2 dla literalnych polityk w metodzie wejścia); Z3–Z4: UNASSESSED | `internal/deserialize`: katalog modeli (Java serialization, XStream jako samo wejście), krawędzie „może wykonać” z wejść Java serialization do callbacków klas serializowalnych wejścia; filtry wykrywane, nieoceniane (Z2). Szczegóły we wpisie DESERIALIZATION:Z0+Z1. |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Najpierw poprawność dispatch i alokacje, potem RTA. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
@@ -3012,6 +3012,76 @@ Przy dodawaniu kolejnego wpisu zapisz:
 - **Następny krok (wymaga zgody):** DESERIALIZATION:Z2 (ocena filtrów
   `ObjectInputFilter`/`resolveClass` dla znanych wzorców, pierwszy model
   biblioteki — XStream w wybranych wydaniach) albo inny obszar.
+
+### DESERIALIZATION:Z2 — ocena filtrów i model XStream — DONE dla literalnych polityk w metodzie wejścia (2026-11-06)
+
+- **Zakres zatwierdzony (2026-11-06):** model XStream zależny od wersji
+  (callbacki, framework bezpieczeństwa, progi 1.4.7 / 1.4.18), ocena
+  filtrów Java serialization (literalny `createFilter` na tym samym
+  strumieniu, wzorce JEP 290), stany polityki w raporcie, aplikacje
+  kontrolne na prawdziwym JVM. Gałąź `deserialization-z2`.
+- **Zrealizowane:**
+  1. `internal/deserialize/callbacks.go`: `ClassTargets(h, format)` —
+     cele per klasa (potrzebne do odcinania klas); `FormatJava` jak w Z1,
+     `FormatXStream`: każda klasa konkretna (też nieserializowalna) —
+     `readResolve` z klasy lub nadklasy o dowolnym dostępie, prywatny
+     `readObject` klas serializowalnych łańcucha, Externalizable:
+     publiczny konstruktor i `readExternal`; bez innych konstruktorów.
+     `Connect` — krawędzie per miejsce z pominięciem klas odrzuconych,
+     liczniki `Candidates`/`Rejected`, próbka odrzuconych.
+  2. `policy.go`: `ResolvePolicies` — fakty `internal/dataflow` metody
+     wejścia (ponowny odczyt klasy). Java: `setObjectInputFilter` na tej
+     samej alokacji strumienia z argumentem
+     `ObjectInputFilter$Config#createFilter(String)` o stałym literale →
+     `evaluated` (JEP 290: dokładna nazwa, `.*`, `.**`, prefiks `*`, `*`,
+     negacja; limity pomijane; pierwsze dopasowanie; brak = UNDECIDED =
+     dopuszczone; wzorce z modułem → unknown); inny filtr, inny/niepewny
+     strumień, `resolveClass` → `unknown`. XStream: wersja z GAV klasy
+     `com.thoughtworks.xstream.XStream`; < 1.4.7 `unrestricted`;
+     1.4.7–1.4.17 start `ANY`; ≥ 1.4.18 start `NONE` (domyślna allowlista
+     typów JDK); na tym samym `new XStream()` przed odczytem:
+     `addPermission(NONE|ANY)` (czyści listę), `setupDefaultSecurity`,
+     `allowTypes`/`denyTypes` (`Class[]`/`String[]` literalne),
+     `*ByWildcard`, `*TypeHierarchy`; ocena od ostatnio dodanego, brak
+     dopasowania = odrzucone; inne wywołania konfiguracji, instancja z
+     pola/parametru, przekazanie instancji do innego kodu → `unknown`.
+  3. Katalog: XStream modelowany (7 przeciążeń `fromXML`, `Format`),
+     `Model.Format`; CLI: polityki, krawędzie obu formatów, log stanów;
+     raport: kolumny polityki, wersji i odrzuconych klas.
+  4. Fixture `testdata/deserialize` (stub API XStream + `fx.Cases` z
+     wejściem na politykę, `scripts/build-deserialize-fixture.sh`, JAR-y w
+     repo); `scripts/prepare-xstream-demo.sh` (XStream 1.4.5/1.4.10/1.4.20,
+     z `--add-opens` dla JDK 25, asercje); demo deserializacji z odczytem
+     filtrowanym.
+- **Weryfikacja:** `internal/deserialize/policy_test.go` — na bytecode:
+  Java brak/literał/dynamiczny/inny strumień; XStream w 1.4.5, 1.4.10,
+  1.4.20 i bez wersji: domyślnie, `allowTypes`, wildcard, hierarchia,
+  `setupDefaultSecurity`, `ANY` po `NONE`, `denyTypes`, pole, ucieczka;
+  wzorce JEP 290 i wildcardy. (Jedno oczekiwanie testu poprawione: `fx.**`
+  obejmuje podpakiety — model miał rację.) JVM (OpenJDK 25): 1.4.5 —
+  wszystkie callbacki; 1.4.10 — samo `allowTypes(Gadget)` niczego nie
+  ogranicza, `NONE`+`allowTypes(Gadget)` odrzuca `Plain`; 1.4.20 — domyślnie
+  odrzuca `Gadget`, `allowTypes(Gadget)` dopuszcza tylko jego; filtr
+  `demo.Gadget;!*` — `Gadget.readObject` działa, następna klasa
+  odrzucona. ariadne na demach daje dokładnie te stany i cele.
+  `go test ./...` (sieć zablokowana) i `go vet ./...` — PASS.
+- **Prawdziwe dane** (offline, `.cache`, main e472f61 vs gałąź):
+  werdykty bez zmian na petclinic i WebGoat. WebGoat: 143 wejścia (doszło
+  przeciążenie `fromXML(String,Object)`), 4 wejścia XStream 1.4.5
+  `unrestricted` (w tym lekcja vulnerable-components), +1088 krawędzi;
+  advisory XStream były już REACHABLE przez punkt wejścia. Żadnego
+  literalnego filtra Java w obu aplikacjach; 11/13 wejść z ograniczeniem
+  to nadpisane `resolveClass` → `unknown`. v2 bajtowo powtarzalny.
+- **Dokumentacja:** `docs/SUPPORT.MD`, README, FAQ, szablon raportu,
+  `MANUAL_MAPPING_AUDIT.MD`, plan DESERIALIZATION, ten rejestr.
+- **Ograniczenia:** tylko polityki literalne w metodzie wejścia; filtry
+  procesowe, `resolveClass`, polityki budowane gdzie indziej,
+  `allowTypesByRegExp`, własne `TypePermission` i konwertery — unknown;
+  konwertery XStream dla typów JDK (klasyczne łańcuchy gadżetów)
+  niemodelowane; inne biblioteki (Jackson, SnakeYAML, Kryo) bez modelu.
+- **Następny krok (wymaga zgody):** DESERIALIZATION:Z3 (dane zewnętrzne i
+  kandydaci łańcuchów), międzyproceduralne polityki (instancja XStream /
+  filtr z pola lub parametru — wymaga DATA_FLOW:D3), albo inny obszar.
 
 ### ASYNC_CALLBACKS:A0 — Katalog modeli callbacków — DONE (2026-10-22)
 

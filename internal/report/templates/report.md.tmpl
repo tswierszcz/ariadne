@@ -585,29 +585,45 @@ None found.
 
 ## Deserialization entry points
 
-DESERIALIZATION Z1. Every call of a cataloged deserialization entry in the input, and
-— for Java serialization — a "may run" call-graph edge to every callback serialization
-may run on a concrete serializable class of the input: a private non-static
-`readObject(ObjectInputStream)`/`readObjectNoData()` of each class of the serializable
-chain, `readResolve()` resolved with serialization's access rules, an Externalizable
-class's public no-arg constructor and `readExternal(ObjectInput)`, and the no-arg
-constructor of the first non-serializable superclass. The stream decides which classes
-appear — a cast after `readObject` does not bound it, the callbacks have already run —
-so these edges say *may run*, not *runs*; whether the data is attacker-controlled is not
-modeled. Enums (resolved by name) and records (canonical constructor) get no edges. A
-filter (`setObjectInputFilter` in the same method, or a `resolveClass`-overriding stream)
-is detected, not evaluated: its edges are kept. Callbacks of JDK classes (e.g. a
-`HashMap` hashing its keys while being read) are not modeled, so every entry is also an
-unbounded model gap. XStream `fromXML` is cataloged as an entry only: its sites are
-listed, without callback edges (its converters are not modeled).
+DESERIALIZATION Z1–Z2. Every call of a cataloged deserialization entry in the input,
+with a "may run" call-graph edge to every callback the format may run on a class of
+the input it may create there:
+- **Java serialization** (`ObjectInputStream#readObject`/`readUnshared`,
+  `ObjectInput#readObject`): concrete serializable classes — private non-static
+  `readObject(ObjectInputStream)`/`readObjectNoData()` of each class of the serializable
+  chain, `readResolve()` with serialization's access rules, an Externalizable class's
+  public no-arg constructor and `readExternal`, and the no-arg constructor of the first
+  non-serializable superclass;
+- **XStream** `fromXML`: any concrete class — `readResolve()` declared in it or a
+  superclass, the private `readObject` of each serializable class of its chain, an
+  Externalizable class's constructor and `readExternal` (no other constructor: XStream
+  allocates without one).
+
+The stream decides which classes appear — a cast after reading does not bound it — so
+the edges say *may run*; whether the data is attacker-controlled is not modeled.
+**Policy** (Z2): `evaluated` — a policy read from literals in the entry's own method,
+on the same object, decides each class (a literal
+`setObjectInputFilter(ObjectInputFilter.Config.createFilter("…"))` with JEP 290 class
+patterns; XStream's `addPermission(NoTypePermission.NONE|AnyTypePermission.ANY)`,
+`allowTypes`/`denyTypes` with literal arrays, `allowTypesByWildcard`/`denyTypesByWildcard`,
+`allowTypeHierarchy`, `setupDefaultSecurity`, the last added permission deciding first);
+rejected classes get no edge. `unrestricted` — XStream before 1.4.7 (no security
+framework), or 1.4.7–1.4.17 with nothing configured. `default_allowlist` — XStream 1.4.18+
+with nothing added: no class of the input is admitted. `unknown` — a restriction exists
+that is not evaluated (a `resolveClass` override, a non-literal filter, an instance
+configured elsewhere or passed to other code): every edge is kept. `none_seen` — nothing
+visible; a process-wide `jdk.serialFilter` is not visible in bytecode. Callbacks of JDK
+classes (a `HashMap` hashing its keys while being read) and XStream's own converters for
+JDK types (the classic gadget chains) are not modeled, so every entry is also an
+unbounded model gap.
 {{with .Deserialization}}
-{{.Summary.Classes}} concrete serializable candidate classes ({{.Summary.Externalizable}} Externalizable; {{.Summary.Enums}} enums and {{.Summary.Records}} records excluded; {{.Summary.Unknown}} of unknown serializability — their superclass chain leaves the input at a JDK class not in the built-in table — not counted), {{.Targets}} callback targets, {{.EdgesAdded}} edges added.
+Java serialization: {{.Summary.Classes}} concrete serializable candidate classes ({{.Summary.Externalizable}} Externalizable; {{.Summary.Enums}} enums and {{.Summary.Records}} records excluded; {{.Summary.Unknown}} of unknown serializability — their superclass chain leaves the input at a JDK class not in the built-in table — not counted), {{.Targets}} callback targets. {{.EdgesAdded}} edges added in all.
 {{if not .Sites}}
 No entry site found.
 {{else}}
-| Caller | Entry | Model | Filter |
-|---|---|---|---|
-{{range .Sites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}){{if .IsApp}} — app{{end}} | `{{.Owner}}#{{.Name}}` | {{.Model}}{{if eq .Coverage "entry-only"}} (entry only){{end}} | {{.Filter}}{{if .FilterDetail}}: {{.FilterDetail}}{{end}} |
+| Caller | Entry | Model | Policy | Classes rejected |
+|---|---|---|---|---|
+{{range .Sites}}| `{{.CallerFQCN}}#{{.CallerName}}{{.CallerDesc}}` (pc={{.PC}}){{if .IsApp}} — app{{end}} | `{{.Owner}}#{{.Name}}` | {{.Model}}{{if .Version}} {{.Version}}{{end}} | {{.Filter}}{{if .FilterDetail}}: {{.FilterDetail}}{{end}} | {{if .Rejected}}{{.Rejected}} of {{.Candidates}} (e.g. {{range $i, $c := .RejectedSample}}{{if $i}}, {{end}}`{{$c}}`{{end}}){{else}}—{{end}} |
 {{end}}{{end}}
 {{else}}
 Not available in this report.
@@ -822,9 +838,10 @@ None found.
   implementation at all — Spring generates it at runtime — so a call to one can only be
   seen as reaching the interface method itself, never the generated proxy's body.
 - **Serialization gadget chains and config-driven behavior** (XML wiring, `web.xml`)
-  are not modeled — Java serialization entries reach the callbacks of the input's
-  serializable classes (see "Deserialization entry points"), not the JDK's own callbacks
-  nor what those call on the objects read, and XStream entries get no callback edges; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only reflects direct and
+  are not modeled — Java serialization and XStream entries reach the callbacks of the
+  input's own classes (see "Deserialization entry points"), not the JDK's own callbacks,
+  XStream's converters for JDK types, nor what those call on the objects read; only
+  literal filters and XStream permissions in the entry's own method are evaluated; a REACHABLE/FRAMEWORK/NOT_REACHABLE verdict only reflects direct and
   virtual/interface (CHA-expanded) method calls found in bytecode. **ServiceLoader**
   provider *declarations* are inventoried (see the section above, SERVICE_LOADING S0),
   and reachable `Iterator.next()` or `Provider.get()` calls can add conditional

@@ -1,6 +1,6 @@
 # Deserializacja — fazy Z0–Z4
 
-Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2–Z4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: Z0 DONE (kontrakt, 2026-11-06), Z1 DONE (2026-11-06), Z2 DONE dla literalnych polityk w metodzie wejścia (2026-11-06), Z3–Z4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [DESERIALIZATION.MD](DESERIALIZATION.MD). Kontrakty: [ROADMAP.MD](ROADMAP.MD).
 
 ## Z0. Kontrakt modeli i ról — DONE (kontrakt, 2026-11-06)
 
@@ -23,7 +23,7 @@ Gotowe: model rozróżnia podatny komponent, jego wejście i właściwy kod zwi�
 
 Gotowe: callback ma uzasadnioną ścieżkę, brak zgodnej sygnatury nie tworzy callbacka, a nieznany zbiór typów jest widoczny. To pierwszy przyrost mechanizmu.
 
-## Z2. Filtry, konfiguracja i pierwszy model biblioteki
+## Z2. Filtry, konfiguracja i pierwszy model biblioteki — DONE dla literalnych polityk w metodzie wejścia (2026-11-06; XStream 1.4.x jako pierwsza biblioteka; polityki spoza metody, `jdk.serialFilter`, `resolveClass` — unknown)
 
 Zależności: DATA_FLOW D3, FRAMEWORK F1 w używanych scenariuszach konfiguracji.
 

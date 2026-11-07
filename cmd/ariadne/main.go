@@ -701,23 +701,24 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// readObjectNoData, readResolve, readExternal, the constructor it
 	// calls). XStream entries are listed, not connected (entry-only).
 	deserSites := deserialize.FindSites(h)
-	deserTargets, deserSummary := deserialize.Candidates(h)
+	warnings = append(warnings, deserialize.ResolvePolicies(h, deserSites)...) // DESERIALIZATION Z2
+	deserJava, deserSummary := deserialize.ClassTargets(h, deserialize.FormatJava)
+	deserXStream, _ := deserialize.ClassTargets(h, deserialize.FormatXStream)
+	deserTargets, _ := deserialize.Candidates(h)
 	var deserGraphEdges []callgraph.DeserializationEdge
-	for _, e := range deserialize.Edges(deserSites, deserTargets) {
+	for _, e := range deserialize.Connect(deserSites, map[string]map[string][]deserialize.Target{deserialize.FormatJava: deserJava, deserialize.FormatXStream: deserXStream}) {
 		deserGraphEdges = append(deserGraphEdges, callgraph.DeserializationEdge{
 			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc, PC: e.PC,
 			TargetFQCN: e.TargetFQCN, TargetName: e.TargetName, TargetDesc: e.TargetDesc,
 		})
 	}
 	deserEdgesAdded := callgraph.ApplyDeserializationEdges(g, deserGraphEdges)
-	deserFiltered := 0
+	deserStates := map[string]int{}
 	for _, s := range deserSites {
-		if s.Filter == deserialize.FilterNotEvaluated {
-			deserFiltered++
-		}
+		deserStates[s.Filter]++
 	}
-	log("deserialization (DESERIALIZATION Z1): %d entry sites (%d with a filter, not evaluated); %d serializable candidate classes (%d Externalizable; %d enums, %d records excluded; %d of unknown serializability), %d callback targets, %d edges added",
-		len(deserSites), deserFiltered, deserSummary.Classes, deserSummary.Externalizable, deserSummary.Enums, deserSummary.Records, deserSummary.Unknown, len(deserTargets), deserEdgesAdded)
+	log("deserialization (DESERIALIZATION Z1/Z2): %d entry sites (policy: %s); %d serializable candidate classes (%d Externalizable; %d enums, %d records excluded; %d of unknown serializability), %d Java serialization callback targets, %d edges added",
+		len(deserSites), report.GapCounts(deserStates), deserSummary.Classes, deserSummary.Externalizable, deserSummary.Enums, deserSummary.Records, deserSummary.Unknown, len(deserTargets), deserEdgesAdded)
 
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
