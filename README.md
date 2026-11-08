@@ -260,7 +260,15 @@ of `NOT_REACHABLE` findings). The "RTA" report section and v2
 `callgraph.rta` give the counts, including the CHA edges kept only by the
 fallback; compare an RTA run with a CHA run with `-graph-out` /
 `-graph-compare`. `-roots all` and `-roots profile` are separate scenarios:
-with `-roots all` every method is a root, so RTA removes little. Checked
+with `-roots all` every method is a root, so RTA removes little. **The
+default stays CHA** (GRAPH_PRECISION P4,
+[testdata/graphbench/RESULTS.MD](testdata/graphbench/RESULTS.MD)): on
+petclinic and WebGoat RTA costs under a second and changes no verdict with
+`-roots all`; with `-roots profile` it moves 8 findings from FRAMEWORK to
+NOT_REACHABLE, 5 correctly, 1 undetermined and 2 wrongly — container →
+servlet dispatch is a skipped `javax.*` call in both modes, and RTA removed
+the artifact path that had kept CHA's answer. Use RTA as a second opinion
+next to a CHA run (`-graph-compare`). Checked
 against the real JVM on `testdata/rta` (`scripts/rta-oracle.sh`). Checked against the real JVM on
 `testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
 method, generic and covariant bridges, an inherited body, a super call).
@@ -1085,6 +1093,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
 ./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
+./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 

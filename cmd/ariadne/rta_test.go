@@ -215,3 +215,17 @@ func TestNameableClasses(t *testing.T) {
 		t.Error("an interface/annotation type is in the fallback (only concrete classes can be created)")
 	}
 }
+
+// TestSnapshotAlgorithmsRTA (GRAPH_PRECISION P4): with RTA the catalog
+// and fixed-point rule versions are part of the snapshot's algorithm
+// versions; CHA snapshots do not carry them.
+func TestSnapshotAlgorithmsRTA(t *testing.T) {
+	rta := algorithmVersions(callgraph.ModeRTA)
+	if rta["callgraph.rta"] != callgraph.RTAVersion || rta["alloc.catalog"] == "" {
+		t.Errorf("rta versions %v", rta)
+	}
+	cha := algorithmVersions(callgraph.ModeCHA)
+	if _, ok := cha["callgraph.rta"]; ok {
+		t.Errorf("cha versions carry the RTA rule: %v", cha)
+	}
+}
