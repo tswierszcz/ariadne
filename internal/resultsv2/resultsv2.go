@@ -64,6 +64,9 @@ type CallGraph struct {
 	// CreatedTypes (GRAPH_PRECISION P1): the created-type catalog,
 	// summarized (the full list is in -graph-out).
 	CreatedTypes *alloc.Summary `json:"created_types,omitempty"`
+	// RTA (GRAPH_PRECISION P2, -callgraph-mode rta): the fixed point's
+	// counts and the CHA edges it removed or kept by the fallback.
+	RTA *callgraph.RTAResult `json:"rta,omitempty"`
 }
 
 // Tool identifies the analyzer build.

@@ -177,6 +177,9 @@ type Data struct {
 	// created classes, summarized, and its gaps.
 	CreatedTypes    *alloc.Summary
 	CreatedTypeGaps []alloc.Gap
+	// RTA (GRAPH_PRECISION P2): the fixed point's result with
+	// -callgraph-mode rta; nil otherwise.
+	RTA             *callgraph.RTAResult
 	Deserialization *Deserialization
 
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:

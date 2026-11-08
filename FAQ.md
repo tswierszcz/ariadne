@@ -532,6 +532,22 @@ whole classpath. Measured on petclinic: with the guard, the graph has
 (85× slower). Without it, practically every CVE in every dependency
 would come out "reachable".
 
+**Why is RTA opt-in, and why doesn't it remove more?** (GRAPH_PRECISION
+P2, `-callgraph-mode rta`.) RTA keeps a CHA edge only if some class that
+reachable code creates dispatches the call there — but a class can also
+be created by mechanisms the analysis does not see: reflection with a
+computed name, `Unsafe`, a framework instantiating a DTO or an entity.
+Dropping those targets silently would turn a false positive into a false
+negative, which is worse for this tool. So every such site, once
+reachable, keeps a justified fallback set of classes alive (classes the
+code can name at run time, annotated classes, member types, registered
+service providers, root parameter types with `-roots all`) and is
+reported as a gap; the report says how many edges were kept only because
+of that fallback. With `-roots all` every method is a root, so almost
+every class is created by reachable code and RTA removes little —
+compare scenarios, not modes alone, and always against a CHA run
+(`-graph-compare`).
+
 Both passes walk the classes in **sorted** name order (not Go's
 randomized map iteration order) — the other half of step 3's determinism
 fix: without it, two runs on the same data produced different, though

@@ -42,7 +42,8 @@ For a specific question, read that phase's Status note. For a broad "what's
 done / what's missing" question, skim every phase's Status note plus section
 8 ("Acceptance criteria"), which is a consolidated checklist across all of
 them. As of the last update, the only pieces deliberately left unimplemented
-are RTA and `--max-dep-depth` (Phase 7) and an exploitability check (Phase
+are `--max-dep-depth` (Phase 7; RTA has since shipped as the opt-in
+`-callgraph-mode rta`, GRAPH_PRECISION P2) and an exploitability check (Phase
 8, always optional) — don't treat those as forgotten work needing a status
 check.
 

@@ -134,19 +134,19 @@ Removed edges{{if gt (len .Removed) 30}} (first 30){{end}}:
 {{end}}{{end}}
 {{end}}{{with .CreatedTypes}}## Created types
 
-GRAPH_PRECISION P1, catalog `{{.Version}}` — report-only: no edge and no verdict depends on it yet. The classes the
+GRAPH_PRECISION P1, catalog `{{.Version}}` — {{if $.RTA}}it feeds RTA (below){{else}}report-only with `-callgraph-mode cha`: no edge and no verdict depends on it{{end}}. The classes the
 input may create, by origin: `new` (an instruction), `service` (a ServiceLoader provider materialized at a
 consumption site), `reflection` (`Constructor#newInstance` with a resolved target), `model` (a library model's
 constructor edge), `container` (a Spring stereotype or `@Bean` return type), `deserialization` (a candidate class
 of a deserialization entry of its format), `entry` (a class whose entry points a framework calls, with
 `-roots profile`). A class may have several origins. **Gaps** are places a class may be created by a mechanism the
-catalog does not model; RTA (GRAPH_PRECISION P2) will keep the CHA targets at the affected calls and record a gap
-instead of dropping them.
+catalog does not model; RTA (GRAPH_PRECISION P2, `-callgraph-mode rta`) makes their fallback classes live when the
+site is reachable and records the gap instead of dropping the targets.
 
 - **Classes:** {{.Types}} ({{.OriginText}}; {{.OnlyModeled}} created only through a model)
 - **Lambda sites:** {{.Lambdas}} (calls on a lambda follow its own edges, not CHA)
 - **Gaps:** {{.GapText}}{{if .ExternalInputs}} — with `-roots all` every root method's reference parameters ({{.RootParams}}) may be objects of any subtype created outside the analyzed code{{end}}
-- **CHA edges to a class not in the catalog:** {{.CHATargetsNotCreated}} of {{.CHATargets}} — informational: the most RTA could remove before gaps are applied, not an improvement by itself
+- **CHA edges to a class not in the catalog:** {{.CHATargetsNotCreated}} of {{.CHATargets}} — informational, counted on the CHA candidate set: the most RTA could remove before reachability and gaps are applied, not an improvement by itself
 {{with $.CreatedTypeGaps}}
 | Gap | Site | Bound | Why |
 |---|---|---|---|
@@ -154,6 +154,25 @@ instead of dropping them.
 {{end}}{{end}}{{if gt (len .) 30}}
 … {{len .}} gaps in all (by kind above).
 {{end}}{{end}}
+{{end}}{{with .RTA}}## RTA
+
+GRAPH_PRECISION P2, `{{.Version}}` (`-callgraph-mode rta`, opt-in). The CHA candidate set, built as in CHA mode with
+every model edge, is narrowed by a fixed point: a class is live once a method creating it (an origin above) is
+reachable from the roots, and a CHA edge stays only if some live class dispatches the call to its target (exact
+descriptor, JVM method selection). Direct, class-init and model edges are kept as they are. Unknown allocation
+(policy `cha-fallback-with-gap`): a reachable gap site makes its fallback classes live — for unresolved reflection,
+`Unsafe` and constructor handles the classes the code can name at run time (class literals, class-name strings,
+annotated classes, field/parameter/return types), for an unknown ServiceLoader service every registered provider,
+for `-roots all` every concrete subtype of a root's reference parameter; a dynamic or container proxy creates no
+class of the input. Reachable `Unsafe`/constructor-handle sites are model gaps of `NOT_REACHABLE` findings.
+Fewer edges or fewer `REACHABLE` results are not by themselves an improvement: compare with a CHA run
+(`-graph-out`/`-graph-compare`).
+
+- **Reachable methods:** {{.ReachableMethods}}
+- **Live classes:** {{.LiveClasses}} ({{.FallbackClasses}} only by the unknown-allocation fallback)
+- **CHA edges:** {{.CHAEdgesRemoved}} of {{.CHAEdgesBefore}} removed; {{.CHAEdgesFallback}} kept only because of fallback classes
+- **Active unknown-allocation gaps:** {{.GapText}}
+
 {{end}}## Withdrawn advisories
 
 Advisories whose every OSV source record is withdrawn are not analyzed (CVE:F2). A withdrawn

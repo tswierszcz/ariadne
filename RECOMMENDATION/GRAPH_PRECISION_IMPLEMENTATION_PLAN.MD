@@ -1,6 +1,6 @@
 # Precyzja grafu — fazy P0–P4
 
-Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md); katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md); katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2 DONE (2026-11-08: opt-in `-callgraph-mode rta`, punkt stały `p2-1`, fallback nieznanych alokacji, wyrocznia JVM `testdata/rta`); P3–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
 
 ## P0. Uczciwy baseline i tryby porównania — DONE (zarchiwizowane 2026-11-08)
 
@@ -17,7 +17,7 @@ luki dla niemodelowanych mechanizmów, wyrocznia JVM `testdata/alloc`; zobacz
 [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
-## P2. RTA i punkt stały
+## P2. RTA i punkt stały — DONE (2026-11-08)
 
 Zależności: P1, B3; początkowo ograniczony katalog modeli z jawnymi lukami.
 
@@ -28,6 +28,8 @@ Zależności: P1, B3; początkowo ograniczony katalog modeli z jawnymi lukami.
 - Udostępnić opt-in RTA, raportować fallbacki i wpływ na werdykty. `roots=all` i korzenie profilowe porównywać jako oddzielne scenariusze.
 
 Gotowe: fixtures z trzema implementacjami, pośrednią alokacją, cyklem i nieznaną fabryką zachowują wszystkie uzasadnione cele. P0–P2 to pierwsze wydanie precyzji grafu.
+
+Wykonano (2026-11-08): `internal/callgraph/rta.go` — strategia `rta` (zbiór kandydatów CHA przy budowie), `ApplyRTA` po dodaniu wszystkich krawędzi modeli: kolejka osiągalnych metod, klasy żywe z pochodzeń katalogu P1 (kontener i klasy wejść od startu), krawędzie CHA czekające na typ (indeks po klasie deklarującej — nowy typ budzi tylko swoje cele), decyzja po dokładnym deskryptorze i `ResolveExact`; wynik niezależny od kolejności (`TestRTAOrderIndependent`). Polityka `cha-fallback-with-gap`: osiągalna luka ożywia klasy fallbacku (refleksja/`Unsafe`/uchwyt konstruktora: klasy nazywalne w czasie działania — literały klas i stałe-nazwy `classfile.NamedClasses`, klasy z adnotacją, typy pól/parametrów/wyników; nieznana usługa: zarejestrowani providerzy; `-roots all`: podtypy parametrów korzeni; proxy: brak klas wejścia), krawędzie zachowane tylko przez fallback liczone osobno, `Unsafe`/uchwyty jako luki modelu `allocation`. Raport „RTA”, v2 `callgraph.rta`. Wyrocznia JVM `testdata/rta` (`TestRTAOracle`), porównanie z CHA na petclinic/WebGoat w obu scenariuszach korzeni. Szczegóły: IMPLEMENTATION_STATUS, wpis GRAPH_PRECISION:P2.
 
 ## P3. Ograniczona analiza points-to
 

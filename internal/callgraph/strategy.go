@@ -20,8 +20,8 @@ const (
 	ModeCHA = "cha"
 )
 
-// Modes lists the implemented modes.
-var Modes = []string{ModeCHA}
+// Modes lists the implemented modes (ModeRTA: rta.go).
+var Modes = []string{ModeCHA, ModeRTA}
 
 // Unknown-allocation policies (GRAPH_PRECISION P0 contract). A strategy
 // that narrows dispatch by the types it knows can be created (RTA) must
@@ -31,9 +31,10 @@ const (
 	// PolicyAllSubtypes: dispatch is never narrowed by allocations, so
 	// nothing depends on knowing them (CHA).
 	PolicyAllSubtypes = "all-subtypes"
-	// PolicyCHAFallbackWithGap (reserved for RTA, P2): at a call whose
-	// receiver may be created by an unmodeled mechanism, keep the CHA set
-	// for that site and record the site as a gap that limits a negative
+	// PolicyCHAFallbackWithGap (RTA, P2): a class an unmodeled mechanism
+	// may create keeps the CHA targets it dispatches to (the mechanism's
+	// fallback classes become live when its site is reachable), and the
+	// site is recorded as an active gap that limits a negative
 	// (NOT_REACHABLE) result — never drop the targets silently.
 	PolicyCHAFallbackWithGap = "cha-fallback-with-gap"
 )
@@ -120,6 +121,8 @@ func StrategyFor(mode string) (Strategy, error) {
 	switch mode {
 	case "", ModeCHA:
 		return CHA{}, nil
+	case ModeRTA:
+		return RTA{}, nil
 	}
 	return nil, fmt.Errorf("unknown call-graph mode %q (implemented: %s)", mode, strings.Join(Modes, ", "))
 }

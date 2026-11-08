@@ -64,6 +64,7 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool, targetJava int) 
 			Fields:            cf.Fields,
 			Annotations:       cf.Annotations,
 			AnnotationDetails: cf.AnnotationDetails,
+			NamedClasses:      cf.NamedClasses(),
 			SourceJar:         jarPath,
 			SourceEntry:       sel.file.Name,
 			VariantVersion:    sel.variant,

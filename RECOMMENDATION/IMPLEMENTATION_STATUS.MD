@@ -22,13 +22,104 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
-| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2–P4: UNASSESSED | P1: katalog typów tworzonych `internal/alloc` (`p1-1`, tylko raport) z pochodzeniem i miejscami oraz lukami, wyrocznia JVM `testdata/alloc`; graf i werdykty bez zmian. Następny: P2 (RTA i punkt stały, opt-in `-callgraph-mode rta`). Szczegóły we wpisie GRAPH_PRECISION:P1. |
+| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08); P3–P4: UNASSESSED | P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### GRAPH_PRECISION:P2 — RTA i punkt stały — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** opt-in `-callgraph-mode rta`
+  z polityką `cha-fallback-with-gap` ustaloną w P0, na katalogu P1;
+  fixtures z trzema implementacjami, pośrednią alokacją, cyklem i nieznaną
+  fabryką; porównanie z CHA przez `-graph-compare`, `-roots profile` i
+  `-roots all` jako osobne scenariusze. Domyślny tryb (`cha`) bez zmian.
+  Gałąź `graph-precision-p2` od `archive-graph-precision-p1` (PR #18).
+- **Zrealizowane:**
+  1. `internal/callgraph/rta.go` (`RTAVersion = "p2-1"`): strategia
+     `RTA` (przy budowie zbiór kandydatów CHA, w metadanych tryb `rta` i
+     polityka `cha-fallback-with-gap`); `ApplyRTA(g, h, RTAInputs)` —
+     punkt stały: kolejka osiągalnych metod (krawędzie inne niż CHA
+     zawsze przechodzone), klasy żywe z `Creation` (miejsce-metoda albo
+     od startu), cele CHA bez żywej klasy parkowane w indeksie po klasie
+     deklarującej i budzone przy ożywieniu klasy-potomka (przodkowie
+     klasy), decyzja: istnieje żywa klasa `C` z `ResolveExact(C, nazwa,
+     deskryptor)` = klasa celu. Na końcu każdy odrębny cel CHA oceniany
+     raz wobec końcowego zbioru żywych klas (`created` > `fallback` >
+     brak); krawędzie bez żywej klasy usuwane, zachowane tylko przez
+     fallback liczone. `RTAResult`: metody osiągalne, klasy żywe (w tym
+     tylko przez fallback), krawędzie CHA przed/usunięte/przez fallback,
+     aktywne luki wg rodzaju.
+  2. `internal/classfile/names.go` (`NamedClasses`: literały klas
+     `ldc`/`ldc_w` i stałe tekstowe w postaci nazwy binarnej klasy),
+     `hierarchy.ClassInfo.NamedClasses`.
+  3. `cmd/ariadne/rta.go`: tłumaczenie katalogu (pochodzenia → `Creation`;
+     `<container>`/miejsce spoza grafu → od startu; luki →
+     `UnknownCreation` z fallbackiem: `reflection-unresolved`/`unsafe`/
+     `constructor-handle` → `nameableClasses` (nazwane w kodzie, z
+     adnotacją klasy poza `kotlin.Metadata`, typy pól/parametrów/wyników;
+     tylko klasy konkretne), `service-unresolved` → zarejestrowani
+     providerzy, `external-input` → konkretne podtypy typów parametrów
+     korzeni, proxy → brak); `rtaGapSites` (`Unsafe`/uchwyty konstruktora
+     jako luki modelu `allocation`, nieograniczone). `main.go`: katalog
+     liczony przed silnikiem osiągalności (w trybie CHA bez wpływu), RTA
+     po koordynatorze modeli, log, raport „RTA”, v2 `callgraph.rta`;
+     opis flagi.
+  4. `testdata/rta` + `scripts/rta-oracle.sh` (javac + JVM; zasób
+     `META-INF/services`) → `rta.jar`, `observed.txt` (9 ciał metod).
+- **Weryfikacja:** `TestRTAOracle` (pełne CLI, bez JDK): każde ciało
+  uruchomione przez JVM osiągalne z `main` w grafie RTA poza `Unnamed#area`
+  (klasa z fabryki refleksyjnej o nazwie budowanej w czasie działania —
+  oczekiwana strata pokryta aktywną luką `reflection-unresolved`);
+  usunięte dokładnie 3 krawędzie CHA (`Ghost` — nigdy nie tworzony,
+  `Hidden` — tworzony w nieosiąganej metodzie, `Unnamed`), `Dynamic`
+  (z adnotacją) zachowany przez fallback; cykl `StepA`↔`StepB` z `StepC`
+  tworzonym dopiero w `StepB#go` zachowany; provider ServiceLoadera
+  zachowany; `-roots all`: 0 usuniętych, aktywna luka `external-input`.
+  Mutacje: pominięcie alokacji odkrytych w trakcie (5 ciał traconych) i
+  pominięcie natychmiastowego sprawdzenia dispatchu (`StepC` tracony) —
+  test zawodzi. `TestRTAOrderIndependent` (5 permutacji kreacji, korzeni
+  i kolejności krawędzi → identyczny wynik i graf), `TestRTAFallbackAndGap`,
+  `TestNameableClasses`, `TestStrategyForRTA`. Real data (offline,
+  `-profile spring`, `-graph-compare` z grafem CHA tej samej gałęzi):
+  petclinic `-roots profile`: 83 421 metod osiągalnych, 15 818 klas żywych
+  (7 562 tylko przez fallback), usunięte 52 561 z 310 418 krawędzi CHA
+  (50 305 zachowanych tylko przez fallback); werdykty FRAMEWORK 71 → 65,
+  NOT_REACHABLE 16 → 22: CVE-2022-45143 (`JsonErrorReportValve`),
+  CVE-2025-55752 i CVE-2026-53404 (`RewriteValve`), CVE-2026-55957
+  (`JNDIRealm`) — komponenty Tomcata tworzone tylko z `server.xml`,
+  którego Spring Boot petclinic nie używa; CVE-2024-22259 (`CorsWebFilter`)
+  i CVE-2024-38809 (`ChannelSendOperator`) — stos reaktywny nieużywany
+  przez aplikację servlet MVC; wszystkie 6 z `MODEL_INCOMPLETE` (luki
+  `allocation`, `reflection` i in.). `-roots all`: usunięte 6 113,
+  werdykty bez zmian. WebGoat `-roots profile`: usunięte 95 378 z 556 769
+  (178 188 przez fallback), FRAMEWORK 51 → 49 (CVE-2021-22118 i
+  CVE-2024-38809 — stos reaktywny), `-roots all`: 14 823, werdykty bez
+  zmian. Żaden REACHABLE nie zmieniony w żadnym scenariuszu. Czas
+  przejścia RTA 0,6–1,3 s (całość: petclinic 18 → 21–22 s, WebGoat
+  27–30 → 31–33 s). Dwa przebiegi RTA: `-graph-out` bajtowo identyczny,
+  v2 identyczne poza `comparison`. `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz RTA and points-to →
+  Partial), README (sekcja 4, `-callgraph-mode`, skrypt wyroczni), FAQ
+  (dlaczego RTA jest opt-in), `docs/RESULTS_CONTRACT.MD` (`callgraph.rta`,
+  luka `allocation`), szablon raportu, PLAN.md (Faza 7 i backlog),
+  plan GRAPH_PRECISION, ten rejestr, skill catch-up.
+- **Ograniczenia:** fallback jest heurystyką z uzasadnieniem, nie dowodem:
+  klasa tworzona refleksyjnie i nazwana tylko w zasobie/konfiguracji
+  (np. zawór Tomcata w `server.xml`) albo tylko w sygnaturze generycznej
+  nie jest żywa — luka oznacza negatyw `MODEL_INCOMPLETE`, nie przywraca
+  krawędzi; fallback jest globalny (klasy, nie miejsca wywołań); krawędzie
+  bezpośrednie do implementacji w nadklasie nie są zawężane; usuwane są
+  też krawędzie do abstrakcyjnych deklaracji (nie prowadzą dalej);
+  z `-roots all` RTA usuwa niewiele (każda metoda jest korzeniem).
+  Domyślny tryb pozostaje CHA — zmiana domyślnej strategii to osobna
+  decyzja po P4.
+- **Następny krok (wymaga zgody):** GRAPH_PRECISION:P3 — ograniczona
+  analiza points-to (DATA_FLOW D3), albo P4 — benchmark i kwalifikacja
+  (pomiar błędnych/pominiętych celów, decyzja o domyślnej strategii).
 
 ### GRAPH_PRECISION:P1 — katalog typów tworzonych jawnie i pośrednio — DONE (2026-11-08)
 

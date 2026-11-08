@@ -130,7 +130,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.snapshotIn, "snapshot-in", "", "replay a data snapshot: every lookup is answered from it (no cache, no network); inputs, analyzer and algorithm versions must match it")
 	fs.StringVar(&cfg.snapshotCompare, "snapshot-compare", "", "compare this run with an earlier snapshot: list the advisories whose derived results were invalidated, and why")
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
-	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0): "cha" (class hierarchy analysis, the default and today's only mode)`)
+	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback)`)
 	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
 	fs.StringVar(&cfg.graphCompare, "graph-compare", "", "compare this run's call graph with one written earlier by -graph-out: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any difference in the graph settings")
 	fs.BoolVar(&cfg.taint, "taint", false, "DATA_FLOW D4 (opt-in, report-only): assess whether request data (Spring MVC/JAX-RS handler parameters, ServletRequest accessors) reaches the data each deserialization entry reads; adds a taint result per entry, never changes a verdict")
@@ -963,6 +963,34 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		warnings = append(warnings, "model analysis: "+reason)
 		modelGapReasons = append(modelGapReasons, reason)
 	}
+	// GRAPH_PRECISION P1: the catalog of created types, over the final
+	// graph (every model edge added) and the models' facts. Report-only
+	// in CHA mode; in RTA mode (P2) it feeds the fixed point below.
+	allocCatalog := alloc.Build(allocInputs(h, g, cfg, roots, springBeanNames, springBeanMethods, springRepositoryBeans,
+		deserJava, deserXStream, deserSites, svcLoadSites, reflectNewInstanceSites, reflectNewInstanceEdgeTargets))
+	allocSummary := alloc.Summarize(allocCatalog, g)
+	log("created types (GRAPH_PRECISION P1, %s): %d classes (%s; %d only through a model), %d lambda sites, gaps: %s; %d of %d CHA edges lead to a class not in the catalog (informational)",
+		alloc.CatalogVersion, allocSummary.Types, report.GapCounts(allocSummary.ByOrigin), allocSummary.OnlyModeled, allocSummary.Lambdas,
+		report.GapCounts(allocSummary.Gaps), allocSummary.CHATargetsNotCreated, allocSummary.CHATargets)
+
+	// GRAPH_PRECISION P2 (opt-in -callgraph-mode rta): narrow the CHA
+	// edges to the classes created by reachable code, after every model
+	// edge is in and before reachability is analyzed.
+	var rtaResult *callgraph.RTAResult
+	if strategy.Mode() == callgraph.ModeRTA {
+		rtaStart := time.Now()
+		providers := []string{}
+		for _, r := range svcRegs {
+			providers = append(providers, r.ProviderClass)
+		}
+		sort.Strings(providers)
+		res := callgraph.ApplyRTA(g, h, rtaInputs(h, g, allocCatalog, roots, providers))
+		rtaResult = &res
+		log("RTA (GRAPH_PRECISION P2, %s): %d reachable methods, %d live classes (%d only by the unknown-allocation fallback); %d of %d CHA edges removed, %d kept only by the fallback; active unknown-allocation gaps: %s; in %s",
+			res.Version, res.ReachableMethods, res.LiveClasses, res.FallbackClasses, res.CHAEdgesRemoved, res.CHAEdgesBefore, res.CHAEdgesFallback,
+			report.GapCounts(res.ActiveGaps), time.Since(rtaStart).Round(time.Millisecond))
+	}
+
 	var engine *reach.Engine
 	if cfg.roots == "profile" {
 		log("roots: profile %q (%d entry-point methods, %d from web.xml)", prof.Name, len(roots), webXMLRootCount)
@@ -977,6 +1005,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		loadSites: svcLoadSites, consumptions: svcConsumptionSites, registrations: svcRegs,
 		deserialization: deserSites,
 	})
+	if rtaResult != nil {
+		gapSites = append(gapSites, rtaGapSites(allocCatalog)...)
+	}
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
 	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)
@@ -1102,15 +1133,6 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
 	}
-	// GRAPH_PRECISION P1: the catalog of created types (report-only; no
-	// edge or verdict changes), over the final graph and the models' facts.
-	allocCatalog := alloc.Build(allocInputs(h, g, cfg, roots, springBeanNames, springBeanMethods, springRepositoryBeans,
-		deserJava, deserXStream, deserSites, svcLoadSites, reflectNewInstanceSites, reflectNewInstanceEdgeTargets))
-	allocSummary := alloc.Summarize(allocCatalog, g)
-	log("created types (GRAPH_PRECISION P1, %s): %d classes (%s; %d only through a model), %d lambda sites, gaps: %s; %d of %d CHA edges lead to a class not in the catalog (informational)",
-		alloc.CatalogVersion, allocSummary.Types, report.GapCounts(allocSummary.ByOrigin), allocSummary.OnlyModeled, allocSummary.Lambdas,
-		report.GapCounts(allocSummary.Gaps), allocSummary.CHATargetsNotCreated, allocSummary.CHATargets)
-
 	// GRAPH_PRECISION P0: the final graph (every model edge added) with
 	// the findings' paths, for -graph-out and -graph-compare.
 	var graphFindings []callgraph.FindingPath
@@ -1175,7 +1197,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
 		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(cfg.taint)}
 	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(cfg.graphCompare)
-	data.CreatedTypes, data.CreatedTypeGaps = &allocSummary, allocCatalog.Gaps
+	data.CreatedTypes, data.CreatedTypeGaps, data.RTA = &allocSummary, allocCatalog.Gaps, rtaResult
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
@@ -1197,7 +1219,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
 		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
-		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary},
+		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult},
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
