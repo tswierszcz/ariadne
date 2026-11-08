@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
@@ -39,8 +40,8 @@ type snapshotRun struct {
 	config   map[string]string
 }
 
-func algorithmVersions() map[string]string {
-	return map[string]string{
+func algorithmVersions(mode string) map[string]string {
+	v := map[string]string{
 		"callgraph.builder":      callgraph.BuilderVersion,
 		"reach.engine":           reach.EngineVersion,
 		"vulnmap.resolver":       vulnmap.ResolverVersion,
@@ -58,6 +59,14 @@ func algorithmVersions() map[string]string {
 		// DATA_FLOW D4: the taint sources, guards and rules (-taint).
 		"taint.catalog": taint.CatalogVersion,
 	}
+	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
+	// point decide edges, so their rule versions are part of the
+	// derivation (CHA: report-only, left out so CHA snapshots don't churn).
+	if mode == callgraph.ModeRTA {
+		v["alloc.catalog"] = alloc.CatalogVersion
+		v["callgraph.rta"] = callgraph.RTAVersion
+	}
+	return v
 }
 
 func toolInfo() snapshot.Tool {
@@ -92,7 +101,7 @@ func analysisConfig(cfg config) map[string]string {
 }
 
 func newSnapshotRun(cfg config) (*snapshotRun, error) {
-	sr := &snapshotRun{tool: toolInfo(), algos: algorithmVersions(), config: analysisConfig(cfg)}
+	sr := &snapshotRun{tool: toolInfo(), algos: algorithmVersions(cfg.callgraphMode), config: analysisConfig(cfg)}
 	if cfg.snapshotOut != "" {
 		r, err := snapshot.NewRecorder(cfg.snapshotOut)
 		if err != nil {

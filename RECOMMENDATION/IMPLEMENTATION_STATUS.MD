@@ -22,13 +22,91 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
-| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P3–P4: UNASSESSED | P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
+| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08); P3: UNASSESSED (nieuzasadnione wynikami P4) | P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### GRAPH_PRECISION:P4 — benchmark i kwalifikacja — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** pomiar CHA vs RTA na fixtures z
+  wyrocznią JVM i na petclinic/WebGoat w obu scenariuszach korzeni: błędne
+  i pominięte cele, nieznane miejsca, zmiany werdyktów CVE, czas, pamięć;
+  wersje reguł w snapshotach; ręczny opis każdej zmiany werdyktu; decyzja
+  o domyślnej strategii; dokumentacja migracji. P3 (points-to) odłożone do
+  decyzji po wynikach. Gałąź `graph-precision-p4` od `main` (`2082ff7`).
+- **Zrealizowane:**
+  1. `scripts/graph-benchmark.sh`: na konfigurację `--repeat` mierzonych
+     przebiegów bez pliku grafu (czas ścienny i szczytowe RSS procesu przez
+     `os.wait4`) i jeden niemierzony z `-graph-out` (CHA) /
+     `-graph-compare` (RTA); każda liczba poza czasem/pamięcią musi być
+     identyczna we wszystkich przebiegach. Zbiera z v2 i logu: rozmiar
+     grafu, krawędzie CHA (usunięte / tylko przez fallback), klasy żywe,
+     aktywne luki alokacji, katalog, miejsca luk modelu (wszystkie /
+     osiągalne), werdykty v1, porównanie z CHA. Wynik:
+     `testdata/graphbench/{results.tsv,verdict-changes.tsv,versions.txt}`.
+     Pierwsza wersja liczyła odczyt ~350 MB pliku grafu do kosztu RTA
+     (+1 GB RSS) — stąd rozdzielenie pomiaru i porównania.
+  2. `cmd/ariadne/graphbench_test.go` (`TestGraphBenchmarkFixtures`): dla
+     `testdata/callgraph` i `testdata/rta` — ciała śledzone (wołające
+     helper śladu) uruchomione przez JVM, a nieosiągnięte (pominięte) i
+     osiągnięte, a nieuruchomione (nadmiarowe); asercje: CHA nic nie gubi,
+     RTA gubi tylko udokumentowany `Unnamed#area`, nadmiar RTA ⊆ nadmiar CHA.
+  3. `cmd/ariadne/snapshot.go`: `algorithmVersions(mode)` — w trybie `rta`
+     także `alloc.catalog` i `callgraph.rta` (CHA bez zmian, żeby nie
+     unieważniać snapshotów CHA); `TestSnapshotAlgorithmsRTA`.
+  4. `testdata/graphbench/RESULTS.MD`: wyniki, ręczna kontrola każdej
+     zmiany werdyktu (skan bytecode wszystkich jarów po nazwach z `/` i
+     `.`, BFS po wyeksportowanych grafach), decyzja, migracja.
+- **Wyniki:** fixtures — `callgraph` 13/13 obserwowanych w obu trybach, 0
+  nadmiarowych; `rta` przy `-roots profile` CHA 0 pominiętych / 2 nadmiarowe
+  (`Ghost`, `Hidden`), RTA 1 pominięte (`Unnamed`, luka aktywna) / 0
+  nadmiarowych; przy `-roots all` oba 0 / 2. Aplikacje (3 przebiegi):
+  petclinic CHA 13,5–17,9 s / 1335–1394 MB, RTA 13,9–14,7 s / 1315–1435 MB;
+  WebGoat CHA 23,1–23,4 s / 1772–1829 MB, RTA 23,8–24,3 s / 1776–1819 MB.
+  `-roots profile`: usunięte 52 561 z 310 418 (petclinic) i 95 378 z
+  556 769 (WebGoat) krawędzi CHA, z zachowanych 50 305 / 178 188 tylko przez
+  fallback; osiągalne miejsca luk 596 → 532 / 676 → 590; `-roots all`:
+  6 113 / 14 823 usuniętych, werdykty bez zmian. Zmiany werdyktów
+  (FRAMEWORK → NOT_REACHABLE, wszystkie z `MODEL_INCOMPLETE`):
+  CVE-2022-45143, CVE-2025-55752, CVE-2026-53404, CVE-2026-55957
+  (petclinic; zawory/realm Tomcata — żadna klasa wejścia ich nie tworzy poza
+  `MBeanFactory#createJNDIRealm`, operacją JMX) i CVE-2021-22118 (WebGoat;
+  reaktywny multipart w aplikacji servlet) — poprawne; CVE-2024-22259
+  (petclinic; ścieżka CHA przez nieużywany `CorsWebFilter`, ścieżka
+  servletowa niewidoczna w obu trybach) — nierozstrzygnięta;
+  CVE-2024-38809 (oba) — fałszywie negatywne: `ResourceHttpRequestHandler#
+  handleRequest` → `ServletWebRequest#checkNotModified(J)` →
+  `validateIfNoneMatch` wykonuje się przy każdym żądaniu zasobu
+  statycznego, ale `ApplicationFilterChain#internalDoFilter` →
+  `javax.servlet.Servlet#service` nie jest rozwijane (skip `javax.`), więc
+  `DispatcherServlet` jest nieosiągalny w obu trybach, a RTA usunęło
+  artefakt (reaktywny `WriteBarrier` → servletowy
+  `DeferredResultSubscriber#onNext`), który trzymał CHA na FRAMEWORK.
+  Żaden REACHABLE nie zmieniony.
+- **Decyzja:** domyślna strategia pozostaje CHA; RTA opt-in jako druga
+  opinia z `-roots profile` i `-graph-compare`. Ponowna ocena po
+  zamodelowaniu dispatchu kontener → servlet/filter. Points-to (P3)
+  nieuzasadnione: o większości zachowanych krawędzi decyduje fallback
+  (refleksja), nie precyzja dispatchu.
+- **Weryfikacja:** `scripts/graph-benchmark.sh --repeat 3` (zielony, 32
+  przebiegi), `TestGraphBenchmarkFixtures`, `TestSnapshotAlgorithmsRTA`,
+  `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `testdata/graphbench/RESULTS.MD`, `docs/SUPPORT.MD`
+  (wiersz RTA and points-to: benchmark, decyzja, ograniczenie skip),
+  README (sekcja 4, skrypt), plan GRAPH_PRECISION, ten rejestr.
+- **Ograniczenia:** dwie aplikacje Spring, jeden profil; czas/pamięć z
+  jednej maszyny (3 przebiegi, zakres min–max); bez zewnętrznego silnika
+  referencyjnego; „nadmiarowe” na fixtures to ciała nieuruchomione w tym
+  przebiegu, nie dowiedzione błędne.
+- **Następny krok (wymaga zgody):** zamodelowanie dispatchu kontener →
+  servlet/filter (ograniczony wyjątek od skip `javax.`/`jakarta.` dla
+  `Servlet#service`/`Filter#doFilter` do zarejestrowanych servletów i
+  filtrów — FRAMEWORKS/JVM_GRAPH), potem ponowny benchmark; P3 dopiero gdy
+  pomiar to uzasadni.
 
 ### GRAPH_PRECISION:P2 — RTA i punkt stały — DONE (2026-11-08)
 
