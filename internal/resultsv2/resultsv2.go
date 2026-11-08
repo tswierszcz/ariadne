@@ -7,6 +7,7 @@
 package resultsv2
 
 import (
+	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
 	"crypto/sha256"
 	"encoding/hex"
@@ -60,6 +61,9 @@ type CallGraph struct {
 	Nodes      int                   `json:"nodes"`
 	Edges      int                   `json:"edges"`
 	Comparison *callgraph.Comparison `json:"comparison,omitempty"`
+	// CreatedTypes (GRAPH_PRECISION P1): the created-type catalog,
+	// summarized (the full list is in -graph-out).
+	CreatedTypes *alloc.Summary `json:"created_types,omitempty"`
 }
 
 // Tool identifies the analyzer build.

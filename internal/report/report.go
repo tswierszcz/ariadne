@@ -4,6 +4,7 @@
 package report
 
 import (
+	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
 	"fmt"
 	"sort"
@@ -172,7 +173,11 @@ type Data struct {
 	// run's call graph differs from GraphCompareFile; nil without it.
 	GraphComparison  *callgraph.Comparison
 	GraphCompareFile string
-	Deserialization  *Deserialization
+	// CreatedTypes/CreatedTypeGaps (GRAPH_PRECISION P1): the catalog of
+	// created classes, summarized, and its gaps.
+	CreatedTypes    *alloc.Summary
+	CreatedTypeGaps []alloc.Gap
+	Deserialization *Deserialization
 
 	// CallbackRegistrationSites is ASYNC_CALLBACKS A0's own inventory:
 	// every call site matching (or nearly matching) a cataloged

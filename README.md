@@ -232,7 +232,18 @@ header and recorded in v2 (`callgraph`), and two graphs are compared edge
 by edge with `-graph-out` / `-graph-compare`: by identity, not by size,
 with the findings whose verdict or path changed and the edges that explain
 it. Fewer edges or fewer REACHABLE results are not by themselves an
-improvement. Checked against the real JVM on
+improvement. **Created types (P1):** every run also catalogs the classes
+the input may create — by `new`, as a ServiceLoader provider, through a
+resolved reflective constructor, as a Spring bean, as a deserialization
+candidate, or as the class of an entry point — each with the sites whose
+reachability creates it, plus the gaps where a class may be created by a
+mechanism the catalog does not model (dynamic proxies, unresolved
+reflection, `Unsafe`, constructor handles, unknown services,
+container-generated repositories, and with `-roots all` the root methods'
+parameters). Report-only for now ("Created types" section, v2
+`callgraph.created_types`, the class list in `-graph-out`); RTA (P2) will
+use it. Checked against the real JVM on `testdata/alloc`
+(`scripts/alloc-oracle.sh`). Checked against the real JVM on
 `testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
 method, generic and covariant bridges, an inherited body, a super call).
 
@@ -870,7 +881,7 @@ Flags:
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
 | `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0): `cha` (the default and, for now, only mode). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
-| `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings and the findings' paths — as sorted text (`ariadne-callgraph-1`; large: ≈ 370 MB for WebGoat). |
+| `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings, the findings' paths and the created-type catalog (GRAPH_PRECISION P1) — as sorted text (`ariadne-callgraph-2`; large: ≈ 370 MB for WebGoat). |
 | `-graph-compare` | no | Compare this run's graph with a `-graph-out` file: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any settings difference (report "Call graph compared with …", v2 `callgraph.comparison`). |
 | `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
 | `-out` | yes | `report.md` output path. |
@@ -1054,6 +1065,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/prepare-taint-demo.sh       /path/to/jdk11-or-later/JAVA_HOME # request data → deserialization entries, -taint control case
 ./scripts/taint-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for the -taint fixture (testdata/taint/oracle)
 ./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
+./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 
