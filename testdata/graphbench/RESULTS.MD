@@ -62,6 +62,19 @@ in either mode.
 
 ## Real applications
 
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| petclinic | profile | cha | 17.3–18.2 | 1320–1435 | 996 446 | — | — | 678 of 1096 | 4 | 5 127 | 6/72/12/57/6 |
+| petclinic | profile | rta | 16.6–16.7 | 1350–1403 | 956 465 | 39 981 of 310 418 (35 374) | 17 106 (6 071) | 625 of 1097 | 4 | 5 127 | 6/68/16/57/6 |
+| petclinic | all | cha | 14.1–16.5 | 1363–1397 | 996 446 | — | — | 678 of 1096 | 4 | 5 127 | 6/72/12/57/6 |
+| petclinic | all | rta | 16.5–18.7 | 1380–1403 | 990 536 | 5 910 of 310 418 (59 454) | 21 835 (9 923) | 676 of 1097 | 4 | 5 127 | 6/72/12/57/6 |
+| WebGoat | profile | cha | 28.0–32.6 | 1783–1841 | 1 411 339 | — | — | 742 of 1194 | 0 | 1 843 | 42/52/9/61/0 |
+| WebGoat | profile | rta | 27.8–29.8 | 1774–1821 | 1 327 988 | 83 351 of 556 769 (158 682) | 25 211 (10 671) | 662 of 1201 | 0 | 1 843 | 42/50/11/61/0 |
+| WebGoat | all | cha | 27.2–29.8 | 1735–1802 | 1 411 344 | — | — | 743 of 1194 | 0 | 1 848 | 42/52/9/61/0 |
+| WebGoat | all | rta | 27.8–32.8 | 1756–1795 | 1 396 558 | 14 786 of 556 769 (101 407) | 32 210 (13 181) | 745 of 1201 | 0 | 1 848 | 42/52/9/61/0 |
+
+<details><summary>Before the service-provider dispatch model (servlet dispatch only, analyzer <code>9a460a6</code>)</summary>
+
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|
 | petclinic | profile | cha | 15.2–15.8 | 1381–1411 | 991 340 | — | — | 606 of 1096 | 4 | 3/74/13/57/6 |
@@ -72,6 +85,8 @@ in either mode.
 | WebGoat | profile | rta | 23.8–25.8 | 1766–1798 | 1 314 196 | 95 378 of 556 769 (178 188) | 24 398 (11 752) | 590 of 1201 | 0 | 42/49/12/61/0 |
 | WebGoat | all | cha | 23.1–23.8 | 1766–1797 | 1 409 575 | — | — | 677 of 1194 | 0 | 42/51/10/61/0 |
 | WebGoat | all | rta | 24.0–25.1 | 1772–1817 | 1 394 752 | 14 823 of 556 769 (122 892) | 32 123 (13 998) | 680 of 1201 | 0 | 42/51/10/61/0 |
+
+</details>
 
 <details><summary>P4 baseline (analyzer <code>a64edf7</code>, without the servlet dispatch model)</summary>
 
@@ -88,19 +103,20 @@ in either mode.
 
 </details>
 
-- **Cost:** RTA adds about 0–1 s; peak memory is within run-to-run noise. The servlet
-  dispatch model's own cost is not measurable against run-to-run variation (petclinic CHA
-  15.2–15.8 s vs 13.5–17.9 s in P4).
-- **Edges:** `-roots profile` removes 16% (petclinic) / 17% (WebGoat) of the CHA edges; `-roots
+- **Cost:** RTA adds about 0–2 s; peak memory is within run-to-run noise. The machine was
+  busier during this run (load average ~5) than for the tables below, so absolute times are
+  not comparable across tables; measured back to back on WebGoat, the service-provider
+  dispatch model's own cost is 0.6–2 s, inside the main analyzer's own spread (23.5–27.2 s).
+- **Edges:** `-roots profile` removes 13% (petclinic) / 15% (WebGoat) of the CHA edges; `-roots
   all` 2–3%. No CHA edge is ever added by RTA. Under RTA, 1 (petclinic) / 7 (WebGoat) more gap
   sites exist — the `Unsafe`/constructor-handle `allocation` gaps RTA introduces.
 - **Unknown sites:** the fallback carries a large share of what RTA keeps (in `-roots
-  profile`, 48 701 of the 260 893 CHA edges kept on petclinic, 178 188 of 461 391 on
-  WebGoat): most of the narrowing RTA could do is given back to unresolved reflection
-  (130–159 reachable sites).
+  profile`, 35 374 of the 270 437 CHA edges kept on petclinic, 158 682 of 473 418 on
+  WebGoat): most of the narrowing RTA could do is given back to unresolved reflection.
 - **Verdicts:** `-roots all` (the default roots) changes no verdict in either app. `-roots
   profile` moves 4 (petclinic) and 2 (WebGoat) findings from `FRAMEWORK` to
-  `NOT_REACHABLE`, all carrying `MODEL_INCOMPLETE`. No `REACHABLE` result changes anywhere.
+  `NOT_REACHABLE`, all carrying `MODEL_INCOMPLETE` — the same findings as before the
+  service-provider dispatch model. No `REACHABLE` result changes anywhere.
 
 ## Servlet container dispatch (model `servlet-container:dispatch`, `s1`)
 
@@ -146,6 +162,36 @@ profile` with RTA, all through the request path; none is a known false positive,
 `REACHABLE` result changes (the `FRAMEWORK`/`REACHABLE` split is unchanged: the new paths
 run entirely through framework code). The petclinic RTA-vs-CHA changes drop from 6 to 4 (the
 four Tomcat valve/realm findings, still correct).
+
+## Service-provider dispatch (model `service-provider:dispatch`, `p1`)
+
+Found by a runtime trace (RUNTIME_NATIVE N1): on petclinic the JVM ran
+`HibernateValidator#buildValidatorFactory` (called by Hibernate's
+`AbstractConfigurationImpl#buildValidatorFactory` through
+`javax.validation.spi.ValidationProvider`, a skipped receiver) while the graph stopped there.
+The model expands calls on a skipped interface that is a registered `META-INF/services` service
+(to its registered providers) or a product of one (an interface of the same API family reached
+through the service's return types; to implementations in the providers' jars) — see the README.
+
+**Catalog.** petclinic: 8 skipped service interfaces with registered providers, 1 096 call
+signatures, 5 127 model edges in total (servlet dispatch included); WebGoat: 11 services,
+1 105 signatures, 1 843–1 848 model edges. Families on petclinic include Bean Validation
+(`javax.validation`, Hibernate Validator), JDBC (`java.sql`, H2 and MySQL drivers) and JCache
+(`javax.cache`, Ehcache). A first version that took every interface of the family (not only
+products) also sent `javax.servlet` calls to spring-web's servlet classes — a family brought
+in by `ServletContainerInitializer`, which hands nothing out — and turned CVE-2021-22118 into a
+false `FRAMEWORK`; the return-type closure removed it.
+
+**Verdict changes against the analyzer without the model** (same input, `-roots all`, CHA,
+`-graph-compare`; identical under `-roots profile` and RTA), each checked against a JFR
+recording of petclinic with exact entries (`jdk.MethodTrace`) of the methods involved:
+
+| App | Advisory | Change | New edge on the path | Runtime check | Verdict |
+|---|---|---|---|---|---|
+| petclinic, WebGoat | CVE-2025-35036 (Hibernate Validator) | `NOT_REACHABLE` → `FRAMEWORK` | `MessageInterpolatorFactory#getObject` → `AbstractConfigurationImpl#getDefaultMessageInterpolator` (a `javax.validation.Configuration` product) | `HibernateValidator#buildValidatorFactory` entered 3 times at startup; the advisory's mapped methods entered (26 exact entries in the vulnerable-method recording) | **correct**: a static false negative removed |
+| petclinic | CVE-2021-46877, CVE-2022-45868, CVE-2023-6378 | `FRAMEWORK` → `REACHABLE` | `CacheConfiguration#lambda$petclinicCacheConfigurationCustomizer$0` (application code) → `Eh107CacheManager#createCache` (a `javax.cache.CacheManager` product of Ehcache's `CachingProvider`) | `Eh107CacheManager#createCache` entered (the first hop is real); the rest of the path — Ehcache's disk store `FileBasedStateRepository#loadMaps` → deserialization → `NodeSerialization#readExternal` — is pre-existing CHA/deserialization over-approximation: 0 entries | first hop **correct**; the `REACHABLE` result is as plausible as the downstream path, i.e. not (petclinic's caches are heap-only) |
+
+No `REACHABLE` result is lost; RTA-versus-CHA changes are unchanged (the 4 + 2 above).
 
 ## Every verdict change, checked by hand
 

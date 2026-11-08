@@ -41,6 +41,7 @@ import (
 	"ariadne/internal/serviceload"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
+	"ariadne/internal/spidispatch"
 	"ariadne/internal/springxml"
 	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
@@ -993,11 +994,28 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	serviceload.RegisterModel(registry)
 	serviceload.RegisterDispatchModels(registry, svcConsumptionSites)
 	servletdispatch.Register(registry)
+	// Calls on a JDK/javax service-provider interface (a receiver CHA never
+	// expands) go to the providers registered for it in META-INF/services.
+	var spiRegs []spidispatch.Registration
+	for _, r := range svcRegs {
+		spiRegs = append(spiRegs, spidispatch.Registration{Service: r.Interface, Provider: r.ProviderClass, Source: r.SourceFile})
+	}
+	spiCatalog := spidispatch.Find(h, spiRegs, callgraph.DefaultSkip)
+	spidispatch.Register(registry, spiCatalog)
+	spiServices := 0
+	for range spiCatalog.Providers {
+		spiServices++
+	}
+	log("service-provider dispatch (%s %s): %d skipped service interfaces with registered providers, %d call signatures in the input (%d registrations of services CHA already expands, %d providers not in the input)",
+		spidispatch.ModelID, spidispatch.Version, spiServices, len(spiCatalog.Signatures), spiCatalog.NotSkipped, spiCatalog.ProviderMissing)
 	modelEvaluator := models.Router{
-		ByID:    map[string]models.Evaluator{servletdispatch.ModelID: servletdispatch.NewEvaluator(h, servletRegs, servletUnresolved)},
+		ByID: map[string]models.Evaluator{
+			servletdispatch.ModelID: servletdispatch.NewEvaluator(h, servletRegs, servletUnresolved),
+			spidispatch.ModelID:     spidispatch.NewEvaluator(h, spiCatalog),
+		},
 		Default: serviceModelEvaluator,
 	}
-	modelBudget := len(svcLoadSites) + 1 + servletdispatch.MaxChain
+	modelBudget := len(svcLoadSites) + 1 + servletdispatch.MaxChain + 2
 	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
 	if err != nil {
 		return fmt.Errorf("coordinating library models: %w", err)

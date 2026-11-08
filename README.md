@@ -348,6 +348,41 @@ through the real `javax.servlet` API; every observed body reached from
 `main`, the two unregistered classes never reached — before the model,
 none of the 5 observed bodies was reached).
 
+**A second bounded exception: JDK/javax service-provider interfaces.**
+A provider-based API — Bean Validation, JDBC, JCache — calls its provider
+through an interface in a skipped package (`javax.validation.spi.
+ValidationProvider#buildValidatorFactory`, `java.sql.Driver#connect`), and
+hands out further objects through other interfaces of the same API
+(`Configuration` → `ValidatorFactory` → `Validator`, `Connection` →
+`Statement` → `ResultSet`, `CacheManager` → `Cache`). The
+`service-provider:dispatch` model (`internal/spidispatch`, version `p1`, a
+B3 registry model with basis `model`) expands a call whose static receiver
+is such an interface:
+
+- a **registered service** (a `META-INF/services` file in the input for a
+  skipped interface) → to its registered providers present in the input;
+- a **product** of a service — an interface of the same API family (the
+  service's package without `.spi`) reached from the service through return
+  types of its methods, transitively — → to the implementations of that
+  interface found in the **jars of the registered providers** only.
+
+Each target is the method the JVM selects on that class. An interface the
+service does not hand out (a `ServletContainerInitializer` returns
+nothing) has no products, so the servlet API stays with the servlet model
+above. Not modeled: implementations outside the providers' jars,
+providers registered only through a module `provides`, and which provider
+a given call site really receives (the edges are "may run", like CHA's;
+a never-created class in a provider jar is a target too). The log line
+`service-provider dispatch (service-provider:dispatch p1): …` counts the
+services and call signatures. Found by a runtime trace: on petclinic the
+JVM ran Hibernate Validator's `HibernateValidator#buildValidatorFactory`
+while the graph stopped at the `ValidationProvider` call
+(CVE-2025-35036 was `NOT_REACHABLE`). Checked against the real JVM on
+`testdata/spidispatch` (`scripts/spidispatch-oracle.sh`: a `javax.*` SPI
+in its own jar, a registered provider and a product, an unregistered
+provider and a product implementation in another jar — every observed body
+reached, the other jar never a target).
+
 A call to a subtype's inherited (not overridden) method resolves to the
 class that actually supplies the body, not a dead-end node under the
 subclass's own name: `classfile.ExtractCalls` reports a Methodref's
@@ -1193,6 +1228,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
 ./scripts/runtime-trace-fixture.sh    /path/to/jdk25-or-later/JAVA_HOME # JFR-recorded runtime trace of testdata/runtime (rtm.jar, rtm-v2.jar, run.trace)
 ./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # write petclinic's vulnerable-method JFR settings, run it under JFR with them, send a fixed scenario, convert, import (java 25+ on PATH)
+./scripts/spidispatch-oracle.sh       /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for service-provider dispatch (testdata/spidispatch)
 ./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)

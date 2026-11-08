@@ -1,9 +1,9 @@
 app	roots	mode	wall_s	peak_rss_mb	nodes	edges	cha_edges	cha_removed	cha_kept_by_fallback	reachable_methods	live_classes	live_only_by_fallback	active_alloc_gaps	catalog_types	catalog_gaps	model_gap_sites	model_gap_sites_reachable	servlet_registrations	model_edges	R/F/NR/U/NA	edges_removed_vs_cha	edges_added_vs_cha	findings_changed_vs_cha	verdicts_changed_vs_cha
-petclinic	profile	cha	15.2-15.8	1381-1411	257640	991340	310418	0	0					17764	328	1096	606	4	21	3/74/13/57/6				
-petclinic	profile	rta	15.2-15.4	1351-1419	257640	941815	310418	49525	48701	88421	16011	7379	container-proxy=4,dynamic-proxy=22,reflection-unresolved=131,service-unresolved=3,unsafe-allocation=1	17764	328	1097	541	4	21	3/70/17/57/6	49525	0	13	4
-petclinic	all	cha	15.2-15.3	1321-1367	257640	991340	310418	0	0					17763	329	1096	606	4	21	3/74/13/57/6				
-petclinic	all	rta	14.1-15.4	1373-1415	257640	985273	310418	6067	71771	111569	21662	11168	container-proxy=4,dynamic-proxy=24,external-input=1,reflection-unresolved=151,service-unresolved=4,unsafe-allocation=1	17763	329	1097	604	4	21	3/74/13/57/6	6067	0	1	0
-webgoat	profile	cha	23.0-24.9	1760-1784	320293	1409574	556769	0	0					26598	327	1194	676	0	78	42/51/10/61/0				
-webgoat	profile	rta	23.8-25.8	1766-1798	320293	1314196	556769	95378	178188	121213	24398	11752	constructor-handle=2,container-proxy=2,dynamic-proxy=27,reflection-unresolved=130,service-unresolved=4,unsafe-allocation=4	26598	327	1201	590	0	78	42/49/12/61/0	95378	0	8	2
-webgoat	all	cha	23.1-23.8	1766-1797	320293	1409575	556769	0	0					26594	328	1194	677	0	79	42/51/10/61/0				
-webgoat	all	rta	24.0-25.1	1772-1817	320293	1394752	556769	14823	122892	153454	32123	13998	constructor-handle=2,container-proxy=2,dynamic-proxy=32,external-input=1,reflection-unresolved=159,service-unresolved=5,unsafe-allocation=4	26594	328	1201	680	0	79	42/51/10/61/0	14823	0	1	0
+petclinic	profile	cha	17.3-18.2	1320-1435	257640	996446	310418	0	0					17764	328	1096	678	4	5127	6/72/12/57/6				
+petclinic	profile	rta	16.6-16.7	1350-1403	257640	956465	310418	39981	35374	114546	17106	6071	container-proxy=4,dynamic-proxy=32,reflection-unresolved=151,service-unresolved=4,unsafe-allocation=1	17764	328	1097	625	4	5127	6/68/16/57/6	39981	0	10	4
+petclinic	all	cha	14.1-16.5	1363-1397	257640	996446	310418	0	0					17763	329	1096	678	4	5127	6/72/12/57/6				
+petclinic	all	rta	16.5-18.7	1380-1403	257640	990536	310418	5910	59454	127455	21835	9923	container-proxy=4,dynamic-proxy=33,external-input=1,reflection-unresolved=162,service-unresolved=5,unsafe-allocation=1	17763	329	1097	676	4	5127	6/72/12/57/6	5910	0	1	0
+webgoat	profile	cha	28.0-32.6	1783-1841	320293	1411339	556769	0	0					26598	327	1194	742	0	1843	42/52/9/61/0				
+webgoat	profile	rta	27.8-29.8	1774-1821	320293	1327988	556769	83351	158682	145652	25211	10671	constructor-handle=2,container-proxy=2,dynamic-proxy=28,reflection-unresolved=146,service-unresolved=4,unsafe-allocation=4	26598	327	1201	662	0	1843	42/50/11/61/0	83351	0	8	2
+webgoat	all	cha	27.2-29.8	1735-1802	320293	1411344	556769	0	0					26594	328	1194	743	0	1848	42/52/9/61/0				
+webgoat	all	rta	27.8-32.8	1756-1795	320293	1396558	556769	14786	101407	168082	32210	13181	constructor-handle=2,container-proxy=2,dynamic-proxy=32,external-input=1,reflection-unresolved=172,service-unresolved=5,unsafe-allocation=4	26594	328	1201	745	0	1848	42/52/9/61/0	14786	0	1	0
