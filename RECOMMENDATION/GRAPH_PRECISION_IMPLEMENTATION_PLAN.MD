@@ -1,19 +1,14 @@
 # Precyzja grafu — fazy P0–P4
 
-Status: P0 DONE (2026-11-07: strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
 
-## P0. Uczciwy baseline i tryby porównania — DONE (2026-11-07)
+## P0. Uczciwy baseline i tryby porównania — DONE (zarchiwizowane 2026-11-08)
 
-Zależności: JVM G0–G4, B0–B1, CVE F1–F4 dla porównywalnych wyników.
-
-- W `internal/callgraph` rozdzielić wybór strategii od internowania i przechowywania grafu. Zachować istniejący builder przez adapter do trybu legacy/CHA.
-- Zapisać sygnatury, korzenie, target i konfigurację skip w metadanych analizy. Nie zmieniać tych parametrów między porównywanymi trybami bez ujawnienia różnicy.
-- Przygotować przypadki, w których wiadomo, które cele są poprawne; skorygować błędy deskryptorów przed przypisaniem redukcji nowemu algorytmowi.
-- Zdefiniować politykę nieznanej alokacji: np. konserwatywny fallback do uzasadnionego zbioru typów dla dotkniętego miejsca, a jeśli nie ma dostatecznej podstawy — niekompletność i ograniczenie wyniku negatywnego.
-
-Gotowe: porównanie krawędzi ma stabilne identyfikatory i wyjaśnia zmiany, a nie tylko rozmiar grafu.
-
-Wykonano (2026-11-07): `internal/callgraph/strategy.go` (`Strategy`, `CHA`, `BuildWith`; `Build` jako adapter — wynik identyczny z `main`), `-callgraph-mode cha`, `Config` grafu w nagłówku raportu, v2 `callgraph` i snapshotcie; `-graph-out`/`-graph-compare` (tożsamość krawędzi: metoda źródłowa i docelowa, rodzaj, podstawa; zmiany werdyktów/ścieżek z krawędziami wyjaśniającymi; różnice ustawień zawsze ujawnione); `testdata/callgraph` z wyrocznią prawdziwego JVM (`scripts/callgraph-oracle.sh`, `TestKnownTargets`) — bez błędów deskryptorów do skorygowania; polityka nieznanej alokacji: CHA `all-subtypes`, dla RTA ustalona `cha-fallback-with-gap`. Szczegóły: IMPLEMENTATION_STATUS, wpis GRAPH_PRECISION:P0.
+Strategia dispatch oddzielona od budowy grafu (`-callgraph-mode cha`), ustawienia grafu w
+metadanych, `-graph-out`/`-graph-compare`, wyrocznia znanych celów na prawdziwym JVM, polityka
+nieznanych alokacji dla RTA; zobacz
+[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)
+po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## P1. Katalog typów tworzonych jawnie i pośrednio
 
