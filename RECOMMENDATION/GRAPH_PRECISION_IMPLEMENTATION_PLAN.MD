@@ -1,6 +1,6 @@
 # Precyzja grafu — fazy P0–P4
 
-Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08: katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2–P4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
 
 ## P0. Uczciwy baseline i tryby porównania — DONE (zarchiwizowane 2026-11-08)
 
@@ -10,7 +10,7 @@ nieznanych alokacji dla RTA; zobacz
 [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
-## P1. Katalog typów tworzonych jawnie i pośrednio
+## P1. Katalog typów tworzonych jawnie i pośrednio — DONE (2026-11-08)
 
 Zależności: DATA_FLOW D1–D2, rejestr B3.
 
@@ -20,6 +20,8 @@ Zależności: DATA_FLOW D1–D2, rejestr B3.
 - Typy przekazywane do publicznych metod w trybie biblioteki nie są ograniczone wyłącznie do alokacji wewnątrz badanej biblioteki. Zadeklarować zewnętrzne wejścia/nieznane typy.
 
 Gotowe: modelowana alokacja ma pochodzenie i może uruchomić rozwinięcie grafu tak samo jak jawne `new`.
+
+Wykonano (2026-11-08): `internal/alloc` — klasy tworzone z pochodzeniem i miejscami (`new`, `service`/`reflection`/`model` z krawędzi modeli do konstruktora, `container`, `deserialization`, `entry`), miejsca lambd osobno, luki (nierozwiązane `newInstance`, `Proxy`, `Unsafe`, `findConstructor`, nieznane usługi, implementacje generowane przez kontener, wejścia zewnętrzne przy `-roots all`); każde pochodzenie ma metodę-miejsce, której osiągalność w P2 aktywuje klasę tak samo jak jawne `new`. Raport, v2 `callgraph.created_types`, lista w `-graph-out` (`ariadne-callgraph-2`). Wyrocznia JVM `testdata/alloc` (`TestCreatedTypesOracle`). Tablice nieskatalogowane (bez metod do dispatchu poza `Object`). Szczegóły: IMPLEMENTATION_STATUS, wpis GRAPH_PRECISION:P1.
 
 ## P2. RTA i punkt stały
 

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"ariadne/internal/alloc"
 	"ariadne/internal/analysis"
 	"ariadne/internal/aop"
 	"ariadne/internal/atomicfile"
@@ -1101,6 +1102,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
 	}
+	// GRAPH_PRECISION P1: the catalog of created types (report-only; no
+	// edge or verdict changes), over the final graph and the models' facts.
+	allocCatalog := alloc.Build(allocInputs(h, g, cfg, roots, springBeanNames, springBeanMethods, springRepositoryBeans,
+		deserJava, deserXStream, deserSites, svcLoadSites, reflectNewInstanceSites, reflectNewInstanceEdgeTargets))
+	allocSummary := alloc.Summarize(allocCatalog, g)
+	log("created types (GRAPH_PRECISION P1, %s): %d classes (%s; %d only through a model), %d lambda sites, gaps: %s; %d of %d CHA edges lead to a class not in the catalog (informational)",
+		alloc.CatalogVersion, allocSummary.Types, report.GapCounts(allocSummary.ByOrigin), allocSummary.OnlyModeled, allocSummary.Lambdas,
+		report.GapCounts(allocSummary.Gaps), allocSummary.CHATargetsNotCreated, allocSummary.CHATargets)
+
 	// GRAPH_PRECISION P0: the final graph (every model edge added) with
 	// the findings' paths, for -graph-out and -graph-compare.
 	var graphFindings []callgraph.FindingPath
@@ -1108,6 +1118,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		graphFindings = append(graphFindings, callgraph.FindingPath{ID: r.CVE, Status: string(r.Status), Path: r.Path})
 	}
 	graphNow := callgraph.Snapshot(g, graphFindings)
+	graphNow.Types = allocExport(allocCatalog)
 	var graphCmp *callgraph.Comparison
 	if graphBefore != nil {
 		c := callgraph.Compare(*graphBefore, graphNow)
@@ -1164,6 +1175,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
 		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(cfg.taint)}
 	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(cfg.graphCompare)
+	data.CreatedTypes, data.CreatedTypeGaps = &allocSummary, allocCatalog.Gaps
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
@@ -1185,7 +1197,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
 		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
-		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp},
+		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary},
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))

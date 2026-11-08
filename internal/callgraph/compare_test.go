@@ -73,3 +73,44 @@ func TestCompareExplains(t *testing.T) {
 		t.Error("comparison reported empty")
 	}
 }
+
+// TestTypesInExport (GRAPH_PRECISION P1): created types round-trip,
+// compare by class, and a v1 file (no types) still reads and compares
+// without inventing type differences.
+func TestTypesInExport(t *testing.T) {
+	before := exportFixture()
+	before.Types = []TypeRecord{{Class: "a.Impl1", Origins: []string{"new=2"}}, {Class: "a.Impl2", Origins: []string{"new=1"}}}
+	after := exportFixture()
+	after.Types = []TypeRecord{{Class: "a.Impl1", Origins: []string{"new=2"}}, {Class: "a.Impl3", Origins: []string{"service=1"}}}
+	var buf bytes.Buffer
+	if err := Write(&buf, after); err != nil {
+		t.Fatal(err)
+	}
+	back, err := Read(strings.NewReader(buf.String()))
+	if err != nil || len(back.Types) != 2 || back.Types[1].Origins[0] != "service=1" {
+		t.Fatalf("round trip: %+v %v", back.Types, err)
+	}
+	c := Compare(before, back)
+	if len(c.TypesAdded) != 1 || c.TypesAdded[0] != "a.Impl3" || len(c.TypesRemoved) != 1 || c.TypesRemoved[0] != "a.Impl2" {
+		t.Errorf("types added %v removed %v", c.TypesAdded, c.TypesRemoved)
+	}
+	v1 := strings.Replace(buf.String(), "# "+ExportFormat, "# "+ExportFormatV1, 1)
+	v1 = strings.Join(filterLines(strings.Split(v1, "\n"), "type\t"), "\n")
+	old, err := Read(strings.NewReader(v1))
+	if err != nil {
+		t.Fatalf("v1: %v", err)
+	}
+	if c := Compare(old, back); c.TypesAdded != nil || c.TypesRemoved != nil {
+		t.Errorf("v1 vs v2 invented type differences: %v %v", c.TypesAdded, c.TypesRemoved)
+	}
+}
+
+func filterLines(ls []string, prefix string) []string {
+	var out []string
+	for _, l := range ls {
+		if !strings.HasPrefix(l, prefix) {
+			out = append(out, l)
+		}
+	}
+	return out
+}

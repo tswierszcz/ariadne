@@ -22,13 +22,73 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
-| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1–P4: UNASSESSED | P0: strategia dispatch oddzielona od budowy grafu (`-callgraph-mode cha`, wynik identyczny z `main`), ustawienia grafu w raporcie/v2/snapshotcie, `-graph-out`/`-graph-compare` (stabilna tożsamość krawędzi, zmiany werdyktów i ścieżek z krawędziami wyjaśniającymi, ujawnione różnice ustawień), wyrocznia znanych celów na prawdziwym JVM (`testdata/callgraph`), polityka nieznanych alokacji dla RTA. Następny: P1 (katalog typów tworzonych jawnie i pośrednio). Szczegóły we wpisie GRAPH_PRECISION:P0. |
+| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08); P2–P4: UNASSESSED | P1: katalog typów tworzonych `internal/alloc` (`p1-1`, tylko raport) z pochodzeniem i miejscami oraz lukami, wyrocznia JVM `testdata/alloc`; graf i werdykty bez zmian. Następny: P2 (RTA i punkt stały, opt-in `-callgraph-mode rta`). Szczegóły we wpisie GRAPH_PRECISION:P1. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### GRAPH_PRECISION:P1 — katalog typów tworzonych jawnie i pośrednio — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** katalog klas tworzonych (`new` i
+  modele) z pochodzeniem, jawne luki dla niemodelowanych mechanizmów,
+  reguła wejść zewnętrznych przy `-roots all`; raport, v2, lista w
+  `-graph-out` (rozszerzenie formatu zatwierdzone); wyrocznia JVM; tylko
+  raport — graf i werdykty bez zmian. Gałąź `graph-precision-p1` od
+  `archive-graph-precision-p0` (PR #16).
+- **Zrealizowane:**
+  1. `internal/alloc` (`CatalogVersion = "p1-1"`): `Build(Inputs)` —
+     `new` z `InitRefs` (tylko klasy konkretne); krawędzie modeli do
+     `<init>` w końcowym grafie (`serviceloader` → `service`, `reflection`,
+     `model`); beany kontenera (stereotypy, konkretne typy zwracane przez
+     `@Bean`); kandydaci deserializacji per format z wejściami tego formatu;
+     klasy metod-korzeni instancyjnych przy `-roots profile` (`entry`);
+     miejsca lambd; luki: `reflection-unresolved`, `dynamic-proxy`,
+     `unsafe-allocation`, `constructor-handle`, `service-unresolved`,
+     `container-proxy` (z ograniczeniem do interfejsu), `external-input`
+     (`-roots all`, z liczbą parametrów referencyjnych). `Summarize`:
+     liczby wg pochodzenia i luk, `cha_edges_to_classes_not_created`
+     (informacyjnie).
+  2. `cmd/ariadne/alloc.go` (zbieranie faktów modeli), log, raport (sekcja
+     „Created types”), v2 `callgraph.created_types`, `-graph-out` →
+     `ariadne-callgraph-2` z rekordami `type` (klasa, pochodzenia z liczbą
+     miejsc); `-graph-compare` czyta też v1 i podaje dodane/usunięte typy.
+  3. `testdata/alloc` + `scripts/alloc-oracle.sh` (javac + JVM; zasób
+     `META-INF/services` dopisywany do JAR-a) → `alloc.jar`, `observed.txt`.
+- **Weryfikacja:** `TestCreatedTypesOracle` (pełne CLI na fixture, bez
+  JDK): 7 klas utworzonych przez JVM — `Square`/`BigSquare`/`Circle`
+  (`new`), `Hexagon` (`reflection`), `PluginImpl` (`model`: provider
+  ServiceLoadera materializowany przez model B3), `Saved`
+  (`deserialization:java`), proxy (luka `dynamic-proxy`); jedyny nadmiar
+  `Never` (`new` w metodzie, której nic nie woła — katalog nie zna
+  osiągalności, to P2); klasa abstrakcyjna nieobecna; mutacja (bez
+  pochodzenia `reflection`) → test zawodzi. `TestOriginsAndGaps`,
+  `TestTypesInExport`. Real data (offline, binarka `main` vs gałąź):
+  petclinic 17 763 klas (container 7, deserialization 497, model 7, new
+  17 710, reflection 6; 53 tylko przez model), 6 358 miejsc lambd, luki 329
+  (reflection-unresolved 258, dynamic-proxy 59, service-unresolved 6,
+  container-proxy 4, unsafe 1, external-input 1); WebGoat 26 594 (146 tylko
+  przez model), 6 249 lambd, luki 328; informacyjnie krawędzie CHA do klas
+  spoza katalogu: petclinic 57 970 / 310 418, WebGoat 92 779 / 556 769.
+  `-graph-compare` z grafem `main`: 0 krawędzi dodanych/usuniętych, 0
+  zmienionych ustaleń; v2 różni się tylko `created_types`; v2 i
+  `-graph-out` bajtowo identyczne w dwóch przebiegach; czas WebGoat
+  23,5–27,4 s (`main`) vs 23,7–28,7 s (w granicach szumu). `go test ./...`,
+  `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz RTA and points-to), README
+  (sekcja 4, `-graph-out`, skrypt wyroczni), `docs/RESULTS_CONTRACT.MD`,
+  szablon raportu, plan GRAPH_PRECISION, ten rejestr.
+- **Ograniczenia:** katalog bez osiągalności (to P2); deserializacja bez
+  odrzuceń polityki (nadmiar, bezpieczny); typy zwracane przez `@Bean`
+  tylko konkretne (interfejs: klasa z `new` w ciele metody fabrycznej);
+  tablice nieskatalogowane; `clone()` nie tworzy nowego typu; w eksporcie
+  liczba miejsc per pochodzenie, nie same miejsca.
+- **Następny krok (wymaga zgody):** GRAPH_PRECISION:P2 — RTA i punkt stały
+  (opt-in `-callgraph-mode rta`, polityka `cha-fallback-with-gap`, fixtures
+  z trzema implementacjami, pośrednią alokacją, cyklem i nieznaną fabryką,
+  porównanie z CHA przez `-graph-compare`).
 
 ### GRAPH_PRECISION:P0 — uczciwy baseline i tryby porównania — DONE (2026-11-07)
 

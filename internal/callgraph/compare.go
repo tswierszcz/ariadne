@@ -18,7 +18,17 @@ import (
 // it, so a comparison says which verdicts changed and through which edges.
 
 // ExportFormat versions the -graph-out format.
-const ExportFormat = "ariadne-callgraph-1"
+const ExportFormat = "ariadne-callgraph-2"
+
+// ExportFormatV1 is the P0 format (no created types); Read accepts it.
+const ExportFormatV1 = "ariadne-callgraph-1"
+
+// TypeRecord is one created class (GRAPH_PRECISION P1) in the export:
+// its origins as "kind[:detail]=<site count>".
+type TypeRecord struct {
+	Class   string
+	Origins []string
+}
 
 // EdgeID is an edge's stable identity.
 type EdgeID struct {
@@ -41,6 +51,8 @@ type Export struct {
 	Config   Config
 	Edges    map[EdgeID][]int // PCs (evidence), sorted
 	Findings map[string]FindingPath
+	// Types are the created classes (P1); nil in a v1 file.
+	Types []TypeRecord
 }
 
 // Snapshot captures g (after every model edge was added) with findings.
@@ -108,6 +120,11 @@ func Write(w io.Writer, ex Export) error {
 		f := ex.Findings[id]
 		fmt.Fprintf(bw, "finding\t%s\t%s\t%s\n", f.ID, f.Status, strings.Join(f.Path, " > "))
 	}
+	types := append([]TypeRecord(nil), ex.Types...)
+	sort.Slice(types, func(i, j int) bool { return types[i].Class < types[j].Class })
+	for _, t := range types {
+		fmt.Fprintf(bw, "type\t%s\t%s\n", t.Class, strings.Join(t.Origins, ","))
+	}
 	return bw.Flush()
 }
 
@@ -122,8 +139,8 @@ func Read(r io.Reader) (Export, error) {
 		line++
 		t := sc.Text()
 		if strings.HasPrefix(t, "# ") {
-			if strings.TrimPrefix(t, "# ") != ExportFormat {
-				return ex, fmt.Errorf("line %d: format %q, want %q", line, strings.TrimPrefix(t, "# "), ExportFormat)
+			if f := strings.TrimPrefix(t, "# "); f != ExportFormat && f != ExportFormatV1 {
+				return ex, fmt.Errorf("line %d: format %q, want %q or %q", line, f, ExportFormat, ExportFormatV1)
 			}
 			sawFormat = true
 			continue
@@ -161,6 +178,15 @@ func Read(r io.Reader) (Export, error) {
 				fp.Path = strings.Split(f[3], " > ")
 			}
 			ex.Findings[fp.ID] = fp
+		case "type":
+			if len(f) != 3 {
+				return ex, fmt.Errorf("line %d: bad type", line)
+			}
+			tr := TypeRecord{Class: f[1]}
+			if f[2] != "" {
+				tr.Origins = strings.Split(f[2], ",")
+			}
+			ex.Types = append(ex.Types, tr)
 		default:
 			return ex, fmt.Errorf("line %d: unknown record %q", line, f[0])
 		}
@@ -219,12 +245,17 @@ type Comparison struct {
 	// advisory set or input), by side.
 	FindingsOnlyBefore []string `json:"findings_only_before,omitempty"`
 	FindingsOnlyAfter  []string `json:"findings_only_after,omitempty"`
+	// TypesAdded/TypesRemoved: created classes (P1) present on one side
+	// only; nil when either export has no types (a v1 file).
+	TypesAdded   []string `json:"types_added,omitempty"`
+	TypesRemoved []string `json:"types_removed,omitempty"`
 }
 
 // Empty reports whether nothing differs.
 func (c Comparison) Empty() bool {
 	return len(c.ConfigDifferences) == 0 && len(c.Added) == 0 && len(c.Removed) == 0 && c.EvidenceChanged == 0 &&
-		len(c.Findings) == 0 && len(c.FindingsOnlyBefore) == 0 && len(c.FindingsOnlyAfter) == 0
+		len(c.Findings) == 0 && len(c.FindingsOnlyBefore) == 0 && len(c.FindingsOnlyAfter) == 0 &&
+		len(c.TypesAdded) == 0 && len(c.TypesRemoved) == 0
 }
 
 // Compare explains after relative to before.
@@ -284,6 +315,25 @@ func Compare(before, after Export) Comparison {
 		if _, ok := after.Findings[id]; !ok {
 			c.FindingsOnlyBefore = append(c.FindingsOnlyBefore, id)
 		}
+	}
+	if before.Types != nil && after.Types != nil {
+		bt, at := map[string]bool{}, map[string]bool{}
+		for _, t := range before.Types {
+			bt[t.Class] = true
+		}
+		for _, t := range after.Types {
+			at[t.Class] = true
+			if !bt[t.Class] {
+				c.TypesAdded = append(c.TypesAdded, t.Class)
+			}
+		}
+		for _, t := range before.Types {
+			if !at[t.Class] {
+				c.TypesRemoved = append(c.TypesRemoved, t.Class)
+			}
+		}
+		sort.Strings(c.TypesAdded)
+		sort.Strings(c.TypesRemoved)
 	}
 	sort.Slice(c.Findings, func(i, j int) bool { return c.Findings[i].ID < c.Findings[j].ID })
 	sort.Strings(c.FindingsOnlyBefore)
