@@ -264,11 +264,15 @@ with `-roots all` every method is a root, so RTA removes little. **The
 default stays CHA** (GRAPH_PRECISION P4,
 [testdata/graphbench/RESULTS.MD](testdata/graphbench/RESULTS.MD)): on
 petclinic and WebGoat RTA costs under a second and changes no verdict with
-`-roots all`; with `-roots profile` it moves 8 findings from FRAMEWORK to
-NOT_REACHABLE, 5 correctly, 1 undetermined and 2 wrongly — container →
-servlet dispatch is a skipped `javax.*` call in both modes, and RTA removed
-the artifact path that had kept CHA's answer. Use RTA as a second opinion
-next to a CHA run (`-graph-compare`). Checked
+`-roots all`; with `-roots profile` it moved 8 findings from FRAMEWORK to
+NOT_REACHABLE in P4, 5 correctly, 1 undetermined and 2 wrongly — container →
+servlet dispatch was a skipped `javax.*` call in both modes. With the servlet
+container dispatch model (below) petclinic's wrong one (CVE-2024-38809) and
+the undetermined one are `FRAMEWORK` through the real request path, leaving
+4 correct changes there; WebGoat's analyzed input does not contain its Boot
+launcher, so nothing registers `DispatcherServlet` and its CVE-2024-38809
+change remains. Use RTA as a second opinion next to a CHA run
+(`-graph-compare`) and check the `servlet dispatch` log line. Checked
 against the real JVM on `testdata/rta` (`scripts/rta-oracle.sh`). Checked against the real JVM on
 `testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
 method, generic and covariant bridges, an inherited body, a super call).
@@ -300,6 +304,49 @@ with the guard vs. 11.4M without it (9.3×), built in 1.9s vs. 2m43s
 (85× slower)**. The practical effect without the guard is that nearly
 every CVE in every dependency would show up as "reachable", which is not
 useful.
+
+**One bounded exception: servlet container dispatch.** The skip also hides
+the one `javax.*`/`jakarta.*` call every web request goes through: the
+container's `servlet.service(req, res)` (`Servlet#service`) and
+`filter.doFilter(req, res, chain)` (`Filter#doFilter`) — Tomcat's
+`ApplicationFilterChain#internalDoFilter`, Undertow's handlers. Without
+it, an app's `DispatcherServlet` is unreachable from `main` in both
+`-callgraph-mode cha` and `rta`. The `servlet-container:dispatch` model
+(`internal/servletdispatch`, version `s1`, a B3 registry model, so its edges
+have basis `model`) expands exactly these calls, plus `HttpServlet`'s own
+template self-calls (`service(HttpServletRequest, …)`, `doGet`/`doPost`/…,
+`getLastModified`, only when the caller is `HttpServlet` itself), to the
+**servlets and filters the app registers** — never to every subtype on the
+class path: classes named in `web.xml`; application classes annotated
+`@WebServlet`/`@WebFilter`; and, for a Spring Boot application (an
+application class annotated `@SpringBootApplication` /
+`@EnableAutoConfiguration`), Spring beans whose class is a servlet or filter
+(stereotype classes, concrete `@Bean` return types — Boot registers every
+such bean; plain Spring MVC does not) and a fixed catalog of auto-configured
+registrations — `DispatcherServlet`, the character-encoding, form-content
+and request-context filters, and Spring Security's `DelegatingFilterProxy`
+with its `FilterChainProxy` delegate — each only when the
+auto-configuration and its `@ConditionalOnClass` classes are on the class
+path and the application does not `exclude` it. Each target is the method
+the JVM selects on the registered class (an inherited body such as
+`HttpServlet#service` for `DispatcherServlet` included). The log line
+`servlet dispatch (s1): N registered servlets/filters (class [kind, basis];
+…)` lists them with their basis, and registered classes count as
+container-created types for RTA. A `@Bean` returning a
+`ServletRegistrationBean`/`FilterRegistrationBean` (or a bare
+`Servlet`/`Filter`) cannot be resolved statically: it makes every container
+dispatch an incomplete model fact with the reason (a `model analysis:`
+warning). Not modeled: servlet/filter `init`/`destroy`, listeners, servlets
+and filters a container or library registers itself
+(`ServletContainerInitializer`s such as Tomcat's WebSocket filter, Boot
+Actuator's metrics filter), Spring Security's internal filter chain behind
+`FilterChainProxy`, and programmatic registration
+(`ServletContext#addServlet`). Checked against the real JVM on
+`testdata/servletdispatch` (`scripts/servletdispatch-oracle.sh`: a
+container that creates web.xml-declared classes by name and dispatches
+through the real `javax.servlet` API; every observed body reached from
+`main`, the two unregistered classes never reached — before the model,
+none of the 5 observed bodies was reached).
 
 A call to a subtype's inherited (not overridden) method resolves to the
 class that actually supplies the body, not a dead-end node under the
@@ -1093,6 +1140,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
 ./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
+./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
@@ -1108,6 +1156,7 @@ internal/
   classfile/             .class parser + bytecode walker
   hierarchy/              class universe: super/interfaces/subtypes/methods
   callgraph/              interning, edges, CHA expansion, synthetic edges
+  servletdispatch/        servlet container dispatch model: registered servlets/filters
   profile/                framework knowledge: detect, roots, framework packages, synthetic edges
     profiles/              spring.yaml, servlet.yaml, jakarta.yaml, micronaut.yaml,
                              quarkus.yaml, generic.yaml (embedded defaults)

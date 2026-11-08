@@ -6,7 +6,8 @@
 # and peak RSS of the analyzer process, graph size, CHA edges (and with
 # RTA: removed / kept only by the unknown-allocation fallback), live
 # classes, active unknown-allocation gaps, reachable model-gap sites, the
-# v1 verdict counts, and — RTA against the CHA run of the same scenario,
+# v1 verdict counts, the servlets/filters the app registers and the edges
+# the B3 models add (servlet container dispatch), and — RTA against the CHA run of the same scenario,
 # via -graph-compare — the edges removed and every finding whose verdict
 # or path changed. Each configuration runs REPEAT measured times with no
 # graph file written or read (time and memory are the minimum and maximum
@@ -71,6 +72,8 @@ def run(app, roots, mode, rep, graph):
     cg = v2["callgraph"]
     m = re.search(r"REACHABLE=(\d+) FRAMEWORK=(\d+) NOT_REACHABLE=(\d+) UNKNOWN=(\d+) NOT_APPLICABLE=(\d+)", logtext)
     g = re.search(r"model gaps: (\d+) unresolved dynamic sites, (\d+) reachable", logtext)
+    sd = re.search(r"servlet dispatch \((\S+)\): (\d+) registered servlets/filters", logtext)
+    me = re.search(r"models: \d+ facts, (\d+) edges added", logtext)
     ct = cg.get("created_types", {})
     rta = cg.get("rta") or {}
     row = {
@@ -84,6 +87,7 @@ def run(app, roots, mode, rep, graph):
         "active_alloc_gaps": ",".join(f"{k}={v}" for k, v in sorted((rta.get("active_gaps") or {}).items())),
         "catalog_types": ct.get("types"), "catalog_gaps": sum((ct.get("gaps_by_kind") or {}).values()),
         "model_gap_sites": g.group(1), "model_gap_sites_reachable": g.group(2),
+        "servlet_registrations": sd.group(2), "model_edges": me.group(1),
         "R/F/NR/U/NA": "/".join(m.groups()),
     }
     changes = []
@@ -99,7 +103,7 @@ def run(app, roots, mode, rep, graph):
                 changes.append((app, roots, mode, f["id"], f["old_status"], f["new_status"], " | ".join(f.get("because") or [])))
     versions = {"tool": v2["tool"]["version"], "builder": cg["builder"], "skip_rule": cg["skip_rule"],
                 "unknown_allocation_policy": cg["unknown_allocation_policy"], "catalog": ct.get("catalog"),
-                "rta": rta.get("version", "")}
+                "rta": rta.get("version", ""), "servlet_dispatch": sd.group(1)}
     return wall, ru.ru_maxrss / 1024.0, row, changes, versions
 
 rows, allchanges, versions = [], [], {}
