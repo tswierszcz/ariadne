@@ -49,6 +49,11 @@ type ClassInfo struct {
 	// AnnotationDetails is Annotations' own richer form, element values
 	// included (FRAMEWORKS F1).
 	AnnotationDetails []classfile.Annotation
+	// NamedClasses are the classes this class names as a class literal or
+	// a class-name string constant (classfile.ClassFile.NamedClasses):
+	// what reflection can create without the analysis knowing the call
+	// (GRAPH_PRECISION P2's fallback for unresolved creation sites).
+	NamedClasses []string
 	// SourceJar is the path of the jar this class was read from — the app
 	// jar (or the in-memory jar PrepareAppInput packed from a classes
 	// directory) for an app class, or the dependency jar's own path

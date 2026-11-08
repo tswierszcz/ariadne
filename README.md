@@ -224,9 +224,9 @@ error.
 implementations a virtual/interface call may run is chosen by a strategy
 (`internal/callgraph/strategy.go`); everything else below — interning,
 direct edges, class initialization, evidence — is the same for every
-strategy. CHA is the default and only mode (`-callgraph-mode cha`); a
-narrower mode (RTA) will be another strategy, never a silent change of the
-default. The graph's settings — mode, builder version, skip rule,
+strategy. CHA is the default (`-callgraph-mode cha`); RTA is an opt-in
+second mode (`-callgraph-mode rta`, P2, below), never a silent change of
+the default. The graph's settings — mode, builder version, skip rule,
 unknown-allocation policy, roots, target Java — are printed in the report
 header and recorded in v2 (`callgraph`), and two graphs are compared edge
 by edge with `-graph-out` / `-graph-compare`: by identity, not by size,
@@ -240,10 +240,28 @@ reachability creates it, plus the gaps where a class may be created by a
 mechanism the catalog does not model (dynamic proxies, unresolved
 reflection, `Unsafe`, constructor handles, unknown services,
 container-generated repositories, and with `-roots all` the root methods'
-parameters). Report-only for now ("Created types" section, v2
-`callgraph.created_types`, the class list in `-graph-out`); RTA (P2) will
-use it. Checked against the real JVM on `testdata/alloc`
-(`scripts/alloc-oracle.sh`). Checked against the real JVM on
+parameters). Report-only in CHA mode ("Created types" section, v2
+`callgraph.created_types`, the class list in `-graph-out`). Checked against
+the real JVM on `testdata/alloc` (`scripts/alloc-oracle.sh`). **RTA (P2,
+opt-in `-callgraph-mode rta`):** the graph is built exactly as for CHA and
+every model edge is added; then a fixed point over the methods reachable
+from the roots and the classes they create (the catalog) decides which
+classes are live, and a CHA edge stays only if a live class dispatches the
+call to its target. Direct, class-init and model edges are untouched. A
+reachable gap applies the unknown-allocation policy
+(`cha-fallback-with-gap`): its fallback classes become live — for
+unresolved reflection, `Unsafe` and constructor handles the classes the
+code can name at run time (class literals, class-name strings, annotated
+classes, field/parameter/return types), for an unknown ServiceLoader
+service every registered provider, for `-roots all` every concrete subtype
+of a root's reference parameter — and the gap is reported; a class named
+only in a configuration file is not covered (the gap stays, as a model gap
+of `NOT_REACHABLE` findings). The "RTA" report section and v2
+`callgraph.rta` give the counts, including the CHA edges kept only by the
+fallback; compare an RTA run with a CHA run with `-graph-out` /
+`-graph-compare`. `-roots all` and `-roots profile` are separate scenarios:
+with `-roots all` every method is a root, so RTA removes little. Checked
+against the real JVM on `testdata/rta` (`scripts/rta-oracle.sh`). Checked against the real JVM on
 `testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
 method, generic and covariant bridges, an inherited body, a super call).
 
@@ -880,7 +898,7 @@ Flags:
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
-| `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0): `cha` (the default and, for now, only mode). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
+| `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0/P2): `cha` (the default) or `rta` (opt-in: CHA edges narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback; see section 4). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
 | `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings, the findings' paths and the created-type catalog (GRAPH_PRECISION P1) — as sorted text (`ariadne-callgraph-2`; large: ≈ 370 MB for WebGoat). |
 | `-graph-compare` | no | Compare this run's graph with a `-graph-out` file: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any settings difference (report "Call graph compared with …", v2 `callgraph.comparison`). |
 | `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
@@ -1066,6 +1084,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/taint-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for the -taint fixture (testdata/taint/oracle)
 ./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
 ./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
+./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 

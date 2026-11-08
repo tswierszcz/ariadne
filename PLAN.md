@@ -1049,7 +1049,7 @@ above) are not. `internal/profile` implements section 4 as described:
   - **CDI's own framework packages** (`javax.enterprise:*`/`jakarta.enterprise:*`/
     `org.jboss.weld:*`) were already listed in `jakarta.yaml` before this; unchanged.
 - **Not implemented:** RTA and `--max-dep-depth` — both still speculative, with no evidence
-  from any real run so far that either is actually needed (see Phase 5's own note on
+  from any real run so far that either is actually needed (**Update 2026-11-08:** RTA now exists as the opt-in `-callgraph-mode rta` (GRAPH_PRECISION P2, `internal/callgraph/rta.go`, with an unknown-allocation fallback; the default stays CHA) — see `docs/SUPPORT.MD` and `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`.) (see Phase 5's own note on
   `--max-dep-depth`). `internal/reach`'s BFS passes stay unchanged (still computed once for
   every CVE, same as Phase 5 left them) — only the root set and the framework-package list
   going into them changed.
@@ -1293,7 +1293,7 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
    CVE as reviewed/accepted so it doesn't keep surfacing as new in every report — the same
    role a `retire.js` ignore-file or similar SCA suppression list plays elsewhere. Pairs
    naturally with baseline mode (an accepted CVE shouldn't count as "new").
-4. **RTA (`--cha rta`).** Already named as deferred in Phase 7/section 9's own risk table;
+4. **RTA (`--cha rta`).** (**Update 2026-11-08:** RTA now exists as the opt-in `-callgraph-mode rta` (GRAPH_PRECISION P2, `internal/callgraph/rta.go`, with an unknown-allocation fallback; the default stays CHA) — see `docs/SUPPORT.MD` and `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`.) Already named as deferred in Phase 7/section 9's own risk table;
    restated here because it's the most direct lever on CHA's own false-positive rate
    (restricting virtual-dispatch expansion to types actually instantiated via `new`,
    instead of every subtype) — worth real measurement once a case shows CHA over-expansion
@@ -1389,7 +1389,7 @@ pass `context.Context` to everything that does network I/O; use table-driven tes
       (Spring Data), and `Roots.Overrides`-based roots (the `servlet` profile) are
       implemented too; the `jakarta` profile is implemented for JAX-RS, EJB and CDI's
       `@Observes` (via a new `Roots.ParameterAnnotations`); the `micronaut` and `quarkus`
-      profiles are implemented too; only RTA and `--max-dep-depth` are not. Gradle input
+      profiles are implemented too; only RTA and `--max-dep-depth` are not (**Update 2026-11-08:** RTA now exists as the opt-in `-callgraph-mode rta` (GRAPH_PRECISION P2, `internal/callgraph/rta.go`, with an unknown-allocation fallback; the default stays CHA) — see `docs/SUPPORT.MD` and `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`.). Gradle input
       (`scripts/gradle-copy-deps.init.gradle`)
       and WAR/EAR input (`internal/input.PrepareAppInput`) *are* implemented — see Phase 7's
       own status note for the line between all of these.
