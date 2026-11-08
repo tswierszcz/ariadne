@@ -37,6 +37,8 @@ Zależności: F1, DATA_FLOW D0–D2 dla prostych fabryk, B3.
 
 Gotowe: jeden bean/qualifier, konflikt, nieznany profil i kontroler z helperem mają właściwe wyniki. F0–F2 to pierwszy zakres frameworków.
 
+Wycinek „dispatch kontenera servletów” (2026-11-08): model B3 `servlet-container:dispatch` (`internal/servletdispatch`, wersja `s1`) — ograniczony wyjątek od pominięcia odbiorców `javax.`/`jakarta.` w CHA dla `Servlet#service`, `Filter#doFilter` i wewnętrznego dispatchu szablonowego `HttpServlet` (`service(HttpServletRequest, …)`, `doGet`/`doPost`/…, tylko gdy wołającym jest sam `HttpServlet`). Cele: wyłącznie servlety i filtry zarejestrowane przez aplikację (web.xml, `@WebServlet`/`@WebFilter`, w aplikacji Spring Boot beany będące servletem/filtrem oraz katalog autokonfiguracji Boot sprawdzony w jej źródłach, z warunkami `@ConditionalOnClass` i `exclude`), metoda wybrana przez JVM na zarejestrowanej klasie; krawędzie z podstawą `model`, rejestracje z własną podstawą w logu; rejestracja nieznanej klasy (`FilterRegistrationBean` itp.) to niekompletny fakt modelu, nie zgadywanie. Wyrocznia JVM `testdata/servletdispatch` (`scripts/servletdispatch-oracle.sh`). Szczegóły i wpływ na petclinic/WebGoat: IMPLEMENTATION_STATUS, wpis FRAMEWORKS:F2 (dispatch kontenera servletów), oraz `testdata/graphbench/RESULTS.MD`.
+
 ## F3. Proxy i ograniczony model AOP
 
 Zależności: F2, DATA_FLOW D3 dla bardziej złożonych powiązań, REFLECTION R2 i JVM G2 w używanych przypadkach.

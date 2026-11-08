@@ -23,7 +23,9 @@ import (
 )
 
 // CatalogVersion versions the origin kinds, gap rules and APIs below.
-const CatalogVersion = "p1-1"
+// p1-2: the servlets/filters the app registers (internal/servletdispatch)
+// are container-created types.
+const CatalogVersion = "p1-2"
 
 // Origin kinds.
 const (
@@ -31,7 +33,7 @@ const (
 	KindService         = "service"         // a ServiceLoader provider edge (serviceloader basis)
 	KindReflection      = "reflection"      // Constructor#newInstance with a resolved target
 	KindModel           = "model"           // a registered library model's constructor edge (B3; today the ServiceLoader models materializing providers)
-	KindContainer       = "container"       // a container bean (Spring stereotype, @Bean return type)
+	KindContainer       = "container"       // a container bean (Spring stereotype, @Bean return type) or a registered servlet/filter
 	KindDeserialization = "deserialization" // a class a deserialization entry may create
 	KindEntry           = "entry"           // a class a framework instantiates to call its entry points
 )

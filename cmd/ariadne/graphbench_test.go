@@ -11,6 +11,7 @@ import (
 
 	"ariadne/internal/callgraph"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/input"
 )
 
 // benchFixture is a fixture with a real-JVM oracle of the method bodies
@@ -20,6 +21,9 @@ type benchFixture struct {
 	pkg                       string // the fixture's package prefix
 	trace                     string // the method a traced body calls to record that it ran
 	bodyColumn                int    // observed file: column holding the body
+	// neverReached: method-key prefixes the graph must not reach in any
+	// mode (servlets/filters on the class path the app never registers).
+	neverReached []string
 }
 
 var benchFixtures = []benchFixture{
@@ -27,6 +31,9 @@ var benchFixtures = []benchFixture{
 		main: "cg.Oracle#main([Ljava/lang/String;)V", pkg: "cg.", trace: "cg.Trace#hit", bodyColumn: 1},
 	{name: "rta", jar: "../../testdata/rta/rta.jar", observed: "../../testdata/rta/observed.txt",
 		main: "rt.Oracle#main([Ljava/lang/String;)V", pkg: "rt.", trace: "rt.Ran#here", bodyColumn: 0},
+	{name: "servlet", jar: "../../testdata/servletdispatch/sd.war", observed: "../../testdata/servletdispatch/observed.txt",
+		main: "sd.Oracle#main([Ljava/lang/String;)V", pkg: "sd.", trace: "sd.Ran#here", bodyColumn: 0,
+		neverReached: []string{"sd.UnusedServlet#", "sd.UnusedFilter#"}},
 }
 
 func (f benchFixture) observedBodies(t *testing.T) map[string]bool {
@@ -52,7 +59,12 @@ func (f benchFixture) observedBodies(t *testing.T) map[string]bool {
 // (only for them does "not observed" mean "did not run").
 func (f benchFixture) bodies(t *testing.T) map[string]bool {
 	t.Helper()
-	h, _, err := hierarchy.Build(f.jar, nil)
+	prepared, err := input.PrepareAppInput(f.jar) // a WAR's WEB-INF/classes
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer prepared.Cleanup()
+	h, _, err := hierarchy.Build(prepared.AppClassesJar, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +146,13 @@ func TestGraphBenchmarkFixtures(t *testing.T) {
 					}
 				}
 				extras[mode] = extra
+				for b := range reach {
+					for _, p := range fx.neverReached {
+						if strings.HasPrefix(b, p) {
+							t.Errorf("%s %s %s: reaches %s, which the app never registers", fx.name, roots, mode, b)
+						}
+					}
+				}
 				table = append(table, fmt.Sprintf("%-9s %-7s %-3s observed %2d  reached %2d/%2d  missed %d %v  extra %d %v",
 					fx.name, roots, mode, len(obs), len(all)-countNotIn(all, reach), len(all), len(missed), sortedKeys(missed), len(extra), sortedKeys(extra)))
 				for b := range missed {

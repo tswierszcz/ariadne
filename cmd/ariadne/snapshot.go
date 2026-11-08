@@ -22,6 +22,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/reach"
 	"ariadne/internal/resultsv2"
+	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
@@ -58,6 +59,9 @@ func algorithmVersions(mode string) map[string]string {
 		"flowsum.summaries": flowsum.SummaryVersion,
 		// DATA_FLOW D4: the taint sources, guards and rules (-taint).
 		"taint.catalog": taint.CatalogVersion,
+		// The servlet container dispatch model (signatures, registration
+		// sources, Spring Boot catalog): it adds call-graph edges in every mode.
+		"servlet.dispatch": servletdispatch.Version,
 	}
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the

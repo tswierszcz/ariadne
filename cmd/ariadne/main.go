@@ -38,6 +38,7 @@ import (
 	"ariadne/internal/report"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/serviceload"
+	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/springxml"
 	"ariadne/internal/taint"
@@ -614,6 +615,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	externalEntries := profile.ExternalEntries(h, activeProfiles, servletClasses, filterClasses, listenerClasses)
 	log("frameworks: %d external entries cataloged (http/servlet/filter/listener)", len(externalEntries))
 
+	// Servlet container dispatch (FRAMEWORKS F2 / JVM_GRAPH): the servlets
+	// and filters the app registers — the bounded target set of the B3
+	// model that expands Servlet#service/Filter#doFilter (javax./jakarta.
+	// receivers the call graph never CHA-expands).
+	var servletBeans []servletdispatch.Bean
+	for _, b := range springBeanNames {
+		servletBeans = append(servletBeans, servletdispatch.Bean{Class: b.FQCN, Detail: "stereotype"})
+	}
+	for _, b := range springBeanMethods {
+		servletBeans = append(servletBeans, servletdispatch.Bean{Class: b.FQCN, Detail: "@Bean " + b.Name, Method: "@Bean " + b.Name})
+	}
+	servletRegs, servletUnresolved := servletdispatch.Find(h, servletdispatch.Inputs{WebXMLServlets: servletClasses, WebXMLFilters: filterClasses, Beans: servletBeans})
+	log("servlet dispatch (%s): %d registered servlets/filters%s, %d registrations of unknown class",
+		servletdispatch.Version, len(servletRegs), servletRegistrationSummary(servletRegs), len(servletUnresolved))
+
 	// FRAMEWORKS F3's own first slice: proxy/target/interceptor
 	// identity only — no new call-graph edge (see aop.FindProxyHandlers'
 	// own doc comment for why: that needs REFLECTION R2, not built).
@@ -953,8 +969,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	registry := models.NewRegistry()
 	serviceload.RegisterModel(registry)
 	serviceload.RegisterDispatchModels(registry, svcConsumptionSites)
-	modelBudget := len(svcLoadSites) + 1
-	modelResult, err := analysis.Run(h, g, registry, serviceModelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
+	servletdispatch.Register(registry)
+	modelEvaluator := models.Router{
+		ByID:    map[string]models.Evaluator{servletdispatch.ModelID: servletdispatch.NewEvaluator(h, servletRegs, servletUnresolved)},
+		Default: serviceModelEvaluator,
+	}
+	modelBudget := len(svcLoadSites) + 1 + servletdispatch.MaxChain
+	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
 	if err != nil {
 		return fmt.Errorf("coordinating library models: %w", err)
 	}
@@ -966,8 +987,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// GRAPH_PRECISION P1: the catalog of created types, over the final
 	// graph (every model edge added) and the models' facts. Report-only
 	// in CHA mode; in RTA mode (P2) it feeds the fixed point below.
-	allocCatalog := alloc.Build(allocInputs(h, g, cfg, roots, springBeanNames, springBeanMethods, springRepositoryBeans,
-		deserJava, deserXStream, deserSites, svcLoadSites, reflectNewInstanceSites, reflectNewInstanceEdgeTargets))
+	allocIn := allocInputs(h, g, cfg, roots, springBeanNames, springBeanMethods, springRepositoryBeans,
+		deserJava, deserXStream, deserSites, svcLoadSites, reflectNewInstanceSites, reflectNewInstanceEdgeTargets)
+	for _, r := range servletRegs {
+		allocIn.Container = append(allocIn.Container, alloc.ContainerBean{Class: r.Class, Detail: string(r.Kind) + " registration (" + r.Basis + ")"})
+	}
+	allocCatalog := alloc.Build(allocIn)
 	allocSummary := alloc.Summarize(allocCatalog, g)
 	log("created types (GRAPH_PRECISION P1, %s): %d classes (%s; %d only through a model), %d lambda sites, gaps: %s; %d of %d CHA edges lead to a class not in the catalog (informational)",
 		alloc.CatalogVersion, allocSummary.Types, report.GapCounts(allocSummary.ByOrigin), allocSummary.OnlyModeled, allocSummary.Lambdas,
@@ -1449,4 +1474,17 @@ func graphSettings(diffs []string) string {
 		return "identical"
 	}
 	return "DIFFERENT — " + strings.Join(diffs, "; ")
+}
+
+// servletRegistrationSummary renders the registered servlets/filters with
+// their basis for the log: " (class [kind, basis]; ...)".
+func servletRegistrationSummary(regs []servletdispatch.Registration) string {
+	if len(regs) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(regs))
+	for _, r := range regs {
+		parts = append(parts, fmt.Sprintf("%s [%s, %s]", r.Class, r.Kind, r.Basis))
+	}
+	return " (" + strings.Join(parts, "; ") + ")"
 }

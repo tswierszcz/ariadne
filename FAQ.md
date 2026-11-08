@@ -532,6 +532,26 @@ whole classpath. Measured on petclinic: with the guard, the graph has
 (85× slower). Without it, practically every CVE in every dependency
 would come out "reachable".
 
+**But then how does a request ever reach `DispatcherServlet`?** Through
+one bounded exception. The container hands every request to the app with
+`servlet.service(req, res)` and `filter.doFilter(req, res, chain)` — calls
+on `javax.servlet.Servlet`/`Filter` (or `jakarta.servlet.*`), which the
+guard above never expands, so without help the whole Spring MVC stack is
+cut off from `main`. Lifting the guard for these two interfaces would fan
+out to every servlet and filter class in every jar (dozens nobody
+registers). Instead, the `servlet-container:dispatch` model
+(`internal/servletdispatch`) adds edges from those calls — and from
+`HttpServlet`'s own `this.service(...)`/`this.doGet(...)`/... template calls
+— only to the servlets and filters the app actually registers: `web.xml`,
+`@WebServlet`/`@WebFilter`, and in a Spring Boot application the beans
+that are servlets or filters plus a short, source-checked catalog of what Spring Boot's auto-configuration
+registers (`DispatcherServlet`, a few standard filters, Spring Security's
+`DelegatingFilterProxy`/`FilterChainProxy`), each with its basis in the
+log. What it cannot name (a `@Bean` returning a `FilterRegistrationBean`)
+is reported as an incomplete model fact, not guessed. Its real-JVM check is
+`testdata/servletdispatch`; its effect on petclinic and WebGoat is in
+[testdata/graphbench/RESULTS.MD](testdata/graphbench/RESULTS.MD).
+
 **Why is RTA opt-in, and why doesn't it remove more?** (GRAPH_PRECISION
 P2, `-callgraph-mode rta`.) RTA keeps a CHA edge only if some class that
 reachable code creates dispatches the call there — but a class can also

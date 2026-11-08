@@ -271,3 +271,22 @@ func compareDottedVersion(a, b []int) int {
 	}
 	return 0
 }
+
+// Router sends each model to the evaluator registered for its ID, and
+// every other model to Default — so independent models (ServiceLoader,
+// servlet dispatch) share one coordinator run without knowing each other.
+type Router struct {
+	ByID    map[string]Evaluator
+	Default Evaluator
+}
+
+// Evaluate implements Evaluator.
+func (r Router) Evaluate(model *Model, site CallSite) Fact {
+	if e, ok := r.ByID[model.ID]; ok {
+		return e.Evaluate(model, site)
+	}
+	if r.Default != nil {
+		return r.Default.Evaluate(model, site)
+	}
+	return Fact{ModelID: model.ID, Incomplete: true, Reason: "no evaluator for model " + model.ID}
+}
