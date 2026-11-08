@@ -220,6 +220,22 @@ error.
 
 ### 4. The call graph and CHA expansion (`internal/callgraph`)
 
+**Strategy, settings and comparison (GRAPH_PRECISION P0).** Which
+implementations a virtual/interface call may run is chosen by a strategy
+(`internal/callgraph/strategy.go`); everything else below — interning,
+direct edges, class initialization, evidence — is the same for every
+strategy. CHA is the default and only mode (`-callgraph-mode cha`); a
+narrower mode (RTA) will be another strategy, never a silent change of the
+default. The graph's settings — mode, builder version, skip rule,
+unknown-allocation policy, roots, target Java — are printed in the report
+header and recorded in v2 (`callgraph`), and two graphs are compared edge
+by edge with `-graph-out` / `-graph-compare`: by identity, not by size,
+with the findings whose verdict or path changed and the edges that explain
+it. Fewer edges or fewer REACHABLE results are not by themselves an
+improvement. Checked against the real JVM on
+`testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
+method, generic and covariant bridges, an inherited body, a super call).
+
 Every method is interned into a dense `uint32` id. Building the graph is
 two passes:
 
@@ -853,6 +869,9 @@ Flags:
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
+| `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0): `cha` (the default and, for now, only mode). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
+| `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings and the findings' paths — as sorted text (`ariadne-callgraph-1`; large: ≈ 370 MB for WebGoat). |
+| `-graph-compare` | no | Compare this run's graph with a `-graph-out` file: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any settings difference (report "Call graph compared with …", v2 `callgraph.comparison`). |
 | `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
@@ -1034,6 +1053,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/prepare-jpms-demo.sh        /path/to/jdk11-or-later/JAVA_HOME # JPMS provides/provider(), -jpms-scenario control case
 ./scripts/prepare-taint-demo.sh       /path/to/jdk11-or-later/JAVA_HOME # request data → deserialization entries, -taint control case
 ./scripts/taint-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for the -taint fixture (testdata/taint/oracle)
+./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
 ```
 

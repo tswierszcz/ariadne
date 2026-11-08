@@ -88,3 +88,15 @@ reopen this whole area. Otherwise, per `RECOMMENDATION/ROADMAP.MD`, this
 area's completion unblocks **R1** (`DATA_FLOW:D0–D2`,
 `SERVICE_LOADING:S0–S2`, `ASYNC_CALLBACKS:A0–A2`), which is the next
 natural direction for this project.
+
+## Addendum (2026-11-07): G2's bridge/default-method gap closed
+
+Closed by GRAPH_PRECISION P0 with a JDK now available (OpenJDK 25): instead of the
+`testdata/fixture` sources named above, a dedicated fixture `testdata/callgraph` is
+compiled with the real javac and run on the real JVM (`scripts/callgraph-oracle.sh`),
+recording which body actually runs at each call site for every receiver the fixture can
+create — including a default method kept and overridden, a generic bridge and a
+covariant-return bridge. `internal/callgraph` `TestKnownTargets` finds every body the JVM
+ran, with three explained extras (the two compiler bridges, a super call's helper) and no CHA
+edge to an undeclared method. Details: `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`, entry
+"GRAPH_PRECISION:P0".

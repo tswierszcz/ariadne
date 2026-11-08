@@ -16,12 +16,19 @@ import (
 // still interned as a node with no outgoing edges of its own, so paths
 // can still end there.
 func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
-	if skip == nil {
-		skip = DefaultSkip
-	}
+	return BuildWith(h, CHA{Skip: skip})
+}
+
+// BuildWith builds the graph with strategy choosing the dispatch targets
+// of virtual/interface calls (GRAPH_PRECISION P0); everything else —
+// interning, direct edges, class initialization, evidence merging — is
+// the same for every strategy.
+func BuildWith(h *hierarchy.Hierarchy, strategy Strategy) *Graph {
 	g := &Graph{
 		idOf:          make(map[string]uint32),
 		byClassMethod: make(map[string][]uint32),
+		config: Config{Mode: strategy.Mode(), Builder: BuilderVersion, SkipRule: strategy.SkipRule(),
+			UnknownAllocationPolicy: strategy.UnknownAllocationPolicy()},
 	}
 
 	// Both passes iterate SortedFQCNs rather than ranging over h.All()
@@ -90,37 +97,7 @@ func Build(h *hierarchy.Hierarchy, skip SkipFunc) *Graph {
 				if call.Kind != classfile.CallVirtual && call.Kind != classfile.CallInterface {
 					continue
 				}
-				if skip(call.Owner) {
-					continue
-				}
-				// CHA expands from the call's own declared receiver type
-				// (call.Owner, deliberately not toOwner above): any
-				// subtype of *that* static type could be the runtime
-				// receiver, regardless of which class actually supplies
-				// the inherited body for Owner itself.
-				for _, sub := range h.Subtypes(call.Owner) {
-					if skip(sub) {
-						continue
-					}
-					subInfo, ok := h.Lookup(sub)
-					if !ok {
-						continue
-					}
-					// Exact descriptor match (JVM_GRAPH G2), not
-					// MethodsByName's name-only match: a subtype that
-					// overrides a *different* overload of the same name
-					// must not be wired up as if it overrode this one. A
-					// bridge method generated for a covariant-return or
-					// generic override already carries the exact erased
-					// descriptor being looked for here, so it needs no
-					// special handling — it resolves like any other
-					// declared method, and its own Calls (the delegating
-					// invocation to the real, covariant-signature
-					// implementation) carry the analysis the rest of the
-					// way.
-					if _, ok := subInfo.MethodByNameAndDesc(call.Name, call.Desc); !ok {
-						continue
-					}
+				for _, sub := range strategy.DispatchTargets(h, call) {
 					subID := g.intern(sub, call.Name, call.Desc)
 					addOrMerge(g, seen, callerID, subID, call.Kind, BasisCHA, call.PC)
 				}
