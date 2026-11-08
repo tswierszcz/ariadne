@@ -1,6 +1,6 @@
 # Przepływ wartości i danych — fazy D0–D5
 
-Status: D0–D2 DONE; D3 DONE (wartości: pięć wycinków 2026-10-22…11-05; zależności: `internal/flowsum` 2026-11-07 — pola instancyjne per obiekt (points-to) poza zakresem); D4 DONE (pilotaż 2026-11-07, zarchiwizowane: [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data_flow/DATA_FLOW_D4.md)); D5 DONE (2026-11-07: wyrocznia JVM, kształty, pomiar, `docs/TAINT_QUALIFICATION.MD`; `-taint` pozostaje opt-in); zob. IMPLEMENTATION_STATUS. Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: **DONE (D0–D5), zarchiwizowane 2026-11-07** — zob. [COMPLETION.md](COMPLETION.md). Wymagania: [DATA_FLOW.MD](DATA_FLOW.MD). Wspólne zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD). Szczegółowe wpisy faz: [IMPLEMENTATION_STATUS.MD](../../../RECOMMENDATION/IMPLEMENTATION_STATUS.MD).
 
 ## D0. Kontrakt IR, wartości i zakresów
 
@@ -51,7 +51,7 @@ Gotowe: fabryka zwraca właściwą wartość, dwa call sites nie tworzą nieuzas
 
 Pilotaż (dane żądania Spring MVC/JAX-RS/Servlet → dane czytane przez wejścia
 deserializacji, `-taint` opt-in, tylko raport) zrealizowany i zweryfikowany;
-zobacz [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](../archive/2026-11-07/data_flow/DATA_FLOW_D4.md)
+zobacz [archive/2026-11-07/data_flow/DATA_FLOW_D4.md](DATA_FLOW_D4.md)
 po pełny zapis (co zrobione, dowody, co celowo odłożone — m.in. kroki
 transformacji wewnątrz metody) i `docs/SUPPORT.MD` po bieżący opis zachowania.
 

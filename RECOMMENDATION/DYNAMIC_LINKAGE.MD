@@ -1,6 +1,6 @@
 # MethodHandle i dynamiczne wiązanie — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD). Wspólne wartości: [DATA_FLOW.MD](DATA_FLOW.MD).
+Status: plan. Fazy: [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD). Wspólne wartości: [DATA_FLOW.MD](../archive/2026-11-07/data_flow/DATA_FLOW.MD).
 
 ## Cel i punkt wyjścia
 

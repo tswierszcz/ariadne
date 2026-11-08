@@ -1,6 +1,6 @@
 # Refleksja — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD). Fundament wartości: [DATA_FLOW.MD](DATA_FLOW.MD).
+Status: plan. Fazy: [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD). Fundament wartości: [DATA_FLOW.MD](../archive/2026-11-07/data_flow/DATA_FLOW.MD).
 
 ## Cel i stan obecny
 

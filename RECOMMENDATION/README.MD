@@ -37,6 +37,13 @@ zarchiwizowane w
 (`COMPLETION.md` tam: co dostarczono, wyrocznia JVM, zestaw CVE, aplikacje kontrolne,
 jawne ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
 
+**Przepływ wartości i danych — DONE (2026-11-07), wszystkie fazy D0–D5.** Dawne
+`DATA_FLOW.MD`/`DATA_FLOW_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-07/data_flow/`](../archive/2026-11-07/data_flow/COMPLETION.md)
+(`COMPLETION.md` tam: co dostarczono, wyrocznia JVM taint, aplikacje kontrolne, jawne
+ograniczenia; kwalifikacja: `docs/TAINT_QUALIFICATION.MD`). Wiersz w `docs/SUPPORT.MD`
+pozostaje `Partial`.
+
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
 | Refleksja i rozpoznawanie nazw klas/metod | [REFLECTION.MD](REFLECTION.MD) | [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD) |
@@ -44,7 +51,6 @@ jawne ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
 | Callbacki i wykonywanie asynchroniczne | [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD) | [ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) |
 | MethodHandle, invokedynamic i dynamiczne stałe | [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD) | [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) |
 | Precyzja grafu: RTA i analiza możliwych obiektów | [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD) | [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) |
-| Przepływ wartości i danych kontrolowanych przez użytkownika | [DATA_FLOW.MD](DATA_FLOW.MD) | [DATA_FLOW_IMPLEMENTATION_PLAN.MD](DATA_FLOW_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 | Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
 | Rozpoznawanie podatności: wersje, poprawki, shading, cache, JDK | [CVE.MD](CVE.MD) | [CVE_IMPLEMENTATION_PLAN.MD](CVE_IMPLEMENTATION_PLAN.MD) |
@@ -64,7 +70,7 @@ jawne ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
 | Konfiguracja i wejścia frameworka | FRAMEWORKS |
 | Dynamiczne ładowanie klas i JNI | RUNTIME_NATIVE; statyczne nazwy klas obsługuje również REFLECTION |
 | RTA i analiza możliwych obiektów | GRAPH_PRECISION |
-| Taint analysis | DATA_FLOW |
+| Taint analysis | DATA_FLOW — **DONE, zarchiwizowane** (D0–D5); pilotaż `-taint` opt-in, kwalifikacja w `docs/TAINT_QUALIFICATION.MD` |
 | Obserwacja działającej aplikacji | RUNTIME_NATIVE |
 | Rozpoznawanie samych podatności — pięć punktów | Istniejące CVE i CVE_IMPLEMENTATION_PLAN |
 | Inne języki, w szczególności Go | ECOSYSTEMS |
