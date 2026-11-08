@@ -1184,6 +1184,33 @@ dependencies. Not all are equally tractable; priority order by how mechanical th
 **Status: not started.** No code written yet; this is a priority list for a future session,
 captured after discussing ecosystem coverage gaps on 2026-10-14.
 
+**Update 2026-11-08: largely done, through the RECOMMENDATION areas that superseded this
+list** (the note above was not updated as they shipped). Per item — current behavior in
+[docs/SUPPORT.MD](docs/SUPPORT.MD), history in
+[RECOMMENDATION/IMPLEMENTATION_STATUS.MD](RECOMMENDATION/IMPLEMENTATION_STATUS.MD):
+1. **ServiceLoader — done.** SERVICE_LOADING S0–S4 (closed 2026-11-05, archived in
+   `archive/2026-11-05/service_loading/`): `META-INF/services` and JPMS inventory, resolved
+   `ServiceLoader.load` sites, provider edges through the B3 model coordinator. Since then
+   the `service-provider:dispatch` model (calls on a JDK/`javax` SPI interface — a receiver
+   CHA skips — to the registered providers and their products; PR #26) closes the remaining
+   case a runtime trace found.
+2. **More dynamic-proxy patterns — partial.** FRAMEWORKS F3's first slice identifies JDK
+   `Proxy` handlers/targets/interceptors (`internal/aop`) without adding edges; Spring Data
+   repositories keep their synthetic edges; the created-type catalog reports
+   `Proxy.newProxyInstance` sites as `dynamic-proxy` gaps. Edges through
+   `InvocationHandler#invoke` are still not modeled (FRAMEWORKS F3/F4).
+3. **Reflection heuristics — done for the declared scope.** REFLECTION R0–R2: literal (and
+   locally traced) `Class.forName`, `getMethod`/`getDeclaredMethod`, `Constructor#newInstance`
+   resolve to real edges; unresolved sites are model gaps of `NOT_REACHABLE` findings. R3–R4
+   (flow across methods, configuration) remain.
+4. **Shaded/relocated dependencies — done for explicit relocation.** CVE F6/F7: embedded
+   components confirmed by class fingerprints against Maven Central (F6a), CycloneDX SBOM
+   candidates (F6b), declared relocations (F7a). Known gadget chains: DESERIALIZATION Z3's
+   chain catalog (closed 2026-11-07). Detecting a relocation nobody declared remains open.
+
+`invokedynamic` beyond lambdas (section 3 point 8) is DYNAMIC_LINKAGE L0–L2 (partial:
+MethodHandle edges for literal lookups; L3–L4 open).
+
 ### Phase 10 (optional, future) — External/offline CVE data file input (`-cves-file`)
 Today Phase 2 (`internal/cves`) always gets CVE data by querying the live OSV API.
 Add a flag, e.g. `-cves-file cves.json`, that **replaces that query** with a file already
@@ -1314,6 +1341,20 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
 
 **Status: not started.** No code written; captured as a backlog, not committed to in this
 order.
+
+**Update 2026-11-08:**
+1. **SARIF — not started.**
+2. **Baseline/diff mode — partial, not as described.** CVE:F3 snapshots
+   (`-snapshot-out`/`-snapshot-compare`) list advisories whose derived result was invalidated
+   or whose verdict changed since a snapshot, and `-graph-out`/`-graph-compare`
+   (GRAPH_PRECISION P0) explain verdict/path changes by call-graph edges. A CI gate on
+   *newly* `REACHABLE` findings against a previous `results.json` (`-baseline`) does not exist.
+3. **Suppression file — not started.**
+4. **RTA — done** as the opt-in `-callgraph-mode rta` (GRAPH_PRECISION P2); P4's benchmark
+   kept CHA as the default (`testdata/graphbench/RESULTS.MD`).
+5. **JDK-itself CVEs — not started** (CVE F8). Related, done: RUNTIME_NATIVE N0–N1 imports
+   runtime traces (`-runtime-trace`) and records the runtime of a run, but no JDK advisory
+   source is wired in.
 
 ## 7. Project layout
 ```
