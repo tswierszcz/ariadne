@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# RUNTIME_NATIVE N1 end-to-end check on a real application: runs the
-# prepared petclinic (scripts/prepare-petclinic.sh) on the real JVM under
-# Java Flight Recorder — stack sampling, class loading, and exact entries
-# (jdk.MethodTrace, JDK 25+) of ServletWebRequest#validateIfNoneMatch
-# (CVE-2024-38809) and DispatcherServlet#doDispatch —, sends a fixed
+# RUNTIME_NATIVE N1 end-to-end check on a real application: analyzes the
+# prepared petclinic (scripts/prepare-petclinic.sh) once to write the JFR
+# settings for exact entries of every mapped vulnerable method of its
+# findings (-runtime-filter-out), runs petclinic on the real JVM under Java
+# Flight Recorder with them — stack sampling, class loading, and
+# jdk.MethodTrace (JDK 25+) —, sends a fixed
 # scenario of requests (pages, then static resources with If-None-Match /
 # If-Modified-Since), stops it, converts the recording with
 # scripts/JfrToTrace.java and runs bin/ariadne -offline -runtime-trace on it.
@@ -19,8 +20,11 @@ w="$root/work/spring-petclinic"
 mkdir -p "$out"
 cd "$root"
 go build -o bin/ariadne ./cmd/ariadne
-filters='org.springframework.web.context.request.ServletWebRequest::validateIfNoneMatch;org.springframework.web.servlet.DispatcherServlet::doDispatch'
-java "-XX:StartFlightRecording=filename=$out/petclinic.jfr,settings=profile,+jdk.ClassLoad#enabled=true,jdk.MethodTrace#enabled=true,jdk.MethodTrace#filter=$filters" \
+analyze() {
+    bin/ariadne -offline -app "$w/app-classes.jar" -deps "$w/target/dependency" -deps-list "$w/deps.txt" -profile spring "$@"
+}
+analyze -runtime-filter-out "$out/vulnerable.jfc" -out "$out/static.md" -json "$out/static.json" 2>&1 | grep -E "runtime filter"
+java "-XX:StartFlightRecording=filename=$out/petclinic.jfr,settings=profile,settings=$out/vulnerable.jfc,+jdk.ClassLoad#enabled=true" \
     -cp "$w/app-classes.jar:$w/target/dependency/*" org.springframework.samples.petclinic.PetClinicApplication --server.port="$port" \
     >"$out/app.log" 2>&1 &
 pid=$!
@@ -44,9 +48,6 @@ wait "$pid" 2>/dev/null || true
 trap - EXIT
 java scripts/JfrToTrace.java --jfr "$out/petclinic.jfr" --out "$out/petclinic.trace" --run-id petclinic \
     --scenario "PetClinicApplication: 8 pages once, then 200 x (3 static resources with If-None-Match and If-Modified-Since, /owners/1)" \
-    --artifact "$w/app-classes.jar" --artifact-dir "$w/target/dependency" \
-    --method-filter 'org.springframework.web.context.request.ServletWebRequest::validateIfNoneMatch' \
-    --method-filter 'org.springframework.web.servlet.DispatcherServlet::doDispatch'
-bin/ariadne -offline -app "$w/app-classes.jar" -deps "$w/target/dependency" -deps-list "$w/deps.txt" -profile spring \
-    -runtime-trace "$out/petclinic.trace" -out "$out/report.md" -json "$out/results.json" -json-format v2 2>&1 | grep -E "runtime trace|REACHABLE="
+    --artifact "$w/app-classes.jar" --artifact-dir "$w/target/dependency"
+analyze -runtime-trace "$out/petclinic.trace" -out "$out/report.md" -json "$out/results.json" -json-format v2 2>&1 | grep -E "runtime trace|REACHABLE="
 sed -n '/^## Runtime evidence/,/^## Withdrawn/p' "$out/report.md"

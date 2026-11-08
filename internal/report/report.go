@@ -723,9 +723,12 @@ func showPerInstance(r reach.Result) bool {
 
 // Runtime is the report's view of an imported runtime trace (RUNTIME_NATIVE N1).
 type Runtime struct {
-	Result     runtimeevents.Result
-	Findings   []RuntimeFinding
-	NotInGraph []runtimeevents.CallObservation
+	Result   runtimeevents.Result
+	Findings []RuntimeFinding
+	// TracedNoEntry: advisories whose mapped methods were traced on entry
+	// and not entered in this run (not evidence of unreachability).
+	TracedNoEntry []RuntimeFinding
+	NotInGraph    []runtimeevents.CallObservation
 }
 
 // RuntimeFinding is one advisory with mapped vulnerable methods seen executing.

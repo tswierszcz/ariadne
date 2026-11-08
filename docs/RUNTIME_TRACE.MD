@@ -96,9 +96,22 @@ analysis missed for this run, worth investigating, never an error of the trace b
 
 ## Producing a trace
 
+`ariadne -runtime-filter-out FILE.jfc` writes the JFR settings that trace, on entry, every
+mapped vulnerable method of the run's findings (verdicts chosen with `-runtime-filter-status`,
+by default all but `NOT_APPLICABLE`; only methods whose class is in the analyzed input): record
+the application with `-XX:StartFlightRecording=settings=profile,settings=FILE.jfc` and every
+finding's vulnerable methods are observed exactly, not only when a sample happens to hit them.
+Tracing many hot methods slows the recorded run; narrow the verdicts if that matters.
+
 `scripts/JfrToTrace.java` converts a Java Flight Recorder recording (JDK 11+ for
 `jdk.ExecutionSample`/`jdk.ClassLoad`; JDK 25+ for exact entries with `jdk.MethodTrace`,
 JEP 520) into this format, recording only classes found in the artifacts it is given. JFR
 does not report where a class's bytes came from, so its classes have `source_basis`
-`classpath-lookup`. See the README for the commands. No Java agent is needed; an agent
+`classpath-lookup`. The `jdk.MethodTrace` filter the recording was made with is read from
+the recording itself into `scope.method_filters`. See the README for the commands.
+
+A finding whose mapped method was covered by `scope.method_filters` and has no `traced`
+entry is reported as **traced, not entered in this run** (v2 `findings[].runtime_traced`
+without a traced `runtime_observed` entry): more informative than a sampled miss, still
+**not** evidence of unreachability — another scenario may run it. No Java agent is needed; an agent
 (RUNTIME_NATIVE N3) would be another recorder of the same format.
