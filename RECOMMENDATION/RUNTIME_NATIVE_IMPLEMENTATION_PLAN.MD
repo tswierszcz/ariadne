@@ -1,8 +1,8 @@
 # Runtime i native — fazy N0–N5
 
-Status: plan. Wymagania: [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: N0, N1 DONE (2026-11-08: kontrakt `ariadne-runtime-trace-1`, importer `internal/runtimeevents` `n1-1`, `-runtime-trace`, rejestrator z JFR bez agenta); N2–N5 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD).
 
-## N0. Kontrakt śladu i zakres dowodów
+## N0. Kontrakt śladu i zakres dowodów — DONE (2026-11-08)
 
 Zależności: B0–B1, wspólne pochodzenie CVE F1; snapshoty CVE F3 przed deklaracją odtwarzalności.
 
@@ -13,7 +13,9 @@ Zależności: B0–B1, wspólne pochodzenie CVE F1; snapshoty CVE F3 przed dekla
 
 Gotowe: można opisać wiarygodność pojedynczego zdarzenia i całego przebiegu, także przy częściowym śladzie.
 
-## N1. Importer offline i korelacja
+Wykonano (2026-11-08): `docs/RUNTIME_TRACE.MD` — format JSON Lines `ariadne-runtime-trace-1`: nagłówek (run id, scenariusz, zakres czasu, runtime, rejestrator i wersja, zakres: rodzaje zdarzeń, klasy, filtry metod; próbkowanie; kompletność: utracone zdarzenia, ucięte stosy, przyczyny; polityka danych `identifiers-only`), rekordy tożsamości (artefakt z SHA-256, loader, definicja klasy per loader z hashem i `source_basis` `observed`/`classpath-lookup`, metoda z deskryptorem) i dowodów (`loaded`, `executed` `traced`/`sampled`, `call` `stack-adjacent`/`stack-through-runtime` z bci/linią wywołującego — tylko zmierzone, `handoff` tylko przy skorelowanych końcach); reguły czytania (brak zdarzenia nic nie dowodzi, wykonanie ≠ wykorzystanie, załadowanie ≠ wykonanie, czas ≠ przyczynowość) i statusy korelacji. Rejestrator bez agenta: `scripts/JfrToTrace.java` (JFR `jdk.ClassLoad`, `jdk.ExecutionSample`, na JDK 25+ `jdk.MethodTrace`).
+
+## N1. Importer offline i korelacja — DONE (2026-11-08)
 
 - Utworzyć proponowany `internal/runtimeevents` z walidacją formatu, typów, odwołań i limitów danych wejściowych.
 - Powiązać metodę z komponentem/bytecode/deskryptorem. Niezgodny hash, nieznany loader lub brak klasy daje brak dopasowania, a nie arbitralne przypięcie do znanego FQCN.
@@ -21,6 +23,8 @@ Gotowe: można opisać wiarygodność pojedynczego zdarzenia i całego przebiegu
 - Zachować id dowodu w wynikach i snapshotach, np. proponowane wejście `-runtime-trace`.
 
 Gotowe: poprawny trace, inna wersja artefaktu, dwa loadery i niepełny trace mają odrębne wyniki. N0–N1 to pierwszy zakres runtime, bez konieczności tworzenia agenta.
+
+Wykonano (2026-11-08): `internal/runtimeevents` (`n1-1`): `Parse` — ścisła walidacja (nieznane rodzaje/pola, wiszące odwołania, duplikaty, wartości spoza enumeracji, rodzaj niezadeklarowany w nagłówku, próbkowany a „kompletny”, limity rozmiaru) odrzuca cały plik; `Correlate` — klasa po SHA-256 pliku klasy (albo artefaktu): `matched`/`matched_artifact` (dowód), `different_version`/`name_only`/`not_in_input` (pokazane, nieużyte), definicje per loader osobno; metody → węzły grafu; zmierzone wywołania → `in_graph` (z podstawami krawędzi) / `not_in_graph`; podatne metody zaobserwowane per ustalenie i instancja. CLI `-runtime-trace` (walidacja przed analizą), raport „Runtime evidence”, v2 `runtime` i `findings[].runtime_observed`, snapshot (wejście `runtime-trace`, wersja `runtime.import`). Graf i werdykty bez zmian. Fixture JFR `testdata/runtime` (`scripts/runtime-trace-fixture.sh`) i prawdziwy przebieg petclinic (`scripts/runtime-trace-petclinic.sh`). Szczegóły: IMPLEMENTATION_STATUS, wpis RUNTIME_NATIVE:N0–N1.
 
 ## N2. Dodatkowe klasy i kontekst ładowania
 

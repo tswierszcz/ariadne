@@ -829,6 +829,44 @@ what's genuinely Quarkus-/MicroProfile-specific on top. No
 wiring at build time via Jandex indexing and bytecode recording, the same
 "real class, not a runtime proxy" story as Micronaut.
 
+### Runtime evidence (`internal/runtimeevents`, optional)
+
+RUNTIME_NATIVE N0–N1. `-runtime-trace FILE` imports what one real run of
+the application did — loaded classes, methods seen executing, measured
+caller → callee relations — in the versioned format
+[docs/RUNTIME_TRACE.MD](docs/RUNTIME_TRACE.MD), and shows it next to the
+static results ("Runtime evidence" report section, v2 `runtime` and
+`findings[].runtime_observed`). It **never** changes the graph or a
+verdict: the absence of an event proves nothing, and a vulnerable method
+seen executing is evidence that the code ran, not that an attacker's data
+reached it. Evidence counts only for classes whose class file (or jar) has
+the recorded SHA-256 — another build of the code, or a class known only by
+name, is reported, never attached — and a class defined by two loaders
+stays two definitions. Measured calls are checked against the static
+graph: `not_in_graph` lists relations the run took that the static
+analysis has no edge for.
+
+No Java agent is needed: `scripts/JfrToTrace.java` converts a Java Flight
+Recorder recording. Stack sampling (`jdk.ExecutionSample`) gives methods
+and measured relations, class loading (`jdk.ClassLoad`) the loaded
+classes, and on JDK 25+ `jdk.MethodTrace` exact entries of the methods you
+name — typically the vulnerable methods of the findings you care about:
+
+```sh
+java -XX:StartFlightRecording=filename=run.jfr,settings=profile,+jdk.ClassLoad#enabled=true,jdk.MethodTrace#enabled=true,jdk.MethodTrace#filter='a.b.C::m' -cp … your.Main
+java scripts/JfrToTrace.java --jfr run.jfr --out run.trace --scenario "what you ran" \
+     --artifact app.jar --artifact-dir deps/ --method-filter 'a.b.C::m'
+bin/ariadne … -runtime-trace run.trace
+```
+
+On petclinic (`scripts/runtime-trace-petclinic.sh`) a scenario of pages and
+static-resource requests traces CVE-2024-38809's
+`ServletWebRequest#validateIfNoneMatch` about 1 400 times, and shows
+CVE-2025-35036's `ValidatorFactoryImpl#<init>` executing while the static
+verdict is `NOT_REACHABLE` (it is reached through a `javax.validation`
+SPI call the graph does not expand) — runtime evidence pointing at a
+static gap, not overriding the verdict.
+
 ### 8. The report (`internal/report`)
 
 `report.md` is rendered from an embedded template and includes: a header
@@ -955,6 +993,7 @@ Flags:
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
 | `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0/P2): `cha` (the default) or `rta` (opt-in: CHA edges narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback; see section 4). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
 | `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings, the findings' paths and the created-type catalog (GRAPH_PRECISION P1) — as sorted text (`ariadne-callgraph-2`; large: ≈ 370 MB for WebGoat). |
+| `-runtime-trace` | no | Import a runtime trace (RUNTIME_NATIVE N1, [docs/RUNTIME_TRACE.MD](docs/RUNTIME_TRACE.MD); e.g. from `scripts/JfrToTrace.java`): loaded classes, executed methods and measured calls, matched to the analyzed classes by content hash and shown next to the results (report "Runtime evidence", v2 `runtime`, `findings[].runtime_observed`); never changes the graph or a verdict. Validated before the analysis; recorded as a snapshot input. |
 | `-graph-compare` | no | Compare this run's graph with a `-graph-out` file: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any settings difference (report "Call graph compared with …", v2 `callgraph.comparison`). |
 | `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
 | `-out` | yes | `report.md` output path. |
@@ -1140,6 +1179,8 @@ itself) uses the scripts in `scripts/`:
 ./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
 ./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
+./scripts/runtime-trace-fixture.sh    /path/to/jdk25-or-later/JAVA_HOME # JFR-recorded runtime trace of testdata/runtime (rtm.jar, rtm-v2.jar, run.trace)
+./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # run the prepared petclinic under JFR, send a fixed scenario, convert, import (java 25+ on PATH)
 ./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
@@ -1182,6 +1223,10 @@ work/                     cloned/built target apps (gitignored; scripts/prepare-
 
 These are structural, not bugs, and are also printed in every generated
 report:
+
+- **Runtime traces are evidence of one run** (`-runtime-trace`): nothing
+  not seen in a trace is less reachable, sampled traces differ between
+  runs, and a trace recorded on another build of the code is not used.
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK
   `Proxy`), and any `invokedynamic` site other than a lambda/method

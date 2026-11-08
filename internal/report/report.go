@@ -21,6 +21,7 @@ import (
 	"ariadne/internal/profile"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
+	"ariadne/internal/runtimeevents"
 	"ariadne/internal/serviceload"
 	"ariadne/internal/snapshot"
 )
@@ -177,6 +178,9 @@ type Data struct {
 	// created classes, summarized, and its gaps.
 	CreatedTypes    *alloc.Summary
 	CreatedTypeGaps []alloc.Gap
+	// Runtime (RUNTIME_NATIVE N1): the imported trace with -runtime-trace;
+	// nil otherwise.
+	Runtime *Runtime
 	// RTA (GRAPH_PRECISION P2): the fixed point's result with
 	// -callgraph-mode rta; nil otherwise.
 	RTA             *callgraph.RTAResult
@@ -715,4 +719,26 @@ func showPerInstance(r reach.Result) bool {
 		}
 	}
 	return false
+}
+
+// Runtime is the report's view of an imported runtime trace (RUNTIME_NATIVE N1).
+type Runtime struct {
+	Result     runtimeevents.Result
+	Findings   []RuntimeFinding
+	NotInGraph []runtimeevents.CallObservation
+}
+
+// RuntimeFinding is one advisory with mapped vulnerable methods seen executing.
+type RuntimeFinding struct {
+	Advisory string
+	Status   string
+	Observed []runtimeevents.MethodObservation
+}
+
+// MultiDefinedText lists the classes defined by several loaders.
+func (r Runtime) MultiDefinedText() string {
+	if len(r.Result.MultiDefined) == 0 {
+		return "none"
+	}
+	return strings.Join(r.Result.MultiDefined, ", ")
 }
