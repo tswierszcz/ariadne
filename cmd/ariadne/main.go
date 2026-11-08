@@ -87,6 +87,8 @@ type config struct {
 	graphOut       string
 	graphCompare   string
 	runtimeTrace   string
+	runtimeFilter  string
+	runtimeStatus  string
 
 	llm        bool
 	llmModel   string
@@ -136,6 +138,8 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback)`)
 	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
 	fs.StringVar(&cfg.runtimeTrace, "runtime-trace", "", "import a runtime trace (RUNTIME_NATIVE N1, format ariadne-runtime-trace-1, docs/RUNTIME_TRACE.MD; e.g. from scripts/JfrToTrace.java): loaded classes, methods seen executing and measured caller → callee relations, matched to the analyzed classes by content hash and shown next to the static results; it never changes the graph or a verdict, and the absence of an event proves nothing")
+	fs.StringVar(&cfg.runtimeFilter, "runtime-filter-out", "", "write a JFR settings file (.jfc) that traces, on entry, the mapped vulnerable methods of this run's findings (jdk.MethodTrace, JDK 25+), to record the next run with: java -XX:StartFlightRecording=settings=profile,settings=FILE ...; then import the converted recording with -runtime-trace")
+	fs.StringVar(&cfg.runtimeStatus, "runtime-filter-status", defaultRuntimeFilterStatus, "with -runtime-filter-out: comma-separated verdicts whose mapped methods are traced")
 	fs.StringVar(&cfg.graphCompare, "graph-compare", "", "compare this run's call graph with one written earlier by -graph-out: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any difference in the graph settings")
 	fs.BoolVar(&cfg.taint, "taint", false, "DATA_FLOW D4 (opt-in, report-only): assess whether request data (Spring MVC/JAX-RS handler parameters, ServletRequest accessors) reaches the data each deserialization entry reads; adds a taint result per entry, never changes a verdict")
 	fs.BoolVar(&cfg.allowStale, "allow-stale", false, "when an online refresh fails, use the cached copy and mark the report as built on stale data (never past -max-data-age)")
@@ -218,6 +222,13 @@ func validate(cfg config) error {
 	}
 	if cfg.roots != "all" && cfg.roots != "profile" {
 		return fmt.Errorf("-roots must be %q or %q, got %q", "all", "profile", cfg.roots)
+	}
+	for _, s := range strings.Split(cfg.runtimeStatus, ",") {
+		switch reach.Status(strings.TrimSpace(s)) {
+		case reach.StatusReachable, reach.StatusFramework, reach.StatusNotReachable, reach.StatusUnknown, reach.StatusNotApplicable:
+		default:
+			return fmt.Errorf("-runtime-filter-status: unknown verdict %q", s)
+		}
 	}
 	if _, err := callgraph.StrategyFor(cfg.callgraphMode); err != nil {
 		return fmt.Errorf("-callgraph-mode: %w", err)
@@ -1057,16 +1068,28 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	engine.SetWebAssetPackages(webAssets)
 	results := engine.Analyze(cveList, vm)
 
+	// RUNTIME_NATIVE N1: the exact-entry tracing selection for a recorded
+	// run (-runtime-filter-out; the file is written with the other outputs).
+	var runtimeFilterSel RuntimeFilter
+	if cfg.runtimeFilter != "" {
+		runtimeFilterSel = runtimeFilter(results, h, cfg.runtimeStatus)
+		if len(runtimeFilterSel.Filters) == 0 {
+			warnings = append(warnings, "-runtime-filter-out: no mapped vulnerable method of the selected verdicts is in the analyzed input; the settings file traces nothing")
+		}
+	}
+
 	// RUNTIME_NATIVE N1: correlate the imported trace with the final graph.
 	// Evidence next to the results; no edge or verdict changes.
 	var runtimeResult *runtimeevents.Result
 	var runtimeObs map[string]map[string][]runtimeevents.MethodObservation
+	var runtimeTracedBy map[string]map[string]bool
 	if runtimeTrace != nil {
 		lookup, closeJars := classLookup(h)
 		rt := runtimeevents.Correlate(runtimeTrace, runtimeevents.Inputs{G: g, Lookup: lookup})
 		closeJars()
 		runtimeResult = &rt
 		runtimeObs = runtimeObserved(rt, results, h, components)
+		runtimeTracedBy = runtimeTraced(rt, results, h, components)
 		log("runtime trace (RUNTIME_NATIVE N1, %s): run %s, %s, sampling %s, complete=%t; classes %s; loaded %s; executed (usable) %s, %d not usable; calls %s; %d advisories with an observed vulnerable method",
 			cfg.runtimeTrace, rt.RunID, rt.Recorder, rt.Sampling, rt.Complete, report.GapCounts(rt.ClassCounts), report.GapCounts(rt.LoadedCounts),
 			report.GapCounts(rt.ExecutedCounts), rt.ExecutedOther, report.GapCounts(rt.CallCounts), len(runtimeObs))
@@ -1251,7 +1274,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(cfg.graphCompare)
 	data.CreatedTypes, data.CreatedTypeGaps, data.RTA = &allocSummary, allocCatalog.Gaps, rtaResult
 	if runtimeResult != nil {
-		data.Runtime = &report.Runtime{Result: *runtimeResult, Findings: runtimeFindings(runtimeObs, results), NotInGraph: runtimeResult.NotInGraph()}
+		data.Runtime = &report.Runtime{Result: *runtimeResult, Findings: runtimeFindings(runtimeObs, results), TracedNoEntry: tracedNoEntry(runtimeTracedBy, runtimeObs, results), NotInGraph: runtimeResult.NotInGraph()}
 	}
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
@@ -1275,7 +1298,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
 		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
 		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult},
-		Runtime:   runtimeResult, RuntimeObserved: runtimeObs,
+		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
@@ -1343,6 +1366,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 		outputs.Add(cfg.graphOut, []byte(gb.String()))
 	}
+	if cfg.runtimeFilter != "" {
+		outputs.Add(cfg.runtimeFilter, runtimeFilterSel.jfcFile(cfg.runtimeStatus))
+	}
 	if sr.recorder != nil {
 		current.AnalysisID = doc.AnalysisID
 		manifest, err := snapshot.Marshal(current)
@@ -1356,6 +1382,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("wrote %s", cfg.out)
 	log("wrote %s", cfg.jsonOut)
+	if cfg.runtimeFilter != "" {
+		log("wrote runtime filter %s: exact entries of %d mapped vulnerable methods of %d advisories (%s; %d mapped methods not in the input); record with -XX:StartFlightRecording=settings=profile,settings=%s (JDK 25+)",
+			cfg.runtimeFilter, len(runtimeFilterSel.Filters), runtimeFilterSel.Advisories, cfg.runtimeStatus, runtimeFilterSel.Skipped, cfg.runtimeFilter)
+	}
 	if cfg.graphOut != "" {
 		log("wrote call graph %s (%d edges, %s)", cfg.graphOut, len(graphNow.Edges), callgraph.ExportFormat)
 	}

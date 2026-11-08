@@ -849,23 +849,33 @@ analysis has no edge for.
 No Java agent is needed: `scripts/JfrToTrace.java` converts a Java Flight
 Recorder recording. Stack sampling (`jdk.ExecutionSample`) gives methods
 and measured relations, class loading (`jdk.ClassLoad`) the loaded
-classes, and on JDK 25+ `jdk.MethodTrace` exact entries of the methods you
-name — typically the vulnerable methods of the findings you care about:
+classes, and on JDK 25+ `jdk.MethodTrace` exact entries of chosen methods.
+`-runtime-filter-out` writes those choices for you — every mapped
+vulnerable method of the findings (`-runtime-filter-status` narrows the
+verdicts) — as a JFR settings file:
 
 ```sh
-java -XX:StartFlightRecording=filename=run.jfr,settings=profile,+jdk.ClassLoad#enabled=true,jdk.MethodTrace#enabled=true,jdk.MethodTrace#filter='a.b.C::m' -cp … your.Main
+bin/ariadne … -runtime-filter-out vulnerable.jfc
+java -XX:StartFlightRecording=filename=run.jfr,settings=profile,settings=vulnerable.jfc,+jdk.ClassLoad#enabled=true -cp … your.Main
 java scripts/JfrToTrace.java --jfr run.jfr --out run.trace --scenario "what you ran" \
-     --artifact app.jar --artifact-dir deps/ --method-filter 'a.b.C::m'
+     --artifact app.jar --artifact-dir deps/
 bin/ariadne … -runtime-trace run.trace
 ```
 
-On petclinic (`scripts/runtime-trace-petclinic.sh`) a scenario of pages and
-static-resource requests traces CVE-2024-38809's
-`ServletWebRequest#validateIfNoneMatch` about 1 400 times, and shows
-CVE-2025-35036's `ValidatorFactoryImpl#<init>` executing while the static
-verdict is `NOT_REACHABLE` (it is reached through a `javax.validation`
-SPI call the graph does not expand) — runtime evidence pointing at a
-static gap, not overriding the verdict.
+The report then lists the advisories whose vulnerable methods were
+entered, with exact counts, and those **traced but not entered in this
+run** — under that scenario only, never a negative.
+
+On petclinic (`scripts/runtime-trace-petclinic.sh`: pages and static
+resources) the generated settings trace 505 vulnerable methods of 91
+advisories: 26 advisories' methods are entered — all 3 statically
+`REACHABLE` ones, 23 of the 74 `FRAMEWORK` ones (CVE-2024-38809's
+`ServletWebRequest#validateIfNoneMatch` about 1 400 times), and
+CVE-2025-35036's `ValidatorFactoryImpl#<init>` while the static verdict is
+`NOT_REACHABLE` (it is reached through a `javax.validation` SPI call the
+graph does not expand) — and 65 are traced but not entered in that
+scenario. Runtime evidence points at a static gap; it does not override
+the verdict.
 
 ### 8. The report (`internal/report`)
 
@@ -994,6 +1004,8 @@ Flags:
 | `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0/P2): `cha` (the default) or `rta` (opt-in: CHA edges narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback; see section 4). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
 | `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings, the findings' paths and the created-type catalog (GRAPH_PRECISION P1) — as sorted text (`ariadne-callgraph-2`; large: ≈ 370 MB for WebGoat). |
 | `-runtime-trace` | no | Import a runtime trace (RUNTIME_NATIVE N1, [docs/RUNTIME_TRACE.MD](docs/RUNTIME_TRACE.MD); e.g. from `scripts/JfrToTrace.java`): loaded classes, executed methods and measured calls, matched to the analyzed classes by content hash and shown next to the results (report "Runtime evidence", v2 `runtime`, `findings[].runtime_observed`); never changes the graph or a verdict. Validated before the analysis; recorded as a snapshot input. |
+| `-runtime-filter-out` | no | Write a JFR settings file (`.jfc`) tracing on entry (`jdk.MethodTrace`, JDK 25+) the mapped vulnerable methods of this run's findings whose class is in the input; record the next run with `-XX:StartFlightRecording=settings=profile,settings=FILE` and import it with `-runtime-trace`. |
+| `-runtime-filter-status` | no | With `-runtime-filter-out`: comma-separated verdicts whose mapped methods are traced (default `REACHABLE,FRAMEWORK,NOT_REACHABLE,UNKNOWN`). |
 | `-graph-compare` | no | Compare this run's graph with a `-graph-out` file: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any settings difference (report "Call graph compared with …", v2 `callgraph.comparison`). |
 | `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
 | `-out` | yes | `report.md` output path. |
@@ -1180,7 +1192,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
 ./scripts/runtime-trace-fixture.sh    /path/to/jdk25-or-later/JAVA_HOME # JFR-recorded runtime trace of testdata/runtime (rtm.jar, rtm-v2.jar, run.trace)
-./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # run the prepared petclinic under JFR, send a fixed scenario, convert, import (java 25+ on PATH)
+./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # write petclinic's vulnerable-method JFR settings, run it under JFR with them, send a fixed scenario, convert, import (java 25+ on PATH)
 ./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)

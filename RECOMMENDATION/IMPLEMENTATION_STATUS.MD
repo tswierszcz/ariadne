@@ -23,7 +23,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: UNASSESSED (nieuzasadnione wynikami P4) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
-| RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | N0, N1: DONE (2026-11-08); N2–N5: UNASSESSED | Kontrakt śladu `ariadne-runtime-trace-1` i importer `-runtime-trace` (dopasowanie po hashach klas, definicje per loader, wywołania vs graf statyczny, podatne metody zaobserwowane per ustalenie); rejestrator z JFR bez agenta. petclinic: CVE-2024-38809 śledzone ~1 400 razy, CVE-2025-35036 wykonane mimo NOT_REACHABLE (luka `javax.validation` SPI). Graf i werdykty bez zmian. Szczegóły we wpisie RUNTIME_NATIVE:N0–N1. |
+| RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | N0, N1: DONE (2026-11-08; PR #24, [zarchiwizowane](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)); N2–N5: UNASSESSED | `-runtime-filter-out`: ustawienia JFR śledzące wszystkie podatne metody ustaleń — petclinic: 505 metod / 91 advisories, 26 wykonanych (3/3 REACHABLE, 23/74 FRAMEWORK, CVE-2025-35036 NOT_REACHABLE), 65 śledzonych bez wejścia. Kontrakt śladu `ariadne-runtime-trace-1` i importer `-runtime-trace` (dopasowanie po hashach klas, definicje per loader, wywołania vs graf statyczny, podatne metody zaobserwowane per ustalenie); rejestrator z JFR bez agenta. petclinic: CVE-2024-38809 śledzone ~1 400 razy, CVE-2025-35036 wykonane mimo NOT_REACHABLE (luka `javax.validation` SPI). Graf i werdykty bez zmian. Szczegóły we wpisie RUNTIME_NATIVE:N0–N1. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
@@ -134,6 +134,54 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   odzwierciedlał rzeczywisty launcher), lifecycle `init`, wewnętrzny łańcuch
   Spring Security, luka ustalenia przy niezarejestrowanym dispatchu.
 
+### RUNTIME_NATIVE:N1 — filtr dokładnego śledzenia z mapowań CVE — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** generowanie z mapowań CVE ustawień
+  JFR śledzących na wejściu podatne metody ustaleń, odczyt aktywnego filtra
+  z nagrania, oznaczenie ustaleń „śledzone, bez wejścia w tym przebiegu”.
+  Gałąź `runtime-filter` od `main` (po PR #24); w tym samym commicie
+  archiwizacja N0–N1.
+- **Zrealizowane:**
+  1. `-runtime-filter-out FILE.jfc` i `-runtime-filter-status` (domyślnie
+     wszystkie werdykty poza NOT_APPLICABLE; nieznany werdykt → błąd):
+     `runtimeFilter` — filtry `Class::method` (konstruktory `<init>`,
+     escapowane w XML) dla zmapowanych metod, których klasa jest w
+     wejściu; plik `.jfc` z `jdk.MethodTrace` (`enabled`, `stackTrace`,
+     `threshold 0 ms`, `filter`), podawany obok `profile`
+     (`settings=profile,settings=FILE`); pusty wybór → plik wyłączony i
+     ostrzeżenie.
+  2. `scripts/JfrToTrace.java`: filtr `jdk.MethodTrace` aktywny w
+     nagraniu (`jdk.ActiveSetting`) trafia do `scope.method_filters`;
+     `--method-filter` tylko dopisuje.
+  3. `runtimeTraced`/`tracedNoEntry`: ustalenia, których zmapowana metoda
+     była objęta filtrem — v2 `findings[].runtime_traced`; raport: lista
+     „Traced on entry, not entered in this run” z zastrzeżeniem, że to nie
+     dowód nieosiągalności.
+  4. `scripts/runtime-trace-petclinic.sh`: najpierw analiza z
+     `-runtime-filter-out`, potem przebieg z wygenerowanym plikiem.
+- **Weryfikacja:** sprawdzono najpierw na JDK 25, że JFR przyjmuje drugi
+  plik ustawień obok `profile`, że filtr obsługuje `<init>` i że aktywny
+  filtr jest zapisany w nagraniu (`jdk.ActiveSetting`). `TestRuntimeFilter`
+  (wybór per werdykt, klasa spoza wejścia pominięta, escapowanie,
+  pokrycie i „bez wejścia”), `TestRuntimeFilterFlag` (pusty wybór →
+  wyłączony plik i ostrzeżenie w raporcie; nieznany werdykt odrzucony).
+  petclinic: filtr 505 metod z 91 advisories (79 zmapowanych metod spoza
+  wejścia), przebieg z ok. 193 000 dokładnych wejść, 39 936 uciętych
+  stosów (głębokie stosy wejść); 70 śledzonych metod wykonanych — 26
+  advisories z dokładnym wejściem: wszystkie 3 statycznie REACHABLE, 23 z
+  74 FRAMEWORK, CVE-2025-35036 (NOT_REACHABLE, 26 wejść); 65 advisories
+  śledzonych bez wejścia w tym scenariuszu; werdykty bez zmian.
+  `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/RUNTIME_TRACE.MD`, `docs/RESULTS_CONTRACT.MD`
+  (`findings[].runtime_traced`), `docs/SUPPORT.MD`, README (sekcja, flagi,
+  skrypt), plan RUNTIME_NATIVE (archiwizacja N0–N1), ten rejestr.
+- **Ograniczenia:** śledzenie wielu gorących metod spowalnia nagrywany
+  przebieg (`-runtime-filter-status` zawęża); filtr JFR nie rozróżnia
+  overloadów (śledzi każdy o tej nazwie); metody zmapowane na klasy spoza
+  wejścia pominięte; „bez wejścia” dotyczy tylko tego scenariusza.
+- **Następny krok (wymaga zgody):** model wywołań SPI `javax.*` przez
+  zarejestrowanych providerów (CVE-2025-35036), albo N2.
+
 ### RUNTIME_NATIVE:N0–N1 — kontrakt śladu i importer offline — DONE (2026-11-08)
 
 - **Zakres zatwierdzony (2026-11-08):** N0 (wersjonowany format śladu i
@@ -207,9 +255,12 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   kontekstu loaderów poza rozdzieleniem definicji (N2), bez korelacji
   handoff z JFR (N4), bez native/JNI (N5); filtr `jdk.MethodTrace` trzeba
   podać ręcznie.
-- **Następny krok (wymaga zgody):** model wywołań SPI `javax.validation`
-  (wskazany przez ślad), lista `jdk.MethodTrace#filter` generowana z
-  mapowań CVE, albo N2 (kontekst loaderów).
+- **Wydanie i archiwum:** zmergowane jako PR #24 (2026-11-08); tekst faz
+  przeniesiony do [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md).
+- **Następny krok:** lista `jdk.MethodTrace#filter` z mapowań CVE —
+  zrobione (wpis „RUNTIME_NATIVE:N1 — filtr dokładnego śledzenia”).
+  Pozostaje (wymaga zgody): model wywołań SPI `javax.validation`
+  (wskazany przez ślad) albo N2 (kontekst loaderów).
 
 ### GRAPH_PRECISION:P4 — benchmark i kwalifikacja — DONE (2026-11-08)
 

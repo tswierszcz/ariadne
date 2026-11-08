@@ -299,6 +299,11 @@ type Finding struct {
 	// this instance seen executing in the imported trace. Execution is not
 	// exploitation; an empty list says nothing (absence is not evidence).
 	RuntimeObserved []runtimeevents.MethodObservation `json:"runtime_observed,omitempty"`
+	// RuntimeTraced (RUNTIME_NATIVE N1): exact-entry tracing covered a
+	// mapped method of this finding in the recorded run. With no traced
+	// entry in runtime_observed it means "traced, not entered in this
+	// run" — still not evidence of unreachability.
+	RuntimeTraced bool `json:"runtime_traced,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -380,6 +385,7 @@ type Inputs struct {
 	// trace and, per advisory and instance, its observed vulnerable methods.
 	Runtime         *runtimeevents.Result
 	RuntimeObserved map[string]map[string][]runtimeevents.MethodObservation
+	RuntimeTraced   map[string]map[string]bool
 }
 
 // DataFreshness is the run's data-freshness state (CVE:F2): State is
@@ -556,6 +562,7 @@ func Build(in Inputs) Document {
 				ModelGaps: f.ModelGaps, Path: f.Path, Entry: f.Entry, Note: f.Note,
 				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
 				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
+				RuntimeTraced:         in.RuntimeTraced[cve.ID][f.Instance],
 			})
 			counts.Findings++
 			counts.FindingsByReachability[string(f.Status)]++

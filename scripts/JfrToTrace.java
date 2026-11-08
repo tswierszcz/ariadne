@@ -24,6 +24,9 @@ import jdk.jfr.consumer.*;
  *        --artifact app.jar [--artifact dep.jar ...] [--artifact-dir dir-of-jars]
  *        [--run-id id] [--method-filter Class::method ...]
  *
+ * The jdk.MethodTrace filter active in the recording (jdk.ActiveSetting) is
+ * read from the recording itself; --method-filter only adds to it.
+ *
  * Record with, e.g.:
  *   java -XX:StartFlightRecording=filename=rec.jfr,settings=profile,+jdk.ClassLoad#enabled=true \
  *        '-XX:StartFlightRecording=...,jdk.MethodTrace#enabled=true,jdk.MethodTrace#filter=a.B::m' ...
@@ -73,6 +76,7 @@ public final class JfrToTrace {
     final Map<String, int[]> calls = new TreeMap<>(); // caller\0callee\0basis\0source\0bci\0line -> count
     int truncated, samples, traces, classLoads;
     long first = Long.MAX_VALUE, last = Long.MIN_VALUE;
+    final Set<String> activeFilters = new TreeSet<>();
     String jvmName = "", jvmVersion = "", jvmVendor = "", jvmVersionInfo = "", samplingPeriod = "";
 
     void run(Path jfr, Path out, String scenario, String runId, List<Path> artifacts, List<String> filters) throws Exception {
@@ -112,10 +116,18 @@ public final class JfrToTrace {
                         }
                     }
                     case "jdk.ActiveSetting" -> {
-                        if ("period".equals(e.getString("name")) && samplingPeriod.isEmpty()) {
+                        String setting = e.getString("name");
+                        boolean period = "period".equals(setting) && samplingPeriod.isEmpty();
+                        boolean filter = "filter".equals(setting) && !e.getString("value").isEmpty();
+                        if (period || filter) {
                             long typeId = e.getLong("id");
                             for (var et : f.readEventTypes()) {
-                                if (et.getId() == typeId && et.getName().equals("jdk.ExecutionSample")) samplingPeriod = e.getString("value");
+                                if (et.getId() != typeId) continue;
+                                if (period && et.getName().equals("jdk.ExecutionSample")) samplingPeriod = e.getString("value");
+                                // the jdk.MethodTrace filter the run was recorded with
+                                if (filter && et.getName().equals("jdk.MethodTrace")) {
+                                    for (String x : e.getString("value").split(";")) if (!x.isBlank()) activeFilters.add(x.trim());
+                                }
                             }
                         }
                     }
@@ -127,6 +139,9 @@ public final class JfrToTrace {
             }
         }
         if (jvmVersion.isEmpty()) jvmVersion = jvmVersionInfo; // jdk.InitialSystemProperty not recorded
+        // --method-filter adds to the filters the recording says were active
+        activeFilters.addAll(filters);
+        filters = new ArrayList<>(activeFilters);
         write(out, scenario, runId == null ? sha256(Files.readAllBytes(jfr)).substring(0, 16) : runId, filters);
         System.err.printf("JfrToTrace: %d class loads, %d samples, %d method traces → %d classes, %d methods, %d executed, %d calls (%d truncated stacks)%n",
                 classLoads, samples, traces, classes.size(), methods.size(), executed.size(), calls.size(), truncated);
