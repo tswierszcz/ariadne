@@ -1103,7 +1103,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var runtimeTracedBy map[string]map[string]bool
 	if runtimeTrace != nil {
 		lookup, closeJars := classLookup(h)
-		rt := runtimeevents.Correlate(runtimeTrace, runtimeevents.Inputs{G: g, Lookup: lookup})
+		rt := runtimeevents.Correlate(runtimeTrace, runtimeevents.Inputs{G: g, Lookup: lookup, Classify: gapClassifier(h, g.Config().Mode)})
 		closeJars()
 		runtimeResult = &rt
 		runtimeObs = runtimeObserved(rt, results, h, components)

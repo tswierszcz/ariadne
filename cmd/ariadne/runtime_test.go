@@ -55,8 +55,8 @@ func TestRuntimeTrace(t *testing.T) {
 	if doc.CallGraph.Edges != plain.CallGraph.Edges || len(doc.Findings) != len(plain.Findings) {
 		t.Errorf("the trace changed the analysis: edges %d vs %d, findings %d vs %d", doc.CallGraph.Edges, plain.CallGraph.Edges, len(doc.Findings), len(plain.Findings))
 	}
-	if rt.ClassCounts[runtimeevents.StatusMatched] != 7 || len(rt.ClassCounts) != 1 {
-		t.Errorf("classes %v, want 7 matched", rt.ClassCounts)
+	if rt.ClassCounts[runtimeevents.StatusMatched] != 12 || len(rt.ClassCounts) != 1 {
+		t.Errorf("classes %v, want 12 matched", rt.ClassCounts)
 	}
 	if strings.Join(rt.MultiDefined, ",") != "rtm.Plugin" {
 		t.Errorf("several definitions %v, want rtm.Plugin", rt.MultiDefined)
@@ -64,10 +64,20 @@ func TestRuntimeTrace(t *testing.T) {
 	if rt.ExecutedCounts["traced"] != 1 || rt.ExecutedCounts["sampled"] == 0 || rt.ExecutedOther != 0 {
 		t.Errorf("executed %v (+%d not usable)", rt.ExecutedCounts, rt.ExecutedOther)
 	}
-	if rt.CallCounts[runtimeevents.CallNotInGraph] != 2 || rt.CallCounts[runtimeevents.CallInGraph] == 0 {
-		t.Errorf("calls %v: want the 2 reflective calls (one per loader) not in the graph", rt.CallCounts)
+	if rt.CallCounts[runtimeevents.CallNotInGraph] != 4 || rt.CallCounts[runtimeevents.CallInGraph] == 0 {
+		t.Errorf("calls %v: want 4 not in the graph", rt.CallCounts)
 	}
-	for _, want := range []string{"## Runtime evidence", "**incomplete**", "`rtm.Main#reflective(Ljava/lang/ClassLoader;J)J` (line", "`rtm.Plugin#work(J)J`", "The absence of an event\nproves nothing"} {
+	// Why: the reflective call under each loader, the body Greeter inherits
+	// from a class outside its type, a lambda run through Work#run in
+	// another method than the one creating it.
+	causes := map[string]int{}
+	for _, g := range rt.GapCauses {
+		causes[g.Cause] = g.Calls
+	}
+	if causes[runtimeevents.GapReflection] != 2 || causes[runtimeevents.GapInherited] != 1 || causes[runtimeevents.GapSAMCall] != 1 || len(causes) != 3 {
+		t.Errorf("gap causes %v, want reflection 2, inherited-impl 1, sam-call 1", causes)
+	}
+	for _, want := range []string{"## Runtime evidence", "**incomplete**", "`rtm.Main#reflective(Ljava/lang/ClassLoader;J)J` (line", "`rtm.Plugin#work(J)J`", "The absence of an event\nproves nothing", "| inherited-impl | 1 | `rtm.Greeter` (1) |"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("report lacks %q", want)
 		}
@@ -158,5 +168,45 @@ func TestRuntimeFilterFlag(t *testing.T) {
 	code, out := runWithEnv([]string{"-app", "x", "-out", "r.md", "-json", "r.json", "-runtime-filter-status", "MAYBE"}, nil)
 	if code == 0 || !strings.Contains(out, "-runtime-filter-status") {
 		t.Errorf("unknown verdict: exit %d, %q", code, out)
+	}
+}
+
+// TestGapClassifier: causes decided from the caller's bytecode at the
+// measured index, on the real classes of testdata/runtime.
+func TestGapClassifier(t *testing.T) {
+	h, _, err := hierarchy.Build("../../testdata/runtime/rtm.jar", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc := func(owner, name, desc, callOwner, callName string) int {
+		ci, _ := h.Lookup(owner)
+		m, _ := ci.MethodByNameAndDesc(name, desc)
+		for _, c := range m.Calls {
+			if c.Owner == callOwner && c.Name == callName {
+				return c.PC
+			}
+		}
+		t.Fatalf("no call %s#%s in %s#%s", callOwner, callName, owner, name)
+		return -1
+	}
+	shapes := pc("rtm.Main", "shapes", "(J)J", "rtm.Shape", "area")
+	cases := []struct {
+		mode, caller, callee string
+		bci                  int
+		basis, cause, detail string
+	}{
+		{"cha", "rtm.Main#shapes(J)J", "rtm.Square#area(J)J", shapes, "stack-adjacent", runtimeevents.GapDispatchMissing, "rtm.Shape"},
+		{"rta", "rtm.Main#shapes(J)J", "rtm.Square#area(J)J", shapes, "stack-adjacent", runtimeevents.GapRTAPruned, "rtm.Shape"},
+		{"cha", "rtm.Gaps#inherited(J)J", "rtm.BaseGreeter#greet(J)J", pc("rtm.Gaps", "inherited", "(J)J", "rtm.Greeter", "greet"), "stack-adjacent", runtimeevents.GapInherited, "rtm.Greeter"},
+		{"cha", "rtm.Gaps#drive(Lrtm/Work;J)J", "rtm.Gaps#lambda$sam$0(J)J", pc("rtm.Gaps", "drive", "(Lrtm/Work;J)J", "rtm.Work", "run"), "stack-through-runtime", runtimeevents.GapSAMCall, "rtm.Work"},
+		{"cha", "rtm.Main#reflective(Ljava/lang/ClassLoader;J)J", "rtm.Plugin#work(J)J", pc("rtm.Main", "reflective", "(Ljava/lang/ClassLoader;J)J", "java.lang.reflect.Method", "invoke"), "stack-through-runtime", runtimeevents.GapReflection, "java.lang.reflect.Method#invoke"},
+		{"cha", "rtm.Main#main([Ljava/lang/String;)V", "rtm.LoadedOnly#<clinit>()V", 0, "stack-adjacent", runtimeevents.GapClassInit, "rtm.LoadedOnly"},
+		{"cha", "rtm.Main#shapes(J)J", "rtm.Square#area(J)J", -1, "stack-adjacent", runtimeevents.GapNoCallAtSite, "no bytecode index"},
+	}
+	for _, c := range cases {
+		cause, detail := gapClassifier(h, c.mode)(c.caller, c.callee, c.bci, c.basis)
+		if cause != c.cause || detail != c.detail {
+			t.Errorf("%s %s -> %s: %s (%s), want %s (%s)", c.mode, c.caller, c.callee, cause, detail, c.cause, c.detail)
+		}
 	}
 }

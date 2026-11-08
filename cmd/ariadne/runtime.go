@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"ariadne/internal/callgraph"
+	"ariadne/internal/classfile"
 	"ariadne/internal/component"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/reach"
@@ -277,4 +279,129 @@ func tracedNoEntry(traced map[string]map[string]bool, obs map[string]map[string]
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Advisory < out[j].Advisory })
 	return out
+}
+
+// gapClassifier decides why the static graph has no edge for a measured
+// call, from the caller's bytecode at the measured index (runtimeevents
+// GapCauseVersion). mode is the graph's -callgraph-mode.
+func gapClassifier(h *hierarchy.Hierarchy, mode string) func(caller, callee string, bci int, basis string) (string, string) {
+	split := func(key string) (owner, name, desc string) {
+		owner, rest, _ := strings.Cut(key, "#")
+		i := strings.IndexByte(rest, '(')
+		if i < 0 {
+			return owner, rest, ""
+		}
+		return owner, rest[:i], rest[i:]
+	}
+	isSubtype := func(cls, of string) bool {
+		if cls == of {
+			return true
+		}
+		for _, s := range h.Subtypes(of) {
+			if s == cls {
+				return true
+			}
+		}
+		return false
+	}
+	implements := func(cls, iface string) bool {
+		seen := map[string]bool{}
+		var walk func(string) bool
+		walk = func(c string) bool {
+			if c == "" || seen[c] {
+				return false
+			}
+			if c == iface {
+				return true
+			}
+			seen[c] = true
+			ci, ok := h.Lookup(c)
+			if !ok {
+				return false
+			}
+			if walk(ci.SuperClass) {
+				return true
+			}
+			for _, i := range ci.Interfaces {
+				if walk(i) {
+					return true
+				}
+			}
+			return false
+		}
+		return walk(cls)
+	}
+	asyncOwners := map[string]bool{
+		"java.lang.Thread": true, "java.util.concurrent.Executor": true, "java.util.concurrent.ExecutorService": true,
+		"java.util.concurrent.ScheduledExecutorService": true, "java.util.concurrent.CompletableFuture": true,
+		"java.util.concurrent.ThreadPoolExecutor": true, "java.util.concurrent.ForkJoinPool": true, "java.util.Timer": true,
+	}
+	return func(caller, callee string, bci int, basis string) (string, string) {
+		cOwner, cName, cDesc := split(caller)
+		eOwner, eName, eDesc := split(callee)
+		if eName == "<clinit>" {
+			return runtimeevents.GapClassInit, eOwner
+		}
+		ci, ok := h.Lookup(cOwner)
+		if !ok {
+			return runtimeevents.GapUnclassified, "caller not in the input"
+		}
+		m, ok := ci.MethodByNameAndDesc(cName, cDesc)
+		if !ok || bci < 0 {
+			return runtimeevents.GapNoCallAtSite, "no bytecode index"
+		}
+		var site *classfile.Call
+		for i := range m.Calls {
+			if m.Calls[i].PC == bci {
+				site = &m.Calls[i]
+				break
+			}
+		}
+		if site == nil {
+			if eName == "<init>" {
+				return runtimeevents.GapClassInit, eOwner
+			}
+			return runtimeevents.GapNoCallAtSite, cOwner + "#" + cName
+		}
+		target := site.Owner + "#" + site.Name
+		switch {
+		case site.Kind == classfile.CallDynamic:
+			return runtimeevents.GapInvokeDynamic, site.Owner
+		case target == "java.lang.reflect.Method#invoke" || target == "java.lang.reflect.Constructor#newInstance" || target == "java.lang.Class#newInstance":
+			return runtimeevents.GapReflection, target
+		case site.Owner == "java.lang.invoke.MethodHandle":
+			return runtimeevents.GapMethodHandle, target
+		case eName == "invoke" && implements(eOwner, "java.lang.reflect.InvocationHandler") && site.Owner != eOwner:
+			return runtimeevents.GapProxy, site.Owner
+		case asyncOwners[site.Owner] && basis == runtimeevents.BasisThroughRuntime:
+			return runtimeevents.GapAsync, target
+		}
+		virtual := site.Kind == classfile.CallVirtual || site.Kind == classfile.CallInterface
+		// A lambda body, or a method-reference target whose name differs
+		// from the interface method: a functional-interface call.
+		if virtual && (strings.HasPrefix(eName, "lambda$") || (eName != site.Name && !isSubtype(eOwner, site.Owner))) {
+			return runtimeevents.GapSAMCall, site.Owner
+		}
+		if callgraph.DefaultSkip(site.Owner) {
+			return runtimeevents.GapSkippedReceiver, site.Owner
+		}
+		// The body the JVM selected comes from a superclass that does not
+		// itself implement the call's type: some subtype inherits it.
+		if virtual && site.Name == eName && site.Desc == eDesc && !isSubtype(eOwner, site.Owner) {
+			for _, s := range h.Subtypes(site.Owner) {
+				if decl, ok := h.ResolveExact(s, site.Name, site.Desc); ok && decl == eOwner {
+					return runtimeevents.GapInherited, site.Owner
+				}
+			}
+		}
+		if site.Name == eName && site.Desc == eDesc && isSubtype(eOwner, site.Owner) {
+			if site.Kind == classfile.CallVirtual || site.Kind == classfile.CallInterface {
+				if mode == callgraph.ModeRTA {
+					return runtimeevents.GapRTAPruned, site.Owner
+				}
+				return runtimeevents.GapDispatchMissing, site.Owner
+			}
+		}
+		return runtimeevents.GapIndirect, target
+	}
 }

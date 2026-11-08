@@ -23,6 +23,10 @@ func Usable(status string) bool {
 	return status == StatusMatched || status == StatusMatchedArtifact
 }
 
+// BasisThroughRuntime is the call basis with frames outside the recorded
+// scope between caller and callee.
+const BasisThroughRuntime = "stack-through-runtime"
+
 // Call statuses against the static graph.
 const (
 	CallInGraph    = "in_graph"
@@ -37,7 +41,32 @@ type Inputs struct {
 	// SHA-256 of its class file and of the artifact it was read from;
 	// ok is false when no analyzed class has that name.
 	Lookup func(fqcn string) (classSHA, artifactSHA string, ok bool)
+	// Classify, when set, names why the static graph has no edge for a
+	// measured call (caller and callee "owner#name+desc", the caller's
+	// bytecode index, -1 when unknown, and the call's basis): a cause from
+	// the Gap* constants and a detail (e.g. the call's receiver type).
+	Classify func(caller, callee string, bci int, basis string) (cause, detail string)
 }
+
+// Causes of a measured call the static graph has no edge for, decided
+// from the caller's bytecode at the measured index (GapCauseVersion).
+const (
+	GapCauseVersion    = "g1"
+	GapClassInit       = "class-init"       // the callee is a <clinit> the JVM ran implicitly
+	GapInvokeDynamic   = "invokedynamic"    // an invokedynamic site (lambda creation, string concatenation, …)
+	GapReflection      = "reflection"       // Method#invoke, Constructor#newInstance, Class#newInstance
+	GapMethodHandle    = "method-handle"    // MethodHandle#invoke*
+	GapProxy           = "proxy"            // a call through a generated proxy into an InvocationHandler
+	GapAsync           = "async"            // a task handed to a thread or executor
+	GapSkippedReceiver = "skipped-receiver" // a call on a java./javax./jdk./sun. type CHA never expands
+	GapRTAPruned       = "rta-pruned"       // a CHA target RTA removed
+	GapInherited       = "inherited-impl"   // the receiver's class inherits the body from a superclass outside the call's type: CHA keeps only declaring subtypes
+	GapSAMCall         = "sam-call"         // a functional-interface call running a lambda or method-reference body
+	GapDispatchMissing = "dispatch-missing" // a non-skipped virtual call whose subtype target has no edge
+	GapIndirect        = "indirect"         // the callee is not the site's target: frames in between were dropped
+	GapNoCallAtSite    = "no-call-at-site"  // no call instruction at the measured index (inlining, line tables)
+	GapUnclassified    = "unclassified"
+)
 
 // ClassResult is one recorded class definition and its status.
 type ClassResult struct {
@@ -72,6 +101,23 @@ type CallObservation struct {
 	Line     int      `json:"line,omitempty"`
 	Status   string   `json:"status"`
 	Bases    []string `json:"graph_bases,omitempty"` // bases of the static edges caller → callee
+	// Cause and CauseDetail (with Inputs.Classify): why a not_in_graph
+	// call has no static edge.
+	Cause       string `json:"cause,omitempty"`
+	CauseDetail string `json:"cause_detail,omitempty"`
+}
+
+// GapCause is one cause with its count and most frequent details.
+type GapCause struct {
+	Cause   string        `json:"cause"`
+	Calls   int           `json:"calls"`
+	Details []GapCauseTop `json:"top_details,omitempty"`
+}
+
+// GapCauseTop is one detail (e.g. a receiver type) and its count.
+type GapCauseTop struct {
+	Detail string `json:"detail"`
+	Calls  int    `json:"calls"`
 }
 
 // Result is a correlated trace. It never changes the graph or a verdict.
@@ -105,6 +151,10 @@ type Result struct {
 	Calls      []CallObservation `json:"-"`
 	CallCounts map[string]int    `json:"calls_by_status"`
 	Handoffs   int               `json:"handoffs"`
+	// GapCauses (with Inputs.Classify): not_in_graph calls by cause, most
+	// frequent first, each with its top 10 details.
+	GapCauseVersion string     `json:"gap_cause_version,omitempty"`
+	GapCauses       []GapCause `json:"calls_not_in_graph_by_cause,omitempty"`
 }
 
 // Correlate matches t against the analyzed input.
@@ -202,13 +252,63 @@ func Correlate(t *Trace, in Inputs) Result {
 			if len(o.Bases) > 0 {
 				o.Status = CallInGraph
 				sort.Strings(o.Bases)
+			} else if in.Classify != nil {
+				o.Cause, o.CauseDetail = in.Classify(ck, ek, c.BCI, c.Basis)
+				if o.Cause == "" {
+					o.Cause = GapUnclassified
+				}
 			}
 		}
 		r.CallCounts[o.Status]++
 		r.Calls = append(r.Calls, o)
 	}
 	sort.Slice(r.Calls, func(i, j int) bool { return r.Calls[i].Evidence < r.Calls[j].Evidence })
+	if in.Classify != nil {
+		r.GapCauseVersion = GapCauseVersion
+		r.GapCauses = gapCauses(r.Calls)
+	}
 	return r
+}
+
+func gapCauses(calls []CallObservation) []GapCause {
+	by := map[string]map[string]int{}
+	total := map[string]int{}
+	for _, c := range calls {
+		if c.Status != CallNotInGraph {
+			continue
+		}
+		if by[c.Cause] == nil {
+			by[c.Cause] = map[string]int{}
+		}
+		by[c.Cause][c.CauseDetail]++
+		total[c.Cause]++
+	}
+	var out []GapCause
+	for cause, details := range by {
+		g := GapCause{Cause: cause, Calls: total[cause]}
+		for d, n := range details {
+			if d != "" {
+				g.Details = append(g.Details, GapCauseTop{Detail: d, Calls: n})
+			}
+		}
+		sort.Slice(g.Details, func(i, j int) bool {
+			if g.Details[i].Calls != g.Details[j].Calls {
+				return g.Details[i].Calls > g.Details[j].Calls
+			}
+			return g.Details[i].Detail < g.Details[j].Detail
+		})
+		if len(g.Details) > 10 {
+			g.Details = g.Details[:10]
+		}
+		out = append(out, g)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Calls != out[j].Calls {
+			return out[i].Calls > out[j].Calls
+		}
+		return out[i].Cause < out[j].Cause
+	})
+	return out
 }
 
 func classStatus(t *Trace, c Class, lookup func(string) (string, string, bool)) string {

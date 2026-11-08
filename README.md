@@ -879,7 +879,14 @@ the recorded SHA-256 — another build of the code, or a class known only by
 name, is reported, never attached — and a class defined by two loaders
 stays two definitions. Measured calls are checked against the static
 graph: `not_in_graph` lists relations the run took that the static
-analysis has no edge for.
+analysis has no edge for, each with a cause read from the caller's
+bytecode at the measured index (a lambda run through a functional
+interface, a skipped `java.*`/`javax.*` receiver, reflection, a body
+inherited from outside the call's type, a proxy, …), grouped by receiver
+type — measured input for the next model rather than a guess
+([testdata/graphbench/TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD):
+on petclinic CHA misses 7.7% of the relations the run took, RTA with
+`-roots profile` 11.4%).
 
 No Java agent is needed: `scripts/JfrToTrace.java` converts a Java Flight
 Recorder recording. Stack sampling (`jdk.ExecutionSample`) gives methods
