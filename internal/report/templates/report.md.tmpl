@@ -173,6 +173,37 @@ Fewer edges or fewer `REACHABLE` results are not by themselves an improvement: c
 - **CHA edges:** {{.CHAEdgesRemoved}} of {{.CHAEdgesBefore}} removed; {{.CHAEdgesFallback}} kept only because of fallback classes
 - **Active unknown-allocation gaps:** {{.GapText}}
 
+{{end}}{{with .Runtime}}## Runtime evidence
+
+RUNTIME_NATIVE N1, importer `{{.Result.ImportVersion}}`, trace `{{.Result.SHA256}}` (`{{.Result.Format}}`). Evidence from **one
+recorded run**, shown next to the static results: it changes no edge and no verdict. **The absence of an event
+proves nothing** (traffic, configuration, timing and sampling decide what a run shows), and a vulnerable method
+seen executing confirms that the code ran, **not** that attacker-controlled data reached it. Evidence is
+attached to an analyzed class only when its class file (or artifact) has the recorded SHA-256 (docs/RUNTIME_TRACE.MD).
+
+- **Run:** `{{.Result.RunID}}` — {{if .Result.Scenario}}{{.Result.Scenario}}{{else}}no scenario given{{end}} ({{.Result.Started}} → {{.Result.Ended}})
+- **Runtime / recorder:** {{.Result.Runtime}} / {{.Result.Recorder}}; recorded kinds: {{range $i, $k := .Result.EventKinds}}{{if $i}}, {{end}}{{$k}}{{end}}{{with .Result.MethodFilters}}; exact entries for {{range $i, $f := .}}{{if $i}}, {{end}}`{{$f}}`{{end}}{{end}}
+- **Completeness:** {{if .Result.Complete}}complete{{else}}**incomplete**{{end}}; sampling {{.Result.Sampling}}; {{.Result.LostEvents}} lost events, {{.Result.Truncated}} truncated stacks{{range .Result.Incomplete}}
+  - {{.}}{{end}}
+- **Classes:** {{gapCounts .Result.ClassCounts}}; several definitions (loaders): {{.MultiDefinedText}}
+- **Loaded classes** (no method implied): {{gapCounts .Result.LoadedCounts}}
+- **Executed methods** matched to the graph: {{gapCounts .Result.ExecutedCounts}}; {{.Result.ExecutedOther}} not usable (class not matched or not a graph node)
+- **Measured calls:** {{gapCounts .Result.CallCounts}} — `not_in_graph` is a relation this run took that the static graph has no edge for
+{{if .Findings}}
+Advisories with a mapped vulnerable method seen executing in this run:
+
+| Advisory | Static verdict | Observed method | Evidence | Basis | Count |
+|---|---|---|---|---|---|
+{{range .Findings}}{{$f := .}}{{range .Observed}}| {{$f.Advisory}} | {{$f.Status}} | `{{.Method}}` | {{.Evidence}} | {{.Basis}} | {{.Count}} |
+{{end}}{{end}}{{else}}
+No mapped vulnerable method was seen executing in this run — which says nothing about the others.
+{{end}}{{if .NotInGraph}}
+Measured calls the static graph has no edge for{{if gt (len .NotInGraph) 30}} (first 30){{end}}:
+
+| Evidence | Caller | Callee (loader) | Basis | Count |
+|---|---|---|---|---|
+{{range $i, $c := .NotInGraph}}{{if lt $i 30}}| {{$c.Evidence}} | `{{$c.Caller}}`{{if $c.Line}} (line {{$c.Line}}){{end}} | `{{$c.Callee}}` ({{$c.Loader}}) | {{$c.Basis}}, {{$c.Source}} | {{$c.Count}} |
+{{end}}{{end}}{{end}}
 {{end}}## Withdrawn advisories
 
 Advisories whose every OSV source record is withdrawn are not analyzed (CVE:F2). A withdrawn

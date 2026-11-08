@@ -22,6 +22,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/reach"
 	"ariadne/internal/resultsv2"
+	"ariadne/internal/runtimeevents"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/taint"
@@ -106,6 +107,12 @@ func analysisConfig(cfg config) map[string]string {
 
 func newSnapshotRun(cfg config) (*snapshotRun, error) {
 	sr := &snapshotRun{tool: toolInfo(), algos: algorithmVersions(cfg.callgraphMode), config: analysisConfig(cfg)}
+	// RUNTIME_NATIVE N1: with a trace, the importer's rules and the trace
+	// file are part of the derivation (the file is an input, above).
+	if cfg.runtimeTrace != "" {
+		sr.algos["runtime.import"] = runtimeevents.ImportVersion
+		sr.config["runtime-trace"] = baseName(cfg.runtimeTrace)
+	}
 	if cfg.snapshotOut != "" {
 		r, err := snapshot.NewRecorder(cfg.snapshotOut)
 		if err != nil {
@@ -150,7 +157,7 @@ func snapshotInputs(cfg config, inv *component.Inventory) ([]snapshot.Input, err
 	for _, a := range inv.Artifacts {
 		out = append(out, snapshot.Input{Role: string(a.Role), Location: a.Location, SHA256: a.SHA256})
 	}
-	for _, f := range []struct{ role, path string }{{"deps-list", cfg.depsList}, {"vuln-methods", cfg.vulnMethods}, {"profile-file", cfg.profileFile}, {"embedded-components", cfg.embeddedComps}, {"sbom", cfg.sbom}} {
+	for _, f := range []struct{ role, path string }{{"deps-list", cfg.depsList}, {"vuln-methods", cfg.vulnMethods}, {"profile-file", cfg.profileFile}, {"embedded-components", cfg.embeddedComps}, {"sbom", cfg.sbom}, {"runtime-trace", cfg.runtimeTrace}} {
 		if f.path == "" {
 			continue
 		}

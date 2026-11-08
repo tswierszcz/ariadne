@@ -552,6 +552,20 @@ is reported as an incomplete model fact, not guessed. Its real-JVM check is
 `testdata/servletdispatch`; its effect on petclinic and WebGoat is in
 [testdata/graphbench/RESULTS.MD](testdata/graphbench/RESULTS.MD).
 
+**Why doesn't a runtime trace change any verdict?** (RUNTIME_NATIVE N1,
+`-runtime-trace`.) A trace is what one run did under one scenario: it can
+show that a vulnerable method ran, but not that it can't run — traffic,
+configuration, timing and sampling decide what a run shows. Turning
+"not seen" into `NOT_REACHABLE` would make a short or narrow test run look
+like proof. And "seen executing" is still not "exploitable": it says the
+code ran, not that attacker data got there. So the trace stays evidence
+next to the static result. Where the two disagree — petclinic's
+CVE-2025-35036 runs although the graph says `NOT_REACHABLE` — the trace
+points at a static gap to model (there, a `javax.validation` SPI call the
+graph never expands), it doesn't overwrite the verdict. Traces are matched
+to the analyzed classes by content hash, so a trace from another build of
+the code is reported but not used.
+
 **Why is RTA opt-in, and why doesn't it remove more?** (GRAPH_PRECISION
 P2, `-callgraph-mode rta`.) RTA keeps a CHA edge only if some class that
 reachable code creates dispatches the call there — but a class can also

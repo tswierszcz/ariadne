@@ -37,6 +37,7 @@ import (
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/report"
 	"ariadne/internal/resultsv2"
+	"ariadne/internal/runtimeevents"
 	"ariadne/internal/serviceload"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
@@ -85,6 +86,7 @@ type config struct {
 	callgraphMode  string
 	graphOut       string
 	graphCompare   string
+	runtimeTrace   string
 
 	llm        bool
 	llmModel   string
@@ -133,6 +135,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
 	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback)`)
 	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
+	fs.StringVar(&cfg.runtimeTrace, "runtime-trace", "", "import a runtime trace (RUNTIME_NATIVE N1, format ariadne-runtime-trace-1, docs/RUNTIME_TRACE.MD; e.g. from scripts/JfrToTrace.java): loaded classes, methods seen executing and measured caller → callee relations, matched to the analyzed classes by content hash and shown next to the static results; it never changes the graph or a verdict, and the absence of an event proves nothing")
 	fs.StringVar(&cfg.graphCompare, "graph-compare", "", "compare this run's call graph with one written earlier by -graph-out: edges added/removed by basis, findings whose verdict or path changed and the edges that explain it, and any difference in the graph settings")
 	fs.BoolVar(&cfg.taint, "taint", false, "DATA_FLOW D4 (opt-in, report-only): assess whether request data (Spring MVC/JAX-RS handler parameters, ServletRequest accessors) reaches the data each deserialization entry reads; adds a taint result per entry, never changes a verdict")
 	fs.BoolVar(&cfg.allowStale, "allow-stale", false, "when an online refresh fails, use the cached copy and mark the report as built on stale data (never past -max-data-age)")
@@ -260,6 +263,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			return fmt.Errorf("-graph-compare %s: %w", cfg.graphCompare, err)
 		}
 		graphBefore = &ex
+	}
+	// RUNTIME_NATIVE N1: the trace is validated before the analysis too.
+	var runtimeTrace *runtimeevents.Trace
+	if cfg.runtimeTrace != "" {
+		t, err := loadRuntimeTrace(cfg.runtimeTrace)
+		if err != nil {
+			return err
+		}
+		runtimeTrace = t
 	}
 	if sr.replay != nil {
 		log("snapshot: replaying %s (data set %s, created %s)", cfg.snapshotIn, sr.replay.DataSetID, sr.replay.CreatedAt.Format(time.RFC3339))
@@ -1045,6 +1057,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	engine.SetWebAssetPackages(webAssets)
 	results := engine.Analyze(cveList, vm)
 
+	// RUNTIME_NATIVE N1: correlate the imported trace with the final graph.
+	// Evidence next to the results; no edge or verdict changes.
+	var runtimeResult *runtimeevents.Result
+	var runtimeObs map[string]map[string][]runtimeevents.MethodObservation
+	if runtimeTrace != nil {
+		lookup, closeJars := classLookup(h)
+		rt := runtimeevents.Correlate(runtimeTrace, runtimeevents.Inputs{G: g, Lookup: lookup})
+		closeJars()
+		runtimeResult = &rt
+		runtimeObs = runtimeObserved(rt, results, h, components)
+		log("runtime trace (RUNTIME_NATIVE N1, %s): run %s, %s, sampling %s, complete=%t; classes %s; loaded %s; executed (usable) %s, %d not usable; calls %s; %d advisories with an observed vulnerable method",
+			cfg.runtimeTrace, rt.RunID, rt.Recorder, rt.Sampling, rt.Complete, report.GapCounts(rt.ClassCounts), report.GapCounts(rt.LoadedCounts),
+			report.GapCounts(rt.ExecutedCounts), rt.ExecutedOther, report.GapCounts(rt.CallCounts), len(runtimeObs))
+	}
+
 	counts := map[reach.Status]int{}
 	for _, r := range results {
 		counts[r.Status]++
@@ -1223,6 +1250,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(cfg.taint)}
 	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(cfg.graphCompare)
 	data.CreatedTypes, data.CreatedTypeGaps, data.RTA = &allocSummary, allocCatalog.Gaps, rtaResult
+	if runtimeResult != nil {
+		data.Runtime = &report.Runtime{Result: *runtimeResult, Findings: runtimeFindings(runtimeObs, results), NotInGraph: runtimeResult.NotInGraph()}
+	}
 	data.Withdrawn = resolution.Withdrawn
 	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
 
@@ -1245,6 +1275,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
 		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
 		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult},
+		Runtime:   runtimeResult, RuntimeObserved: runtimeObs,
 	})
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))

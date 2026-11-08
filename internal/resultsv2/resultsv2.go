@@ -25,6 +25,7 @@ import (
 	"ariadne/internal/mavenversion"
 	"ariadne/internal/reach"
 	"ariadne/internal/relocate"
+	"ariadne/internal/runtimeevents"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/vulnmap"
 )
@@ -53,6 +54,10 @@ type Document struct {
 	// CallGraph (GRAPH_PRECISION P0, additive): the call graph's settings
 	// and size, and the comparison with an earlier graph (-graph-compare).
 	CallGraph *CallGraph `json:"callgraph,omitempty"`
+	// Runtime (RUNTIME_NATIVE N1, -runtime-trace): the imported trace's
+	// metadata, completeness and correlation counts. Evidence only: never
+	// part of reachability.
+	Runtime *runtimeevents.Result `json:"runtime,omitempty"`
 }
 
 // CallGraph describes the run's call graph.
@@ -290,6 +295,10 @@ type Finding struct {
 	// DeserializationChains (DESERIALIZATION Z4): catalog chains naming
 	// this advisory on this instance — evidence only, never a verdict.
 	DeserializationChains []ChainRef `json:"deserialization_chains,omitempty"`
+	// RuntimeObserved (RUNTIME_NATIVE N1): mapped vulnerable methods of
+	// this instance seen executing in the imported trace. Execution is not
+	// exploitation; an empty list says nothing (absence is not evidence).
+	RuntimeObserved []runtimeevents.MethodObservation `json:"runtime_observed,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -367,6 +376,10 @@ type Inputs struct {
 	TaintCatalog string
 	// CallGraph (GRAPH_PRECISION P0): rendered as is when set.
 	CallGraph *CallGraph
+	// Runtime and RuntimeObserved (RUNTIME_NATIVE N1): the correlated
+	// trace and, per advisory and instance, its observed vulnerable methods.
+	Runtime         *runtimeevents.Result
+	RuntimeObserved map[string]map[string][]runtimeevents.MethodObservation
 }
 
 // DataFreshness is the run's data-freshness state (CVE:F2): State is
@@ -542,6 +555,7 @@ func Build(in Inputs) Document {
 				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
 				ModelGaps: f.ModelGaps, Path: f.Path, Entry: f.Entry, Note: f.Note,
 				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
+				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
 			})
 			counts.Findings++
 			counts.FindingsByReachability[string(f.Status)]++
@@ -550,6 +564,7 @@ func Build(in Inputs) Document {
 	doc.Coverage.Counts = counts
 	doc.Deserialization = buildDeserialization(in)
 	doc.CallGraph = in.CallGraph
+	doc.Runtime = in.Runtime
 	return doc
 }
 

@@ -23,7 +23,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: UNASSESSED (nieuzasadnione wynikami P4) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
-| RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Importer i kontrakt dowodów przed opcjonalnym agentem. |
+| RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | N0, N1: DONE (2026-11-08); N2–N5: UNASSESSED | Kontrakt śladu `ariadne-runtime-trace-1` i importer `-runtime-trace` (dopasowanie po hashach klas, definicje per loader, wywołania vs graf statyczny, podatne metody zaobserwowane per ustalenie); rejestrator z JFR bez agenta. petclinic: CVE-2024-38809 śledzone ~1 400 razy, CVE-2025-35036 wykonane mimo NOT_REACHABLE (luka `javax.validation` SPI). Graf i werdykty bez zmian. Szczegóły we wpisie RUNTIME_NATIVE:N0–N1. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
@@ -133,6 +133,83 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   dołączyć `webgoat-server` do przygotowania WebGoat (żeby benchmark
   odzwierciedlał rzeczywisty launcher), lifecycle `init`, wewnętrzny łańcuch
   Spring Security, luka ustalenia przy niezarejestrowanym dispatchu.
+
+### RUNTIME_NATIVE:N0–N1 — kontrakt śladu i importer offline — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** N0 (wersjonowany format śladu i
+  zasady wiarygodności) i N1 (importer offline, korelacja, raport/v2/
+  snapshot) bez agenta Java; jako pierwszy rejestrator — konwerter
+  nagrania Java Flight Recorder. Gałąź `runtime-n0-n1` od
+  `servlet-dispatch` (PR #23 jeszcze niezmergowany).
+- **Zrealizowane:**
+  1. `docs/RUNTIME_TRACE.MD`: format `ariadne-runtime-trace-1` (JSON
+     Lines; nagłówek z metadanymi przebiegu, zakresem, próbkowaniem i
+     kompletnością; artefakty, loadery, definicje klas per loader z
+     hashem i `source_basis`, metody; dowody `loaded`/`executed`/`call`/
+     `handoff` z id), limity, reguły czytania, statusy korelacji.
+  2. `scripts/JfrToTrace.java`: konwersja nagrania JFR (API
+     `jdk.jfr.consumer`, bez narzędzi spoza JRE): klasy tylko z podanych
+     artefaktów (hash pliku klasy z classpath — JFR nie podaje źródła
+     bajtów), loader z `jdk.ClassLoad`/ramek, `executed` z próbek
+     (`sampled`, raz na próbkę) i z `jdk.MethodTrace` (`traced`),
+     relacje z sąsiednich ramek (`stack-adjacent`) lub przez ramki spoza
+     zakresu (`stack-through-runtime`), z bci i linią wywołującego;
+     ucięte stosy liczone; przyczyny niekompletności w nagłówku.
+  3. `internal/runtimeevents` (`ImportVersion = "n1-1"`): `Parse`
+     (ścisła walidacja, limity 1 GiB / 1 MiB na linię / 5 mln rekordów /
+     4 KiB na napis), `Correlate` (statusy klas po SHA-256 pliku klasy lub
+     artefaktu, dwie definicje osobno, metody → węzły grafu, wywołania →
+     `in_graph` z podstawami krawędzi / `not_in_graph` / `unusable`),
+     `ObservedVulnerable` (mapowanie bez deskryptora = każdy overload),
+     `NotInGraph`.
+  4. CLI: `-runtime-trace` (wczytanie i walidacja przed analizą),
+     `cmd/ariadne/runtime.go` (hash klasy z wpisu jara, z którego klasa
+     została przeczytana; obserwacje per ustalenie i instancja), log,
+     raport „Runtime evidence”, v2 `runtime` i
+     `findings[].runtime_observed`, snapshot: wejście `runtime-trace`,
+     konfiguracja `runtime-trace`, wersja `runtime.import` (tylko ze
+     śladem).
+  5. `testdata/runtime` + `scripts/runtime-trace-fixture.sh`: `rtm.jar`,
+     `rtm-v2.jar` (inna kompilacja `Square`), `run.trace` nagrany na JDK 25
+     (wywołanie przez interfejs, `Lib.parse` śledzone dokładnie 1000 razy,
+     klasa tylko załadowana, `Plugin` w loaderze aplikacji i w izolowanym
+     `URLClassLoader`, wywołanie refleksyjne o nazwie budowanej w czasie
+     działania); `scripts/runtime-trace-petclinic.sh`.
+- **Weryfikacja:** `TestParseFixture`, `TestParseRejects` (20 naruszeń
+  kontraktu odrzucanych), `TestCorrelateStatuses` (matched / not_in_input
+  / different_version / name_only, dwie definicje), `TestObservedVulnerable`,
+  `TestRuntimeTrace` (pełne CLI: 7 klas `matched`, `rtm.Plugin` z dwiema
+  definicjami, 1 metoda `traced`, 2 wywołania refleksyjne `not_in_graph`
+  — po jednym na loader —, graf i ustalenia identyczne jak bez śladu; na
+  `rtm-v2.jar` `Square` `different_version`, jego próbki nieużyte),
+  `TestRuntimeTraceSnapshot` (wejście i wersja w manifeście, zły plik
+  odrzucony przed analizą); mutacja (dopasowanie bez porównania hashy) —
+  oba testy zawodzą. Prawdziwy przebieg: petclinic na JDK 25 pod JFR
+  (strony + 200 × zasoby statyczne z `If-None-Match`), dwa niezależne
+  przebiegi skryptu: 10 527 klas `matched`, ok. 2 400–2 650 metod
+  wykonanych, 2 414–2 746 relacji `in_graph`, 217–251 `not_in_graph`, 244–
+  319 uciętych stosów; CVE-2024-38809 `ServletWebRequest#
+  validateIfNoneMatch` `traced` 1 409 / 1 419 razy (statycznie FRAMEWORK);
+  CVE-2025-35036 `ValidatorFactoryImpl#<init>` wykonane (`sampled`), a
+  statycznie NOT_REACHABLE z `MODEL_INCOMPLETE` — wywołujący w śladzie:
+  `HibernateValidator#buildValidatorFactory`, osiągany przez
+  `javax.validation.spi.ValidationProvider#buildValidatorFactory`
+  (pomijany odbiorca `javax.*`); 12–13 advisories z zaobserwowaną podatną
+  metodą (liczba zmienna — próbkowanie); werdykty bez zmian
+  (3/74/13/57/6). `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/RUNTIME_TRACE.MD` (nowy), `docs/SUPPORT.MD`
+  (wiersz Runtime evidence), `docs/RESULTS_CONTRACT.MD` (`runtime`,
+  `findings[].runtime_observed`), README (sekcja, flaga, skrypty,
+  ograniczenia), FAQ, plan RUNTIME_NATIVE, ten rejestr.
+- **Ograniczenia:** dowód jednego przebiegu; JFR nie podaje źródła bajtów
+  klasy (hash z classpath, `source_basis` `classpath-lookup`); id loadera
+  nie są stabilne między przebiegami; bez agenta (N3), bez analizy
+  kontekstu loaderów poza rozdzieleniem definicji (N2), bez korelacji
+  handoff z JFR (N4), bez native/JNI (N5); filtr `jdk.MethodTrace` trzeba
+  podać ręcznie.
+- **Następny krok (wymaga zgody):** model wywołań SPI `javax.validation`
+  (wskazany przez ślad), lista `jdk.MethodTrace#filter` generowana z
+  mapowań CVE, albo N2 (kontekst loaderów).
 
 ### GRAPH_PRECISION:P4 — benchmark i kwalifikacja — DONE (2026-11-08)
 
