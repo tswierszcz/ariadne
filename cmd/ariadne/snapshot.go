@@ -25,6 +25,7 @@ import (
 	"ariadne/internal/runtimeevents"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
+	"ariadne/internal/spidispatch"
 	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
 )
@@ -63,6 +64,7 @@ func algorithmVersions(mode string) map[string]string {
 		// The servlet container dispatch model (signatures, registration
 		// sources, Spring Boot catalog): it adds call-graph edges in every mode.
 		"servlet.dispatch": servletdispatch.Version,
+		"spi.dispatch":     spidispatch.Version,
 	}
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the
