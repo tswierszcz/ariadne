@@ -115,3 +115,22 @@ func TestInclusiveVersionInRange_missingTrailingSegmentReadsAsZero(t *testing.T)
 		t.Error("inclusiveVersionInRange(5.3.0 against 5.3..5.3) = false, want true")
 	}
 }
+
+type fixedEvaluator string
+
+func (f fixedEvaluator) Evaluate(m *Model, _ CallSite) Fact {
+	return Fact{ModelID: m.ID, Reason: string(f)}
+}
+
+func TestRouterSendsEachModelToItsEvaluator(t *testing.T) {
+	r := Router{ByID: map[string]Evaluator{"a": fixedEvaluator("A")}, Default: fixedEvaluator("default")}
+	if got := r.Evaluate(&Model{ID: "a"}, CallSite{}).Reason; got != "A" {
+		t.Errorf("model a -> %q", got)
+	}
+	if got := r.Evaluate(&Model{ID: "b"}, CallSite{}).Reason; got != "default" {
+		t.Errorf("model b -> %q", got)
+	}
+	if f := (Router{}).Evaluate(&Model{ID: "c"}, CallSite{}); !f.Incomplete || f.Reason == "" {
+		t.Errorf("no evaluator: %+v", f)
+	}
+}

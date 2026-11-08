@@ -1,6 +1,6 @@
 # Precyzja grafu — fazy P0–P4
 
-Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md); katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md); opt-in `-callgraph-mode rta`, punkt stały `p2-1`, fallback nieznanych alokacji, wyrocznia JVM `testdata/rta`); P4 DONE (2026-11-08: benchmark `scripts/graph-benchmark.sh` + `TestGraphBenchmarkFixtures`, kwalifikacja w `testdata/graphbench/RESULTS.MD`, domyślny tryb pozostaje CHA); P3 nierozpoczęte (nieuzasadnione wynikami P4); zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md); katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md); opt-in `-callgraph-mode rta`, punkt stały `p2-1`, fallback nieznanych alokacji, wyrocznia JVM `testdata/rta`); P4 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md); benchmark `scripts/graph-benchmark.sh` + `TestGraphBenchmarkFixtures`, kwalifikacja w `testdata/graphbench/RESULTS.MD`, domyślny tryb pozostaje CHA); P3 nierozpoczęte (nieuzasadnione wynikami P4); zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
 
 ## P0. Uczciwy baseline i tryby porównania — DONE (zarchiwizowane 2026-11-08)
 
@@ -37,13 +37,10 @@ Zależności: DATA_FLOW D3; P2 jest przydatnym baseline, nie koniecznym fundamen
 
 Gotowe: dwa receivery, alias pól, tablica i fabryka dają uzasadnione różnice względem RTA. Metryki wskazują koszt oraz jakość, zanim zwiększy się czułość analizy.
 
-## P4. Benchmark i kwalifikacja — DONE (2026-11-08)
+## P4. Benchmark i kwalifikacja — DONE (zarchiwizowane 2026-11-08)
 
-- Osobno mierzyć błędne cele, pominięte oczekiwane cele, nieznane miejsca, zmiany CVE, czas i pamięć na fixtures i reprezentatywnych aplikacjach.
-- Jeśli używany jest zewnętrzny silnik referencyjny, przypiąć wersję, zakres i konfigurację; jego wynik także nie jest automatycznie prawdą.
-- Porównanie musi uwzględniać wersję modeli frameworka/refleksji i reguły JDK skip. Ulepszenie potwierdzać ręcznie opisanymi przypadkami, nie opinią LLM o krótszej ścieżce.
-- Wykonać B4, snapshoty i dokumentację migracji. Zmiana domyślnej strategii jest osobną decyzją po pomiarze.
-
-Nie podaje się z góry gwarantowanej redukcji fałszywych alarmów ani kosztu analizy całego classpath.
-
-Wykonano (2026-11-08): `scripts/graph-benchmark.sh` (petclinic/WebGoat × `-roots profile`/`all` × CHA/RTA; 3 mierzone przebiegi bez pliku grafu — czas i szczytowe RSS przez `wait4` — plus przebieg z `-graph-out`/`-graph-compare`; wszystkie liczby poza czasem/pamięcią muszą być identyczne) → `testdata/graphbench/{results.tsv,verdict-changes.tsv,versions.txt}`; `TestGraphBenchmarkFixtures` (pominięte/nadmiarowe ciała wobec wyroczni JVM `testdata/callgraph` i `testdata/rta`); wersje katalogu i RTA w snapshotach (tylko tryb `rta`). Bez zewnętrznego silnika referencyjnego (żaden nie jest przypięty; wzorcem są wyrocznie JVM i ręcznie sprawdzony bytecode). Kwalifikacja (`testdata/graphbench/RESULTS.MD`): RTA kosztuje 0,4–0,7 s i niemierzalną pamięć; `-roots all` bez zmian werdyktów; 8 zmian przy `-roots profile` — 5 poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne (CVE-2024-38809: niemodelowany dispatch kontener → servlet przez pomijany odbiorca `javax.*` w obu trybach). Decyzja: domyślnie CHA, RTA opt-in; ponowna ocena po zamodelowaniu dispatchu servletów/filtrów. Szczegóły: IMPLEMENTATION_STATUS, wpis GRAPH_PRECISION:P4.
+Benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `TestGraphBenchmarkFixtures`), ręczna
+kwalifikacja każdej zmiany werdyktu, decyzja: domyślnie CHA; ponowna ocena po modelu dispatchu
+kontenera servletów; zobacz
+[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)
+po pełny zapis i `testdata/graphbench/RESULTS.MD` po bieżące wyniki.

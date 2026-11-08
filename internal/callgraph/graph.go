@@ -21,8 +21,10 @@ type EdgeBasis string
 
 // BuilderVersion versions call-graph construction (edge kinds, CHA,
 // class-init, library models). Bump it on any change that can change the
-// graph for the same classes; snapshots record it (CVE:F3).
-const BuilderVersion = "1"
+// graph for the same classes; snapshots record it (CVE:F3). 2: the
+// servlet container dispatch model (internal/servletdispatch) adds
+// Servlet#service/Filter#doFilter edges to registered servlets/filters.
+const BuilderVersion = "2"
 
 const (
 	// BasisDirect is a direct edge to exactly the call site's own symbolic
