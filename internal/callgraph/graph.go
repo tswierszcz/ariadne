@@ -24,7 +24,7 @@ type EdgeBasis string
 // graph for the same classes; snapshots record it (CVE:F3). 2: the
 // servlet container dispatch model (internal/servletdispatch) adds
 // Servlet#service/Filter#doFilter edges to registered servlets/filters.
-const BuilderVersion = "2"
+const BuilderVersion = "3"
 
 const (
 	// BasisDirect is a direct edge to exactly the call site's own symbolic

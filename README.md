@@ -383,6 +383,15 @@ in its own jar, a registered provider and a product, an unregistered
 provider and a product implementation in another jar — every observed body
 reached, the other jar never a target).
 
+CHA's own targets follow the same rule (builder version `3`): for a
+virtual/interface call on `T`, every subtype of `T` declaring the method,
+plus — for each concrete subtype that only inherits it — the body JVM
+method selection finds for that subtype, also when it is declared in a
+superclass that is not itself a subtype of `T` (a class implementing an
+interface with a method inherited from an unrelated base class). Without
+it, CHA missed 17 relations a recorded petclinic run took
+([testdata/graphbench/TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)).
+
 A call to a subtype's inherited (not overridden) method resolves to the
 class that actually supplies the body, not a dead-end node under the
 subclass's own name: `classfile.ExtractCalls` reports a Methodref's

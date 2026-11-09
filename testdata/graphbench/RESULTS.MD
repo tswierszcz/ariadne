@@ -1,8 +1,15 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-09 after CHA's inherited implementations (builder `3`)**: for each concrete
+subtype that only inherits the called method, CHA also targets the body JVM method selection
+finds for it, including one in a superclass outside the call's type (found by a runtime
+trace, [TRACE_GAPS.MD](TRACE_GAPS.MD)). The tables under "Real applications" are this rerun;
+the builder `2` figures are kept below them. No verdict changed in any configuration; the
+RTA-versus-CHA verdict changes are the same 4 + 2.
+
 **Rerun 2026-11-08 after the servlet container dispatch model** (`servlet-container:dispatch`,
-`internal/servletdispatch`, FRAMEWORKS F2): the files here and the tables below are that
-rerun; the P4 figures without the model are kept in "P4 baseline" for comparison, and the
+`internal/servletdispatch`, FRAMEWORKS F2): the sections below describe that rerun
+(its table is kept as "Builder `2`"); the P4 figures without the model are kept in "P4 baseline" for comparison, and the
 section "Servlet container dispatch" explains what changed and why.
 
 Measured 2026-11-08 with `scripts/graph-benchmark.sh --repeat 3` (real applications) and
@@ -15,7 +22,7 @@ hand from the bytecode, not by an LLM's opinion of a shorter path.
 |---|---|
 | `results.tsv` | one row per app × roots scenario × mode: wall time and peak RSS (min–max of 3 measured runs), graph size, CHA edges removed / kept only by the unknown-allocation fallback, live classes, active unknown-allocation gaps, created-type catalog size and gaps, model-gap sites (all / reachable), v1 verdict counts `R/F/NR/U/NA`, registered servlets/filters and edges added by B3 models, and against the CHA run of the same scenario the edges removed/added and the findings whose verdict or path changed |
 | `verdict-changes.tsv` | every verdict change against CHA, with the removed edges that explain it (from `-graph-compare`) |
-| `versions.txt` | analyzer commit, Go version, and per mode the graph settings and rule versions: builder `2`, skip rule (`java.`, `javax.`, `jdk.`, `sun.` receivers not expanded — the servlet dispatch model is the bounded exception), unknown-allocation policy, catalog `p1-2`, RTA `p2-1`, servlet dispatch `s1` |
+| `versions.txt` | analyzer commit, Go version, and per mode the graph settings and rule versions: builder `3`, skip rule (`java.`, `javax.`, `jdk.`, `sun.` receivers not expanded — the servlet dispatch model is the bounded exception), unknown-allocation policy, catalog `p1-2`, RTA `p2-1`, servlet dispatch `s1` |
 
 ## Setup
 
@@ -64,6 +71,25 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| petclinic | profile | cha | 14.6–14.8 | 1364–1392 | 1 008 159 | — | — | 679 of 1096 | 4 | 5 154 | 6/72/12/57/6 |
+| petclinic | profile | rta | 14.7–15.2 | 1338–1393 | 971 408 | 36 751 of 322 104 (36 445) | 17 275 (5 969) | 635 of 1097 | 4 | 5 154 | 6/68/16/57/6 |
+| petclinic | all | cha | 14.5–14.6 | 1361–1376 | 1 008 159 | — | — | 679 of 1096 | 4 | 5 154 | 6/72/12/57/6 |
+| petclinic | all | rta | 15.0–15.1 | 1358–1374 | 1 002 249 | 5 910 of 322 104 (60 047) | 21 837 (9 786) | 677 of 1097 | 4 | 5 154 | 6/72/12/57/6 |
+| WebGoat | profile | cha | 23.2–24.0 | 1766–1795 | 1 427 778 | — | — | 744 of 1194 | 0 | 1 850 | 42/52/9/61/0 |
+| WebGoat | profile | rta | 24.5–25.5 | 1768–1772 | 1 345 079 | 82 699 of 573 201 (161 035) | 25 229 (10 669) | 668 of 1201 | 0 | 1 850 | 42/50/11/61/0 |
+| WebGoat | all | cha | 23.6–23.9 | 1762–1770 | 1 427 783 | — | — | 745 of 1194 | 0 | 1 855 | 42/52/9/61/0 |
+| WebGoat | all | rta | 24.6–24.9 | 1768–1824 | 1 413 003 | 14 780 of 573 201 (103 372) | 32 212 (13 162) | 747 of 1201 | 0 | 1 855 | 42/52/9/61/0 |
+
+Against builder `2`: +11 713 (petclinic) / +16 439 (WebGoat) CHA-basis edges, a few more
+reachable gap sites and model edges (code reached through the newly targeted bodies), the same
+verdict counts. Computing the dispatch targets once per owner/name/descriptor instead of per
+call site (`callgraph.BuildWith`) keeps the extra resolution from costing time: without it,
+WebGoat's analysis took 47–48 s.
+
+<details><summary>Builder <code>2</code> (before the inherited-implementation fix, analyzer <code>1f7d7f0</code>)</summary>
+
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | petclinic | profile | cha | 17.3–18.2 | 1320–1435 | 996 446 | — | — | 678 of 1096 | 4 | 5 127 | 6/72/12/57/6 |
 | petclinic | profile | rta | 16.6–16.7 | 1350–1403 | 956 465 | 39 981 of 310 418 (35 374) | 17 106 (6 071) | 625 of 1097 | 4 | 5 127 | 6/68/16/57/6 |
 | petclinic | all | cha | 14.1–16.5 | 1363–1397 | 996 446 | — | — | 678 of 1096 | 4 | 5 127 | 6/72/12/57/6 |
@@ -72,6 +98,8 @@ in either mode.
 | WebGoat | profile | rta | 27.8–29.8 | 1774–1821 | 1 327 988 | 83 351 of 556 769 (158 682) | 25 211 (10 671) | 662 of 1201 | 0 | 1 843 | 42/50/11/61/0 |
 | WebGoat | all | cha | 27.2–29.8 | 1735–1802 | 1 411 344 | — | — | 743 of 1194 | 0 | 1 848 | 42/52/9/61/0 |
 | WebGoat | all | rta | 27.8–32.8 | 1756–1795 | 1 396 558 | 14 786 of 556 769 (101 407) | 32 210 (13 181) | 745 of 1201 | 0 | 1 848 | 42/52/9/61/0 |
+
+</details>
 
 <details><summary>Before the service-provider dispatch model (servlet dispatch only, analyzer <code>9a460a6</code>)</summary>
 

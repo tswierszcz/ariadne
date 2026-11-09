@@ -63,13 +63,29 @@ What each cause means (checked on examples, and on the fixture `testdata/runtime
   does not reach (behind the gaps above) or that are created reflectively by name — RTA's
   narrowing compounds every other gap.
 
+## After fixing CHA's inherited implementations (builder `3`)
+
+Step 1 below, done the same day: CHA now also targets, for each concrete subtype, the body JVM
+method selection finds for it when it is declared above the subtype in a class outside the
+call's type (`callgraph.CHA.DispatchTargets`, `TestCHAInheritedBody`). Same trace:
+
+| Mode | Roots | Not in the static graph | Change |
+|---|---|---|---|
+| CHA | profile | 203 (7.1%) | −18: `inherited-impl` 17 → **0**, `no-call-at-site` 3 → 2 |
+| RTA | profile | 234 (8.2%) | −92: `rta-pruned` 105 → **31** |
+
+The RTA drop is the compounding effect described above: code that is now reachable creates
+classes RTA used to consider dead. Verdicts: none changed on petclinic or WebGoat in either
+roots mode (CHA, `-graph-compare` against the builder `2` graph); 43–44 petclinic and 1–3
+WebGoat findings got a shorter path through a body the JVM really runs (e.g.
+`OwnerController#processFindForm` → `AbstractErrors#rejectValue` behind `BindingResult`);
++11 713 / +16 439 edges.
+
 ## What this says about the next steps
 
 Ranked by measured payoff per effort:
 
-1. **Fix CHA's inherited implementations (`inherited-impl`, 17).** A correctness fix in one
-   place (`callgraph.CHA.DispatchTargets`), JVM-exact, no heuristic; every graph changes, so
-   it needs the usual verdict comparison.
+1. **Fix CHA's inherited implementations (`inherited-impl`, 17) — done** (section above).
 2. **SAM-call materialization (`sam-call`, 58).** DYNAMIC_LINKAGE L1's open half: follow a
    lambda/method reference from its creation site to the functional-interface calls that
    receive it (DATA_FLOW summaries already track values across calls).

@@ -134,6 +134,41 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   odzwierciedlał rzeczywisty launcher), lifecycle `init`, wewnętrzny łańcuch
   Spring Security, luka ustalenia przy niezarejestrowanym dispatchu.
 
+### JVM_GRAPH:G2 (korekta) — CHA dla implementacji dziedziczonych spoza typu wywołania — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** naprawa defektu CHA wskazanego
+  przez klasyfikację luk względem śladu (`inherited-impl`, 17 relacji na
+  petclinic). Gałąź `cha-inherited` od `trace-gaps` (PR #28).
+- **Zrealizowane:** `callgraph.CHA.DispatchTargets` — poza podtypami
+  deklarującymi metodę, dla każdego konkretnego podtypu bez własnej
+  deklaracji cel = ciało wybrane przez `ResolveExact` (także w nadklasie
+  spoza hierarchii typu wywołania i domyślna metoda interfejsu;
+  abstrakcyjne pominięte, reguła skip jak dla podtypów). RTA korzysta z
+  tego zbioru kandydatów bez zmian. `BuilderVersion` 2 → 3.
+- **Weryfikacja:** `TestCHAInheritedBody` (fixture `testdata/runtime`:
+  `LoudGreeter extends BaseGreeter implements Greeter` — krawędź CHA do
+  `BaseGreeter#greet`, którą JVM wykonał w nagranym śladzie);
+  `TestKnownTargets` (wyrocznia JVM P0) bez nowych nadmiarowych celów;
+  `TestRuntimeTrace` — w fixture zostają `reflection` 2 i `sam-call` 1.
+  petclinic, ten sam ślad: CHA 221 → 203 relacji poza grafem
+  (`inherited-impl` 17 → 0), RTA `-roots profile` 326 → 234
+  (`rta-pruned` 105 → 31). `-graph-compare` z grafem buildera 2 (oba tryby
+  korzeni): petclinic +11 713 krawędzi, 0 zmian werdyktów, 43–44 ścieżki
+  krótsze (np. `OwnerController#processFindForm` →
+  `AbstractErrors#rejectValue`); WebGoat +16 439, 0 zmian werdyktów, 1–3
+  ścieżki. Benchmark `scripts/graph-benchmark.sh --repeat 3` powtórzony
+  (2026-11-09, `testdata/graphbench/RESULTS.MD`): bez zmian werdyktów;
+  pierwszy przebieg wykazał 2× dłuższą analizę WebGoat (47 s zamiast
+  28 s — `ResolveExact` dla każdego miejsca wywołania), naprawione
+  zapamiętaniem celów dispatchu per właściciel/nazwa/deskryptor w
+  `callgraph.BuildWith` (WebGoat 23–25 s, petclinic 14,5–15 s).
+  `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz Direct calls, CHA and
+  inheritance), README (sekcja 4), FAQ (CHA),
+  `testdata/graphbench/TRACE_GAPS.MD` i `RESULTS.MD`, ten rejestr.
+- **Następny krok (wymaga zgody):** materializacja wywołań SAM
+  (DYNAMIC_LINKAGE L1, 58 relacji) albo refleksja między metodami (R3).
+
 ### RUNTIME_NATIVE:N1 — przyczyny luk grafu względem śladu — DONE (2026-11-08)
 
 - **Zakres zatwierdzony (2026-11-08):** pogrupowanie relacji zmierzonych w
@@ -187,8 +222,9 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 - **Ograniczenia:** jeden przebieg jednej aplikacji; przyczyna z
   instrukcji pod zmierzonym indeksem (ramki inline mogą go przesunąć —
   `no-call-at-site`); mierzy pominięte cele, nie nadaproksymację.
-- **Następny krok (wymaga zgody):** naprawa CHA dla dziedziczonych
-  implementacji (JVM_GRAPH G2), potem materializacja wywołań SAM (L1).
+- **Następny krok:** naprawa CHA dla dziedziczonych implementacji —
+  zrobione (wpis „JVM_GRAPH:G2 (korekta)”). Pozostaje (wymaga zgody):
+  materializacja wywołań SAM (L1).
 
 ### SERVICE_LOADING (po zamknięciu obszaru): dispatch SPI na pomijanych odbiorcach — DONE (2026-11-08)
 

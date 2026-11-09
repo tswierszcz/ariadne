@@ -522,7 +522,13 @@ the bytecode's own target **and** to the CHA expansion for
 exactly as the compiler saw it statically — at run time it could be any
 subtype. The static graph doesn't know which, so it plays it safe: it
 adds an edge to **every** subtype (from `hierarchy.Subtypes()`) that
-itself declares that method.
+itself declares that method — and, for a concrete subtype that only
+inherits it, to the body the JVM would select for it, even when that body
+sits in a superclass outside the interface's hierarchy (Spring's
+`DefaultListableBeanFactory` implements `ConfigurableListableBeanFactory`
+but inherits `getBean` from `AbstractBeanFactory`). Until 2026-11-08 that
+last case was missed; a runtime trace measured it (17 relations petclinic
+really took, `testdata/graphbench/TRACE_GAPS.MD`).
 
 **Guarding against explosion.** CHA never expands calls on
 `java.*`/`javax.*`/`jdk.*`/`sun.*` types (`DefaultSkip`) — without this

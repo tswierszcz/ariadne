@@ -64,20 +64,21 @@ func TestRuntimeTrace(t *testing.T) {
 	if rt.ExecutedCounts["traced"] != 1 || rt.ExecutedCounts["sampled"] == 0 || rt.ExecutedOther != 0 {
 		t.Errorf("executed %v (+%d not usable)", rt.ExecutedCounts, rt.ExecutedOther)
 	}
-	if rt.CallCounts[runtimeevents.CallNotInGraph] != 4 || rt.CallCounts[runtimeevents.CallInGraph] == 0 {
-		t.Errorf("calls %v: want 4 not in the graph", rt.CallCounts)
+	if rt.CallCounts[runtimeevents.CallNotInGraph] != 3 || rt.CallCounts[runtimeevents.CallInGraph] == 0 {
+		t.Errorf("calls %v: want 3 not in the graph", rt.CallCounts)
 	}
-	// Why: the reflective call under each loader, the body Greeter inherits
-	// from a class outside its type, a lambda run through Work#run in
-	// another method than the one creating it.
+	// The body Greeter inherits from BaseGreeter is a CHA edge now
+	// (TestCHAInheritedBody); what is left:
+	// Why the rest: the reflective call under each loader, a lambda run
+	// through Work#run in another method than the one creating it.
 	causes := map[string]int{}
 	for _, g := range rt.GapCauses {
 		causes[g.Cause] = g.Calls
 	}
-	if causes[runtimeevents.GapReflection] != 2 || causes[runtimeevents.GapInherited] != 1 || causes[runtimeevents.GapSAMCall] != 1 || len(causes) != 3 {
-		t.Errorf("gap causes %v, want reflection 2, inherited-impl 1, sam-call 1", causes)
+	if causes[runtimeevents.GapReflection] != 2 || causes[runtimeevents.GapSAMCall] != 1 || len(causes) != 2 {
+		t.Errorf("gap causes %v, want reflection 2, sam-call 1", causes)
 	}
-	for _, want := range []string{"## Runtime evidence", "**incomplete**", "`rtm.Main#reflective(Ljava/lang/ClassLoader;J)J` (line", "`rtm.Plugin#work(J)J`", "The absence of an event\nproves nothing", "| inherited-impl | 1 | `rtm.Greeter` (1) |"} {
+	for _, want := range []string{"## Runtime evidence", "**incomplete**", "`rtm.Main#reflective(Ljava/lang/ClassLoader;J)J` (line", "`rtm.Plugin#work(J)J`", "The absence of an event\nproves nothing", "| sam-call | 1 | `rtm.Work` (1) |"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("report lacks %q", want)
 		}

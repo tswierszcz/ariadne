@@ -1,17 +1,17 @@
-commit	1f7d7f07188cf29fdca10e02e65610f69044a393 (dirty)
+commit	16ff33aa37274f6b03234546583986773f2c99ba (dirty)
 go version go1.27.3 linux/amd64
 repeat	3
 profile	spring
 offline	true
-cha.tool	v0.0.0-20261108212848-1f7d7f07188c+dirty
-cha.builder	2
+cha.tool	v0.0.0-20261108222929-16ff33aa3727+dirty
+cha.builder	3
 cha.skip_rule	receiver types under java., javax., jdk., sun. are not expanded
 cha.unknown_allocation_policy	all-subtypes
 cha.catalog	p1-2
 cha.rta	
 cha.servlet_dispatch	s1
-rta.tool	v0.0.0-20261108212848-1f7d7f07188c+dirty
-rta.builder	2
+rta.tool	v0.0.0-20261108222929-16ff33aa3727+dirty
+rta.builder	3
 rta.skip_rule	receiver types under java., javax., jdk., sun. are not expanded
 rta.unknown_allocation_policy	cha-fallback-with-gap
 rta.catalog	p1-2

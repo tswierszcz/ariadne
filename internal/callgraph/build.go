@@ -57,6 +57,12 @@ func BuildWith(h *hierarchy.Hierarchy, strategy Strategy) *Graph {
 	// appended as evidence onto the one Edge that survives (JVM_GRAPH G0:
 	// "deduplikacja nie usuwa alternatywnych dowodów").
 	seen := make(map[edgeKey]int)
+	// The same owner/name/descriptor is called from many sites, and the
+	// strategy's answer depends only on that triple (Strategy's contract);
+	// resolving the body each concrete subtype inherits made recomputing
+	// it per site double WebGoat's analysis time.
+	type dispatchKey struct{ owner, name, desc string }
+	dispatch := make(map[dispatchKey][]string)
 	for _, fqcn := range fqcns {
 		ci := classes[fqcn]
 		for _, m := range ci.Methods {
@@ -97,7 +103,13 @@ func BuildWith(h *hierarchy.Hierarchy, strategy Strategy) *Graph {
 				if call.Kind != classfile.CallVirtual && call.Kind != classfile.CallInterface {
 					continue
 				}
-				for _, sub := range strategy.DispatchTargets(h, call) {
+				dk := dispatchKey{call.Owner, call.Name, call.Desc}
+				targets, ok := dispatch[dk]
+				if !ok {
+					targets = strategy.DispatchTargets(h, call)
+					dispatch[dk] = targets
+				}
+				for _, sub := range targets {
 					subID := g.intern(sub, call.Name, call.Desc)
 					addOrMerge(g, seen, callerID, subID, call.Kind, BasisCHA, call.PC)
 				}
