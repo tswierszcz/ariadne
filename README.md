@@ -372,6 +372,33 @@ continue through CHA over-approximation (on WebGoat, 15 Undertow advisories
 became `REACHABLE`, 11 of them through such paths —
 [RESULTS.MD](testdata/graphbench/RESULTS.MD)).
 
+**Undertow features a Spring Boot application leaves off (`internal/bootfeatures`,
+`u1`).** Inside the container, CHA dispatches to every implementation on the
+class path — a stream close reaches every XNIO `ChannelListener` (AJP, HTTP/2,
+PROXY protocol, the HTTP client's), an exchange end reaches
+`Http2ServerConnection` — and those classes are created by code CHA also
+considers reachable, so neither a creator gate nor RTA removes them. Whether
+they run is configuration: Spring Boot's Undertow factory turns on HTTP/2
+only with `server.http2.enabled=true`, TLS only with `server.ssl.*` (and
+`server.ssl.enabled` not false), a write timeout only through
+`server.undertow.options`, and never configures AJP, the PROXY protocol,
+Undertow's own authentication mechanisms or its HTTP client. When Undertow
+and Boot's Undertow factory (or a `@SpringBootApplication`) are in the input,
+ariadne reads the packaged `application*.properties`/`application*.yml`
+(every profile; a feature any file enables is on) and the application
+classes (a call, `new` or static read of the feature's API, e.g.
+`Undertow$Builder#addAjpListener`, turns it on); a feature nothing turns on
+is not a CHA/RTA target (direct calls are untouched). A switch whose value
+is a placeholder (`server.ssl.enabled=${WEBGOAT_SSLENABLED:false}`) is the
+environment's to decide, so that feature stays on. The log line
+`Undertow features (Spring Boot, u1; config …): http2 off (…); …` gives
+each decision; the graph's skip rule names the features left out.
+Configuration outside the packaged files (environment variables, command
+line, an external config directory) is not read — a deployment that
+enables HTTP/2 that way is outside what the input shows. On WebGoat: 4
+Undertow advisories leave `REACHABLE` (HTTP/2 HPACK, AJP, PROXY protocol,
+Undertow form authentication).
+
 **A second bounded exception: JDK/javax service-provider interfaces.**
 A provider-based API — Bean Validation, JDBC, JCache — calls its provider
 through an interface in a skipped package (`javax.validation.spi.

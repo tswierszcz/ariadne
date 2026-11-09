@@ -65,6 +65,12 @@ type Strategy interface {
 // DefaultSkip.
 type CHA struct {
 	Skip SkipFunc
+	// Exclude, when set, removes classes from the targets (never from the
+	// receivers): a model's decision that they do not run in this input
+	// (internal/bootfeatures — Undertow features a Spring Boot application
+	// leaves off). ExcludeRule describes it for the graph's settings.
+	Exclude     func(class string) bool
+	ExcludeRule string
 }
 
 // Mode implements Strategy.
@@ -75,10 +81,14 @@ func (CHA) UnknownAllocationPolicy() string { return PolicyAllSubtypes }
 
 // SkipRule implements Strategy.
 func (c CHA) SkipRule() string {
+	rule := "custom skip function"
 	if c.Skip == nil {
-		return "receiver types under " + strings.Join(jdkPrefixes, ", ") + " are not expanded"
+		rule = "receiver types under " + strings.Join(jdkPrefixes, ", ") + " are not expanded"
 	}
-	return "custom skip function"
+	if c.Exclude != nil && c.ExcludeRule != "" {
+		rule += "; " + c.ExcludeRule
+	}
+	return rule
 }
 
 func (c CHA) skip() SkipFunc {
@@ -99,8 +109,12 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 	}
 	var out []string
 	seen := map[string]bool{}
+	excluded := func(string) bool { return false }
+	if c.Exclude != nil {
+		excluded = c.Exclude
+	}
 	for _, sub := range h.Subtypes(call.Owner) {
-		if skip(sub) {
+		if skip(sub) || excluded(sub) {
 			continue
 		}
 		subInfo, ok := h.Lookup(sub)
@@ -130,7 +144,7 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 			continue
 		}
 		decl, ok := h.ResolveExact(sub, call.Name, call.Desc)
-		if !ok || decl == call.Owner || seen[decl] || skip(decl) {
+		if !ok || decl == call.Owner || seen[decl] || skip(decl) || excluded(decl) {
 			continue
 		}
 		declInfo, ok := h.Lookup(decl)

@@ -582,6 +582,11 @@ wrappers of the filters that run — and not every wrapper class on the class
 path. That lets a path continue from application code into the container
 (on WebGoat, 15 Undertow advisories became `REACHABLE`; 4 plausible, 11
 through CHA over-approximation inside Undertow — see RESULTS.MD).
+Since `internal/bootfeatures` (`u1`), Undertow features a Spring Boot
+application leaves off by configuration — HTTP/2, AJP, the PROXY protocol,
+Undertow's own authentication, its HTTP client, TLS and a write timeout
+unless the packaged configuration or application code turns them on — are
+no longer CHA targets; that removed 4 of those 11.
 
 **Why doesn't a runtime trace change any verdict?** (RUNTIME_NATIVE N1,
 `-runtime-trace`.) A trace is what one run did under one scenario: it can

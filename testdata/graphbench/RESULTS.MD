@@ -1,5 +1,14 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-09 after the Undertow feature model (`internal/bootfeatures`, `u1`)**: in a
+Spring Boot application with embedded Undertow, the classes of Undertow features the packaged
+configuration and the application code leave off (HTTP/2, AJP, PROXY protocol, Undertow's own
+authentication, its HTTP client, write timeout; TLS here stays on — its switch is an environment
+placeholder) are not CHA/RTA targets (README, "Undertow features a Spring Boot application leaves
+off"). The first table under "Real applications" is this rerun. **WebGoat: 4 Undertow advisories
+`REACHABLE` → `NOT_REACHABLE`**, and one more RTA-versus-CHA change (CVE-2023-5685); petclinic
+(Tomcat): identical graph. See "Undertow features (u1)" below.
+
 **Rerun 2026-11-09 after the servlet request/response objects (`servlet-container:dispatch`
 `s2`)**: calls on `javax.servlet` request/response/wrapper/filter-chain objects reach the bodies
 of the implementations reachable code creates (README, "Request, response and filter-chain
@@ -89,8 +98,27 @@ in either mode.
 
 ## Real applications
 
+| petclinic | profile | cha | 9.8 | 1356–1372 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
+| petclinic | profile | rta | 10.2–10.3 | 1351–1423 | 979 715 | 36 111 of 322 104 (35 727) | 17 379 (5 846) | 639 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/68/16/57/6 |
+| petclinic | all | cha | 9.7–9.8 | 1391–1427 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
+| petclinic | all | rta | 10.3–10.4 | 1355–1378 | 1 009 933 | 5 893 of 322 104 (59 461) | 21 851 (9 626) | 679 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 15.6–15.7 | 1706–1753 | 1 429 644 | — | — | 742 of 1194 | 0 | 1 927 | 1 557 (2 270) | 53/37/13/61/0 |
+| WebGoat | profile | rta | 16.1–16.3 | 1699–1797 | 1 345 733 | 83 911 of 570 065 (162 221) | 25 173 (10 660) | 667 of 1201 | 0 | 1 927 | 1 557 (2 270) | 52/35/16/61/0 |
+| WebGoat | all | cha | 15.5–16.1 | 1616–1726 | 1 429 650 | — | — | 743 of 1194 | 0 | 1 932 | 1 558 (2 265) | 53/37/13/61/0 |
+| WebGoat | all | rta | 16.0–16.2 | 1647–1804 | 1 414 887 | 14 763 of 570 065 (104 410) | 32 223 (13 220) | 745 of 1201 | 0 | 1 932 | 1 558 (2 265) | 53/37/13/61/0 |
+
+Against `s2` without the feature model (`-graph-compare`, both roots scenarios): petclinic
+identical (no Undertow); WebGoat 3 215 CHA edges removed, none added. **Times:** the machine was
+slower for this whole run than for the `s2` table below (petclinic, which this change does not
+touch, 9.7–9.8 s against 5.8–6.4 s); measured back to back on WebGoat (`-roots profile`, CHA)
+the analyzer without and with the model takes 14.8–15.2 s and 15.2–15.4 s — within the run-to-run
+spread.
+
+<details><summary>Servlet model <code>s2</code>, before the Undertow feature model (analyzer <code>8298256</code>)</summary>
+
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+
 | petclinic | profile | cha | 5.8–5.9 | 1363–1392 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
 | petclinic | profile | rta | 6.1–6.3 | 1327–1476 | 979 715 | 36 111 of 322 104 (35 727) | 17 379 (5 846) | 639 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/68/16/57/6 |
 | petclinic | all | cha | 6.0–6.4 | 1363–1466 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
@@ -107,6 +135,8 @@ WebGoat, nothing removed; petclinic registers one more filter (`ResourceUrlEncod
 busy with other analyses for the builder `4` run; measured back to back on WebGoat
 (`-roots profile`, CHA), `s1` and `s2` both take 8.4–8.6 s — the model costs about 0.1 s
 (building its 6 649–10 159 candidates: 50–70 ms).
+
+</details>
 
 <details><summary>Builder <code>4</code>, servlet model <code>s1</code> (before the request/response objects, analyzer <code>0018f2d</code>)</summary>
 
@@ -213,6 +243,31 @@ WebGoat's analysis took 47–48 s.
   profile` moves 4 (petclinic) and 2 (WebGoat) findings from `FRAMEWORK` to
   `NOT_REACHABLE`, all carrying `MODEL_INCOMPLETE` — the same findings as before the
   service-provider dispatch model. No `REACHABLE` result changes anywhere.
+
+## Undertow features (`internal/bootfeatures`, `u1`)
+
+WebGoat's packaged configuration (`application-webgoat.properties`) sets no HTTP/2, AJP, PROXY
+protocol, write timeout, Undertow login configuration or HTTP client, and its application code
+references none of their APIs; `server.ssl.enabled=${WEBGOAT_SSLENABLED:false}` is an
+environment placeholder, so TLS stays on. The 11 artifacts of the `s2` section below, after the
+model (both roots scenarios, CHA):
+
+| Advisory | Feature on the `s2` path | After `u1` | Check |
+|---|---|---|---|
+| CVE-2021-3859 | HTTP/2 HPACK and frame parsing | `NOT_REACHABLE` (`MODEL_INCOMPLETE`) | **correct for the packaged configuration**: HTTP/2 is off unless `server.http2.enabled` is set |
+| CVE-2024-6162 | AJP request parsing | `NOT_REACHABLE` (`MODEL_INCOMPLETE`) | **correct**: Spring Boot never configures an AJP listener; the application adds none |
+| CVE-2024-7885 | PROXY protocol listener | `NOT_REACHABLE` (`MODEL_INCOMPLETE`) | **correct**: the PROXY protocol is a listener flag only application code sets |
+| CVE-2023-1973 | Undertow form authentication | `NOT_REACHABLE` (`MODEL_INCOMPLETE`) | **correct**: WebGoat authenticates with Spring Security; no Undertow login configuration |
+| CVE-2023-1108 | TLS conduit | `REACHABLE` | TLS is the environment's choice (`WEBGOAT_SSLENABLED`); **plausible when TLS is on** |
+| CVE-2024-1635 | (was: write-timeout conduit) | `REACHABLE`, now through `HttpReadListener#newRequest` → `ParseState#reset` | the broad mapping includes the HTTP/1.1 parser, which runs on every request — **plausible**, like CVE-2024-1459 |
+| CVE-2026-28367, CVE-2026-28368, CVE-2026-28369 | (was: Undertow HTTP client) | `REACHABLE`, now ending at `HttpReadListener#handleEventWithNoRunningRequest` | the mapped server read loop runs on every request — **plausible target**, reached through a generic `ChannelListeners#invokeChannelListener` hop |
+| CVE-2021-3690 | WebSocket pong handling | `REACHABLE` | still a **CHA artifact** (stream close → any listener → `BufferedBinaryMessage$1`); WebSockets are on (undertow-websockets-jsr on the class path), so the feature model does not apply |
+| CVE-2023-5685 | XNIO future cancellation | `REACHABLE` in CHA; `NOT_REACHABLE` with RTA (`-roots profile`, `verdict-changes.tsv`) | still a **CHA artifact** (`dispatchRequest` → `HttpContinue` handler → WebSocket exchange); RTA removes it — the one new RTA-versus-CHA change, a correct one |
+
+So of the 11: 4 removed, 5 now plausible or configuration-dependent, 2 artifacts left. A
+deployment that enables HTTP/2, AJP or the PROXY protocol outside the packaged files (environment
+variables, command line) is outside what the input shows; the `NOT_REACHABLE` results carry
+`MODEL_INCOMPLETE`.
 
 ## Servlet request/response objects (`servlet-container:dispatch` `s2`)
 
