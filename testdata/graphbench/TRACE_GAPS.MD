@@ -220,6 +220,40 @@ Hikari's proxies into H2 (`JdbcConnection`, `JdbcStatement`, `JdbcPreparedStatem
 `org.h2.Driver#connect`): the service-provider model already expands that call, but its caller
 was not reachable before. No new relation is missing. No `java.sql`/`javax.sql` relation is left.
 
+## What the `proxy` relations are (FRAMEWORKS F3, measured, not built)
+
+2026-11-09, before building JDK-proxy dispatch (a call on interface `I` → `H#invoke` when a
+reachable `Proxy.newProxyInstance` site has handler `H` and `I` in its interface set): the 12
+`proxy` relations of the `j1` recording above (CHA, `-roots profile`), each traced to the
+`newProxyInstance` site that creates its proxy, and that site's two arguments read with
+DATA_FLOW's local values (`dataflow.Analyze`, `ArgumentAt`; a throwaway probe, not committed).
+
+| Handler the JVM ran | Relations | Creation site | Handler argument | Interface array |
+|---|---|---|---|---|
+| Spring AOP `JdkDynamicAopProxy` (Spring Data repositories, from `OwnerController`/`VetController`/`VisitController`) | 5 | `JdkDynamicAopProxy#getProxy(ClassLoader)` | `this` (exact class) | field `proxiedInterfaces`, filled from the `AdvisedSupport` configuration |
+| `SharedEntityManagerCreator$SharedEntityManagerInvocationHandler` (Spring Data JPA query creation) | 2 | `SharedEntityManagerCreator#createSharedEntityManager` | `new` | a `Class[]` built from the `interfaces` parameter plus `EntityManagerProxy` (`System.arraycopy`) |
+| `ExtendedEntityManagerCreator$ExtendedEntityManagerInvocationHandler` | 2 | `ExtendedEntityManagerCreator#createProxy` | `new` | the result of a call (`ClassUtils.toClassArray` over a set of the raw EntityManager's interfaces) |
+| `AbstractEntityManagerFactoryBean$ManagedEntityManagerFactoryInvocationHandler` | 2 | `AbstractEntityManagerFactoryBean#createEntityManagerFactoryProxy` | `new` | `ClassUtils.toClassArray(Collection)` over interfaces collected from the native factory's class |
+| `SharedEntityManagerCreator$DeferredQueryInvocationHandler` | 1 | `SharedEntityManagerInvocationHandler#invoke` | `new` | the result of a call (`ClassUtils.getAllInterfacesForClass` of the real query) |
+
+The handler's class is known at all 6 creation sites; **the interface set is bounded at none of
+them** — each comes from configuration, a parameter or the class of an object created at run
+time. Over the whole input: petclinic 59 `newProxyInstance` sites, 24 with a literal interface
+array (21 also with a `new` handler); WebGoat 52 / 21 (16) — annotation proxies, Spring JDBC's
+close-suppressing and transaction-aware connection proxies, Hibernate's `Session` proxy, MySQL
+Connector/J wrappers: none on a measured relation. So the planned rule would add **0 of the 12**;
+the stop rule set before the measurement applies (as for REFLECTION R3), nothing was built.
+
+A model that could close them would not infer the interface set but take it from a catalog: the
+proxies `SharedEntityManagerCreator`/`ExtendedEntityManagerCreator` create implement
+`javax.persistence.EntityManager` (and `Query`/`EntityManagerFactory` for the other two handlers),
+and Spring Data wraps each repository bean (FRAMEWORKS F2's `RepositoryBeans`) in a
+`JdkDynamicAopProxy`. Even then the edge stops at the handler's `invoke`: from there the JVM
+calls `Method#invoke` on the target (on the builder `4` recording, 6 of the 37 `reflection` relations
+were exactly these handlers passing their `Method` on), and Spring Data's repository path already reaches
+`SimpleJpaRepository` through the profile's synthetic edges. Expected effect on reachability:
+small; not started.
+
 ## What this says about the next steps
 
 Ranked by measured payoff per effort:
@@ -233,7 +267,8 @@ Ranked by measured payoff per effort:
    above: 33 of the 35 servlet relations). Originally: an extension
    of the servlet dispatch model; the rest of `skipped-receiver` is spread thin over many JDK
    types (collections, I/O), where lifting the skip would fan out (the reason it exists).
-5. **JPA/Spring Data proxies (`proxy`, 12)** — FRAMEWORKS F3/F4.
+5. **JPA/Spring Data proxies (`proxy`, 12)** — FRAMEWORKS F3/F4. Measured 2026-11-09 (section "What the `proxy` relations
+   are"): 0 of 12 have a bounded interface set; only a catalog-based model could close them.
 6. **JDBC objects (`skipped-receiver`, 22 on the 2026-11-09 recording) — done** (section
    above, `j1`: all 22, plus the `Driver#connect` relation behind them).
 
