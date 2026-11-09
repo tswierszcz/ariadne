@@ -134,6 +134,98 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   odzwierciedlał rzeczywisty launcher), lifecycle `init`, wewnętrzny łańcuch
   Spring Security, luka ustalenia przy niezarejestrowanym dispatchu.
 
+### JVM_GRAPH:G2 (korekta) — CHA dla implementacji dziedziczonych spoza typu wywołania — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** naprawa defektu CHA wskazanego
+  przez klasyfikację luk względem śladu (`inherited-impl`, 17 relacji na
+  petclinic). Gałąź `cha-inherited` od `trace-gaps` (PR #28).
+- **Zrealizowane:** `callgraph.CHA.DispatchTargets` — poza podtypami
+  deklarującymi metodę, dla każdego konkretnego podtypu bez własnej
+  deklaracji cel = ciało wybrane przez `ResolveExact` (także w nadklasie
+  spoza hierarchii typu wywołania i domyślna metoda interfejsu;
+  abstrakcyjne pominięte, reguła skip jak dla podtypów). RTA korzysta z
+  tego zbioru kandydatów bez zmian. `BuilderVersion` 2 → 3.
+- **Weryfikacja:** `TestCHAInheritedBody` (fixture `testdata/runtime`:
+  `LoudGreeter extends BaseGreeter implements Greeter` — krawędź CHA do
+  `BaseGreeter#greet`, którą JVM wykonał w nagranym śladzie);
+  `TestKnownTargets` (wyrocznia JVM P0) bez nowych nadmiarowych celów;
+  `TestRuntimeTrace` — w fixture zostają `reflection` 2 i `sam-call` 1.
+  petclinic, ten sam ślad: CHA 221 → 203 relacji poza grafem
+  (`inherited-impl` 17 → 0), RTA `-roots profile` 326 → 234
+  (`rta-pruned` 105 → 31). `-graph-compare` z grafem buildera 2 (oba tryby
+  korzeni): petclinic +11 713 krawędzi, 0 zmian werdyktów, 43–44 ścieżki
+  krótsze (np. `OwnerController#processFindForm` →
+  `AbstractErrors#rejectValue`); WebGoat +16 439, 0 zmian werdyktów, 1–3
+  ścieżki. Benchmark `scripts/graph-benchmark.sh --repeat 3` powtórzony
+  (2026-11-09, `testdata/graphbench/RESULTS.MD`): bez zmian werdyktów;
+  pierwszy przebieg wykazał 2× dłuższą analizę WebGoat (47 s zamiast
+  28 s — `ResolveExact` dla każdego miejsca wywołania), naprawione
+  zapamiętaniem celów dispatchu per właściciel/nazwa/deskryptor w
+  `callgraph.BuildWith` (WebGoat 23–25 s, petclinic 14,5–15 s).
+  `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `docs/SUPPORT.MD` (wiersz Direct calls, CHA and
+  inheritance), README (sekcja 4), FAQ (CHA),
+  `testdata/graphbench/TRACE_GAPS.MD` i `RESULTS.MD`, ten rejestr.
+- **Następny krok (wymaga zgody):** materializacja wywołań SAM
+  (DYNAMIC_LINKAGE L1, 58 relacji) albo refleksja między metodami (R3).
+
+### RUNTIME_NATIVE:N1 — przyczyny luk grafu względem śladu — DONE (2026-11-08)
+
+- **Zakres zatwierdzony (2026-11-08):** pogrupowanie relacji zmierzonych w
+  przebiegu, których graf statyczny nie ma, według przyczyny ustalonej z
+  bytecode wywołującego; pomiar CHA i RTA na petclinic; ranking dalszych
+  modeli według pomiaru. Gałąź `trace-gaps` od `main` (po PR #26, #27).
+- **Zrealizowane:**
+  1. `internal/runtimeevents`: `Inputs.Classify`, przyczyna i szczegół na
+     każdej relacji `not_in_graph`, `Result.GapCauses` (liczby per
+     przyczyna, 10 najczęstszych szczegółów), `GapCauseVersion = "g1"`.
+  2. `cmd/ariadne/runtime.go` `gapClassifier`: instrukcja wywołania pod
+     zmierzonym `bci` w metodzie wywołującej → `class-init`,
+     `invokedynamic`, `reflection`, `method-handle`, `proxy` (cel
+     `InvocationHandler#invoke`), `async` (Thread/Executor przez ramki
+     runtime), `sam-call` (ciało lambdy albo cel referencji o innej nazwie
+     niż metoda interfejsu), `skipped-receiver`, `inherited-impl` (ciało
+     wybrane przez JVM dla podtypu pochodzi z nadklasy spoza typu
+     wywołania), `rta-pruned` / `dispatch-missing`, `no-call-at-site`.
+  3. Raport: tabela przyczyn z typami odbiorców, kolumna przyczyny w
+     tabeli relacji; v2 `runtime.gap_cause_version`,
+     `runtime.calls_not_in_graph_by_cause`; snapshot: wersja
+     `runtime.gap_causes`.
+  4. Fixture `testdata/runtime` rozszerzony (`Gaps.java`: dziedziczone
+     ciało `BaseGreeter#greet` za `Greeter`, lambda tworzona w `sam()` i
+     wywoływana w `drive()`), ślad nagrany ponownie.
+  5. `testdata/graphbench/TRACE_GAPS.MD`: pomiar na petclinic i ranking.
+- **Weryfikacja:** `TestGapClassifier` (7 przypadków na prawdziwym bytecode
+  `rtm.jar`: dispatch-missing/rta-pruned zależnie od trybu,
+  inherited-impl, sam-call, reflection, class-init, brak indeksu),
+  `TestRuntimeTrace` (fixture: reflection 2, inherited-impl 1, sam-call 1;
+  tabela w raporcie). Pierwsza wersja zostawiała 41 relacji jako
+  „pośrednie”; przejrzane przykłady okazały się dziedziczonymi
+  implementacjami i wywołaniami SAM — dodane jako osobne przyczyny, „pośrednie”
+  spadło do 0. Błąd szablonu (`$` wewnątrz `with`) wykryty przy pierwszym
+  renderowaniu, poprawiony. petclinic (ślad z 505 metodami śledzonymi):
+  CHA 221 z 2 867 relacji poza grafem (skipped-receiver 87, sam-call 58,
+  reflection 33, inherited-impl 17, proxy 12, class-init 8, async 3,
+  no-call-at-site 3), identycznie dla `-roots all` i `profile`; RTA
+  `-roots all` 222 (1 rta-pruned), RTA `-roots profile` 326 (105
+  rta-pruned, 35 z nich handlery AttoParser/Thymeleaf). `go test ./...`,
+  `go vet ./...` — PASS.
+- **Wniosek:** największe mierzalne luki to wywołania SAM (DYNAMIC_LINKAGE
+  L1), refleksja między metodami (REFLECTION R3) i dziedziczone
+  implementacje — te ostatnie to defekt CHA (`DispatchTargets` bierze tylko
+  podtypy deklarujące metodę), tani do naprawy; RTA jako domyślny tryb
+  dodatkowo nieuzasadniony (105 pominiętych relacji przy `-roots profile`);
+  points-to (P3) nieuzasadnione.
+- **Dokumentacja:** `docs/RUNTIME_TRACE.MD`, `docs/RESULTS_CONTRACT.MD`,
+  `docs/SUPPORT.MD`, README, `testdata/graphbench/TRACE_GAPS.MD`, ten
+  rejestr.
+- **Ograniczenia:** jeden przebieg jednej aplikacji; przyczyna z
+  instrukcji pod zmierzonym indeksem (ramki inline mogą go przesunąć —
+  `no-call-at-site`); mierzy pominięte cele, nie nadaproksymację.
+- **Następny krok:** naprawa CHA dla dziedziczonych implementacji —
+  zrobione (wpis „JVM_GRAPH:G2 (korekta)”). Pozostaje (wymaga zgody):
+  materializacja wywołań SAM (L1).
+
 ### SERVICE_LOADING (po zamknięciu obszaru): dispatch SPI na pomijanych odbiorcach — DONE (2026-11-08)
 
 - **Zakres zatwierdzony (2026-11-08):** model B3 dla wywołań na

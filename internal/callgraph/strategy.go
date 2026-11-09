@@ -47,6 +47,9 @@ type Strategy interface {
 	// DispatchTargets returns, in a deterministic order, the classes
 	// whose own declaration of call.Name+call.Desc the call may run as a
 	// CHA-basis edge. Called only for invokevirtual/invokeinterface.
+	// The result must depend only on h and call.Owner/Name/Desc: the
+	// builder computes it once per such triple and reuses it for every
+	// call site (BuildWith), and callers must not modify it.
 	DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []string
 	// UnknownAllocationPolicy names the strategy's policy for receivers
 	// created by unmodeled mechanisms.
@@ -95,6 +98,7 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 		return nil
 	}
 	var out []string
+	seen := map[string]bool{}
 	for _, sub := range h.Subtypes(call.Owner) {
 		if skip(sub) {
 			continue
@@ -108,10 +112,38 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 		// A bridge method already carries the exact erased descriptor, so
 		// it resolves like any declared method and its own Calls carry the
 		// analysis to the covariant implementation.
-		if _, ok := subInfo.MethodByNameAndDesc(call.Name, call.Desc); !ok {
+		if _, ok := subInfo.MethodByNameAndDesc(call.Name, call.Desc); ok {
+			if !seen[sub] {
+				seen[sub] = true
+				out = append(out, sub)
+			}
 			continue
 		}
-		out = append(out, sub)
+		// A concrete subtype that does not declare the method runs the
+		// body JVM method selection finds above it — possibly in a
+		// superclass that is not itself a subtype of the call's type
+		// (DefaultListableBeanFactory implements
+		// ConfigurableListableBeanFactory but inherits getBean from
+		// AbstractBeanFactory). That body is a target too (measured
+		// against a runtime trace: testdata/graphbench/TRACE_GAPS.MD).
+		if subInfo.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) != 0 {
+			continue
+		}
+		decl, ok := h.ResolveExact(sub, call.Name, call.Desc)
+		if !ok || decl == call.Owner || seen[decl] || skip(decl) {
+			continue
+		}
+		declInfo, ok := h.Lookup(decl)
+		if !ok {
+			continue
+		}
+		// A default method of an interface outside the call's type is the
+		// body selected the same way; an abstract declaration is not.
+		if m, ok := declInfo.MethodByNameAndDesc(call.Name, call.Desc); !ok || m.IsAbstract() {
+			continue
+		}
+		seen[decl] = true
+		out = append(out, decl)
 	}
 	return out
 }

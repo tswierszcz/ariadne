@@ -199,12 +199,19 @@ Advisories with a mapped vulnerable method seen executing in this run:
 No mapped vulnerable method was seen executing in this run — which says nothing about the others.
 {{end}}{{if .TracedNoEntry}}
 Traced on entry, **not entered in this run** ({{len .TracedNoEntry}}): {{range $i, $f := .TracedNoEntry}}{{if $i}}, {{end}}{{$f.Advisory}} ({{$f.Status}}){{end}}. Exact-entry tracing was on for their mapped methods and recorded no call — under this scenario only; other traffic, configuration or timing may run them, so this is not evidence of unreachability.
-{{end}}{{if .NotInGraph}}
+{{end}}{{if .Result.GapCauses}}
+Why the static graph has no edge for a measured call (causes `{{.Result.GapCauseVersion}}`, decided from the caller's
+bytecode at the measured index) — what a further model would have to cover:
+
+| Cause | Calls | Most frequent receiver types / sites |
+|---|---|---|
+{{range .Result.GapCauses}}| {{.Cause}} | {{.Calls}} | {{range $i, $d := .Details}}{{if lt $i 5}}{{if $i}}, {{end}}`{{$d.Detail}}` ({{$d.Calls}}){{end}}{{end}} |
+{{end}}{{end}}{{if .NotInGraph}}
 Measured calls the static graph has no edge for{{if gt (len .NotInGraph) 30}} (first 30){{end}}:
 
-| Evidence | Caller | Callee (loader) | Basis | Count |
-|---|---|---|---|---|
-{{range $i, $c := .NotInGraph}}{{if lt $i 30}}| {{$c.Evidence}} | `{{$c.Caller}}`{{if $c.Line}} (line {{$c.Line}}){{end}} | `{{$c.Callee}}` ({{$c.Loader}}) | {{$c.Basis}}, {{$c.Source}} | {{$c.Count}} |
+| Evidence | Caller | Callee (loader) | Basis | Count | Cause |
+|---|---|---|---|---|---|
+{{range $i, $c := .NotInGraph}}{{if lt $i 30}}| {{$c.Evidence}} | `{{$c.Caller}}`{{if $c.Line}} (line {{$c.Line}}){{end}} | `{{$c.Callee}}` ({{$c.Loader}}) | {{$c.Basis}}, {{$c.Source}} | {{$c.Count}} | {{$c.Cause}}{{if $c.CauseDetail}} (`{{$c.CauseDetail}}`){{end}} |
 {{end}}{{end}}{{end}}
 {{end}}## Withdrawn advisories
 

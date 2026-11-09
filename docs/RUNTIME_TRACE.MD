@@ -94,6 +94,20 @@ and descriptor. A `call` between two matched methods is reported as **in the sta
 (an edge exists, with its basis) or **not in the static graph** — a relation the static
 analysis missed for this run, worth investigating, never an error of the trace by itself.
 
+### Why a measured call is not in the graph
+
+Every `not_in_graph` call gets a cause decided from the caller's bytecode at the measured index
+(causes `g1`): `class-init` (an implicit `<clinit>`), `invokedynamic`, `reflection`
+(`Method#invoke`, `Constructor#newInstance`, `Class#newInstance`), `method-handle`, `proxy`
+(into an `InvocationHandler`), `async` (through a thread or executor), `sam-call` (a
+functional-interface call running a lambda or method-reference body), `skipped-receiver` (a
+`java.`/`javax.`/`jdk.`/`sun.` receiver CHA never expands), `inherited-impl` (the body comes
+from a superclass outside the call's type, which CHA misses), `rta-pruned` (a CHA edge RTA
+removed), `dispatch-missing`, `no-call-at-site` (no call instruction at that index — inlined
+frames, line tables), `unclassified`. The report groups them with their most frequent receiver
+types — what a further model would have to cover; `testdata/graphbench/TRACE_GAPS.MD` is the
+petclinic measurement.
+
 ## Producing a trace
 
 `ariadne -runtime-filter-out FILE.jfc` writes the JFR settings that trace, on entry, every

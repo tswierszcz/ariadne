@@ -50,6 +50,8 @@ public final class Main {
         try (URLClassLoader isolated = new URLClassLoader("isolated", new URL[] {jar}, ClassLoader.getPlatformClassLoader())) {
             acc += reflective(isolated, 600);
         }
+        acc += Gaps.inherited(500);
+        acc += Gaps.sam(500);
         System.out.println(acc);
     }
 }

@@ -113,6 +113,7 @@ func newSnapshotRun(cfg config) (*snapshotRun, error) {
 	// file are part of the derivation (the file is an input, above).
 	if cfg.runtimeTrace != "" {
 		sr.algos["runtime.import"] = runtimeevents.ImportVersion
+		sr.algos["runtime.gap_causes"] = runtimeevents.GapCauseVersion
 		sr.config["runtime-trace"] = baseName(cfg.runtimeTrace)
 	}
 	if cfg.snapshotOut != "" {
