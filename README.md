@@ -434,6 +434,35 @@ in its own jar, a registered provider and a product, an unregistered
 provider and a product implementation in another jar — every observed body
 reached, the other jar never a target).
 
+**JDBC objects (`jdbc:objects`, `internal/jdbcdispatch`, version `j1`).**
+The service-provider model reaches a driver's classes, but a real
+application rarely talks to the driver directly: Hibernate or Spring's
+`JdbcTemplate` call `Connection`/`PreparedStatement`/`ResultSet` methods on
+a pool's proxies (Hikari's `HikariProxyConnection`,
+`HikariProxyPreparedStatement`, …), which live outside the driver jars, and
+the pool's proxy calls the driver through the same interfaces. Since `j1`
+a virtual/interface call on `java.sql` `Connection`, `Statement`,
+`PreparedStatement`, `CallableStatement`, `ResultSet`, `DatabaseMetaData`,
+`ResultSetMetaData`, `ParameterMetaData`, `Array`, `Blob`, `Clob`,
+`NClob`, `SQLXML`, `Savepoint`, `Wrapper` or `javax.sql.DataSource` gets
+an edge (basis `model`) to the body every concrete implementation in the
+input runs for it, **once a method creating that implementation (`new`)
+is reachable from the roots** — the same creator gate as the servlet
+objects above: the pool's proxies once its proxy factory runs, the driver's
+connection once its `connect` runs. A pool or wrapper class nothing
+reachable creates is not a target, nor is one created only reflectively (a
+`DataSource` class Spring Boot instantiates by name gets its edges only if
+some reachable method also `new`s it — on petclinic Boot creates
+`HikariDataSource` reflectively, and the gate admits it through Hikari's own
+`new HikariDataSource` in `HikariConnectionProvider`/`HikariJNDIFactory`,
+not through Boot's creation). `java.sql.Driver` is left to the
+service-provider model. The log line `JDBC objects (jdbc:objects j1): N
+candidates, N edges added, …` counts them; snapshots record
+`jdbc.objects`. Measured on a petclinic trace: every one of the 22
+`java.sql`/`javax.sql` relations the graph missed is an edge now, and the
+`java.sql.Driver#connect` relation behind them follows
+([TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)).
+
 CHA's own targets follow the same rule (builder version `3`): for a
 virtual/interface call on `T`, every subtype of `T` declaring the method,
 plus — for each concrete subtype that only inherits it — the body JVM

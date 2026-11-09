@@ -22,6 +22,7 @@ import (
 	"ariadne/internal/cves"
 	"ariadne/internal/exploit"
 	"ariadne/internal/httpcache"
+	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/reach"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/runtimeevents"
@@ -69,6 +70,8 @@ func algorithmVersions(mode string) map[string]string {
 		// sources, Spring Boot catalog): it adds call-graph edges in every mode.
 		"servlet.dispatch": servletdispatch.Version,
 		"spi.dispatch":     spidispatch.Version,
+		// JDBC objects: creator-gated edges in every mode.
+		"jdbc.objects": jdbcdispatch.Version,
 		// Undertow features a Spring Boot application leaves off: CHA/RTA
 		// targets in every mode.
 		"boot.features": bootfeatures.Version,

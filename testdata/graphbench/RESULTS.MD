@@ -1,5 +1,22 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-09 after the JDBC objects (`jdbc:objects` `j1`, `internal/jdbcdispatch`)**: a
+virtual/interface call on a `java.sql` connection, statement, result set, metadata object, LOB or
+`javax.sql.DataSource` reaches the bodies of the implementations reachable code creates — a
+pool's proxies, a driver's classes (README, "JDBC objects"; measured on a runtime trace in
+[TRACE_GAPS.MD](TRACE_GAPS.MD): all 22 JDBC relations the graph missed are edges now). The first
+table under "Real applications" is this rerun. **No verdict or path changed** in any mode or
+roots scenario (`-graph-compare` against `fac65dc`: petclinic +11 342 edges, WebGoat +4 882 /
++4 883, none removed; `verdict-changes.tsv` unchanged). The "Model edges" column counts only the
+registry models' edges, not the creator-gated JDBC or servlet-object edges (the log lines
+`JDBC objects …`: petclinic 12 560 added, WebGoat 4 589). On petclinic that column drops 5 326 → 4 108: the 1 218
+edges the service-provider model used to add from JDBC calls into H2's own classes are now added
+first by the JDBC gate (12 560 − 1 218 = the 11 342 net); on WebGoat it grows 1 927 → 2 219 /
+1 932 → 2 225 (library-model call sites reachable through the new edges). **Times:** the machine was slower for
+this whole run (petclinic 12.5–14.1 s against 9.7–10.4 s for `u1`); measured back to back on
+WebGoat (`-roots profile`, CHA) the analyzer without and with the model takes 19.9–20.4 s and
+20.4 s — within the spread; the model itself logs 150–180 ms.
+
 **Rerun 2026-11-09 after the Undertow feature model (`internal/bootfeatures`, `u1`)**: in a
 Spring Boot application with embedded Undertow, the classes of Undertow features the packaged
 configuration and the application code leave off (HTTP/2, AJP, PROXY protocol, Undertow's own
@@ -98,6 +115,21 @@ in either mode.
 
 ## Real applications
 
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| petclinic | profile | cha | 13.6–14.1 | 1359–1386 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | profile | rta | 13.0–13.6 | 1345–1381 | 991 057 | 36 111 of 322 104 (35 727) | 17 385 (5 845) | 639 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/68/16/57/6 |
+| petclinic | all | cha | 12.5–12.9 | 1331–1374 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | all | rta | 13.7–13.8 | 1323–1386 | 1 021 275 | 5 893 of 322 104 (59 461) | 21 852 (9 620) | 679 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 19.8–20.0 | 1653–1712 | 1 434 527 | — | — | 742 of 1194 | 0 | 2 219 | 1 557 (2 269) | 53/37/13/61/0 |
+| WebGoat | profile | rta | 20.6–20.9 | 1779–1802 | 1 350 616 | 83 911 of 570 065 (162 221) | 25 180 (10 659) | 667 of 1201 | 0 | 2 219 | 1 557 (2 269) | 52/35/16/61/0 |
+| WebGoat | all | cha | 19.1–19.8 | 1700–1851 | 1 434 532 | — | — | 743 of 1194 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
+| WebGoat | all | rta | 20.5–21.1 | 1680–1720 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
+
+<details><summary>Undertow feature model <code>u1</code>, before the JDBC objects (analyzer <code>fac65dc</code>)</summary>
+
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | petclinic | profile | cha | 9.8 | 1356–1372 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
 | petclinic | profile | rta | 10.2–10.3 | 1351–1423 | 979 715 | 36 111 of 322 104 (35 727) | 17 379 (5 846) | 639 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/68/16/57/6 |
 | petclinic | all | cha | 9.7–9.8 | 1391–1427 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
@@ -114,11 +146,12 @@ touch, 9.7–9.8 s against 5.8–6.4 s); measured back to back on WebGoat (`-roo
 the analyzer without and with the model takes 14.8–15.2 s and 15.2–15.4 s — within the run-to-run
 spread.
 
+</details>
+
 <details><summary>Servlet model <code>s2</code>, before the Undertow feature model (analyzer <code>8298256</code>)</summary>
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-
 | petclinic | profile | cha | 5.8–5.9 | 1363–1392 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
 | petclinic | profile | rta | 6.1–6.3 | 1327–1476 | 979 715 | 36 111 of 322 104 (35 727) | 17 379 (5 846) | 639 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/68/16/57/6 |
 | petclinic | all | cha | 6.0–6.4 | 1363–1466 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
