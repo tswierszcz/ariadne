@@ -152,3 +152,31 @@ Ranked by measured payoff per effort:
 Not supported by this measurement: RTA as a default (it adds 105 missed relations with
 `-roots profile`), and points-to (GRAPH_PRECISION P3) — what the graph misses is dominated by
 unmodeled mechanisms, not by imprecise dispatch.
+
+## What the `reflection` relations are (REFLECTION R3, measured, not built)
+
+2026-11-09, before starting REFLECTION R3 (reflection across methods): the 37 `reflection`
+relations of the builder `4` trace above (same recording, CHA, `-roots profile`), each checked
+in the caller's bytecode for where the `Method`/`Constructor`/`Class` comes from. This corrects
+item 3 of the list above: they are not `ReflectionUtils`/Hibernate-accessor calls on a
+`Method` looked up elsewhere.
+
+| Where the reflective object comes from | Relations | Sites |
+|---|---|---|
+| Spring `@Bean` factory methods: the `factoryMethod` parameter, picked by `ConstructorResolver` from `getDeclaredMethods()` of the configuration class by a name taken from the bean definition | 18 | `SimpleInstantiationStrategy#instantiate` |
+| JDK proxy `InvocationHandler` passing on its `Method` parameter (the interface method called on the proxy) | 6 | `SharedEntityManagerCreator$SharedEntityManagerInvocationHandler`/`$DeferredQueryInvocationHandler`, `ExtendedEntityManagerCreator$ExtendedEntityManagerInvocationHandler`, `AbstractEntityManagerFactoryBean#invokeProxyMethod` ×2 |
+| Spring MVC handler methods (`getBridgedMethod()`, found by `MethodIntrospector` scanning for `@RequestMapping`) | 3 | `InvocableHandlerMethod#doInvoke` |
+| Classes named in bean definitions or `spring.factories` | 3 | `BeanUtils#instantiateClass` ×2, Boot `Instantiator#instantiate` |
+| Hibernate defaults: a class from an interface call (`PersisterClassResolver`) or a `Map` lookup by mode | 2 | `PersisterFactoryImpl#createEntityPersister`, `EntityTuplizerFactory#constructTuplizer` |
+| SpEL: a name from a template expression | 2 | `ReflectiveMethodExecutor#execute`, `ReflectivePropertyAccessor$OptimalPropertyAccessor#read` |
+| Lookup and call in one method, but the `Class` comes from a facade or a field | 2 | `BeanValidationIntegrator#integrate` (`ClassLoaderService#classForName`), devtools `RestartLauncher#run` (`Class.forName(this.mainClassName)`) |
+
+**0 of 37** have the shape R3 targets — a `Method`/`Constructor` found by constant names (R1/R2)
+in one method and called in another — so building it would change nothing here; the
+2026-11-05 probe over every `Method#invoke` site of petclinic and WebGoat found the same (0
+sites). `getDeclaredMethods()`/`getMethods()` filtered by name is not a bounded set either: every
+filter here takes its name from annotations or bean definitions. The bounded sets are
+annotation-defined (all `@Bean` methods, all request-mapping methods), which the spring profile
+already roots — an edge there would shorten paths, not change a verdict. Configuration-sourced
+names (`spring.factories`, 3 relations) and `setAccessible` were not measured as worth a model.
+Not done.
