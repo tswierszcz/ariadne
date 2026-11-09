@@ -64,3 +64,16 @@ Wykonano (2026-11-08): `docs/RUNTIME_TRACE.MD` — format JSON Lines `ariadne-ru
 Gotowe: poprawny trace, inna wersja artefaktu, dwa loadery i niepełny trace mają odrębne wyniki. N0–N1 to pierwszy zakres runtime, bez konieczności tworzenia agenta.
 
 Wykonano (2026-11-08): `internal/runtimeevents` (`n1-1`): `Parse` — ścisła walidacja (nieznane rodzaje/pola, wiszące odwołania, duplikaty, wartości spoza enumeracji, rodzaj niezadeklarowany w nagłówku, próbkowany a „kompletny”, limity rozmiaru) odrzuca cały plik; `Correlate` — klasa po SHA-256 pliku klasy (albo artefaktu): `matched`/`matched_artifact` (dowód), `different_version`/`name_only`/`not_in_input` (pokazane, nieużyte), definicje per loader osobno; metody → węzły grafu; zmierzone wywołania → `in_graph` (z podstawami krawędzi) / `not_in_graph`; podatne metody zaobserwowane per ustalenie i instancja. CLI `-runtime-trace` (walidacja przed analizą), raport „Runtime evidence”, v2 `runtime` i `findings[].runtime_observed`, snapshot (wejście `runtime-trace`, wersja `runtime.import`). Graf i werdykty bez zmian. Fixture JFR `testdata/runtime` (`scripts/runtime-trace-fixture.sh`) i prawdziwy przebieg petclinic (`scripts/runtime-trace-petclinic.sh`). Szczegóły: IMPLEMENTATION_STATUS, wpis RUNTIME_NATIVE:N0–N1.
+
+## Addendum (2026-11-09): przyczyny luk grafu względem śladu (`g1`)
+
+Rozszerzenie N1 po archiwizacji: każde zmierzone wywołanie, dla którego graf statyczny nie ma
+krawędzi, jest klasyfikowane z bytecode wywołującego pod zmierzonym indeksem (`sam-call`,
+`skipped-receiver`, `reflection`, `inherited-impl`, `proxy`, `class-init`, `async`,
+`rta-pruned`, …) i grupowane z typami odbiorców (raport, v2
+`runtime.calls_not_in_graph_by_cause`; `TestGapClassifier`). Pomiar na petclinic:
+`testdata/graphbench/TRACE_GAPS.MD`. Skutki: naprawa CHA dla implementacji dziedziczonych
+(JVM_GRAPH G2, PR #29) i materializacja wywołań SAM (DYNAMIC_LINKAGE L1, PR #30). Commit
+`16ff33a` (PR #28, wszedł do `main` razem z #29). Pełny wpis:
+`RECOMMENDATION/IMPLEMENTATION_STATUS.MD`, „RUNTIME_NATIVE:N1 — przyczyny luk grafu względem
+śladu”.
