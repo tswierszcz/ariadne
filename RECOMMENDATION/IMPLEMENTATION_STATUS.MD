@@ -297,6 +297,28 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 - **Następny krok (wymaga zgody):** materializacja wywołań SAM
   (DYNAMIC_LINKAGE L1, 58 relacji) albo refleksja między metodami (R3).
 
+### RUNTIME_NATIVE:N1 — ostrzejszy klasyfikator `sam-call` (przyczyny `g2`) — DONE (2026-11-09)
+
+- **Zakres:** poprawka pomiaru, nie grafu. `g1` liczył jako `sam-call` każde
+  wywołanie wirtualne, którego zmierzony cel nazywa się inaczej niż wołana
+  metoda — przez ramki JDK także kolekcje wołające `equals`/`hashCode`,
+  spliteratory, `Comparator` (12 z 22 na śladzie petclinic po L1).
+- **Zrealizowane:** `gapClassifier` (`cmd/ariadne/runtime.go`): `sam-call`
+  tylko, gdy cel implementuje lambdę/referencję metody tworzoną w wejściu
+  (`invokedynamic` z `SamInterface`/`SamMethod`; także nadpisanie celu
+  referencji), której interfejs to typ wywołania (lub jego podtyp), a metoda
+  to wołana metoda. `GapCauseVersion` `g1` → `g2` (wersja w snapshotach).
+- **Weryfikacja:** `TestGapClassifier` (nowy przypadek: cel, którego żadna
+  lambda nie implementuje, w miejscu SAM → nie `sam-call`); ten sam ślad
+  petclinic, builder `4`: `sam-call` 22 → 12, `skipped-receiver` 92 → 102,
+  łącznie 175 bez zmian (pozostałe 12 sprawdzone pojedynczo:
+  `TRACE_GAPS.MD`, „A sharper `sam-call`”). `go test ./...`, `go vet` — PASS.
+- **Dokumentacja:** `docs/RUNTIME_TRACE.MD`, `docs/SUPPORT.MD`,
+  `testdata/graphbench/TRACE_GAPS.MD`, ten rejestr.
+- **Ograniczenia:** gdy cel jest też celem referencji metody tworzonej w
+  wejściu, klasyfikator nie odróżni wywołania przez lambdę od zwykłego
+  obiektu tej klasy (2 z 12).
+
 ### RUNTIME_NATIVE:N1 — przyczyny luk grafu względem śladu — DONE (2026-11-08)
 
 - **Zakres zatwierdzony (2026-11-08):** pogrupowanie relacji zmierzonych w

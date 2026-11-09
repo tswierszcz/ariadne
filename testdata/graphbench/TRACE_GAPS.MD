@@ -3,7 +3,8 @@
 What the call graph misses, measured against a recorded run rather than guessed: every
 caller → callee relation a JFR recording of petclinic measured (RUNTIME_NATIVE N1,
 `-runtime-trace`) is checked against the static graph, and each one the graph has no edge for
-gets a cause decided from the caller's bytecode at the measured index (causes `g1`,
+gets a cause decided from the caller's bytecode at the measured index (causes `g1`; `g2`
+from 2026-11-09, see "A sharper `sam-call`" below;
 `runtimeevents.GapCauseVersion`; report section "Runtime evidence", v2
 `runtime.calls_not_in_graph_by_cause`).
 
@@ -134,6 +135,31 @@ for the site):
   from `NOT_REACHABLE` to `FRAMEWORK` through `JdbcTemplate#execute(ConnectionCallback)` "running"
   `AbstractJdbcInsert`'s lambda, whose creating method nothing reachable calls (a
   context-insensitive union: the helper's parameter got every lambda any caller passes).
+
+### A sharper `sam-call` (causes `g2`)
+
+`g1` counted as `sam-call` any virtual call whose measured callee had another name than the
+called method — which, through JDK frames, also caught the 12 non-lambdas above. Since `g2`
+(2026-11-09) a call is `sam-call` only when the callee implements a lambda or method reference
+the input creates (`invokedynamic` with a functional interface; an override of a
+method-reference target included) whose interface is the call's type, or a subtype of it, and
+whose method is the called one. Same trace, builder `4`:
+
+| Cause | `g1` | `g2` |
+|---|---|---|
+| `sam-call` | 22 | **12** |
+| `skipped-receiver` | 92 | **102** |
+| Not in the static graph | 175 | 175 |
+
+The 10 that moved are the JDK collection, spliterator, `Comparator`, `ClassLoader` and
+`FutureTask` relations listed above (one, a stream sink in front of a lambda of another
+interface, moved because the lambda's interface is not the call's). The 12 left are the 7 real
+ones with the value lost, the 3 left out by the reachability gate, and 2 whose callee is also
+the target of a method reference the input creates for that interface
+(`EndpointIdTimeToLivePropertyFunction#apply` through `Function`,
+`SpringConfigurationPropertySources#iterator` through `Iterable`) — counted as `sam-call`,
+though the receiver may be an ordinary object of that class (the classifier cannot tell).
+`TestGapClassifier` covers a callee no lambda implements at a SAM call site.
 
 ## What this says about the next steps
 
