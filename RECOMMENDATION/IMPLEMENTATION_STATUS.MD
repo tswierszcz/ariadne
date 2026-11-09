@@ -30,6 +30,50 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS:F2 — funkcje Undertow wyłączone w aplikacji Spring Boot (`internal/bootfeatures`, `u1`) — DONE for this scope (2026-11-09)
+
+- **Zakres:** 11 fałszywych `REACHABLE` na WebGoat po `s2` (ścieżki z kodu
+  aplikacji przez nadaproksymację CHA wewnątrz Undertow). Pomiar: każda
+  ścieżka idzie przez rozwinięcie CHA (`AbstractFramedStreamSourceChannel#close`
+  → każdy XNIO `ChannelListener`, `endExchange` → `Http2ServerConnection`,
+  stream → każdy `StreamSinkConduit`); klasy docelowe są tworzone przez kod
+  osiągalny w CHA, więc bramka twórcy i RTA ich nie usuwają — decyduje
+  konfiguracja. Decyzja użytkownika: model funkcji Boot+Undertow.
+- **Zrealizowane:** `internal/bootfeatures` — katalog funkcji (HTTP/2, TLS,
+  AJP, protokół PROXY, timeout zapisu, mechanizmy uwierzytelniania Undertow,
+  klient HTTP) z klasami i tym, co je włącza: właściwość w spakowanych
+  `application*.properties`/`.yml` (każdy profil; parser właściwości i
+  podzbioru YAML), odwołanie w klasie aplikacji (wywołanie, `new`,
+  `getstatic` API funkcji), `login-config` w web.xml; przełącznik będący
+  placeholderem środowiska (`${VAR:default}`) zostawia funkcję włączoną.
+  Działa, gdy w wejściu są undertow-core i fabryka Undertow Spring Boot (albo
+  `@SpringBootApplication`). `callgraph.CHA`/`RTA` dostały `Exclude` /
+  `ExcludeRule` (klasy wyłączonych funkcji nie są celami; reguła w opisie
+  skip rule); linia logu z decyzją dla każdej funkcji; `boot.features` w
+  snapshotach.
+- **Weryfikacja:** `TestReadConfig`, `TestDecideAndExclude`.
+  `-graph-compare` z `main` (oba scenariusze korzeni): petclinic bez zmian
+  (Tomcat); WebGoat −3 215 krawędzi, **4 advisories `REACHABLE` →
+  `NOT_REACHABLE`** (HTTP/2 HPACK CVE-2021-3859, AJP CVE-2024-6162, PROXY
+  CVE-2024-7885, uwierzytelnianie formularzem Undertow CVE-2023-1973;
+  wszystkie z `MODEL_INCOMPLETE`), sprawdzone ręcznie (`RESULTS.MD`,
+  „Undertow features (u1)”); z 11 artefaktów: 4 usunięte, 5 wiarygodnych
+  lub zależnych od konfiguracji (TLS przez placeholder, szerokie mapowania
+  trafiające w parser HTTP/1.1), 2 artefakty zostają (pong WebSocket,
+  CVE-2023-5685 — to ostatnie RTA usuwa: nowa, poprawna zmiana RTA–CHA).
+  `scripts/graph-benchmark.sh --repeat 3`; czas na WebGoat jeden po drugim
+  w granicach rozrzutu. `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** README, FAQ, `docs/SUPPORT.MD` (nowy wiersz Embedded
+  Undertow features), `RESULTS.MD`, ten rejestr.
+- **Ograniczenia:** tylko Undertow i tylko spakowana konfiguracja (zmienne
+  środowiskowe, linia poleceń i zewnętrzne pliki mogą włączyć funkcję);
+  podzbiór YAML; wywołania bezpośrednie do klas funkcji zostają; inne
+  zależne od konfiguracji części kontenerów (konektory Tomcat, Jetty) nadal
+  rozwijane przez CHA.
+- **Następny krok (wymaga zgody):** JDBC jako pomijany odbiorca (bramka
+  twórcy dla `java.sql`, około 15 relacji na śladzie) albo model wywołań
+  `@Bean`.
+
 ### FRAMEWORKS:F2 — dispatch kontenera servletów `s2`: obiekty żądania/odpowiedzi/łańcucha — DONE for this scope (2026-11-09)
 
 - **Zakres:** krok 4 z `testdata/graphbench/TRACE_GAPS.MD` — wywołania na

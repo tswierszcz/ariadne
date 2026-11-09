@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"ariadne/internal/alloc"
+	"ariadne/internal/bootfeatures"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
@@ -68,6 +69,9 @@ func algorithmVersions(mode string) map[string]string {
 		// sources, Spring Boot catalog): it adds call-graph edges in every mode.
 		"servlet.dispatch": servletdispatch.Version,
 		"spi.dispatch":     spidispatch.Version,
+		// Undertow features a Spring Boot application leaves off: CHA/RTA
+		// targets in every mode.
+		"boot.features": bootfeatures.Version,
 	}
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the

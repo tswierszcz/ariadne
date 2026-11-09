@@ -21,6 +21,7 @@ import (
 	"ariadne/internal/analysis"
 	"ariadne/internal/aop"
 	"ariadne/internal/atomicfile"
+	"ariadne/internal/bootfeatures"
 	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
@@ -664,6 +665,27 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 
 	strategy, _ := callgraph.StrategyFor(cfg.callgraphMode) // validated in parseFlags
+	// Undertow features a Spring Boot application leaves off
+	// (internal/bootfeatures): their classes are not CHA/RTA targets.
+	bootConfig, err := bootfeatures.ReadConfig(prepared.AppClassesJar, prepared.WebXMLs)
+	if err != nil {
+		warnings = append(warnings, "reading packaged Spring Boot configuration: "+err.Error())
+	}
+	bootFeatures := bootfeatures.Decide(h, bootConfig, servletdispatch.IsBootApplication(h))
+	if bootFeatures.Applies {
+		log("Undertow features (Spring Boot, %s; config %s): %s", bootfeatures.Version, strings.Join(bootConfig.Files, ", "), bootFeatureSummary(bootFeatures))
+		if off := bootFeatures.Off(); len(off) > 0 {
+			rule := "Undertow features off in this Spring Boot application not expanded (" + bootfeatures.Version + ": " + strings.Join(off, ", ") + ")"
+			switch s := strategy.(type) {
+			case callgraph.CHA:
+				s.Exclude, s.ExcludeRule = bootFeatures.Excluded, rule
+				strategy = s
+			case callgraph.RTA:
+				s.Exclude, s.ExcludeRule = bootFeatures.Excluded, rule
+				strategy = s
+			}
+		}
+	}
 	log("building call graph (mode %s)", strategy.Mode())
 	g := callgraph.BuildWith(h, strategy)
 	g.SetAnalysis(cfg.roots, cfg.targetJava)
@@ -1612,6 +1634,19 @@ func graphSettings(diffs []string) string {
 
 // servletRegistrationSummary renders the registered servlets/filters with
 // their basis for the log: " (class [kind, basis]; ...)".
+func bootFeatureSummary(r bootfeatures.Result) string {
+	var parts []string
+	for _, s := range r.States {
+		state := "off"
+		if s.On {
+			state = "on"
+		}
+		p := s.Feature + " " + state + " (" + s.Why
+		parts = append(parts, p+")")
+	}
+	return strings.Join(parts, "; ")
+}
+
 func servletRegistrationSummary(regs []servletdispatch.Registration) string {
 	if len(regs) == 0 {
 		return ""

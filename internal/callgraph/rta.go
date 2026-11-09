@@ -36,6 +36,9 @@ const ModeRTA = "rta"
 // produces the CHA candidate set; ApplyRTA narrows it.
 type RTA struct {
 	Skip SkipFunc
+	// Exclude/ExcludeRule: see CHA.
+	Exclude     func(class string) bool
+	ExcludeRule string
 }
 
 // Mode implements Strategy.
@@ -45,12 +48,14 @@ func (RTA) Mode() string { return ModeRTA }
 func (RTA) UnknownAllocationPolicy() string { return PolicyCHAFallbackWithGap }
 
 // SkipRule implements Strategy.
-func (r RTA) SkipRule() string { return CHA{Skip: r.Skip}.SkipRule() }
+func (r RTA) SkipRule() string { return r.cha().SkipRule() }
 
 // DispatchTargets implements Strategy: the CHA candidates.
 func (r RTA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []string {
-	return CHA{Skip: r.Skip}.DispatchTargets(h, call)
+	return r.cha().DispatchTargets(h, call)
 }
+
+func (r RTA) cha() CHA { return CHA{Skip: r.Skip, Exclude: r.Exclude, ExcludeRule: r.ExcludeRule} }
 
 // RTAVersion versions the fixed point and the fallback rules.
 const RTAVersion = "p2-1"

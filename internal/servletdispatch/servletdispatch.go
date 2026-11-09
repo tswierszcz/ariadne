@@ -332,6 +332,13 @@ func subtypeSet(h *hierarchy.Hierarchy, pick func(api) string) map[string]bool {
 	return out
 }
 
+// IsBootApplication reports whether an application class enables Spring
+// Boot auto-configuration (@SpringBootApplication/@EnableAutoConfiguration).
+func IsBootApplication(h *hierarchy.Hierarchy) bool {
+	_, boot := bootApplication(h)
+	return boot
+}
+
 // bootApplication reports whether an application class enables Spring
 // Boot auto-configuration, and which auto-configurations it excludes
 // (exclude/excludeName).
