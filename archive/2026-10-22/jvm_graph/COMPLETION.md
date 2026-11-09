@@ -100,3 +100,18 @@ covariant-return bridge. `internal/callgraph` `TestKnownTargets` finds every bod
 ran, with three explained extras (the two compiler bridges, a super call's helper) and no CHA
 edge to an undeclared method. Details: `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`, entry
 "GRAPH_PRECISION:P0".
+
+## Addendum (2026-11-09): CHA targets bodies inherited from outside the call's type
+
+A runtime trace of petclinic (RUNTIME_NATIVE N1 gap causes, `testdata/graphbench/TRACE_GAPS.MD`)
+showed 17 relations CHA missed: a concrete subtype of the call's type that does not declare the
+method inherits it from a superclass that is not itself a subtype of that type (Spring's
+`DefaultListableBeanFactory` implements `ConfigurableListableBeanFactory` but inherits `getBean`
+from `AbstractBeanFactory`). `callgraph.CHA.DispatchTargets` now also targets, for each such
+subtype, the body `hierarchy.ResolveExact` selects (a default method included, an abstract
+declaration never); `BuilderVersion` 2 → 3; dispatch targets are memoized per
+owner/name/descriptor in `callgraph.BuildWith` (without it, WebGoat's analysis doubled).
+Verified: `TestCHAInheritedBody`, `TestKnownTargets` unchanged, `inherited-impl` 17 → 0 on the
+same trace, `scripts/graph-benchmark.sh --repeat 3` with no verdict change. PR #29 (`651b3b5`,
+merge `36b361f`). Details: `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`, entry
+"JVM_GRAPH:G2 (korekta)".

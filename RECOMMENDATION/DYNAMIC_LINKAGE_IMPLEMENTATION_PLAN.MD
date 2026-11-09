@@ -1,6 +1,6 @@
 # Dynamiczne wiązanie — fazy L0–L4
 
-Status: plan. Wymagania: [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD). Zależności wspólne: [ROADMAP.MD](ROADMAP.MD).
+Status: L1 DONE (2026-11-09, [zarchiwizowane](../archive/2026-11-09/dynamic_linkage/DYNAMIC_LINKAGE_L1.md)); L0 i część L2 — zob. IMPLEMENTATION_STATUS; reszta: plan. Wymagania: [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD). Zależności wspólne: [ROADMAP.MD](ROADMAP.MD).
 
 ## L0. Reprezentacja bootstrapów i uchwytów
 
@@ -12,14 +12,12 @@ Zależności: JVM G0–G3, DATA_FLOW D0–D2, B3.
 
 Gotowe: rodzaj REF_invokeVirtual/REF_invokeStatic/REF_newInvokeSpecial jest dostępny dla modelu; nieznany bootstrap ma diagnostykę przy konkretnym miejscu.
 
-## L1. Lambdy i method references
+## L1. Lambdy i method references — DONE (zarchiwizowane 2026-11-09)
 
-- Model LambdaMetafactory tworzy wartość obiektu funkcyjnego i przechwytuje receiver/argumenty w zakresie lokalnej analizy.
-- Wywołanie SAM albo zarejestrowany callback materializuje cel z prawidłowym przekazaniem argumentów. Współpracuje z ASYNC A1–A2, nie wymaga jego pełnego katalogu.
-- Rozróżnić statyczny cel, wirtualny method reference i konstruktor. Wirtualny cel korzysta z JVM G2 i znanych typów.
-- Oddzielić możliwy kod bootstrapu od ciała lambdy. W miarę migracji zachować jawnie oznaczony konserwatywny wariant dla nieznanego użycia obiektu zamiast cichego utracenia dotychczasowych celów.
-
-Gotowe: nieużyta lambda, natychmiastowe wywołanie, zapis w zmiennej i reference do override mają oczekiwane różnice. To pierwszy przyrost poprawy istniejącego wsparcia.
+Wartość funkcyjna w miejscu utworzenia i krawędzie `sam` od wywołań interfejsu funkcyjnego do
+implementacji (`internal/samcall`, builder `4`); zobacz
+[archive/2026-11-09/dynamic_linkage/DYNAMIC_LINKAGE_L1.md](../archive/2026-11-09/dynamic_linkage/DYNAMIC_LINKAGE_L1.md)
+po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## L2. Podstawowe MethodHandle
 
