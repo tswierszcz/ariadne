@@ -5,7 +5,9 @@ WAR (`-app` is the WAR itself, so `web.xml` is read) with Stripes, Spring 4.3 XM
 MyBatis and HSQLDB. The first table under "Real applications" is this run (petclinic and WebGoat
 rerun with it: same graphs and verdicts as the `j1` run, times within its spread). No model of
 the last increments changes a JPetStore verdict; the two scenarios of roots differ by 8 advisories,
-and RTA changes 2 — see "JPetStore" below.
+and RTA changes 2 — see "JPetStore" below. **Then fixed:** the web.xml lifecycle methods are
+roots of `-roots all` too; the JPetStore `all` rows of the table are after the fix (before:
+CHA 225 288 edges, 0/1/15/19/0; RTA 0/0/16/19/0), petclinic and WebGoat unchanged (no web.xml).
 
 **Rerun 2026-11-09 after the JDBC objects (`jdbc:objects` `j1`, `internal/jdbcdispatch`)**: a
 virtual/interface call on a `java.sql` connection, statement, result set, metadata object, LOB or
@@ -134,8 +136,8 @@ in either mode.
 | WebGoat | all | rta | 20.1–20.4 | 1713–1811 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
 | JPetStore | profile | cha | 3.5–3.6 | 289–319 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 0/9/7/19/0 |
 | JPetStore | profile | rta | 3.6–3.6 | 299–317 | 212 542 | 13 164 of 59 637 (16 326) | 3 221 (1 256) | 150 of 365 | 1 | 98 | 0 (0) | 0/8/8/19/0 |
-| JPetStore | all | cha | 3.4–3.5 | 295–307 | 225 288 | — | — | 67 of 364 | 1 | 7 | 0 (0) | 0/1/15/19/0 |
-| JPetStore | all | rta | 3.5–3.5 | 291–313 | 165 958 | 59 330 of 59 637 (296) | 74 (28) | 1 of 365 | 1 | 7 | 0 (0) | 0/0/16/19/0 |
+| JPetStore | all | cha | 3.1–3.2 | 297–305 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 0/9/7/19/0 |
+| JPetStore | all | rta | 3.2–3.2 | 289–319 | 212 721 | 12 985 of 59 637 (16 501) | 3 244 (1 273) | 150 of 365 | 1 | 98 | 0 (0) | 0/8/8/19/0 |
 
 <details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
 
@@ -526,7 +528,16 @@ not entered in this scenario. So the default scenario gives **3 false negatives*
 `CachedIntrospectionResults`; bean creation → `evaluateBeanDefinitionString` → SpEL for the SpEL
 advisories (CVE-2024-38820's path goes through a CHA `afterPropertiesSet`, below).
 
-**RTA versus CHA** (`verdict-changes.tsv`, 2 new rows):
+**Fixed (2026-11-09):** the web.xml lifecycle methods are now roots of `-roots all` too (every
+application method plus them; log line `roots: all (N methods: every application method, M more
+from web.xml)`). JPetStore `-roots all`: 312 roots (6 from web.xml), +418 edges (the creator
+gates see more reachable creators), the 8 advisories above `NOT_REACHABLE` → `FRAMEWORK` — the
+same verdicts as `-roots profile` (0/9/7/19/0 CHA, 0/8/8/19/0 RTA). petclinic and WebGoat have no
+`web.xml`: graphs and verdicts unchanged in the benchmark.
+
+**RTA versus CHA** (`verdict-changes.tsv`; before the fix — after it, the `-roots all` row is
+CVE-2024-38820 like `-roots profile`, and CVE-2026-41851 is `FRAMEWORK` in both modes through
+Spring's bootstrap):
 
 | Roots | Advisory | Why CHA reached it | Check | Verdict |
 |---|---|---|---|---|

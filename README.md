@@ -935,7 +935,7 @@ per call site — a precise per-call-site version would need
 callee, a much bigger change than this simplification buys back).
 
 `-roots profile` (default: `-roots all`, every application method, as
-above) narrows the BFS roots to the active profile's own entry points
+above, plus the `web.xml` lifecycle roots described below) narrows the BFS roots to the active profile's own entry points
 instead: a method carrying one of `roots.annotations`
 (`@RequestMapping`/`@GetMapping`/.../`@Scheduled`/`@EventListener`/`@Bean`
 for `spring`), every public method of a class itself carrying one,
@@ -1159,7 +1159,7 @@ Flags:
 | `-sbom` | no | CycloneDX JSON SBOM (spec 1.4–1.6; CVE:F6b; example: `testdata/sbom/webgoat-jruby.cdx.json`). A component whose SHA-256 is an analyzed dependency jar's is tied to it; Maven components nested in it become embedded candidates of that jar, verified by their classes. Untied components and the dependency graph are not used; a disagreeing identity is reported, never applied. |
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
-| `-roots` | no | `all` (default: every application method) or `profile` (the active profile's own entry points). |
+| `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners) or `profile` (the active profile's own entry points, plus the same `web.xml` methods). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
@@ -1541,15 +1541,17 @@ report:
   become real `-roots profile` entry points (FRAMEWORKS F2 — the
   report's own "web.xml-declared roots" section); previously a plain
   servlet with no annotation contributed nothing under `-roots
-  profile`. They are **not** roots of the default `-roots all` (every
-  *application* method): a WAR whose container entry points are library
-  classes named in `web.xml` (Spring's `ContextLoaderListener`, Stripes'
-  filter) then gets `NOT_REACHABLE` for framework code the container
-  runs. Measured on JPetStore (`scripts/prepare-jpetstore.sh`): 8
-  advisories `FRAMEWORK` under `-roots profile`, `NOT_REACHABLE` under
-  `-roots all`, 3 of them with their vulnerable method executing in a
-  recorded run ([RESULTS.MD](testdata/graphbench/RESULTS.MD), "JPetStore") —
-  analyze a WAR with `-roots profile`.
+  profile`. Since the JPetStore measurement they are roots of the default
+  `-roots all` too (every application method **plus** these): a WAR's
+  container entry points are often library classes named in `web.xml`
+  (Spring's `ContextLoaderListener`, Stripes' filter), which "every
+  application method" alone left out — on JPetStore
+  (`scripts/prepare-jpetstore.sh`) 8 advisories were `NOT_REACHABLE` under
+  `-roots all` and `FRAMEWORK` under `-roots profile`, 3 of them with their
+  vulnerable method executing in a recorded run; both scenarios now agree
+  ([RESULTS.MD](testdata/graphbench/RESULTS.MD), "JPetStore"). The log
+  line `roots: all (N methods: every application method, M more from
+  web.xml)` counts them.
   **Entry point catalog**: a single labeled inventory combining the
   HTTP routes above with the web.xml lifecycle methods, each tagged
   with its own basis (`http-mapping`/`servlet`/`filter`/`listener`)

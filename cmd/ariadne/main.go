@@ -628,12 +628,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("frameworks: %d DI injection points found, %d resolved to exactly one bean", len(injectionPoints), resolvedInjectionCount)
 
 	// FRAMEWORKS F2: inventory of web.xml-declared lifecycle methods
-	// that WebXMLAppRoots would add under -roots profile — shown
-	// regardless of which -roots mode this run actually used, same as
-	// every other inventory section in this report.
+	// WebXMLAppRoots adds as roots (both -roots scenarios since the
+	// JPetStore measurement; only under -roots profile before).
 	webXMLRootsFound := profile.WebXMLRoots(h, servletClasses, filterClasses, listenerClasses)
 	if len(webXMLRootsFound) > 0 {
-		log("frameworks: %d web.xml-declared lifecycle methods found (roots under -roots profile)", len(webXMLRootsFound))
+		log("frameworks: %d web.xml-declared lifecycle methods found (roots in both -roots scenarios)", len(webXMLRootsFound))
 	}
 
 	// FRAMEWORKS F2: entry point catalog — the above HTTP/web.xml
@@ -1037,7 +1036,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		webXMLRootCount = len(webRoots)
 		roots = append(roots, webRoots...)
 	} else {
-		roots = reach.AppRoots(g, h)
+		// Every application method, plus the lifecycle methods of the
+		// servlets/filters/listeners web.xml registers: in a WAR those are
+		// often library classes (Spring's ContextLoaderListener, a web
+		// framework's filter) the container calls, which "every application
+		// method" alone would leave out (measured on JPetStore).
+		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
+		roots, webXMLRootCount = appendNewRoots(reach.AppRoots(g, h), webRoots)
 	}
 	var modelGapReasons []string
 	registry := models.NewRegistry()
@@ -1147,6 +1152,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("roots: profile %q (%d entry-point methods, %d from web.xml)", prof.Name, len(roots), webXMLRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	} else {
+		log("roots: all (%d methods: every application method, %d more from web.xml)", len(roots), webXMLRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	}
 	engine.SetComponents(components) // CVE:F1b: findings per affected component instance
@@ -1666,4 +1672,22 @@ func servletRegistrationSummary(regs []servletdispatch.Registration) string {
 		parts = append(parts, fmt.Sprintf("%s [%s, %s]", r.Class, r.Kind, r.Basis))
 	}
 	return " (" + strings.Join(parts, "; ") + ")"
+}
+
+// appendNewRoots appends to roots the extra roots not already in it, in
+// their order, and returns the result with how many were new.
+func appendNewRoots(roots, extra []uint32) ([]uint32, int) {
+	seen := make(map[uint32]bool, len(roots))
+	for _, r := range roots {
+		seen[r] = true
+	}
+	n := 0
+	for _, r := range extra {
+		if !seen[r] {
+			seen[r] = true
+			roots = append(roots, r)
+			n++
+		}
+	}
+	return roots, n
 }
