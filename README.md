@@ -1343,6 +1343,7 @@ itself) uses the scripts in `scripts/`:
 ```bash
 ./scripts/prepare-petclinic.sh        /path/to/jdk11/JAVA_HOME         # Maven, Spring Boot
 ./scripts/prepare-webgoat.sh          /path/to/jdk17-or-later/JAVA_HOME # Maven, Spring Boot, control case
+./scripts/prepare-jpetstore.sh        [JAVA_HOME]                       # Maven, WAR (web.xml, Stripes, Spring 4.3 XML, MyBatis, HSQLDB); analyze target/jpetstore.war with -deps-list
 ./scripts/prepare-petclinic-gradle.sh /path/to/jdk11/JAVA_HOME         # same app, Gradle instead
 ./scripts/prepare-servlet-demo.sh     /path/to/jdk11-or-later/JAVA_HOME # plain Servlet, control case
 ./scripts/prepare-jakarta-demo.sh     /path/to/jdk11-or-later/JAVA_HOME # JAX-RS+EJB+CDI, control case
@@ -1356,6 +1357,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
 ./scripts/runtime-trace-fixture.sh    /path/to/jdk25-or-later/JAVA_HOME # JFR-recorded runtime trace of testdata/runtime (rtm.jar, rtm-v2.jar, run.trace)
 ./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # write petclinic's vulnerable-method JFR settings, run it under JFR with them, send a fixed scenario, convert, import (java 25+ on PATH)
+./scripts/runtime-trace-jpetstore.sh  [OUT_DIR] [PORT]                  # the same for JPetStore's WAR in Jetty (jetty-runner fetched by Maven)
 ./scripts/spidispatch-oracle.sh       /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for service-provider dispatch (testdata/spidispatch)
 ./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
@@ -1539,7 +1541,15 @@ report:
   become real `-roots profile` entry points (FRAMEWORKS F2 — the
   report's own "web.xml-declared roots" section); previously a plain
   servlet with no annotation contributed nothing under `-roots
-  profile`.
+  profile`. They are **not** roots of the default `-roots all` (every
+  *application* method): a WAR whose container entry points are library
+  classes named in `web.xml` (Spring's `ContextLoaderListener`, Stripes'
+  filter) then gets `NOT_REACHABLE` for framework code the container
+  runs. Measured on JPetStore (`scripts/prepare-jpetstore.sh`): 8
+  advisories `FRAMEWORK` under `-roots profile`, `NOT_REACHABLE` under
+  `-roots all`, 3 of them with their vulnerable method executing in a
+  recorded run ([RESULTS.MD](testdata/graphbench/RESULTS.MD), "JPetStore") —
+  analyze a WAR with `-roots profile`.
   **Entry point catalog**: a single labeled inventory combining the
   HTTP routes above with the web.xml lifecycle methods, each tagged
   with its own basis (`http-mapping`/`servlet`/`filter`/`listener`)

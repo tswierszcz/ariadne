@@ -22,13 +22,68 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation site; SAM-call materialization 2026-11-09; PR #30, [L1 zarchiwizowane](../archive/2026-11-09/dynamic_linkage/DYNAMIC_LINKAGE_L1.md)), L2 (same-method + static-field case): DONE; L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | L1: lambda/method reference uruchamiana przez interfejs funkcyjny w innej metodzie niż tworząca dostaje krawędź `sam` (`internal/samcall`, builder `4`); na śladzie petclinic luki `sam-call` 50 → 22 (12 z nich to nie lambdy). L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat (pola instancyjne / wynik innego wywołania). |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
-| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: UNASSESSED (nieuzasadnione wynikami P4) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
+| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: UNASSESSED (nieuzasadnione wynikami P4); trzecia aplikacja pomiarowa JPetStore (WAR, 2026-11-09): żaden model nie zmienia werdyktu, 3 fałszywe negatywy domyślnego `-roots all` (korzenie web.xml) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | N0, N1: DONE (2026-11-08; PR #24, [zarchiwizowane](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)); N2–N5: UNASSESSED | Przyczyny luk grafu względem śladu (`g1`, PR #28, addendum w archiwum N0–N1): na petclinic wskazały defekt CHA (naprawiony, PR #29) i wywołania SAM (L1, PR #30). `-runtime-filter-out`: ustawienia JFR śledzące wszystkie podatne metody ustaleń — petclinic: 505 metod / 91 advisories, 26 wykonanych (3/3 REACHABLE, 23/74 FRAMEWORK, CVE-2025-35036 NOT_REACHABLE), 65 śledzonych bez wejścia. Kontrakt śladu `ariadne-runtime-trace-1` i importer `-runtime-trace` (dopasowanie po hashach klas, definicje per loader, wywołania vs graf statyczny, podatne metody zaobserwowane per ustalenie); rejestrator z JFR bez agenta. petclinic: CVE-2024-38809 śledzone ~1 400 razy, CVE-2025-35036 wykonane mimo NOT_REACHABLE (luka `javax.validation` SPI). Graf i werdykty bez zmian. Szczegóły we wpisie RUNTIME_NATIVE:N0–N1. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### GRAPH_PRECISION:P4 — trzecia aplikacja pomiarowa: JPetStore 6.0.2 (WAR) — DONE for this scope (2026-11-09)
+
+- **Zakres (zatwierdzony):** aplikacja z innym zestawem mechanizmów i CVE
+  niż petclinic/WebGoat, żeby ocenić modele `s1`/`p1`/`s2`/`j1` na
+  werdyktach: skrypt przygotowania, przebiegi CHA/RTA × korzenie,
+  przypisanie werdyktów do modeli binarkami sprzed kolejnych modeli,
+  ręczna weryfikacja zmian, ślad runtime, benchmark, dokumentacja.
+- **Zrealizowane:** `scripts/prepare-jpetstore.sh` (tag `jpetstore-6.0.2`;
+  na JDK 25 bez `ct.sym`/`javac`/`jar` na PATH: `-source/-target 8`,
+  `maven-war-plugin` 3.4.0 wołany wprost, `app-classes.jar` pakowany
+  Pythonem), `scripts/runtime-trace-jpetstore.sh` (WAR w Jetty 9.4
+  `jetty-runner`, `--add-opens java.base/java.lang` dla CGLIB Springa 4.3,
+  scenariusz katalog/szukanie/koszyk/logowanie kontem demo z danych
+  aplikacji), JPetStore w `scripts/graph-benchmark.sh` (wejście: sam WAR +
+  `-deps-list`; bez `-deps-list` tylko 7/17 jarów rozpoznanych i 8 z 35
+  advisories).
+- **Wynik:** 35 advisories, 18 zmapowanych. **Żaden model** (`s1`, `p1`,
+  CHA dziedziczone ciała, L1, `s2`, `u1`, `j1`) **nie zmienia werdyktu**
+  (`-graph-compare` kolejnych binarek `95ae6ec`…HEAD, oba scenariusze;
+  przyrost krawędzi: `p1` +98/+7, builder `3` +3 190, `s2` +255/+0, `j1`
+  +811/+739). Rozbieżność scenariuszy korzeni: 8 advisories `FRAMEWORK`
+  pod `-roots profile` i `NOT_REACHABLE` pod domyślnym `-roots all` —
+  ścieżki z `ContextLoaderListener` (biblioteka zarejestrowana w
+  `web.xml`, korzeń tylko w `profile`); ślad potwierdza wykonanie
+  podatnych metod CVE-2022-22965/22970 (`CachedIntrospectionResults`) i
+  CVE-2026-41848 (`AntPathMatcher`) → **3 fałszywe negatywy trybu
+  domyślnego**. RTA vs CHA: 2 nowe zmiany, sprawdzone ręcznie
+  (CVE-2024-38820 poprawna; CVE-2026-41851 usuwa artefakt CHA przez
+  appendery log4j, RTA traci przy tym refleksyjnie tworzony
+  `Log4JLogger`). Ślad: 722 relacje, 37 poza grafem (`skipped-receiver`
+  17 — m.in. `RequestDispatcher` do JSP 9, `DataSource` →
+  `SimpleDriverDataSource` 1 (ograniczenie `j1` zmierzone), `FilterChain`
+  1; `reflection` 11 — handlery Stripes 4; `proxy` 7 — mappery MyBatis 5,
+  `SqlSessionTemplate` 2 z ograniczonym zbiorem interfejsów;
+  `class-init` 2). `go test ./...`, `go vet ./...` — PASS.
+- **Dokumentacja:** `RESULTS.MD` (sekcja „JPetStore”, tabela), 
+  `TRACE_GAPS.MD` (sekcja „A second application”), README (skrypty,
+  korzenie web.xml a `-roots all`), `docs/SUPPORT.MD` (wiersze Profiles
+  and selected roots, Servlet container dispatch, JDBC objects), ten
+  rejestr.
+- **Ograniczenia pomiaru:** jedna aplikacja, jeden scenariusz; 17 z 35
+  advisories niezmapowanych (m.in. HSQLDB CVE-2022-41853, log4j 1.2 —
+  bez commitów poprawek), więc modele JDBC nie mają tu podatnej metody do
+  osiągnięcia; kontener spoza wejścia.
+- **Następny krok (wymaga zgody), w kolejności wartości:**
+  1. korzenie `web.xml` także pod `-roots all` (lub ostrzeżenie dla WAR-a)
+     — usuwa 3 zmierzone fałszywe negatywy trybu domyślnego;
+  2. rozpoznawanie servletów bez API servletów w wejściu (znane nadtypy
+     `HttpServlet`/`GenericServlet`);
+  3. ręczne mapowania dla HSQLDB CVE-2022-41853 i log4j 1.2
+     (JDBCAppender, SocketServer, JMS) — dopiero wtedy JPetStore sprawdzi
+     `j1` na werdyktach;
+  4. model katalogowy proxy (MyBatis `SqlSessionTemplate`/mappery,
+     Spring ORM).
 
 ### FRAMEWORKS:F3 — wycinek 2 (dispatch przez proxy JDK): pomiar na śladzie, reguła stopu zadziałała — NOT STARTED (2026-11-09)
 
