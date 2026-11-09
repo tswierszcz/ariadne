@@ -1,5 +1,15 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-09 after the servlet request/response objects (`servlet-container:dispatch`
+`s2`)**: calls on `javax.servlet` request/response/wrapper/filter-chain objects reach the bodies
+of the implementations reachable code creates (README, "Request, response and filter-chain
+objects"; measured on a runtime trace in [TRACE_GAPS.MD](TRACE_GAPS.MD)). The first table under
+"Real applications" is this rerun; the builder `4` / `s1` table is kept below it. **WebGoat:
+15 Undertow advisories `FRAMEWORK` → `REACHABLE`** in every mode and roots scenario, each checked
+by hand in "Servlet request/response objects" below (4 plausible, 11 through CHA
+over-approximation inside Undertow); petclinic: no verdict change; the RTA-versus-CHA changes
+are the same 4 + 2.
+
 **Rerun 2026-11-09 after SAM-call materialization (builder `4`, DYNAMIC_LINKAGE L1,
 `internal/samcall`)**: a lambda/method reference run through its functional interface in
 another method than the one creating it gets a `sam` edge from the calling site (README "SAM
@@ -81,6 +91,27 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| petclinic | profile | cha | 5.8–5.9 | 1363–1392 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
+| petclinic | profile | rta | 6.1–6.3 | 1327–1476 | 979 715 | 36 111 of 322 104 (35 727) | 17 379 (5 846) | 639 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/68/16/57/6 |
+| petclinic | all | cha | 6.0–6.4 | 1363–1466 | 1 015 826 | — | — | 681 of 1096 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
+| petclinic | all | rta | 6.4–6.5 | 1363–1388 | 1 009 933 | 5 893 of 322 104 (59 461) | 21 851 (9 626) | 679 of 1097 | 5 | 5 326 | 1 629 (2 525) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 8.8–9.2 | 1706–1728 | 1 432 859 | — | — | 745 of 1194 | 0 | 1 927 | 1 557 (2 270) | 57/37/9/61/0 |
+| WebGoat | profile | rta | 9.2–9.3 | 1684–1794 | 1 350 750 | 82 109 of 573 201 (160 476) | 25 343 (10 571) | 671 of 1201 | 0 | 1 927 | 1 557 (2 270) | 57/35/11/61/0 |
+| WebGoat | all | cha | 8.8–8.9 | 1702–1818 | 1 432 865 | — | — | 746 of 1194 | 0 | 1 932 | 1 558 (2 265) | 57/37/9/61/0 |
+| WebGoat | all | rta | 9.3–9.4 | 1712–1777 | 1 418 102 | 14 763 of 573 201 (102 750) | 32 228 (13 018) | 748 of 1201 | 0 | 1 932 | 1 558 (2 265) | 57/37/9/61/0 |
+
+Against `s1` (`-graph-compare`, both roots scenarios): +5 870 edges on petclinic (5 866 servlet
+object edges — the "Model edges" column counts only the registry models' edges), +3 447 on
+WebGoat, nothing removed; petclinic registers one more filter (`ResourceUrlEncodingFilter`).
+**Times are not comparable with the tables below:** this machine was idle for this run and
+busy with other analyses for the builder `4` run; measured back to back on WebGoat
+(`-roots profile`, CHA), `s1` and `s2` both take 8.4–8.6 s — the model costs about 0.1 s
+(building its 6 649–10 159 candidates: 50–70 ms).
+
+<details><summary>Builder <code>4</code>, servlet model <code>s1</code> (before the request/response objects, analyzer <code>0018f2d</code>)</summary>
+
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | petclinic | profile | cha | 10.4–11.1 | 1336–1364 | 1 009 956 | — | — | 681 of 1096 | 4 | 5 325 | 1 626 (2 530) | 6/72/12/57/6 |
 | petclinic | profile | rta | 11.0–11.1 | 1371–1437 | 973 845 | 36 111 of 322 104 (35 732) | 17 373 (5 869) | 639 of 1097 | 4 | 5 325 | 1 626 (2 530) | 6/68/16/57/6 |
 | petclinic | all | cha | 10.6–10.7 | 1339–1425 | 1 009 956 | — | — | 681 of 1096 | 4 | 5 325 | 1 626 (2 530) | 6/72/12/57/6 |
@@ -99,6 +130,8 @@ allocates a 32 KiB buffer per attribute, which made re-reading classes (here, in
 in hierarchy building) allocation-bound. Before that fix and the memoization below, the first
 benchmark of this change measured WebGoat at 25.0–25.1 s and +200 MB, with the SAM step
 taking 12.5 s.
+
+</details>
 
 <details><summary>Builder <code>3</code> (before SAM-call materialization, analyzer <code>651b3b5</code>)</summary>
 
@@ -180,6 +213,39 @@ WebGoat's analysis took 47–48 s.
   profile` moves 4 (petclinic) and 2 (WebGoat) findings from `FRAMEWORK` to
   `NOT_REACHABLE`, all carrying `MODEL_INCOMPLETE` — the same findings as before the
   service-provider dispatch model. No `REACHABLE` result changes anywhere.
+
+## Servlet request/response objects (`servlet-container:dispatch` `s2`)
+
+What changed: a call on a `javax.servlet` request, response, wrapper or `FilterChain` object now
+reaches the bodies of the implementations reachable code creates — Tomcat's
+`RequestFacade`/`Request`/`ResponseFacade`/`Response`/`ApplicationFilterChain` on petclinic,
+Undertow's `HttpServletRequestImpl`/`HttpServletResponseImpl`/`FilterHandler$FilterChainImpl` on
+WebGoat, and the wrappers of filters that run. On petclinic no verdict changes (32 findings get
+a different path, all `FRAMEWORK` before and after: the shortest path now enters Tomcat through
+`ServletRequestAttributes#getAttribute` → `Request#getAttribute`). On WebGoat, in both roots
+scenarios and both modes, **15 Undertow advisories go from `FRAMEWORK` to `REACHABLE`**: a path
+now starts in application code (`Welcome#welcome` calling `request.getSession()`,
+`AjaxAuthenticationEntryPoint#commence` calling `response.sendError(…)`) and continues into
+Undertow. Every first hop is real — the application really calls that method on Undertow's own
+request/response object. What follows it, checked advisory by advisory:
+
+| Advisory | Vulnerable code (mapped) | Path after the first hop | Verdict |
+|---|---|---|---|
+| CVE-2023-4639 | `Cookies#parseCookie` | `getSession` → `ServletContextImpl#getSession` → `SessionCookieConfig#findSessionId` → `HttpServerExchange#getRequestCookie` → cookie parsing | **plausible**: a session lookup parses the request's cookies |
+| CVE-2024-3884, CVE-2024-4027 | a broad mapping (57 methods) including `HttpServletRequestImpl#getQueryString` | Spring Security's `LoginUrlAuthenticationEntryPoint#buildHttpsRedirectUrlForRequest` → `getQueryString` | **plausible** as a call of a mapped method; the mapping itself is broad (a mapped accessor is not the vulnerable parsing) |
+| CVE-2024-1459 | `HttpRequestParser#handlePath`, `ParseState#reset` | `sendError` → error dispatch → `HttpServerExchange#endExchange` → `HttpReadListener#exchangeComplete` → `newRequest` → `ParseState#reset` | **plausible**: ending an exchange on a keep-alive connection resets the parser for the next request |
+| CVE-2024-1635 | `WriteTimeoutStreamSinkConduit` | `sendError` → `responseDone` → `ServletOutputStreamImpl#close` → `ConduitStreamSinkChannel#shutdownWrites` → `WriteTimeoutStreamSinkConduit#terminateWrites` | **CHA artifact for this input**: the conduit exists only with a write timeout configured (CHA over every `StreamSinkConduit`) |
+| CVE-2023-1108 | `SslConduit#wrapAndFlip` | the same stream close → `SslConduit#write` | **CHA artifact**: TLS conduit, WebGoat serves plain HTTP |
+| CVE-2021-3690, CVE-2021-3859, CVE-2023-5685, CVE-2024-6162, CVE-2024-7885, CVE-2026-28367, CVE-2026-28368, CVE-2026-28369 | WebSocket pong handling, HTTP/2 HPACK, XNIO future cancel, AJP decoding, PROXY protocol, the HTTP client | `endExchange` → `Http2ServerConnection#terminateRequestChannel` → `AbstractFramedStreamSourceChannel#close` → CHA over every `ChannelListener#handleEvent` (WebSocket, AJP, HTTP client, PROXY listeners); CVE-2023-5685 through `HttpContinue`/`AsyncWebSocketHttpServerExchange` | **CHA artifacts**: an HTTP/1.1 servlet exchange is not an HTTP/2 stream, and the listener fan-out has no receiver evidence |
+| CVE-2023-1973 | Undertow's `FormAuthenticationMechanism` | error dispatch → `ServletInitialHandler#dispatchRequest` → `AuthenticationCallHandler` → Undertow's own security context | **CHA artifact for this input**: WebGoat authenticates with Spring Security, Undertow's form authentication is not configured |
+
+So 4 plausible, 11 artifacts of CHA expansion *inside* Undertow (receivers not under the skip
+rule, expanded to every implementation on the class path). The model did not create those paths;
+it made them start in application code. Before `s2` the same vulnerable methods were already
+reached from framework roots through the same internals (`FRAMEWORK`). Narrowing Undertow's
+internal dispatch (listeners, conduits, protocol channels) is separate work; RTA does not remove
+them either (the classes are created by reachable Undertow code). Petclinic's Tomcat paths do not
+produce such changes on this input.
 
 ## SAM-call materialization (builder `4`)
 
