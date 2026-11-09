@@ -51,7 +51,7 @@ type Inputs struct {
 // Causes of a measured call the static graph has no edge for, decided
 // from the caller's bytecode at the measured index (GapCauseVersion).
 const (
-	GapCauseVersion    = "g1"
+	GapCauseVersion    = "g2"
 	GapClassInit       = "class-init"       // the callee is a <clinit> the JVM ran implicitly
 	GapInvokeDynamic   = "invokedynamic"    // an invokedynamic site (lambda creation, string concatenation, …)
 	GapReflection      = "reflection"       // Method#invoke, Constructor#newInstance, Class#newInstance

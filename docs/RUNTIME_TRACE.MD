@@ -97,10 +97,12 @@ analysis missed for this run, worth investigating, never an error of the trace b
 ### Why a measured call is not in the graph
 
 Every `not_in_graph` call gets a cause decided from the caller's bytecode at the measured index
-(causes `g1`): `class-init` (an implicit `<clinit>`), `invokedynamic`, `reflection`
+(causes `g2`): `class-init` (an implicit `<clinit>`), `invokedynamic`, `reflection`
 (`Method#invoke`, `Constructor#newInstance`, `Class#newInstance`), `method-handle`, `proxy`
 (into an `InvocationHandler`), `async` (through a thread or executor), `sam-call` (a
-functional-interface call running a lambda or method-reference body), `skipped-receiver` (a
+functional-interface call running the implementation of a lambda or method reference the input
+creates for that interface and method — since `g2`; `g1` also counted any callee named
+differently from the call, such as a JDK collection calling `equals`/`hashCode`), `skipped-receiver` (a
 `java.`/`javax.`/`jdk.`/`sun.` receiver CHA never expands), `inherited-impl` (the body comes
 from a superclass outside the call's type, which CHA misses), `rta-pruned` (a CHA edge RTA
 removed), `dispatch-missing`, `no-call-at-site` (no call instruction at that index — inlined

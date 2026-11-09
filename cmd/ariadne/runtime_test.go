@@ -203,6 +203,9 @@ func TestGapClassifier(t *testing.T) {
 		{"rta", "rtm.Main#shapes(J)J", "rtm.Square#area(J)J", shapes, "stack-adjacent", runtimeevents.GapRTAPruned, "rtm.Shape"},
 		{"cha", "rtm.Gaps#inherited(J)J", "rtm.BaseGreeter#greet(J)J", pc("rtm.Gaps", "inherited", "(J)J", "rtm.Greeter", "greet"), "stack-adjacent", runtimeevents.GapInherited, "rtm.Greeter"},
 		{"cha", "rtm.Gaps#drive(Lrtm/Work;J)J", "rtm.Gaps#lambda$sam$0(J)J", pc("rtm.Gaps", "drive", "(Lrtm/Work;J)J", "rtm.Work", "run"), "stack-through-runtime", runtimeevents.GapSAMCall, "rtm.Work"},
+		// The same site, a callee no lambda/method reference implements
+		// (a JDK frame calling equals/hashCode looks like this): not a SAM call.
+		{"cha", "rtm.Gaps#drive(Lrtm/Work;J)J", "rtm.Square#area(J)J", pc("rtm.Gaps", "drive", "(Lrtm/Work;J)J", "rtm.Work", "run"), "stack-through-runtime", runtimeevents.GapIndirect, "rtm.Work#run"},
 		{"cha", "rtm.Main#reflective(Ljava/lang/ClassLoader;J)J", "rtm.Plugin#work(J)J", pc("rtm.Main", "reflective", "(Ljava/lang/ClassLoader;J)J", "java.lang.reflect.Method", "invoke"), "stack-through-runtime", runtimeevents.GapReflection, "java.lang.reflect.Method#invoke"},
 		{"cha", "rtm.Main#main([Ljava/lang/String;)V", "rtm.LoadedOnly#<clinit>()V", 0, "stack-adjacent", runtimeevents.GapClassInit, "rtm.LoadedOnly"},
 		{"cha", "rtm.Main#shapes(J)J", "rtm.Square#area(J)J", -1, "stack-adjacent", runtimeevents.GapNoCallAtSite, "no bytecode index"},
