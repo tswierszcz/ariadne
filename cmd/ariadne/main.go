@@ -1043,14 +1043,34 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Default: serviceModelEvaluator,
 	}
 	modelBudget := len(svcLoadSites) + 1 + servletdispatch.MaxChain + 2
-	samGate.Apply(g, roots) // DYNAMIC_LINKAGE L1, before the models see the graph
+	// Servlet request/response/chain objects (servlet-container:dispatch
+	// s2): calls on them reach the bodies of the implementations reachable
+	// code creates — gated like the SAM edges.
+	objStart := time.Now()
+	objEdges := servletdispatch.ObjectEdges(h)
+	objGate := callgraph.NewCreatorGate(g, h, objEdges, callgraph.BasisModel)
+	objTime := time.Since(objStart)
+	applyGates := func() (callgraph.SAMStats, callgraph.SAMStats) {
+		var sam, obj callgraph.SAMStats
+		for {
+			before := sam.Added + obj.Added
+			sam = samGate.Apply(g, roots)
+			obj = objGate.Apply(g, roots)
+			if sam.Added+obj.Added == before {
+				return sam, obj
+			}
+		}
+	}
+	applyGates() // DYNAMIC_LINKAGE L1 and the servlet objects, before the models see the graph
 	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
 	if err != nil {
 		return fmt.Errorf("coordinating library models: %w", err)
 	}
 	log("models: %d facts, %d edges added, %d iterations (incomplete=%t)", len(modelResult.Facts), modelResult.AddedEdges, modelResult.Iterations, modelResult.Incomplete)
 	// Model edges can make more creators reachable.
-	samApplied := samGate.Apply(g, roots)
+	samApplied, objApplied := applyGates()
+	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
+		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
 		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)

@@ -3,7 +3,8 @@
 What the call graph misses, measured against a recorded run rather than guessed: every
 caller → callee relation a JFR recording of petclinic measured (RUNTIME_NATIVE N1,
 `-runtime-trace`) is checked against the static graph, and each one the graph has no edge for
-gets a cause decided from the caller's bytecode at the measured index (causes `g1`,
+gets a cause decided from the caller's bytecode at the measured index (causes `g1`; `g2`
+from 2026-11-09, see "A sharper `sam-call`" below;
 `runtimeevents.GapCauseVersion`; report section "Runtime evidence", v2
 `runtime.calls_not_in_graph_by_cause`).
 
@@ -135,6 +136,60 @@ for the site):
   `AbstractJdbcInsert`'s lambda, whose creating method nothing reachable calls (a
   context-insensitive union: the helper's parameter got every lambda any caller passes).
 
+### A sharper `sam-call` (causes `g2`)
+
+`g1` counted as `sam-call` any virtual call whose measured callee had another name than the
+called method — which, through JDK frames, also caught the 12 non-lambdas above. Since `g2`
+(2026-11-09) a call is `sam-call` only when the callee implements a lambda or method reference
+the input creates (`invokedynamic` with a functional interface; an override of a
+method-reference target included) whose interface is the call's type, or a subtype of it, and
+whose method is the called one. Same trace, builder `4`:
+
+| Cause | `g1` | `g2` |
+|---|---|---|
+| `sam-call` | 22 | **12** |
+| `skipped-receiver` | 92 | **102** |
+| Not in the static graph | 175 | 175 |
+
+The 10 that moved are the JDK collection, spliterator, `Comparator`, `ClassLoader` and
+`FutureTask` relations listed above (one, a stream sink in front of a lambda of another
+interface, moved because the lambda's interface is not the call's). The 12 left are the 7 real
+ones with the value lost, the 3 left out by the reachability gate, and 2 whose callee is also
+the target of a method reference the input creates for that interface
+(`EndpointIdTimeToLivePropertyFunction#apply` through `Function`,
+`SpringConfigurationPropertySources#iterator` through `Iterable`) — counted as `sam-call`,
+though the receiver may be an ordinary object of that class (the classifier cannot tell).
+`TestGapClassifier` covers a callee no lambda implements at a SAM call site.
+
+## After the servlet request/response objects (model `s2`)
+
+Step 4 below, 2026-11-09 (`servlet-container:dispatch` `s2`, `servletdispatch.ObjectEdges`): a
+virtual/interface call on `javax.servlet` `ServletRequest`/`ServletResponse`, their `Http*` and
+`*Wrapper` types or `FilterChain` gets a `model` edge to the body each concrete implementation
+in the input runs, once a method creating that implementation is reachable from the roots
+(the SAM calls' creator gate); Thymeleaf's `ResourceUrlEncodingFilter` joins the Boot catalog.
+Same trace, builder `4`, causes `g2`, CHA `-roots profile`:
+
+| Cause | `s1` | `s2` |
+|---|---|---|
+| **`skipped-receiver`** | **102** | **69** |
+| `no-call-at-site` | 3 | 0 |
+| `reflection`, `sam-call`, `proxy`, `class-init`, `async`, `indirect` | 37, 12, 9, 8, 3, 1 | unchanged |
+| **Not in the static graph** | **175 of 2 702 (6.5%)** | **139 (5.1%)** |
+
+Of the 35 servlet relations under `skipped-receiver`, 33 are edges now: the filters' `chain.doFilter`
+into Tomcat's `ApplicationFilterChain`, Spring/Thymeleaf code into `RequestFacade`/`ResponseFacade`
+and the servlet wrappers, and `ResourceUrlEncodingFilter` with its wrappers. Left: Tomcat's
+WebSocket `WsFilter` (registered by a `ServletContainerInitializer`) and that initializer's own
+`onStartup` — not modeled. The 3 `no-call-at-site` relations (`UrlPathHelper#getContextPath`,
+`ResourceHttpRequestHandler#getMediaType`, measured at an index with no call instruction) are
+request accessors the graph now has as edges from the same caller.
+
+The gate leaves out the wrappers only an unreachable method creates (Tomcat's
+`CsrfPreventionFilter`/`ExpiresFilter`/`RemoteIpFilter`), but not those of filters that are
+reachable only through CHA (Spring's `ForwardedHeaderFilter`, `ShallowEtagHeaderFilter`: their
+`doFilterInternal` is a CHA target of `OncePerRequestFilter#doFilter`).
+
 ## What this says about the next steps
 
 Ranked by measured payoff per effort:
@@ -144,7 +199,8 @@ Ranked by measured payoff per effort:
    recording, 12 of the rest not lambdas).
 3. **Reflection across methods (`reflection`, 33).** REFLECTION R3 — most are framework
    internals (Spring's `ReflectionUtils`, Hibernate accessors).
-4. **Servlet API wrappers and `FilterChain` (`skipped-receiver`, ~20 of 87).** An extension
+4. **Servlet API wrappers and `FilterChain` (`skipped-receiver`, ~20 of 87) — done** (section
+   above: 33 of the 35 servlet relations). Originally: an extension
    of the servlet dispatch model; the rest of `skipped-receiver` is spread thin over many JDK
    types (collections, I/O), where lifting the skip would fan out (the reason it exists).
 5. **JPA/Spring Data proxies (`proxy`, 12)** — FRAMEWORKS F3/F4.

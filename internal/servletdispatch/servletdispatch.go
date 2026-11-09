@@ -53,7 +53,7 @@ const ModelID = "servlet-container:dispatch"
 
 // Version versions the model's semantics (signatures, registration sources,
 // Spring Boot catalog). Snapshots record it.
-const Version = "s1"
+const Version = "s2"
 
 // MaxChain is how many model iterations one dispatch can need: the
 // container's Servlet#service edge, then HttpServlet#service(Http...), then
@@ -170,7 +170,11 @@ func Register(registry *models.Registry) {
 // spring.mvc.formcontent.filter.enabled, both matchIfMissing=true), or on
 // the absence of an application bean of the same type
 // (RequestContextFilter). HiddenHttpMethodFilter is off by default
-// (matchIfMissing=false) and not listed.
+// (matchIfMissing=false) and not listed. Thymeleaf's ResourceUrlEncodingFilter
+// (s2) is a FilterRegistrationBean conditional on an enabled resource chain:
+// spring.(web.)resources.chain.enabled, or webjars-locator's
+// org.webjars.WebJarAssetLocator on the class path — only the latter is
+// checked (properties are not read); Boot 2.x (thymeleaf-spring5) only.
 var bootCatalog = []struct {
 	autoConfig, class string
 	kind              Kind
@@ -189,6 +193,8 @@ var bootCatalog = []struct {
 		[]string{"org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer", "org.springframework.security.config.http.SessionCreationPolicy", "org.springframework.security.web.FilterChainProxy"}},
 	{"org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration", "org.springframework.security.web.FilterChainProxy", KindFilter, " (springSecurityFilterChain, DelegatingFilterProxy's delegate)",
 		[]string{"org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer", "org.springframework.security.config.http.SessionCreationPolicy"}},
+	{"org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration", "org.springframework.web.servlet.resource.ResourceUrlEncodingFilter", KindFilter, " (resource chain enabled by webjars-locator)",
+		[]string{"org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$ThymeleafWebMvcConfiguration", "org.thymeleaf.spring5.SpringTemplateEngine", "org.webjars.WebJarAssetLocator"}},
 }
 
 var bootAnnotations = []string{

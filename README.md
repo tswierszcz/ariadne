@@ -348,6 +348,30 @@ through the real `javax.servlet` API; every observed body reached from
 `main`, the two unregistered classes never reached — before the model,
 none of the 5 observed bodies was reached).
 
+**Request, response and filter-chain objects (model version `s2`).** Calls
+*on* the objects the container passes along — `request.getHeader(…)`,
+`response.sendError(…)`, a filter's `chain.doFilter(…)`, on
+`javax.servlet.ServletRequest`/`ServletResponse`, their `Http*` and
+`*Wrapper` types and `FilterChain` — are skipped receivers too, so they
+never reached the container's or a wrapper's body. Since `s2` each such
+virtual/interface call gets an edge (basis `model`) to the body every
+concrete implementation in the input runs for it, **once a method creating
+that implementation (`new`) is reachable from the roots** — the same
+creator gate as the SAM calls: Tomcat's `RequestFacade`/`Request`,
+`ApplicationFilterChain`, Undertow's `HttpServletRequestImpl`, and the
+wrappers of filters that run; not the wrappers only an unreachable filter
+creates (`servlet objects (…): N candidates, N edges added, …` in the log).
+`jakarta.servlet` is not listed: it is not under the skip rule, CHA already
+expands it. `s2` also adds Thymeleaf's `ResourceUrlEncodingFilter` to the
+Boot catalog (when webjars-locator enables the resource chain; the
+`spring.web.resources.chain.enabled` property is not read). Measured on a
+petclinic trace: 175 → 139 relations missing from the graph
+([TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)). The container's own
+internals stay CHA-expanded, so a path from application code into them can
+continue through CHA over-approximation (on WebGoat, 15 Undertow advisories
+became `REACHABLE`, 11 of them through such paths —
+[RESULTS.MD](testdata/graphbench/RESULTS.MD)).
+
 **A second bounded exception: JDK/javax service-provider interfaces.**
 A provider-based API — Bean Validation, JDBC, JCache — calls its provider
 through an interface in a skipped package (`javax.validation.spi.

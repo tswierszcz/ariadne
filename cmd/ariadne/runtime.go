@@ -331,6 +331,35 @@ func gapClassifier(h *hierarchy.Hierarchy, mode string) func(caller, callee stri
 		}
 		return walk(cls)
 	}
+	// Every lambda / method-reference implementation the input creates,
+	// by name+descriptor, with its declaring class and functional
+	// interface/method — built on the first classification.
+	type samImpl struct{ owner, iface, method string }
+	var samImpls map[string][]samImpl
+	samCall := func(site *classfile.Call, eOwner, eName, eDesc string) bool {
+		if samImpls == nil {
+			samImpls = map[string][]samImpl{}
+			for _, ci := range h.All() {
+				for _, m := range ci.Methods {
+					for _, c := range m.Calls {
+						if c.Kind == classfile.CallDynamic && c.SamInterface != "" {
+							k := c.Name + c.Desc
+							samImpls[k] = append(samImpls[k], samImpl{c.Owner, c.SamInterface, c.SamMethod})
+						}
+					}
+				}
+			}
+		}
+		for _, s := range samImpls[eName+eDesc] {
+			if s.method != site.Name || (s.iface != site.Owner && !implements(s.iface, site.Owner)) {
+				continue
+			}
+			if s.owner == eOwner || (eName != "<init>" && isSubtype(eOwner, s.owner)) {
+				return true
+			}
+		}
+		return false
+	}
 	asyncOwners := map[string]bool{
 		"java.lang.Thread": true, "java.util.concurrent.Executor": true, "java.util.concurrent.ExecutorService": true,
 		"java.util.concurrent.ScheduledExecutorService": true, "java.util.concurrent.CompletableFuture": true,
@@ -377,9 +406,14 @@ func gapClassifier(h *hierarchy.Hierarchy, mode string) func(caller, callee stri
 			return runtimeevents.GapAsync, target
 		}
 		virtual := site.Kind == classfile.CallVirtual || site.Kind == classfile.CallInterface
-		// A lambda body, or a method-reference target whose name differs
-		// from the interface method: a functional-interface call.
-		if virtual && (strings.HasPrefix(eName, "lambda$") || (eName != site.Name && !isSubtype(eOwner, site.Owner))) {
+		// A functional-interface call: the callee is the implementation of
+		// a lambda or method reference the input creates (or an override
+		// of a method reference's target) whose functional interface is
+		// the site's type and whose method is the site's method. A callee
+		// merely named differently from the site (a JDK collection calling
+		// equals/hashCode, a Spliterator, a Comparator object, a stream
+		// sink in front of a lambda of another interface) is not one (g2).
+		if virtual && samCall(site, eOwner, eName, eDesc) {
 			return runtimeevents.GapSAMCall, site.Owner
 		}
 		if callgraph.DefaultSkip(site.Owner) {
