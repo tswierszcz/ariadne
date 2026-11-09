@@ -2,6 +2,7 @@ package classfile
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 )
@@ -15,7 +16,14 @@ type reader struct {
 }
 
 func newReader(r io.Reader) *reader {
-	return &reader{r: bufio.NewReaderSize(r, 32*1024)}
+	size := 32 * 1024
+	// An attribute already in memory (Code, LineNumberTable…) needs no
+	// larger buffer than itself; a 32 KiB one per attribute made parsing
+	// allocation-bound.
+	if br, ok := r.(*bytes.Reader); ok && br.Len() < size {
+		size = br.Len()
+	}
+	return &reader{r: bufio.NewReaderSize(r, size)}
 }
 
 func (r *reader) u1() byte {

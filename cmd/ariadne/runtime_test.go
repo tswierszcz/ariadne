@@ -64,21 +64,24 @@ func TestRuntimeTrace(t *testing.T) {
 	if rt.ExecutedCounts["traced"] != 1 || rt.ExecutedCounts["sampled"] == 0 || rt.ExecutedOther != 0 {
 		t.Errorf("executed %v (+%d not usable)", rt.ExecutedCounts, rt.ExecutedOther)
 	}
-	if rt.CallCounts[runtimeevents.CallNotInGraph] != 3 || rt.CallCounts[runtimeevents.CallInGraph] == 0 {
-		t.Errorf("calls %v: want 3 not in the graph", rt.CallCounts)
+	if rt.CallCounts[runtimeevents.CallNotInGraph] != 2 || rt.CallCounts[runtimeevents.CallInGraph] == 0 {
+		t.Errorf("calls %v: want 2 not in the graph", rt.CallCounts)
 	}
 	// The body Greeter inherits from BaseGreeter is a CHA edge now
-	// (TestCHAInheritedBody); what is left:
-	// Why the rest: the reflective call under each loader, a lambda run
-	// through Work#run in another method than the one creating it.
+	// (TestCHAInheritedBody), and the lambda created in Gaps#sam and run
+	// through Work#run in Gaps#drive a SAM-call edge (DYNAMIC_LINKAGE L1,
+	// internal/samcall). What is left: the reflective call under each loader.
 	causes := map[string]int{}
 	for _, g := range rt.GapCauses {
 		causes[g.Cause] = g.Calls
 	}
-	if causes[runtimeevents.GapReflection] != 2 || causes[runtimeevents.GapSAMCall] != 1 || len(causes) != 2 {
-		t.Errorf("gap causes %v, want reflection 2, sam-call 1", causes)
+	if causes[runtimeevents.GapReflection] != 2 || len(causes) != 1 {
+		t.Errorf("gap causes %v, want reflection 2", causes)
 	}
-	for _, want := range []string{"## Runtime evidence", "**incomplete**", "`rtm.Main#reflective(Ljava/lang/ClassLoader;J)J` (line", "`rtm.Plugin#work(J)J`", "The absence of an event\nproves nothing", "| sam-call | 1 | `rtm.Work` (1) |"} {
+	if strings.Contains(md, "| sam-call |") {
+		t.Error("the report still lists a sam-call gap")
+	}
+	for _, want := range []string{"## Runtime evidence", "**incomplete**", "`rtm.Main#reflective(Ljava/lang/ClassLoader;J)J` (line", "`rtm.Plugin#work(J)J`", "The absence of an event\nproves nothing"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("report lacks %q", want)
 		}

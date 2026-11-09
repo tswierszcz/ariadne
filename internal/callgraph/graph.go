@@ -24,7 +24,9 @@ type EdgeBasis string
 // graph for the same classes; snapshots record it (CVE:F3). 2: the
 // servlet container dispatch model (internal/servletdispatch) adds
 // Servlet#service/Filter#doFilter edges to registered servlets/filters.
-const BuilderVersion = "3"
+// 3: CHA targets the body a concrete subtype inherits from outside the
+// call's type. 4: SAM-call materialization (internal/samcall, BasisSAM).
+const BuilderVersion = "4"
 
 const (
 	// BasisDirect is a direct edge to exactly the call site's own symbolic
@@ -100,6 +102,15 @@ const (
 	// candidate class — the stream decides which; nothing proves a given
 	// class is in it.
 	BasisDeserialization EdgeBasis = "deserialization"
+	// BasisSAM is a DYNAMIC_LINKAGE L1 edge (internal/samcall): a call of
+	// a functional interface's method (Supplier#get, a library callback)
+	// whose receiver DATA_FLOW resolved to a lambda or method reference
+	// created in another method — or a call handing such a value to a
+	// method outside the analyzed input — connected to the value's
+	// implementation (dispatch-expanded for an instance-method
+	// reference). The creating method keeps its own invokedynamic edge;
+	// this one is from where the body may run.
+	BasisSAM EdgeBasis = "sam"
 	// BasisModel is an edge supplied by a registered library model.
 	BasisModel EdgeBasis = "model"
 )
@@ -207,6 +218,7 @@ type Graph struct {
 	chaEdges          int
 	initEdges         int
 	modelEdges        int
+	samEdges          int
 	unresolvedDynamic int
 	// unresolvedOwner counts direct calls whose declared receiver type is
 	// itself part of the analyzed universe, but whose method could not

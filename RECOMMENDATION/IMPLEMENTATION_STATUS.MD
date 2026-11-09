@@ -20,7 +20,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3–R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
 | FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F2 (siódmy wycinek, 2026-11-08): dispatch kontenera servletów — model B3 `servlet-container:dispatch` do zarejestrowanych servletów/filtrów; F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony, reszta UNASSESSED; F4–F5: UNASSESSED | Dispatch kontenera (2026-11-08): `Servlet#service`/`Filter#doFilter`/szablon `HttpServlet` → servlety/filtry z web.xml, `@WebServlet`/`@WebFilter`, beanów i katalogu autokonfiguracji Boot; petclinic: `DispatcherServlet` osiągalny, fałszywie negatywne CVE-2024-38809 przy RTA usunięte; WebGoat bez rejestracji (launcher poza wejściem). F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
-| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation-site case), L2 (same-method + static-field case): DONE; L1 (SAM-call materialization), L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | Po DATA_FLOW D3's pierwszym wycinku L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat — rzeczywiste miejsca używają pól instancyjnych albo wyniku innego wywołania, nie pól statycznych, które D3 teraz obsługuje. Szczery, zmierzony wynik po dwóch przyrostach. |
+| DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation site; SAM-call materialization 2026-11-09), L2 (same-method + static-field case): DONE; L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | L1: lambda/method reference uruchamiana przez interfejs funkcyjny w innej metodzie niż tworząca dostaje krawędź `sam` (`internal/samcall`, builder `4`); na śladzie petclinic luki `sam-call` 50 → 22 (12 z nich to nie lambdy). L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat (pola instancyjne / wynik innego wywołania). |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: UNASSESSED (nieuzasadnione wynikami P4) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | N0, N1: DONE (2026-11-08; PR #24, [zarchiwizowane](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)); N2–N5: UNASSESSED | `-runtime-filter-out`: ustawienia JFR śledzące wszystkie podatne metody ustaleń — petclinic: 505 metod / 91 advisories, 26 wykonanych (3/3 REACHABLE, 23/74 FRAMEWORK, CVE-2025-35036 NOT_REACHABLE), 65 śledzonych bez wejścia. Kontrakt śladu `ariadne-runtime-trace-1` i importer `-runtime-trace` (dopasowanie po hashach klas, definicje per loader, wywołania vs graf statyczny, podatne metody zaobserwowane per ustalenie); rejestrator z JFR bez agenta. petclinic: CVE-2024-38809 śledzone ~1 400 razy, CVE-2025-35036 wykonane mimo NOT_REACHABLE (luka `javax.validation` SPI). Graf i werdykty bez zmian. Szczegóły we wpisie RUNTIME_NATIVE:N0–N1. |
@@ -29,6 +29,131 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### DYNAMIC_LINKAGE:L1 — materializacja wywołań SAM — DONE for this scope (2026-11-09)
+
+- **Zakres zlecenia:** otwarta połowa L1 — lambda/method reference tworzona
+  w jednej metodzie i uruchamiana przez metodę interfejsu funkcyjnego w
+  innej (przekazana jako argument, zwrócona, zapisana w polu) ma dostać
+  krawędź od miejsca wywołania SAM do implementacji, z wartością śledzoną
+  przez DATA_FLOW, bez zastępczego „każda lambda tego interfejsu” bez
+  ujawnionej luki; osobna podstawa krawędzi; zmierzone na śladzie
+  petclinic (`TRACE_GAPS.MD`: `sam-call` 58 z 203). Gałąź od
+  `cha-inherited` (PR #29, na #28).
+- **Zrealizowane:**
+  1. `internal/classfile`: `Call` dla rozwiązanego `invokedynamic` niesie
+     `SamInterface`/`SamMethod` (z `NameAndType`). `newReader` nie
+     alokuje już bufora 32 KiB na każdy atrybut w pamięci (parsowanie było
+     ograniczone alokacjami — patrz „Czas”).
+  2. `internal/dataflow`: `CallerIndex.SetOptions(CallerOptions{MaxDepth,
+     MaxCallers, FollowCaptures, VirtualCallers})` — parametr
+     implementacji lambdy rozwiązywany przez wartości przechwycone w
+     miejscach `invokedynamic` (z przesunięciem o odbiorcę dla uchwytów
+     instancyjnych; parametr spoza przechwyconych to argument wywołania
+     SAM — nieznany z tym powodem); wywołujący metody wirtualnej jako suma
+     miejsc nazywających ją i deklaracje, które nadpisuje w wejściu
+     (nadtyp spoza wejścia blokuje, chyba że nie może zadeklarować
+     metody: interfejs znacznikowy albo typ JDK i deskryptor z typem spoza
+     JDK); `Facts`, `Prefetch` (równoległa analiza, wynik niezależny od
+     kolejności), `MethodFacts.ReturnValues`/`FieldWrites` (każdy zapis
+     pola z wartością, dowolny odbiorca); pamięć podręczna 512
+     sparsowanych klas.
+  3. Nowy `internal/samcall` (`Version = "l1-1"`): `Find` — wywołania
+     metody SAM na interfejsie implementowanym przez jakąś lambdę wejścia
+     (lub jego nadtypie) oraz wywołania metody spoza wejścia z argumentem
+     typu takiego interfejsu („escape”); `Resolver` — odbiorca/argument
+     przez fakty metody, bezpośrednich wywołujących (`CallerOptions.Direct`,
+     do 64 na metodę), pola (wszystkie zapisy w klasie i klasach
+     zagnieżdżonych; pole ani prywatne, ani finalne → luka) i zwroty
+     metod static/private; każde ogniwo (parametr, pole, zwrot) liczone
+     raz i zapamiętane, cykle cięte (wynik przecięty cyklem ważny tylko
+     do końca bieżącego miejsca); parametr/pole o typie, który nie może
+     trzymać lambdy (nie jest interfejsem funkcyjnym wejścia, jego
+     nadtypem ani `Object`), nie jest śledzone; budżet 20 000 ogniw na
+     miejsce; luki z kategorią (`parameter`, `sam-argument`, `field`,
+     `call-result`, `instance-call`, `unknown-value`, `depth`,
+     `bootstrap`, `budget`); `Edges`, `Summarize`.
+  4. `internal/callgraph`: `BasisSAM = "sam"`, `SAMGate` — kandydaci
+     dodawani dopiero, gdy któraś metoda tworząca wartość jest osiągalna
+     z korzeni (punkt stały; wywoływane przed i po modelach bibliotek);
+     referencja metody instancyjnej rozwijana jak wywołanie wirtualne
+     (zapamiętane per właściciel/nazwa/deskryptor); para już w grafie
+     (krawędź `invokedynamic` twórcy) nie jest dublowana.
+     `BuilderVersion` 3 → 4.
+  5. CLI: dwie linie logu (miejsca i luki; krawędzie dodane / pokryte /
+     pominięte przez bramkę), nagłówek raportu (`SAM calls
+     (DYNAMIC_LINKAGE L1)`, liczba krawędzi SAM w wierszu Call graph),
+     wersja `samcall.rules` w snapshotach, kolumny `sam_edges` /
+     `sam_edges_gated` w `scripts/graph-benchmark.sh`.
+- **Weryfikacja:** fixture z prawdziwym javac i JVM `testdata/samcall`
+  (`scripts/samcall-oracle.sh`: każde ciało lambdy/cel referencji
+  zapisuje najbliższą ramkę fixture pod sobą, StackWalker bez ukrytych
+  ramek) — `TestSAMFixture`: wszystkie 8 zmierzonych relacji
+  (parametr, zwrot, pole ustawiane setterem, pole finalne z referencją
+  związaną do nadpisanej metody — celem jest nadpisanie, referencja
+  konstruktora, `List#forEach`, lambda przechwycona przez lambdę, helper
+  wołany przez interfejs) to krawędzie `sam` pod zmierzonym bci;
+  nieużywana lambda i lambda z nigdy niewywoływanej metody nie mają
+  żadnej; `TestSAMGapsDisclosed`, `TestMayDeclareOutside`.
+  `TestRuntimeTrace`: luka `sam-call` (`Gaps#drive` → `lambda$sam$0`)
+  zniknęła, zostaje `reflection` 2. petclinic, nowe nagranie tym samym
+  skryptem (stare nie zostało zachowane), CHA `-roots profile`: poza
+  grafem 204 → 175 z 2 702, `sam-call` 50 → 22 (12 to nie lambdy —
+  kolekcje JDK wołające `equals`/`hashCode`, spliteratory, `Comparator`;
+  7 realnych z utraconą wartością — element tablicy, zmienna przez
+  handler wyjątku, wynik wywołania instancyjnego, argument SAM, nadtyp
+  JDK; 3 pominięte przez bramkę osiągalności). Pierwsza wersja bez bramki
+  zmieniła CVE-2021-23463 z `NOT_REACHABLE` na `FRAMEWORK` przez
+  kontekstowo-niewrażliwą sumę (`JdbcTemplate#execute(ConnectionCallback)`
+  „uruchamiał” lambdę `AbstractJdbcInsert`, której twórcy nic osiągalnego
+  nie woła) — bramka to usunęła. `scripts/graph-benchmark.sh --repeat 3`
+  (2026-11-09, `testdata/graphbench/RESULTS.MD`): żadnej zmiany werdyktu w
+  8 konfiguracjach, zmiany RTA–CHA te same (4 + 2); `-graph-compare` z
+  grafem buildera 3: petclinic +1 626 `sam` i +171 `model`, 2 krótsze
+  ścieżki (`SpringApplicationRunListeners#doWithListeners` →
+  `lambda$contextLoaded$4` przez `List#forEach`); WebGoat +1 557–1 558
+  `sam` i +77 `model`, 1 ścieżka (`Lazy#getNullable` →
+  `JpaQueryMethod#lambda$new$0`); usuniętych krawędzi 0. Czas analizy
+  niższy niż z builderem 3: petclinic 14,6 → 10,4–11,1 s, WebGoat
+  23,2–24,0 → 16,2–16,3 s, szczytowa pamięć bez zmian (1,34–1,36 /
+  1,71–1,81 GB).
+  `go test ./...`, `go vet ./...`, `go test -race ./internal/samcall
+  ./internal/dataflow` — PASS.
+- **Czas:** pierwsza wersja: krok SAM 9,2 s na petclinic (ponowne
+  czytanie i parsowanie klasy dla każdej metody); po pamięci podręcznej
+  klas, równoległym `Prefetch` i usunięciu bufora 32 KiB na atrybut w
+  parserze — ok. 2,8 s; cała analiza jest krótsza niż przed zmianą
+  (poprawka parsera przyspiesza też budowę hierarchii) — liczby w
+  `testdata/graphbench/RESULTS.MD`. Pamięć:
+  pierwszy pomiar dał +300 MB szczytowego RSS (1,37 → 1,66 GB);
+  przyczyną była kopia całej `hierarchy.Method` w każdym miejscu
+  wywołania `dataflow.CallerIndex` (ok. 600 tys.) — teraz wskaźnik, a
+  fakty rozwiązywane partiami po 1 024 metody z limitem 4 096 w
+  pamięci. Poprawka indeksu
+  zmniejsza też pamięć SERVICE_LOADING, który używa tego samego indeksu.
+  WebGoat: pierwszy pomiar benchmarku dał krok SAM 12,5 s (rekurencyjne
+  rozwijanie łańcuchów parametrów w `ResolveParameter`); po przejściu na
+  bezpośrednich wywołujących z zapamiętaniem ogniw w `samcall` kolejna
+  wersja zawisła na interpreterze JRuby (`Iterable#iterator`, łańcuchy
+  parametrów `IRubyObject` > 60 poziomów, silnie rekurencyjne) —
+  przycinanie po typie zadeklarowanym i budżet to usunęły. Końcowo krok
+  SAM: petclinic 1,9 s, WebGoat 2,4 s, te same krawędzie co przed
+  optymalizacjami.
+- **Dokumentacja:** README (sekcja 4 „SAM calls”, Known limitations),
+  FAQ (invokedynamic), `docs/SUPPORT.MD` (wiersz Lambdas and method
+  references), `testdata/graphbench/TRACE_GAPS.MD` i `RESULTS.MD`, ten
+  rejestr.
+- **Ograniczenia:** wartość nie jest śledzona przez wynik wywołania
+  instancyjnego, element tablicy, kolekcję ani zmienną żywą przez handler
+  wyjątku; analiza niewrażliwa na kontekst (suma po wywołujących, ze
+  złagodzeniem przez bramkę twórcy); wartość przekazana do metody JDK
+  traktowana jako przez nią uruchamiana, także gdy JDK ją tylko
+  przechowuje (`Map#put`); krawędzie `sam` nie są zawężane przez RTA.
+  Klasyfikator luk śladu liczy jako `sam-call` także wywołania nie-lambd
+  przez ramki JDK.
+- **Następny krok (wymaga zgody):** refleksja między metodami (REFLECTION
+  R3, 37 relacji na nowym śladzie) albo zawężenie klasyfikatora
+  `sam-call` i śledzenie wyniku wywołań instancyjnych.
 
 ### FRAMEWORKS:F2 — siódmy wycinek: dispatch kontenera servletów (model B3 `servlet-container:dispatch`) — DONE for this scope (2026-11-08)
 

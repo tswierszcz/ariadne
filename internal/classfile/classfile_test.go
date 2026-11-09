@@ -97,11 +97,11 @@ func callCounts(calls []Call) map[Call]int {
 func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 	const greetWithDesc = "(Ljava/lang/String;Ljava/util/function/Function;)Ljava/lang/String;"
 	common := map[Call]int{
-		{Kind: CallSpecial, Owner: "fixture.FormalGreeter", Name: "<init>", Desc: "()V"}:                                                     1,
-		{Kind: CallSpecial, Owner: "fixture.CasualGreeter", Name: "<init>", Desc: "()V"}:                                                     1,
-		{Kind: CallInterface, Owner: "fixture.Greeter", Name: "greet", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                       2,
-		{Kind: CallDynamic, Owner: "fixture.App", Name: "lambda$handle$0", Desc: "(Ljava/lang/String;)Ljava/lang/String;", RefKind: RefInvokeStatic}: 1,
-		{Kind: CallDynamic, Owner: "fixture.Util", Name: "shout", Desc: "(Ljava/lang/String;)Ljava/lang/String;", RefKind: RefInvokeStatic}:          1,
+		{Kind: CallSpecial, Owner: "fixture.FormalGreeter", Name: "<init>", Desc: "()V"}:                                                                                                                              1,
+		{Kind: CallSpecial, Owner: "fixture.CasualGreeter", Name: "<init>", Desc: "()V"}:                                                                                                                              1,
+		{Kind: CallInterface, Owner: "fixture.Greeter", Name: "greet", Desc: "(Ljava/lang/String;)Ljava/lang/String;"}:                                                                                                2,
+		{Kind: CallDynamic, Owner: "fixture.App", Name: "lambda$handle$0", Desc: "(Ljava/lang/String;)Ljava/lang/String;", RefKind: RefInvokeStatic, SamInterface: "java.util.function.Function", SamMethod: "apply"}: 1,
+		{Kind: CallDynamic, Owner: "fixture.Util", Name: "shout", Desc: "(Ljava/lang/String;)Ljava/lang/String;", RefKind: RefInvokeStatic, SamInterface: "java.util.function.Function", SamMethod: "apply"}:          1,
 	}
 
 	cases := []struct {
@@ -112,10 +112,10 @@ func TestParseAndExtractCalls_handleMethod(t *testing.T) {
 		{
 			release: 8,
 			extra: map[Call]int{
-				{Kind: CallSpecial, Owner: "fixture.App", Name: "greetWith", Desc: greetWithDesc}:                                                          2,
-				{Kind: CallSpecial, Owner: "java.lang.StringBuilder", Name: "<init>", Desc: "()V"}:                                                         1,
-				{Kind: CallVirtual, Owner: "java.lang.StringBuilder", Name: "append", Desc: "(Ljava/lang/String;)Ljava/lang/StringBuilder;"}:               4,
-				{Kind: CallVirtual, Owner: "java.lang.StringBuilder", Name: "toString", Desc: "()Ljava/lang/String;"}:                                      1,
+				{Kind: CallSpecial, Owner: "fixture.App", Name: "greetWith", Desc: greetWithDesc}:                                            2,
+				{Kind: CallSpecial, Owner: "java.lang.StringBuilder", Name: "<init>", Desc: "()V"}:                                           1,
+				{Kind: CallVirtual, Owner: "java.lang.StringBuilder", Name: "append", Desc: "(Ljava/lang/String;)Ljava/lang/StringBuilder;"}: 4,
+				{Kind: CallVirtual, Owner: "java.lang.StringBuilder", Name: "toString", Desc: "()Ljava/lang/String;"}:                        1,
 			},
 			wantUnresolved: 0,
 		},

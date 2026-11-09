@@ -54,13 +54,17 @@ type Header struct {
 	// GraphConfig is the call graph's construction metadata
 	// (GRAPH_PRECISION P0): mode, builder, skip rule, allocation policy,
 	// roots, target JDK.
-	GraphConfig     callgraph.Config
-	GraphNodes      int
-	GraphEdges      int
-	PreCHAEdges     int
-	CHAEdges        int
-	InitEdges       int
-	ModelEdges      int
+	GraphConfig callgraph.Config
+	GraphNodes  int
+	GraphEdges  int
+	PreCHAEdges int
+	CHAEdges    int
+	InitEdges   int
+	ModelEdges  int
+	// SAMEdges/SAMLine: DYNAMIC_LINKAGE L1's SAM-call edges and the
+	// site/gap summary (internal/samcall).
+	SAMEdges        int
+	SAMLine         string
 	UnresolvedDyn   int
 	UnresolvedOwner int
 	// Model gaps (contract §4): unresolved dynamic sites, those reachable

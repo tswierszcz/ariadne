@@ -36,9 +36,26 @@ type MethodFacts struct {
 	// determinism contract (byte-identical results.json across runs)
 	// does not tolerate that.
 	returnOrder []bytecodeir.Site
-	aborted     bool
-	reason      string
+	// writes lists every field-put (static or instance, any receiver)
+	// with the value stored, in instruction order of the analysis.
+	writes  []FieldWrite
+	aborted bool
+	reason  string
 }
+
+// FieldWrite is one putfield/putstatic and the value it stores. Unlike
+// FieldValueAt it covers instance writes through any receiver and
+// outside constructors; the receiver is not recorded — a consumer using
+// it is instance-insensitive (DYNAMIC_LINKAGE L1's field rule).
+type FieldWrite struct {
+	Site   bytecodeir.Site
+	Field  valueflow.FieldRef // as the bytecode names it
+	Static bool
+	Value  valueflow.Value
+}
+
+// FieldWrites returns every field write the analysis reached.
+func (f *MethodFacts) FieldWrites() []FieldWrite { return f.writes }
 
 var _ valueflow.Facts = (*MethodFacts)(nil)
 
@@ -93,6 +110,16 @@ func (f *MethodFacts) FieldValueAt(at bytecodeir.Site) valueflow.Value {
 		panic(fmt.Sprintf("dataflow: FieldValueAt: no field-put recorded at %+v (instance field, or not a real field-put site in this method)", at))
 	}
 	return v
+}
+
+// ReturnValues returns the value of every value-returning return of the
+// method, in instruction order (none for a void method).
+func (f *MethodFacts) ReturnValues() []valueflow.Value {
+	out := make([]valueflow.Value, 0, len(f.returnOrder))
+	for _, s := range f.returnOrder {
+		out = append(out, f.returns[s])
+	}
+	return out
 }
 
 // Aborted reports whether the local-value analysis gave up before
