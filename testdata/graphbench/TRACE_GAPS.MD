@@ -1,4 +1,4 @@
-# Static-graph gaps against a real run (petclinic)
+# Static-graph gaps against a real run (petclinic, JPetStore)
 
 What the call graph misses, measured against a recorded run rather than guessed: every
 caller → callee relation a JFR recording of petclinic measured (RUNTIME_NATIVE N1,
@@ -253,6 +253,51 @@ calls `Method#invoke` on the target (on the builder `4` recording, 6 of the 37 `
 were exactly these handlers passing their `Method` on), and Spring Data's repository path already reaches
 `SimpleJpaRepository` through the profile's synthetic edges. Expected effect on reachability:
 small; not started.
+
+## A second application: JPetStore 6.0.2 (WAR)
+
+2026-11-09: the same measurement on MyBatis JPetStore 6.0.2 (`scripts/prepare-jpetstore.sh`), a
+WAR with `web.xml`-registered Stripes `StripesFilter`/`DispatcherServlet` and Spring's
+`ContextLoaderListener`, Spring 4.3 XML configuration, MyBatis 3.4 over an embedded HSQLDB.
+Recorded with `scripts/runtime-trace-jpetstore.sh`: the WAR in Jetty 9.4 (`jetty-runner`; the
+container is not part of the analyzed input), JDK 25.0.5 with `--add-opens
+java.base/java.lang=ALL-UNNAMED` (Spring 4.3's CGLIB), 50 × catalog, categories, product, item,
+search, cart, sign-on with the application's seeded demo account, new order form, sign-off.
+Analyzer `j1`, CHA, `-roots profile`, causes `g2`.
+
+**722 measured relations, 37 (5.1%) not in the static graph:**
+
+| Cause | Calls | What they are |
+|---|---|---|
+| `skipped-receiver` | 17 | `RequestDispatcher#forward` into JSP tag handlers 9 (the JSPs are compiled by the container, not in the input); `FilterChain#doFilter` → Stripes `DispatcherServlet#service` 1 and `HttpServletRequest` → `StripesRequestWrapper` 1 (the chain and request classes are the container's: `s2`'s creator gate has no creator in a WAR); `DataSource#getConnection` → Spring's `SimpleDriverDataSource` 1 and `Driver#connect` → HSQLDB's `JDBCDriver` 1 (below); `Map`, `Object#hashCode`, `FutureTask`, `DocumentBuilder` 1 each |
+| `reflection` | 11 | Stripes calling the action beans' event handlers through `Method#invoke` 4 (`CatalogActionBean#viewCategory`, `#viewProduct`, `#searchProducts`, `CartActionBean#addItemToCart`); MyBatis-Spring's `SqlSessionInterceptor` → `DefaultSqlSession` 2; Spring XML property injection 1; `Constructor#newInstance` from bean definitions and logging/HSQLDB factories 4 |
+| `proxy` | 7 | MyBatis mapper proxies (`MapperProxy#invoke` from `CatalogService` 5) and `SqlSessionTemplate`'s `SqlSession` proxy 2 |
+| `class-init` | 2 | `FormatNumberSupport`, `CglibAopProxy` |
+
+What this says about the models built on petclinic:
+
+- **JDBC objects (`j1`)** reach nothing here on the measured path: the `DataSource` is Spring's
+  `SimpleDriverDataSource`, created by an XML bean definition (reflection), so it has no creator
+  and the gate keeps `DataSourceUtils#doGetConnection` → `getConnection` out — the documented
+  limitation, measured. The driver's `connect` relation behind it follows from that (its caller is
+  not reachable). `j1` still adds 811 edges (`-roots profile`) on JPetStore, none on a measured
+  relation.
+- **Servlet objects (`s2`)** add nothing: in a WAR the request, response and filter-chain classes
+  belong to the container, which is not in the input, so no creator exists.
+- **JDK proxies (FRAMEWORKS F3)**: unlike petclinic's 12, **2 of these 7** have a bounded interface
+  set — `SqlSessionTemplate`'s constructor creates `Proxy.newProxyInstance(…, new Class[]
+  {SqlSession.class}, new SqlSessionInterceptor())`; the 5 mapper proxies take their interface
+  from `MapperProxyFactory`'s `mapperInterface` field (configuration: the mapper scanner). The
+  petclinic stop decision stands (2 of 19 over both applications), but the bounded case exists.
+- **Roots.** The same trace shows mapped vulnerable methods of CVE-2022-22965/CVE-2022-22970
+  (`CachedIntrospectionResults#<init>`, 17 traced entries), CVE-2026-41848
+  (`AntPathMatcher$AntPathStringMatcher#matchStrings`, 238) and CVE-2026-41851
+  (`SpelParserConfiguration#<init>`) running. With `-roots profile` all four are `FRAMEWORK`
+  (paths from `ContextLoaderListener#contextInitialized`/`contextDestroyed`, a web.xml root);
+  with the default `-roots all` the first three are **`NOT_REACHABLE`**: `all` roots every
+  *application* method, and JPetStore's container entry points are library classes named in
+  `web.xml` (README: web.xml roots are `-roots profile` entry points). See RESULTS.MD,
+  "JPetStore".
 
 ## What this says about the next steps
 

@@ -1,5 +1,12 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-09 with a third application, JPetStore 6.0.2 (`scripts/prepare-jpetstore.sh`)**: a
+WAR (`-app` is the WAR itself, so `web.xml` is read) with Stripes, Spring 4.3 XML configuration,
+MyBatis and HSQLDB. The first table under "Real applications" is this run (petclinic and WebGoat
+rerun with it: same graphs and verdicts as the `j1` run, times within its spread). No model of
+the last increments changes a JPetStore verdict; the two scenarios of roots differ by 8 advisories,
+and RTA changes 2 — see "JPetStore" below.
+
 **Rerun 2026-11-09 after the JDBC objects (`jdbc:objects` `j1`, `internal/jdbcdispatch`)**: a
 virtual/interface call on a `java.sql` connection, statement, result set, metadata object, LOB or
 `javax.sql.DataSource` reaches the bodies of the implementations reachable code creates — a
@@ -117,6 +124,23 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| petclinic | profile | cha | 13.5–14.5 | 1319–1493 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | profile | rta | 12.6–13.7 | 1318–1349 | 991 057 | 36 111 of 322 104 (35 727) | 17 385 (5 845) | 639 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/68/16/57/6 |
+| petclinic | all | cha | 12.2–12.4 | 1391–1400 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | all | rta | 13.1–13.3 | 1341–1384 | 1 021 275 | 5 893 of 322 104 (59 461) | 21 852 (9 620) | 679 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 18.9–19.2 | 1710–1784 | 1 434 527 | — | — | 742 of 1194 | 0 | 2 219 | 1 557 (2 269) | 53/37/13/61/0 |
+| WebGoat | profile | rta | 18.9–20.0 | 1698–1811 | 1 350 616 | 83 911 of 570 065 (162 221) | 25 180 (10 659) | 667 of 1201 | 0 | 2 219 | 1 557 (2 269) | 52/35/16/61/0 |
+| WebGoat | all | cha | 18.9–19.4 | 1614–1754 | 1 434 532 | — | — | 743 of 1194 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
+| WebGoat | all | rta | 20.1–20.4 | 1713–1811 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
+| JPetStore | profile | cha | 3.5–3.6 | 289–319 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 0/9/7/19/0 |
+| JPetStore | profile | rta | 3.6–3.6 | 299–317 | 212 542 | 13 164 of 59 637 (16 326) | 3 221 (1 256) | 150 of 365 | 1 | 98 | 0 (0) | 0/8/8/19/0 |
+| JPetStore | all | cha | 3.4–3.5 | 295–307 | 225 288 | — | — | 67 of 364 | 1 | 7 | 0 (0) | 0/1/15/19/0 |
+| JPetStore | all | rta | 3.5–3.5 | 291–313 | 165 958 | 59 330 of 59 637 (296) | 74 (28) | 1 of 365 | 1 | 7 | 0 (0) | 0/0/16/19/0 |
+
+<details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
+
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | petclinic | profile | cha | 13.6–14.1 | 1359–1386 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
 | petclinic | profile | rta | 13.0–13.6 | 1345–1381 | 991 057 | 36 111 of 322 104 (35 727) | 17 385 (5 845) | 639 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/68/16/57/6 |
 | petclinic | all | cha | 12.5–12.9 | 1331–1374 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
@@ -125,6 +149,8 @@ in either mode.
 | WebGoat | profile | rta | 20.6–20.9 | 1779–1802 | 1 350 616 | 83 911 of 570 065 (162 221) | 25 180 (10 659) | 667 of 1201 | 0 | 2 219 | 1 557 (2 269) | 52/35/16/61/0 |
 | WebGoat | all | cha | 19.1–19.8 | 1700–1851 | 1 434 532 | — | — | 743 of 1194 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
 | WebGoat | all | rta | 20.5–21.1 | 1680–1720 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
+
+</details>
 
 <details><summary>Undertow feature model <code>u1</code>, before the JDBC objects (analyzer <code>fac65dc</code>)</summary>
 
@@ -455,6 +481,57 @@ recording of petclinic with exact entries (`jdk.MethodTrace`) of the methods inv
 | petclinic | CVE-2021-46877, CVE-2022-45868, CVE-2023-6378 | `FRAMEWORK` → `REACHABLE` | `CacheConfiguration#lambda$petclinicCacheConfigurationCustomizer$0` (application code) → `Eh107CacheManager#createCache` (a `javax.cache.CacheManager` product of Ehcache's `CachingProvider`) | `Eh107CacheManager#createCache` entered (the first hop is real); the rest of the path — Ehcache's disk store `FileBasedStateRepository#loadMaps` → deserialization → `NodeSerialization#readExternal` — is pre-existing CHA/deserialization over-approximation: 0 entries | first hop **correct**; the `REACHABLE` result is as plausible as the downstream path, i.e. not (petclinic's caches are heap-only) |
 
 No `REACHABLE` result is lost; RTA-versus-CHA changes are unchanged (the 4 + 2 above).
+
+## JPetStore (WAR, `web.xml` registrations)
+
+MyBatis JPetStore 6.0.2 (`scripts/prepare-jpetstore.sh`: built with `-source/-target 8` on the
+current JDK, the WAR analyzed with `-deps-list`; 17/17 dependency jars identified, 35 advisories,
+18 mapped). Runtime trace: [TRACE_GAPS.MD](TRACE_GAPS.MD), "A second application".
+
+**Each model, one at a time.** The same input through the analyzer after every model merged so
+far, each graph compared with the previous one (`-graph-compare`, CHA):
+
+| Analyzer | Model added | `-roots profile` edges | `-roots all` edges | Verdicts (both scenarios) |
+|---|---|---|---|---|
+| `95ae6ec` | (P4 baseline) | 221 346 | 221 346 | profile 0/9/7/19/0, all 0/1/15/19/0 |
+| `436695c` | servlet container dispatch `s1` | +0 | +0 | unchanged |
+| `f27c8f3` | service-provider dispatch `p1` | +98 | +7 | unchanged |
+| `36b361f` | CHA inherited bodies (builder `3`) | +3 190 | +3 190 | unchanged (1 path shorter) |
+| `2aa71d9` | SAM-call materialization (builder `4`) | +0 | +0 | unchanged (no lambdas: Java 6 sources) |
+| `8298256` | servlet objects `s2` | +255 | +0 | unchanged |
+| `fac65dc` | Undertow features `u1` | +0 | +0 | unchanged (Jetty/Tomcat app) |
+| `jdbc-objects` | JDBC objects `j1` | +811 | +739 | unchanged |
+
+The servlet models have little to work with in a WAR: the container is not part of the input,
+so nothing calls `Servlet#service`/`Filter#doFilter` and no request, response or filter-chain
+class has a creator. Only `StripesFilter` is registered: Stripes' `DispatcherServlet` extends
+`javax.servlet.http.HttpServlet`, and the servlet API is `provided` (not in the WAR), so the
+hierarchy cannot tell it is a servlet — harmless here (registration only matters for container
+dispatch), but a WAR's servlets are generally not recognized without the API jar. The web.xml
+lifecycle methods are roots under `-roots profile` either way.
+
+**The two root scenarios.** 8 advisories are `FRAMEWORK` with `-roots profile` and
+`NOT_REACHABLE` with the default `-roots all`: CVE-2022-22950, CVE-2022-22965, CVE-2022-22970,
+CVE-2023-20861, CVE-2023-20863, CVE-2024-38808, CVE-2024-38820, CVE-2026-41848. Every profile
+path starts at `ContextLoaderListener#contextInitialized` or `#contextDestroyed` — a library class
+the application registers in `web.xml`, so a root of `-roots profile` but not of `-roots all`
+(every *application* method). Checked against the runtime trace: the mapped methods of
+CVE-2022-22965/CVE-2022-22970 (`CachedIntrospectionResults#<init>`) and CVE-2026-41848
+(`AntPathMatcher$AntPathStringMatcher#matchStrings`) **ran**; the other 5 were traced on entry and
+not entered in this scenario. So the default scenario gives **3 false negatives** here, where
+`-roots profile` is right (`FRAMEWORK`: Spring's own bootstrap, not application code). The
+`-roots profile` paths are plausible: `ContextLoader#initWebApplicationContext` →
+`SingletonBeanFactoryLocator` → `PathMatchingResourcePatternResolver` → `AntPathMatcher`;
+`ContextCleanupListener` → `DisposableBeanAdapter` → `BeanUtils#getPropertyDescriptors` →
+`CachedIntrospectionResults`; bean creation → `evaluateBeanDefinitionString` → SpEL for the SpEL
+advisories (CVE-2024-38820's path goes through a CHA `afterPropertiesSet`, below).
+
+**RTA versus CHA** (`verdict-changes.tsv`, 2 new rows):
+
+| Roots | Advisory | Why CHA reached it | Check | Verdict |
+|---|---|---|---|---|
+| profile | CVE-2024-38820 | `invokeInitMethods` → CHA to `ContentNegotiationManagerFactoryBean#afterPropertiesSet` → `MappingMediaTypeFileExtensionResolver` | JPetStore configures no Spring MVC; nothing reachable creates that factory bean; the trace shows the mapped method traced and not entered | **correct** |
+| all | CVE-2026-41851 | Stripes `Log#error` → `Log4JLogger#error` → log4j `AppenderAttachableImpl` → CHA to every `Appender` → … → SpEL | The CHA path is an artifact (no appender of JPetStore's log4j configuration evaluates SpEL); RTA removes it at `Log4JLogger`, which commons-logging's `LogFactoryImpl` creates reflectively (the trace has that `Constructor#newInstance` relation) — RTA drops a body the JVM runs. `SpelParserConfiguration#<init>` does run, from Spring's bootstrap, which `-roots all` does not root | artifact removed; **false negative** of the `-roots all` scenario (as above), not of RTA's narrowing |
 
 ## Every verdict change, checked by hand
 
