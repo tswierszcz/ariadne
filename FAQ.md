@@ -588,6 +588,19 @@ Undertow's own authentication, its HTTP client, TLS and a write timeout
 unless the packaged configuration or application code turns them on — are
 no longer CHA targets; that removed 4 of those 11.
 
+**And JDBC — `connection.prepareStatement(…)`, `rs.getInt(…)`?** Same story,
+same answer. `java.sql` is under the skip rule, and the service-provider
+model only reaches classes in the drivers' own jars — not the connection
+pool's proxies (Hikari's `HikariProxyConnection` and friends) that Hibernate
+and Spring JDBC actually hold. Since `jdbc:objects` `j1` a call on a JDBC
+connection, statement, result set, metadata object or `DataSource` reaches
+the bodies of the implementations reachable code creates with `new` — the
+pool's proxies once its proxy factory runs, the driver's classes once its
+`connect` runs — and not every JDBC class on the class path. On a petclinic
+trace that closed all 22 JDBC relations the graph used to miss. A
+`DataSource` class only instantiated by name (Spring Boot's
+`DataSourceBuilder`) has no creator, so it gets no edge from this model.
+
 **Why doesn't a runtime trace change any verdict?** (RUNTIME_NATIVE N1,
 `-runtime-trace`.) A trace is what one run did under one scenario: it can
 show that a vulnerable method ran, but not that it can't run — traffic,

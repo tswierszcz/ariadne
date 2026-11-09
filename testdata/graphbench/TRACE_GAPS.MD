@@ -190,6 +190,36 @@ The gate leaves out the wrappers only an unreachable method creates (Tomcat's
 reachable only through CHA (Spring's `ForwardedHeaderFilter`, `ShallowEtagHeaderFilter`: their
 `doFilterInternal` is a CHA target of `OncePerRequestFilter#doFilter`).
 
+## After the JDBC objects (model `j1`)
+
+2026-11-09 (`jdbc:objects` `j1`, `internal/jdbcdispatch`): a virtual/interface call on a
+`java.sql` connection, statement, result set, metadata, LOB, `Savepoint`, `Wrapper` or
+`javax.sql.DataSource` gets a `model` edge to the body each concrete implementation in the input
+runs, once a method creating that implementation is reachable from the roots — the servlet
+objects' creator gate (`callgraph.ObjectEdges`, now shared by both models; README "JDBC objects").
+
+**A new recording.** The `s2` trace was not kept (the machine was restarted), so petclinic was
+recorded again with the same script and scenario (`scripts/runtime-trace-petclinic.sh`, JDK
+25.0.5): 2 946 measured relations. Before/after are both on this new trace — `main` at `fac65dc`
+(`s2`, `u1`) and `j1`, CHA, `-roots profile`, causes `g2`:
+
+| Cause | `main` | `j1` |
+|---|---|---|
+| **`skipped-receiver`** | **85** | **62** |
+| `reflection`, `sam-call`, `proxy`, `class-init`, `async`, `no-call-at-site` | 43, 15, 12, 7, 1, 1 | unchanged |
+| **Not in the static graph** | **164 of 2 946 (5.6%)** | **141 (4.8%)** |
+
+The 23 that are edges now: all 22 relations on a `java.sql`/`javax.sql` receiver — Hibernate
+and Spring JDBC into Hikari's proxies (`HikariProxyConnection#commit`/`setAutoCommit`/
+`setReadOnly`, `ProxyConnection#close`, `HikariProxyPreparedStatement#executeQuery`/
+`getQueryTimeout`, `HikariProxyResultSet#getInt`/`getDate`, `HikariProxyStatement#execute`,
+`HikariProxyDatabaseMetaData#storesLowerCaseIdentifiers`, `HikariDataSource#getConnection`),
+Hikari's proxies into H2 (`JdbcConnection`, `JdbcStatement`, `JdbcPreparedStatement`,
+`JdbcResultSet`, `JdbcDatabaseMetaData`), Hikari's pool into its `DriverDataSource` — and the
+`java.sql.Driver` relation behind them (`DriverDataSource#getConnection` →
+`org.h2.Driver#connect`): the service-provider model already expands that call, but its caller
+was not reachable before. No new relation is missing. No `java.sql`/`javax.sql` relation is left.
+
 ## What this says about the next steps
 
 Ranked by measured payoff per effort:
@@ -204,6 +234,8 @@ Ranked by measured payoff per effort:
    of the servlet dispatch model; the rest of `skipped-receiver` is spread thin over many JDK
    types (collections, I/O), where lifting the skip would fan out (the reason it exists).
 5. **JPA/Spring Data proxies (`proxy`, 12)** — FRAMEWORKS F3/F4.
+6. **JDBC objects (`skipped-receiver`, 22 on the 2026-11-09 recording) — done** (section
+   above, `j1`: all 22, plus the `Driver#connect` relation behind them).
 
 Not supported by this measurement: RTA as a default (it adds 105 missed relations with
 `-roots profile`), and points-to (GRAPH_PRECISION P3) — what the graph misses is dominated by
