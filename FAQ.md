@@ -574,6 +574,15 @@ is reported as an incomplete model fact, not guessed. Its real-JVM check is
 `testdata/servletdispatch`; its effect on petclinic and WebGoat is in
 [testdata/graphbench/RESULTS.MD](testdata/graphbench/RESULTS.MD).
 
+**And calls on the request and response themselves?** `request.getHeader(…)`
+or `chain.doFilter(…)` are `javax.servlet` receivers as well. Since model
+version `s2` they reach the bodies of the implementations reachable code
+actually creates — the container's request/response/chain classes and the
+wrappers of the filters that run — and not every wrapper class on the class
+path. That lets a path continue from application code into the container
+(on WebGoat, 15 Undertow advisories became `REACHABLE`; 4 plausible, 11
+through CHA over-approximation inside Undertow — see RESULTS.MD).
+
 **Why doesn't a runtime trace change any verdict?** (RUNTIME_NATIVE N1,
 `-runtime-trace`.) A trace is what one run did under one scenario: it can
 show that a vulnerable method ran, but not that it can't run — traffic,

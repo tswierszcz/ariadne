@@ -56,13 +56,23 @@ type samCandidate struct {
 type SAMGate struct {
 	cands []samCandidate
 	stats SAMStats
+	basis EdgeBasis
 }
 
 // NewSAMGate resolves the candidates to graph nodes. Dispatch targets of
 // virtual method references are computed once per owner/name/descriptor,
 // like BuildWith's.
 func NewSAMGate(g *Graph, h *hierarchy.Hierarchy, edges []SAMEdge) *SAMGate {
-	s := &SAMGate{}
+	return NewCreatorGate(g, h, edges, BasisSAM)
+}
+
+// NewCreatorGate is NewSAMGate for candidate edges of another basis: the
+// same "add once a creator of the receiver is reachable" rule, used by a
+// library model whose targets depend on which classes reachable code
+// creates (internal/servletdispatch's request/response objects, basis
+// BasisModel, counted with the other model edges).
+func NewCreatorGate(g *Graph, h *hierarchy.Hierarchy, edges []SAMEdge, basis EdgeBasis) *SAMGate {
+	s := &SAMGate{basis: basis}
 	type key struct{ owner, name, desc string }
 	dispatch := map[key][]string{}
 	cha := CHA{Skip: DefaultSkip}
@@ -182,7 +192,7 @@ func (s *SAMGate) add(g *Graph, c *samCandidate) {
 		if ex.To != c.to {
 			continue
 		}
-		if ex.Basis == BasisSAM && ex.Kind == c.kind {
+		if ex.Basis == s.basis && ex.Kind == c.kind {
 			idx = i
 			break
 		}
@@ -200,8 +210,12 @@ func (s *SAMGate) add(g *Graph, c *samCandidate) {
 	case other:
 		s.stats.Covered++
 	default:
-		g.addEdge(c.from, c.to, c.kind, BasisSAM, &CallSite{PC: c.pc})
-		g.samEdges++
+		g.addEdge(c.from, c.to, c.kind, s.basis, &CallSite{PC: c.pc})
+		if s.basis == BasisSAM {
+			g.samEdges++
+		} else {
+			g.modelEdges++
+		}
 		s.stats.Added++
 	}
 }
