@@ -601,6 +601,16 @@ trace that closed all 22 JDBC relations the graph used to miss. A
 `DataSource` class only instantiated by name (Spring Boot's
 `DataSourceBuilder`) has no creator, so it gets no edge from this model.
 
+**Why could `-roots all` see less than `-roots profile`?** `-roots all` meant
+"every application method", and in a WAR the methods the container calls
+first are often not application methods: `web.xml` registers library
+classes — Spring's `ContextLoaderListener`, a web framework's filter. Those
+lifecycle methods were roots of `-roots profile` only, so on JPetStore the
+default scenario called 8 advisories `NOT_REACHABLE` that `-roots profile`
+called `FRAMEWORK`, and a recorded run showed 3 of their vulnerable methods
+executing. Since then the `web.xml` lifecycle methods are roots of both
+scenarios, and the two agree there.
+
 **Why doesn't a runtime trace change any verdict?** (RUNTIME_NATIVE N1,
 `-runtime-trace`.) A trace is what one run did under one scenario: it can
 show that a vulnerable method ran, but not that it can't run — traffic,

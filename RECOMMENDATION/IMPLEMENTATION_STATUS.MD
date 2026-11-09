@@ -30,6 +30,32 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS:F2 — korzenie `web.xml` także pod `-roots all` — DONE (2026-11-09)
+
+- **Zakres (zatwierdzony):** krok 1 z wpisu JPetStore — metody cyklu życia
+  servletów/filtrów/listenerów z `web.xml` korzeniami także domyślnego
+  `-roots all` (dotąd tylko `-roots profile`).
+- **Zrealizowane:** `cmd/ariadne`: `-roots all` = `reach.AppRoots` +
+  `profile.WebXMLAppRoots` bez duplikatów, w ustalonej kolejności
+  (`appendNewRoots`); linia logu `roots: all (N methods: every application
+  method, M more from web.xml)`; sekcja raportu „web.xml-declared roots”
+  opisuje oba scenariusze.
+- **Weryfikacja:** `TestAppendNewRoots`. JPetStore `-roots all`
+  (`-graph-compare` z wersją sprzed poprawki): 312 korzeni (6 z web.xml),
+  +418 krawędzi, 8 advisories `NOT_REACHABLE` → `FRAMEWORK` — te same
+  werdykty co `-roots profile`; 3 z nich (CVE-2022-22965/22970,
+  CVE-2026-41848) z podatną metodą wykonaną na śladzie.
+  `scripts/graph-benchmark.sh --repeat 3`: petclinic i WebGoat (bez
+  `web.xml`) bez zmian; JPetStore `all` RTA–CHA: CVE-2024-38820 jak w
+  `profile` (sprawdzone wcześniej, poprawne). `go test ./...`,
+  `go vet ./...` — PASS.
+- **Dokumentacja:** README (flaga `-roots`, akapit o korzeniach web.xml),
+  FAQ, `docs/SUPPORT.MD` (wiersz Profiles and selected roots),
+  `RESULTS.MD`, `TRACE_GAPS.MD`, szablon raportu, ten rejestr.
+- **Następny krok (wymaga zgody):** rozpoznawanie servletów bez API
+  servletów w wejściu albo ręczne mapowania HSQLDB CVE-2022-41853 i log4j
+  1.2 (kroki 2–3 z wpisu JPetStore).
+
 ### GRAPH_PRECISION:P4 — trzecia aplikacja pomiarowa: JPetStore 6.0.2 (WAR) — DONE for this scope (2026-11-09)
 
 - **Zakres (zatwierdzony):** aplikacja z innym zestawem mechanizmów i CVE

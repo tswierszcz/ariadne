@@ -296,8 +296,9 @@ What this says about the models built on petclinic:
   (paths from `ContextLoaderListener#contextInitialized`/`contextDestroyed`, a web.xml root);
   with the default `-roots all` the first three are **`NOT_REACHABLE`**: `all` roots every
   *application* method, and JPetStore's container entry points are library classes named in
-  `web.xml` (README: web.xml roots are `-roots profile` entry points). See RESULTS.MD,
-  "JPetStore".
+  `web.xml` (web.xml roots were `-roots profile` entry points only). Fixed the same day: the
+  web.xml lifecycle methods are roots of `-roots all` too, and both scenarios agree. See
+  RESULTS.MD, "JPetStore".
 
 ## What this says about the next steps
 
