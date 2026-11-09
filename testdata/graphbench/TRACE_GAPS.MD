@@ -81,14 +81,67 @@ WebGoat findings got a shorter path through a body the JVM really runs (e.g.
 `OwnerController#processFindForm` → `AbstractErrors#rejectValue` behind `BindingResult`);
 +11 713 / +16 439 edges.
 
+## After SAM-call materialization (builder `4`)
+
+Step 2 below, 2026-11-09 (DYNAMIC_LINKAGE L1, `internal/samcall`, rules `l1-1`): a lambda or
+method reference created in one method and run through its functional interface in another
+gets a `sam` edge from the calling site; the value is followed with DATA_FLOW (callers,
+captured values, field writers, helper returns), a value handed to a JDK method is linked from
+that call, and an edge needs a reachable creator of the value (README "SAM calls").
+
+**A new recording.** The trace above was not kept, so petclinic was recorded again with the
+same script and scenario (`scripts/runtime-trace-petclinic.sh`, JDK 25.0.5): 2 702 measured
+relations. Before/after are both on this new trace — the builder `3` binary (`651b3b5`) and
+builder `4` — CHA, `-roots profile`:
+
+| Cause | Builder `3` | Builder `4` |
+|---|---|---|
+| `skipped-receiver` | 93 | 92 |
+| **`sam-call`** | **50** | **22** |
+| `reflection` | 37 | 37 |
+| `proxy` | 9 | 9 |
+| `class-init` | 8 | 8 |
+| `async`, `no-call-at-site`, `indirect` | 3, 3, 1 | 3, 3, 1 |
+| **Not in the static graph** | **204 of 2 702 (7.5%)** | **175 (6.5%)** |
+
+(The first trace had 58 `sam-call` of 203; sampling makes each recording differ.) The
+`skipped-receiver` relation that went away is `MergedAnnotationCollectors#lambda$toMultiValueMap$4`
+→ `MultiValueMapAdapter#add`, now in the graph.
+
+What the 22 left are, checked one by one (the measured callee, and the reason the resolver recorded
+for the site):
+
+- **12 are not lambdas at all.** The classifier counts as `sam-call` any virtual call whose
+  measured callee has another name than the called method; through JDK frames that also
+  catches a collection calling `equals`/`hashCode` (`Map` 3, `Set` 2), a `Stream` pulling from
+  a Spring `Spliterator` (3), `List#sort` running a `Comparator` object, `ClassLoader` delegation,
+  a Tomcat `FutureTask` (`Runnable` → `StartChild#call`) and a JDK stream sink in front of a
+  lambda (`Consumer`). A sharper classifier would move them to `skipped-receiver`.
+- **7 are real, with the value lost on the way** (each counted as a gap in the run's log):
+  `ServletContextInitializer` ×2 (an array element, `TomcatStarter`), `Supplier` ×2 (a local
+  live across an exception handler, `SpringIterableConfigurationPropertySource$Mappings`),
+  `BiPredicate` (the result of an instance call, `getAncestorOfCheck()`), Spring Boot's
+  `JCacheManagerCustomizer` (itself the argument of a `Consumer` run over an `ObjectProvider`
+  stream), ByteBuddy's `TypeCache#findOrInsert` (`Callable`; its class extends the JDK's
+  `ReferenceQueue`, which might declare a method of that signature, so its callers are not
+  closed).
+- **3 are left out by the reachability gate:** the values are resolved, but no method creating
+  them is reachable from the profile roots — Spring Data's `RepositoryMethodInvoker`
+  (`Invokable` → `AbstractJpaQuery#execute`: the creator runs behind the repository proxy), the
+  actuator's `DiscoveredOperationsFactory` (`MethodIntrospector$MetadataLookup`) and
+  `SpringConfigurationPropertySources#adapt` (`Function`). Without the gate they are edges, but
+  so are spurious ones: a first version without it changed CVE-2021-23463 (H2 `JdbcSQLXML`)
+  from `NOT_REACHABLE` to `FRAMEWORK` through `JdbcTemplate#execute(ConnectionCallback)` "running"
+  `AbstractJdbcInsert`'s lambda, whose creating method nothing reachable calls (a
+  context-insensitive union: the helper's parameter got every lambda any caller passes).
+
 ## What this says about the next steps
 
 Ranked by measured payoff per effort:
 
 1. **Fix CHA's inherited implementations (`inherited-impl`, 17) — done** (section above).
-2. **SAM-call materialization (`sam-call`, 58).** DYNAMIC_LINKAGE L1's open half: follow a
-   lambda/method reference from its creation site to the functional-interface calls that
-   receive it (DATA_FLOW summaries already track values across calls).
+2. **SAM-call materialization (`sam-call`, 58) — done** (section above: 50 → 22 on a new
+   recording, 12 of the rest not lambdas).
 3. **Reflection across methods (`reflection`, 33).** REFLECTION R3 — most are framework
    internals (Spring's `ReflectionUtils`, Hibernate accessors).
 4. **Servlet API wrappers and `FilterChain` (`skipped-receiver`, ~20 of 87).** An extension

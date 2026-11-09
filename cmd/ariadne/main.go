@@ -38,6 +38,7 @@ import (
 	"ariadne/internal/report"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/runtimeevents"
+	"ariadne/internal/samcall"
 	"ariadne/internal/serviceload"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
@@ -722,6 +723,32 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("method handles: %d invoke/invokeExact call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
 		len(handleInvokeSites), len(handleEdgeTargets), handleEdgesAdded)
 
+	// DYNAMIC_LINKAGE L1 (SAM-call materialization): a lambda/method
+	// reference created in one method and run through its functional
+	// interface in another — connect the calling site to the
+	// implementation, following the value with DATA_FLOW (callers,
+	// captured values, fields, helper returns). Unresolved receivers add
+	// no edge and are counted as gaps.
+	samStart := time.Now()
+	samSites := samcall.Find(h)
+	samResolver := samcall.NewResolver(h)
+	samResults := samResolver.Resolve(samSites)
+	samResolver.Close()
+	var samGraphEdges []callgraph.SAMEdge
+	for _, e := range samcall.Edges(samResults) {
+		var creators []callgraph.MethodRef
+		for _, c := range e.Creators {
+			creators = append(creators, callgraph.MethodRef{FQCN: c.Owner, Name: c.Name, Desc: c.Desc})
+		}
+		samGraphEdges = append(samGraphEdges, callgraph.SAMEdge{CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, Kind: e.CallKind, TargetFQCN: e.TargetFQCN, TargetName: e.TargetName, TargetDesc: e.TargetDesc, Virtual: e.Virtual, Creators: creators})
+	}
+	// The edges wait for the roots (samGate.Apply, with the library
+	// models): each needs a reachable method creating the value.
+	samGate := callgraph.NewSAMGate(g, h, samGraphEdges)
+	samStats := samcall.Summarize(samResults)
+	log("SAM calls (DYNAMIC_LINKAGE L1, %s): %s; %d edge candidates, in %s", samcall.Version, samSiteSummary(samStats), len(samGraphEdges), time.Since(samStart).Round(time.Millisecond))
+
 	// REFLECTION R2: find every java.lang.reflect.Method#invoke call
 	// site, read its Method receiver back via REFLECTION R1's own
 	// KindReflectiveMethod, and connect it to every overload of the
@@ -1016,11 +1043,17 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Default: serviceModelEvaluator,
 	}
 	modelBudget := len(svcLoadSites) + 1 + servletdispatch.MaxChain + 2
+	samGate.Apply(g, roots) // DYNAMIC_LINKAGE L1, before the models see the graph
 	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
 	if err != nil {
 		return fmt.Errorf("coordinating library models: %w", err)
 	}
 	log("models: %d facts, %d edges added, %d iterations (incomplete=%t)", len(modelResult.Facts), modelResult.AddedEdges, modelResult.Iterations, modelResult.Incomplete)
+	// Model edges can make more creators reachable.
+	samApplied := samGate.Apply(g, roots)
+	samLine := samSummary(samStats, samApplied)
+	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
+		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)
 	for _, reason := range modelResult.Reasons {
 		warnings = append(warnings, "model analysis: "+reason)
 		modelGapReasons = append(modelGapReasons, reason)
@@ -1258,6 +1291,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		CHAEdges:           g.CHAEdgeCount(),
 		InitEdges:          g.InitEdgeCount(),
 		ModelEdges:         g.ModelEdgeCount(),
+		SAMEdges:           g.SAMEdgeCount(),
+		SAMLine:            samLine,
 		UnresolvedDyn:      g.UnresolvedDynamicCount(),
 		UnresolvedOwner:    g.UnresolvedOwnerCount(),
 		GapSites:           len(gapSites),

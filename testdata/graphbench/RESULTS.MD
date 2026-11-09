@@ -1,5 +1,13 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-09 after SAM-call materialization (builder `4`, DYNAMIC_LINKAGE L1,
+`internal/samcall`)**: a lambda/method reference run through its functional interface in
+another method than the one creating it gets a `sam` edge from the calling site (README "SAM
+calls"; measured on a runtime trace in [TRACE_GAPS.MD](TRACE_GAPS.MD)). The first table under
+"Real applications" is this rerun; the builder `3` table is kept below it. **No verdict changed**
+in any mode or roots scenario, against builder `3` or between RTA and CHA (the same 4 + 2
+RTA-versus-CHA changes, `verdict-changes.tsv` unchanged); see "SAM-call materialization" below.
+
 **Rerun 2026-11-09 after CHA's inherited implementations (builder `3`)**: for each concrete
 subtype that only inherits the called method, CHA also targets the body JVM method selection
 finds for it, including one in a superclass outside the call's type (found by a runtime
@@ -20,9 +28,9 @@ hand from the bytecode, not by an LLM's opinion of a shorter path.
 
 | File | Content |
 |---|---|
-| `results.tsv` | one row per app × roots scenario × mode: wall time and peak RSS (min–max of 3 measured runs), graph size, CHA edges removed / kept only by the unknown-allocation fallback, live classes, active unknown-allocation gaps, created-type catalog size and gaps, model-gap sites (all / reachable), v1 verdict counts `R/F/NR/U/NA`, registered servlets/filters and edges added by B3 models, and against the CHA run of the same scenario the edges removed/added and the findings whose verdict or path changed |
+| `results.tsv` | one row per app × roots scenario × mode: wall time and peak RSS (min–max of 3 measured runs), graph size, CHA edges removed / kept only by the unknown-allocation fallback, live classes, active unknown-allocation gaps, created-type catalog size and gaps, model-gap sites (all / reachable), v1 verdict counts `R/F/NR/U/NA`, registered servlets/filters and edges added by B3 models, SAM-call edges added and left out (`sam_edges`, `sam_edges_gated`), and against the CHA run of the same scenario the edges removed/added and the findings whose verdict or path changed |
 | `verdict-changes.tsv` | every verdict change against CHA, with the removed edges that explain it (from `-graph-compare`) |
-| `versions.txt` | analyzer commit, Go version, and per mode the graph settings and rule versions: builder `3`, skip rule (`java.`, `javax.`, `jdk.`, `sun.` receivers not expanded — the servlet dispatch model is the bounded exception), unknown-allocation policy, catalog `p1-2`, RTA `p2-1`, servlet dispatch `s1` |
+| `versions.txt` | analyzer commit, Go version, and per mode the graph settings and rule versions: builder `4`, skip rule (`java.`, `javax.`, `jdk.`, `sun.` receivers not expanded — the servlet dispatch model is the bounded exception), unknown-allocation policy, catalog `p1-2`, RTA `p2-1`, servlet dispatch `s1`, SAM-call rules `l1-1` |
 
 ## Setup
 
@@ -33,7 +41,9 @@ hand from the bytecode, not by an LLM's opinion of a shorter path.
   run that writes (CHA) or compares against (RTA) the graph — reading a several-hundred-MB
   graph file costs ~1 GB of memory, which must not be charged to the strategy. Every figure
   other than time and memory was identical across the 4 runs (the script checks).
-- `versions.txt` names a dirty commit (`a64edf7`, P4): the uncommitted changes at measurement
+- The builder `4` rerun's `versions.txt` names `651b3b5 (dirty)`: the uncommitted changes were
+  this change (SAM-call materialization, its docs and tests), measured as committed.
+- `versions.txt` of the P4 run named a dirty commit (`a64edf7`, P4): the uncommitted changes at measurement
   time were the servlet dispatch model and its wiring, docs and tests. One later change (Spring
   servlet/filter beans count only in a Spring Boot application) does not apply to either app
   — neither declares such a bean; the per-finding comparison below was run with the final
@@ -69,6 +79,29 @@ in either mode.
 
 ## Real applications
 
+| App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| petclinic | profile | cha | 10.4–11.1 | 1336–1364 | 1 009 956 | — | — | 681 of 1096 | 4 | 5 325 | 1 626 (2 530) | 6/72/12/57/6 |
+| petclinic | profile | rta | 11.0–11.1 | 1371–1437 | 973 845 | 36 111 of 322 104 (35 732) | 17 373 (5 869) | 639 of 1097 | 4 | 5 325 | 1 626 (2 530) | 6/68/16/57/6 |
+| petclinic | all | cha | 10.6–10.7 | 1339–1425 | 1 009 956 | — | — | 681 of 1096 | 4 | 5 325 | 1 626 (2 530) | 6/72/12/57/6 |
+| petclinic | all | rta | 11.1–11.2 | 1362–1457 | 1 004 063 | 5 893 of 322 104 (59 466) | 21 847 (9 651) | 679 of 1097 | 4 | 5 325 | 1 626 (2 530) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 16.2–16.3 | 1732–1814 | 1 429 412 | — | — | 745 of 1194 | 0 | 1 927 | 1 557 (2 270) | 42/52/9/61/0 |
+| WebGoat | profile | rta | 16.9–17.1 | 1759–1770 | 1 347 303 | 82 109 of 573 201 (160 476) | 25 337 (10 573) | 671 of 1201 | 0 | 1 927 | 1 557 (2 270) | 42/50/11/61/0 |
+| WebGoat | all | cha | 16.2–16.3 | 1710–1798 | 1 429 418 | — | — | 746 of 1194 | 0 | 1 932 | 1 558 (2 265) | 42/52/9/61/0 |
+| WebGoat | all | rta | 17.1–17.2 | 1704–1808 | 1 414 655 | 14 763 of 573 201 (102 750) | 32 228 (13 030) | 748 of 1201 | 0 | 1 932 | 1 558 (2 265) | 42/52/9/61/0 |
+
+Against builder `3`: +1 626 (petclinic) / +1 557–1 558 (WebGoat) `sam` edges and +171 / +77
+library-model edges (the B3 models reach more call sites through bodies now reachable at their
+real calling site), nothing removed; the same verdict counts. The analysis is **faster** than
+with builder `3` (petclinic 14.6 → 10.4–11.1 s, WebGoat 23.2–24.0 → 16.2–16.3 s) at about the
+same peak memory: the SAM step itself takes 1.9 s / 2.4 s, and the class-file parser no longer
+allocates a 32 KiB buffer per attribute, which made re-reading classes (here, in DATA_FLOW and
+in hierarchy building) allocation-bound. Before that fix and the memoization below, the first
+benchmark of this change measured WebGoat at 25.0–25.1 s and +200 MB, with the SAM step
+taking 12.5 s.
+
+<details><summary>Builder <code>3</code> (before SAM-call materialization, analyzer <code>651b3b5</code>)</summary>
+
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | petclinic | profile | cha | 14.6–14.8 | 1364–1392 | 1 008 159 | — | — | 679 of 1096 | 4 | 5 154 | 6/72/12/57/6 |
@@ -79,6 +112,8 @@ in either mode.
 | WebGoat | profile | rta | 24.5–25.5 | 1768–1772 | 1 345 079 | 82 699 of 573 201 (161 035) | 25 229 (10 669) | 668 of 1201 | 0 | 1 850 | 42/50/11/61/0 |
 | WebGoat | all | cha | 23.6–23.9 | 1762–1770 | 1 427 783 | — | — | 745 of 1194 | 0 | 1 855 | 42/52/9/61/0 |
 | WebGoat | all | rta | 24.6–24.9 | 1768–1824 | 1 413 003 | 14 780 of 573 201 (103 372) | 32 212 (13 162) | 747 of 1201 | 0 | 1 855 | 42/52/9/61/0 |
+
+</details>
 
 Against builder `2`: +11 713 (petclinic) / +16 439 (WebGoat) CHA-basis edges, a few more
 reachable gap sites and model edges (code reached through the newly targeted bodies), the same
@@ -145,6 +180,52 @@ WebGoat's analysis took 47–48 s.
   profile` moves 4 (petclinic) and 2 (WebGoat) findings from `FRAMEWORK` to
   `NOT_REACHABLE`, all carrying `MODEL_INCOMPLETE` — the same findings as before the
   service-provider dispatch model. No `REACHABLE` result changes anywhere.
+
+## SAM-call materialization (builder `4`)
+
+What changed against builder `3` (CHA, `-graph-compare` with the builder `3` graph of the same
+app and roots scenario, `651b3b5`):
+
+| App | Roots | Edges added | Findings changed | Verdicts changed |
+|---|---|---|---|---|
+| petclinic | profile / all | `sam` 1 626, `model` 171 | 2 (path only) | 0 |
+| WebGoat | profile | `sam` 1 557, `model` 77 | 1 (path only) | 0 |
+| WebGoat | all | `sam` 1 558, `model` 77 | 1 (path only) | 0 |
+
+The paths that changed, checked by hand in the bytecode — each a shorter path through a body
+the JVM runs at that site:
+
+- petclinic, CVE-2023-20860 and CVE-2026-47884 (`spring-webmvc`, still `FRAMEWORK`): the path now
+  goes `SpringApplicationRunListeners#doWithListeners` → `lambda$contextLoaded$4`. `contextLoaded`
+  creates `listener -> listener.contextLoaded(context)` and passes it to `doWithListeners`, which
+  hands it to `List#forEach` (an "escape" site: the JDK runs it). The petclinic trace measured
+  the sibling lambdas `lambda$starting$0` / `lambda$environmentPrepared$2` from the same site.
+- WebGoat, CVE-2025-41249 (still `FRAMEWORK`): `Lazy#getNullable` → `JpaQueryMethod#lambda$new$0`.
+  `JpaQueryMethod`'s constructor passes `() -> …` to `Lazy.of`, the `Lazy` constructor stores it
+  in its final field `supplier`, and `getNullable` calls `supplier.get()`.
+
+`sam_edges_gated` (2 530 / 2 265) counts candidates left out because no method creating the
+value is reachable from the roots. The resolution is context-insensitive (a helper's parameter
+gets every lambda any caller passes). A first version without that check changed one verdict on
+petclinic: CVE-2021-23463 (H2 `JdbcSQLXML#setResult`) went from `NOT_REACHABLE` to `FRAMEWORK`
+through `JdbcTemplate#execute(ConnectionCallback)` "running" `AbstractJdbcInsert`'s lambda,
+reached from `EmbeddedDatabaseConnection#isEmbedded`, which passes a lambda of its own. The
+creating method `executeInsertAndReturnKeyHolderInternal` is reachable from nothing, so no
+execution of the reachable code holds that lambda. With the check the verdict is
+`NOT_REACHABLE` again, as with builder `3`.
+
+Cost, measured while building it (each fix kept the edges identical):
+
+| Version | SAM step petclinic / WebGoat | Cause |
+|---|---|---|
+| first | 9.2 s / — | each method's class re-read and parsed per analysis |
+| + class cache, parallel prefetch, parser buffer | 2.8 s / 12.5 s | `ResolveParameter` expanding every caller chain anew (64 callers × 6 levels) |
+| + direct callers, each link memoized | 3.3 s / > 100 s | JRuby's interpreter (`Iterable#iterator` behind > 60 levels of `IRubyObject` parameters): cycle-cut outcomes recomputed per visit |
+| + per-site memo of cycle-cut outcomes, declared-type pruning, 20 000-link budget | 1.9 s / 2.4 s | — |
+
+Peak memory went up by 300 MB in the first version because `dataflow.CallerIndex` copied a whole
+`hierarchy.Method` into each of its ~600 000 caller entries. It now keeps a pointer, and the facts
+are resolved in batches of 1 024 methods, at most 4 096 kept.
 
 ## Servlet container dispatch (model `servlet-container:dispatch`, `s1`)
 

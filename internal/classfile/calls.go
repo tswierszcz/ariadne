@@ -50,6 +50,13 @@ type Call struct {
 	// JVMS reference kind) for every other Kind, or an unresolved
 	// dynamic call.
 	RefKind byte
+	// SamInterface/SamMethod are, for a resolved CallDynamic
+	// (LambdaMetafactory), the functional interface the created object
+	// implements and its abstract method's name — read from the
+	// invokedynamic NameAndType (DYNAMIC_LINKAGE L1, SAM-call
+	// materialization finds the interface calls that may run Owner#Name
+	// from them). "" for every other call.
+	SamInterface, SamMethod string
 }
 
 // InitKind says which instruction produced an InitRef — the three JVMS
@@ -208,5 +215,10 @@ func (c *ClassFile) resolveInvokeDynamic(idx uint16, pc int) (Call, bool, error)
 	if !ok {
 		return Call{}, false, nil
 	}
-	return Call{Kind: CallDynamic, Owner: impl.Owner, Name: impl.Name, Desc: impl.Desc, PC: pc, RefKind: impl.Kind}, true, nil
+	samMethod, desc, err := c.pool.nameAndType(e.nameAndTypeIndex)
+	if err != nil {
+		return Call{}, false, err
+	}
+	return Call{Kind: CallDynamic, Owner: impl.Owner, Name: impl.Name, Desc: impl.Desc, PC: pc, RefKind: impl.Kind,
+		SamInterface: samInterfaceOf(desc), SamMethod: samMethod}, true, nil
 }

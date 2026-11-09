@@ -3,6 +3,7 @@ package main
 import (
 	"ariadne/internal/deserialize"
 	"ariadne/internal/flowsum"
+	"ariadne/internal/samcall"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -59,6 +60,8 @@ func algorithmVersions(mode string) map[string]string {
 		"deserialize.chains": deserialize.ChainCatalogVersion,
 		// DATA_FLOW D3: the dependency-summary rules.
 		"flowsum.summaries": flowsum.SummaryVersion,
+		// DYNAMIC_LINKAGE L1: SAM-call materialization rules.
+		"samcall.rules": samcall.Version,
 		// DATA_FLOW D4: the taint sources, guards and rules (-taint).
 		"taint.catalog": taint.CatalogVersion,
 		// The servlet container dispatch model (signatures, registration

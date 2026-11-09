@@ -16,8 +16,11 @@
 - **Frameworks detected:** {{.FrameworksDetected}} — FRAMEWORKS F0: which profiles' own marker classes were actually found, independent of which one(s) got merged into the active Profile above (e.g. both `spring` and `jakarta` can be detected while only `spring` ends up selected by `-profile`)
 - **Max bytecode version seen:** {{.MaxBytecodeVer}}
 - **JPMS scenario:** {{if .JPMSScenario}}{{.JPMSScenario}}{{else}}classpath{{end}} (see "JPMS module descriptors")
-- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model); mode `{{.GraphConfig.Mode}}` (builder {{.GraphConfig.Builder}}; {{.GraphConfig.SkipRule}}; unknown allocations: `{{.GraphConfig.UnknownAllocationPolicy}}`; roots `{{.GraphConfig.Roots}}`{{if .GraphConfig.TargetJava}}; target Java {{.GraphConfig.TargetJava}}{{end}})
+- **Call graph:** {{.GraphNodes}} nodes, {{.GraphEdges}} edges ({{.PreCHAEdges}} direct, {{.CHAEdges}} added by CHA, {{.InitEdges}} class-init, {{.ModelEdges}} library-model, {{.SAMEdges}} SAM-call); mode `{{.GraphConfig.Mode}}` (builder {{.GraphConfig.Builder}}; {{.GraphConfig.SkipRule}}; unknown allocations: `{{.GraphConfig.UnknownAllocationPolicy}}`; roots `{{.GraphConfig.Roots}}`{{if .GraphConfig.TargetJava}}; target Java {{.GraphConfig.TargetJava}}{{end}})
 - **Unresolved `invokedynamic` sites:** {{.UnresolvedDyn}}
+{{- if .SAMLine}}
+- **SAM calls (DYNAMIC_LINKAGE L1):** {{.SAMLine}} — a lambda/method reference run through its functional interface in another method than the one creating it; an unresolved receiver adds no edge (no "every lambda of the interface" fallback)
+{{- end}}
 - **Data freshness:** {{.DataFreshness}}{{range .FreshnessLines}}; {{.}}{{end}}
 - **Model gaps:** {{.GapSites}} unresolved reflection/MethodHandle/callback/ServiceLoader sites, {{.GapsReachable}} reachable from the roots ({{.GapsUnbounded}} with no bounded candidate set) — see `MODEL_INCOMPLETE` below
 - **Calls resolved outside the analyzed input:** {{.UnresolvedOwner}} (informational — expected to be a few thousand on a real app; dominated by methods actually inherited from the JDK or another class outside `-app`/`-deps`, not evidence of a bug on its own)

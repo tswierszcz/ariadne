@@ -392,6 +392,38 @@ interface with a method inherited from an unrelated base class). Without
 it, CHA missed 17 relations a recorded petclinic run took
 ([testdata/graphbench/TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)).
 
+**SAM calls (builder version `4`, DYNAMIC_LINKAGE L1, `internal/samcall`).**
+A lambda or method reference gets an edge from the method creating it
+(the `invokedynamic` above); when it is *run* somewhere else — passed to a
+helper, returned, stored in a field and called later through its
+functional interface (`Supplier#get`, `Runnable#run`, a library callback
+such as Spring's `ReflectionUtils$MethodCallback`) — that calling site gets
+a `sam` edge to the implementation too. The value is followed with
+DATA_FLOW: the receiver of every call of a functional interface's method
+(an interface some lambda of the input implements, or a supertype of one),
+through the method's callers (the union over call sites, also through a
+supertype declaration it overrides, at most 64 callers per method), the
+values a lambda body captured from its creator, the writers of a field
+(every write in the field's class and nested classes), and the returns of
+static/private helpers — each link resolved once and memoized; a parameter
+or field whose declared type cannot hold a lambda is not followed, and a
+site needing more than 20 000 links is a gap. A value handed to a method
+outside the input (`List#forEach`, `Map#computeIfAbsent`,
+`Optional#orElseGet`) gets the same edge from the call handing it over:
+the JDK code that may run it is not in the graph. An instance-method
+reference (`obj::m`, `Type::m`) is dispatch-expanded like a virtual call,
+so an override is a target. Two rules keep it honest: a receiver the
+analysis cannot follow adds **no** edge — never "every lambda of the
+interface" — and is counted with its reason in the log and the report
+header (`SAM calls (DYNAMIC_LINKAGE L1): …`); and an edge is added only
+once some method creating the value is reachable from the roots (a fixed
+point with the library models), so a lambda whose creator never runs does
+not reach a shared helper through other callers. On a recorded petclinic
+run, functional-interface calls the graph missed fell from 50 to 22
+([testdata/graphbench/TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD));
+checked against the real JVM on `testdata/samcall`
+(`scripts/samcall-oracle.sh`).
+
 A call to a subtype's inherited (not overridden) method resolves to the
 class that actually supplies the body, not a dead-end node under the
 subclass's own name: `classfile.ExtractCalls` reports a Methodref's
@@ -1333,6 +1365,16 @@ report:
   (`CompletionStage`, listeners, reactive operators), and a lambda whose
   own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
   left unresolved rather than guessed at.
+- **Lambdas run in another method than the one creating them** get a `sam`
+  edge only where DATA_FLOW follows the value (DYNAMIC_LINKAGE L1, above):
+  not through the result of an instance call, an array element, a
+  collection, a value live across an exception handler, a field written
+  outside its class, a method overriding one declared outside the input,
+  or past the caller and work limits — those sites are counted as gaps in the
+  report header, with no edge. Resolution is context-insensitive (a
+  helper's parameter gets every lambda any reachable creator passes), and a
+  value handed to a JDK method is taken to run there even when the JDK
+  only stores it (`Map#put`).
 - **Serialization gadget chains** are only matched against a five-chain
   catalog (DESERIALIZATION Z3a: present classes, guards, JDK, site policy
   — never the data flow, never a search for new chains); otherwise not

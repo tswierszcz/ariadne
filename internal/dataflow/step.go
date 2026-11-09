@@ -105,6 +105,9 @@ func (it *interp) step(st *absState, op classfile.LocalOp) string {
 		if !ok {
 			return "stack underflow at a field-put instruction"
 		}
+		stored := entries[len(entries)-1].v
+		it.facts.writes = append(it.facts.writes, FieldWrite{Site: it.site(op.PC, bytecodeir.OpFieldPut),
+			Field: valueflow.FieldRef{Owner: op.FieldOwner, Name: op.FieldName, Desc: op.FieldDesc}, Static: op.IsStatic, Value: stored})
 		if op.IsStatic {
 			// DATA_FLOW D3: record what was actually stored, for
 			// Facts.FieldValueAt — the other half of ResolveStaticField's

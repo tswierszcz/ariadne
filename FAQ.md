@@ -451,6 +451,22 @@ normal graph edge. If the bootstrap is something else (e.g.
 `StringConcatFactory`), the program **deliberately doesn't guess** —
 it counts it as "unresolved" and reports it that way.
 
+That edge goes from the method that **creates** the lambda. When the
+lambda is run somewhere else — handed to a helper, returned, kept in a
+field and later called as `supplier.get()` — the calling method needs an
+edge too, or a path through it is lost. Since builder version `4`
+(DYNAMIC_LINKAGE L1, `internal/samcall`) every call of a functional
+interface's method asks DATA_FLOW where its receiver came from (the
+method's callers, values a lambda captured, a field's writers, a helper's
+return) and links the site to the lambdas found (`sam` edges). It never
+guesses "every lambda of `Supplier`": what it cannot follow is a counted
+gap with no edge. And it only adds an edge once a method creating that
+lambda is itself reachable — otherwise a helper called from many places
+would "run" lambdas whose creators never execute. Why bother? A recorded
+petclinic run took 50 such relations the graph did not have; now 22
+remain (most of the rest are not lambdas at all, but JDK collections
+calling `equals`/`hashCode`).
+
 Every part of this was checked by hand against `javap -c -p -v` on the
 same file compiled for Java 8 and Java 21. On real data: 29154 classes
 from petclinic and 40811 from WebGoat parsed with zero errors.

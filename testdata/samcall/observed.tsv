@@ -1,0 +1,9 @@
+# caller	bci	callee (the body that ran) — recorded on the real JVM by sc.Oracle
+sc.DirectExec#exec(Ljava/lang/Runnable;)V	1	sc.Main#lambda$caseInterfaceHelper$0()V
+sc.Holder#fire()V	4	sc.Main#target()V
+sc.Main#build(Ljava/util/function/Supplier;)Ljava/lang/Object;	1	sc.Thing#<init>()V
+sc.Main#caseReturn()V	5	sc.Main#lambda$make$0()Ljava/lang/String;
+sc.Main#each(Ljava/util/List;Ljava/util/function/Consumer;)V	2	sc.Main#lambda$caseEscape$0(Ljava/lang/String;)V
+sc.Main#lambda$caseCaptured$1(Lsc/Op;)V	2	sc.Main#lambda$caseCaptured$0(I)I
+sc.Main#run(Lsc/Op;I)I	2	sc.Main#lambda$caseParam$0(I)I
+sc.Task#go()I	6	sc.Derived#measure(Ljava/lang/String;)I
