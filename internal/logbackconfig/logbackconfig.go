@@ -32,6 +32,13 @@
 // Every other catalog appender is off: not a CHA/RTA target. Direct calls
 // are untouched; logback-access's appenders are not in the catalog.
 //
+// Since l2-2 the same configuration also decides logback's other Joran
+// components — filters, turbo filters, evaluators, connection sources,
+// rolling and triggering policies, layouts, encoders, receivers,
+// discriminators, status listeners — which CHA otherwise reaches through
+// every LifeCycle#start/#stop/#isStarted call (StatusListenerConfigHelper,
+// LifeCycleManager): see Result.decideComponents.
+//
 // The model decides nothing — every appender stays on — when the
 // configuration may come from elsewhere: no packaged file and no Spring
 // Boot (-Dlogback.configurationFile, BasicConfigurator), Boot's
@@ -52,11 +59,12 @@ import (
 
 	"ariadne/internal/appref"
 	"ariadne/internal/bootfeatures"
+	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 )
 
 // Version versions the appender catalog and the rules above.
-const Version = "l2-1"
+const Version = "l2-2"
 
 // Appenders are logback's own concrete appenders: every class of
 // logback-core and logback-classic implementing
@@ -86,6 +94,24 @@ var Appenders = []string{
 	"ch.qos.logback.core.read.ListAppender",
 	"ch.qos.logback.core.rolling.RollingFileAppender",
 }
+
+// DefaultClasses are the classes Joran creates for a nested element that
+// names none, by element name: logback-classic's default nested
+// component rules (layout, encoder, evaluator; read in the bytecode of
+// 1.2.3 and 1.5.12) and the one @DefaultClass in logback-core/classic
+// 1.1.11–1.5.12 (SiftingAppender#setDiscriminator).
+var DefaultClasses = map[string]string{
+	"layout":        "ch.qos.logback.classic.PatternLayout",
+	"encoder":       "ch.qos.logback.classic.encoder.PatternLayoutEncoder",
+	"evaluator":     "ch.qos.logback.classic.boolex.JaninoEventEvaluator",
+	"discriminator": "ch.qos.logback.classic.sift.MDCBasedDiscriminator",
+}
+
+const (
+	lifeCycle = "ch.qos.logback.core.spi.LifeCycle"
+	converter = "ch.qos.logback.core.pattern.Converter"
+	appender  = "ch.qos.logback.core.Appender"
+)
 
 const (
 	// marker: logback-classic is in the input.
@@ -125,9 +151,13 @@ type Config struct {
 	// Files are the configuration files read, as "<jar>!/<entry>"
 	// (included resources too).
 	Files []string
-	// Classes maps every appender class a file names to the first file
-	// naming it.
+	// Classes maps every class a file names in a class attribute (an
+	// appender, a filter, an evaluator, a connection source, a status
+	// listener...) to the first file naming it.
 	Classes map[string]string
+	// Bare are the element names that appear without a class attribute:
+	// Joran instantiates their default class (DefaultClasses).
+	Bare map[string]bool
 	// Unreadable explains why the configuration cannot be relied on.
 	Unreadable []string
 }
@@ -135,7 +165,7 @@ type Config struct {
 // ReadConfig reads the logback configuration files at the root of every
 // jar (the application's classes first) and the resources they include.
 func ReadConfig(jars []appref.Jar) (Config, error) {
-	c := Config{Classes: map[string]string{}}
+	c := Config{Classes: map[string]string{}, Bare: map[string]bool{}}
 	idx, err := indexJars(jars)
 	defer idx.close()
 	if err != nil {
@@ -252,10 +282,7 @@ func (c *Config) readFile(idx *index, e entry, seen map[string]bool, depth int) 
 			if cl, ok := attr("class"); ok {
 				imports[cl[strings.LastIndex(cl, ".")+1:]] = cl
 			}
-		case "appender":
-			if cl, ok := attr("class"); ok {
-				classes = append(classes, cl)
-			}
+			continue
 		case "include":
 			if res, ok := attr("resource"); ok && !strings.Contains(res, "${") {
 				inc := idx.byName[strings.TrimPrefix(res, "/")]
@@ -268,17 +295,23 @@ func (c *Config) readFile(idx *index, e entry, seen map[string]bool, depth int) 
 				continue
 			}
 			c.Unreadable = append(c.Unreadable, fmt.Sprintf("%s: an include by file, URL or placeholder", e.where()))
+			continue
+		}
+		if cl, ok := attr("class"); ok {
+			classes = append(classes, cl)
+		} else {
+			c.Bare[se.Name.Local] = true
 		}
 	}
 	for _, cl := range classes {
 		switch {
 		case strings.Contains(cl, "${"):
-			c.Unreadable = append(c.Unreadable, fmt.Sprintf("%s: appender class %q is a placeholder", e.where(), cl))
+			c.Unreadable = append(c.Unreadable, fmt.Sprintf("%s: class %q is a placeholder", e.where(), cl))
 			continue
 		case !strings.Contains(cl, "."):
 			full, ok := imports[cl]
 			if !ok {
-				c.Unreadable = append(c.Unreadable, fmt.Sprintf("%s: appender class %q not imported", e.where(), cl))
+				c.Unreadable = append(c.Unreadable, fmt.Sprintf("%s: class %q not imported", e.where(), cl))
 				continue
 			}
 			cl = full
@@ -306,7 +339,10 @@ type Result struct {
 	// default configuration.
 	Source string
 	States []State
-	off    map[string]bool
+	// Components are the decisions on Joran-only components (see
+	// Decide), sorted by class.
+	Components []State
+	off        map[string]bool
 }
 
 // NotInInput is Result.Why when logback-classic is absent.
@@ -367,7 +403,106 @@ func Decide(h *hierarchy.Hierarchy, c Config, boot bootfeatures.Config) Result {
 		}
 		r.States = append(r.States, st)
 	}
+	r.decideComponents(h, c, refs)
 	return r
+}
+
+// decideComponents applies the component rule (l2-2): a Joran-only
+// component is a concrete class of logback (ch.qos.logback.*)
+// implementing LifeCycle, neither an appender (the catalog above decides
+// those) nor a pattern converter (PatternLayout and FileNamePattern
+// create converters reflectively from their own maps, whatever the
+// configuration says), that no code in the input creates with `new` —
+// only reflection (Joran, from the configuration) creates it. It is on
+// when a class attribute names it, when it is the default class of an
+// element present without one, when application code references it, or
+// when Joran could create it implicitly from a setter's parameter type
+// (a one-argument set*/add* method declared for that concrete type);
+// otherwise it is not a CHA/RTA target. What decides an evaluator
+// (CVE-2024-12798's JaninoEventEvaluator) or a connection source
+// (CVE-2021-42550) is then the configuration, not CHA over
+// LifeCycle#start/#stop.
+func (r *Result) decideComponents(h *hierarchy.Hierarchy, c Config, refs appref.References) {
+	set := func(classes []string) map[string]bool {
+		m := map[string]bool{}
+		for _, x := range classes {
+			m[x] = true
+		}
+		return m
+	}
+	lifecycles := set(h.Subtypes(lifeCycle))
+	converters := set(h.Subtypes(converter))
+	appenders := set(h.Subtypes(appender))
+	created := map[string]bool{}
+	setterTypes := map[string]bool{}
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		for _, m := range ci.Methods {
+			for _, ref := range m.InitRefs {
+				if ref.Kind == classfile.InitNew {
+					created[ref.Owner] = true
+				}
+			}
+			if (strings.HasPrefix(m.Name, "set") || strings.HasPrefix(m.Name, "add")) && strings.HasPrefix(m.Descriptor, "(L") && strings.HasSuffix(m.Descriptor, ";)V") {
+				param := strings.TrimSuffix(strings.TrimPrefix(m.Descriptor, "(L"), ";)V")
+				if !strings.Contains(param, ";") {
+					setterTypes[strings.ReplaceAll(param, "/", ".")] = true
+				}
+			}
+		}
+	}
+	defaults := map[string]string{}
+	for elem, cl := range DefaultClasses {
+		if c.Bare[elem] {
+			defaults[cl] = "default class of <" + elem + ">"
+		}
+	}
+	for _, fqcn := range h.SortedFQCNs() {
+		if !strings.HasPrefix(fqcn, "ch.qos.logback.") || !lifecycles[fqcn] || converters[fqcn] || appenders[fqcn] || created[fqcn] {
+			continue
+		}
+		ci, _ := h.Lookup(fqcn)
+		if ci.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) != 0 {
+			continue
+		}
+		st := State{Class: fqcn}
+		if file, ok := c.Classes[fqcn]; ok {
+			st.On, st.Why = true, "configured in "+file
+		} else if why, ok := defaults[fqcn]; ok {
+			st.On, st.Why = true, why
+		} else if by, ok := refs.Owner(fqcn); ok {
+			st.On, st.Why = true, "referenced by "+by
+		} else if setterTypes[fqcn] {
+			st.On, st.Why = true, "a setter's parameter type (Joran may create it implicitly)"
+		} else {
+			st.Why = "created only by reflection, not configured"
+			r.off[fqcn] = true
+		}
+		r.Components = append(r.Components, st)
+	}
+}
+
+// ComponentsOff lists the Joran-only components left out, by simple
+// name, sorted by class.
+func (r Result) ComponentsOff() []string {
+	var out []string
+	for _, st := range r.Components {
+		if !st.On {
+			out = append(out, st.Class[strings.LastIndex(st.Class, ".")+1:])
+		}
+	}
+	return out
+}
+
+// ComponentsOn counts the Joran-only components left on.
+func (r Result) ComponentsOn() int {
+	n := 0
+	for _, st := range r.Components {
+		if st.On {
+			n++
+		}
+	}
+	return n
 }
 
 // Excluded reports whether class is an appender the configuration leaves

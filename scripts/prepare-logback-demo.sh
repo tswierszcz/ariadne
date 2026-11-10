@@ -2,7 +2,7 @@
 # Control app for the logback appender model (FRAMEWORKS:F2 l2,
 # internal/logbackconfig): a minimal Spring Boot 2.4.5 application
 # (logback 1.2.3, the version petclinic and WebGoat ship) that logs at INFO
-# and prints the appenders logback actually attached, packaged three times
+# and prints the appenders logback actually attached, packaged four times
 # with different configuration and identical classes:
 #   - app-default.jar: no logback file, no logging.file.* — Spring Boot's
 #     default configuration (ConsoleAppender only);
@@ -10,15 +10,21 @@
 #     adds its RollingFileAppender;
 #   - app-smtp.jar: logback-spring.xml with Boot's console appender and a
 #     SMTPAppender whose JaninoEventEvaluator (CVE-2024-12798) runs on
-#     every event (it never sends: the expression is false for INFO).
+#     every event (it never sends: the expression is false for INFO);
+#   - app-filter.jar: logback-spring.xml with Boot's console appender and an
+#     EvaluatorFilter whose <evaluator> names no class — Joran's default,
+#     JaninoEventEvaluator (l2-2's default-class rule).
+# The XML variants set debug="true", so logback lists every component Joran
+# instantiates ("of type [...]"): the JVM's own account of which
+# filters/evaluators exist, without application code referencing them.
 #
 # The script runs each on the real JVM (the app lists the root logger's
 # appenders), then runs bin/ariadne (-profile spring -roots all; OSV
 # through the cache) and prints the model's decision and the verdicts of
 # the three logback advisories whose CHA paths went through unconfigured
-# appenders on petclinic/WebGoat.
+# appenders or LifeCycle calls on petclinic/WebGoat.
 #
-# Produces under work/logback-demo/: app-{default,file,smtp}.jar,
+# Produces under work/logback-demo/: app-{default,file,smtp,filter}.jar,
 # target/dependency/*.jar, deps.txt.
 #
 # Usage: scripts/prepare-logback-demo.sh [JAVA_HOME]   (any JDK 8+; default: java on PATH)
@@ -31,7 +37,7 @@ fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$root/work/logback-demo"
 rm -rf "$work"
-mkdir -p "$work/src/main/java/demo" "$work/variants/default" "$work/variants/file" "$work/variants/smtp"
+mkdir -p "$work/src/main/java/demo" "$work/variants/default" "$work/variants/file" "$work/variants/smtp" "$work/variants/filter"
 cd "$work"
 
 # source/target rather than <release>: a JDK without ct.sym rejects --release.
@@ -120,7 +126,7 @@ logging.file.name=target/demo.log
 EOF
 : > variants/smtp/application.properties
 cat > variants/smtp/logback-spring.xml <<'EOF'
-<configuration>
+<configuration debug="true">
   <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
   <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
   <appender name="MAIL" class="ch.qos.logback.classic.net.SMTPAppender">
@@ -138,6 +144,28 @@ cat > variants/smtp/logback-spring.xml <<'EOF'
 </configuration>
 EOF
 
+: > variants/filter/application.properties
+cat > variants/filter/logback-spring.xml <<'EOF'
+<configuration debug="true">
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+      <evaluator>
+        <expression>return message.contains("secret");</expression>
+      </evaluator>
+      <OnMatch>DENY</OnMatch>
+      <OnMismatch>NEUTRAL</OnMismatch>
+    </filter>
+    <encoder>
+      <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>
+EOF
+
 java -version
 mvn -q -B package -DskipTests
 mvn -q -B dependency:copy-dependencies -DoutputDirectory=target/dependency -DincludeScope=runtime
@@ -145,7 +173,7 @@ mvn -q -B dependency:list -DoutputFile=deps.txt -DincludeScope=runtime
 
 # One jar per variant: the same classes plus that variant's resources
 # (zipped with Python, so a JDK without the jar tool is enough).
-for v in default file smtp; do
+for v in default file smtp filter; do
     python3 -I - "target/classes" "variants/$v" "app-$v.jar" <<'PY'
 import os, sys, zipfile
 classes, res, out = sys.argv[1:]
@@ -160,19 +188,20 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
 PY
 done
 
-for v in default file smtp; do
+for v in default file smtp filter; do
     echo "== real JVM, $v"
-    java -cp "app-$v.jar:target/dependency/*" demo.DemoApplication 2>&1 | grep -E "root appenders"
+    java -cp "app-$v.jar:target/dependency/*" demo.DemoApplication 2>&1 |
+        grep -E "root appenders|of type \[|Assuming default type" | sed -E 's/.*(of type \[[^]]*\]|Assuming default type \[[^]]*\] for \[[^]]*\]).*/  Joran: \1/' | sort -u
 done
 
 echo "== ariadne"
 cd "$root"
 go build -o bin/ariadne ./cmd/ariadne
-for v in default file smtp; do
+for v in default file smtp filter; do
     out="$work/ariadne-$v"
     bin/ariadne -cache-dir "$root/.cache" -app "$work/app-$v.jar" -deps "$work/target/dependency" \
         -deps-list "$work/deps.txt" -profile spring -roots all -out "$out.md" -json "$out.json" 2>&1 |
-        grep -E "logback appenders" || true
+        grep -E "logback appenders|logback Joran-only" | sed -E 's/; off .*//; s/ off \(.*/ off/' || true
     python3 -I - "$out.json" "$v" <<'PY'
 import json, sys
 for r in json.load(open(sys.argv[1])):
