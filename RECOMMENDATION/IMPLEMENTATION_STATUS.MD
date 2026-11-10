@@ -61,9 +61,13 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   spoza wejścia (`WEB-INF/*.xml` w WAR) niewykryte; interceptor
   `SqlSessionTemplate` odcięty, gdy szablon tworzy tylko refleksja
   Springa; CHA za `JdkDynamicAopProxy#invoke` rozwija cały łańcuch AOP.
-- **Następny krok (wymaga zgody):** model łańcucha interceptorów Spring
-  AOP (tylko skonfigurowane `Advisor`y) albo `ROADMAP:B3` (koordynator w
-  CLI).
+- **Łańcuch interceptorów Spring AOP — zmierzony, NOT STARTED
+  (2026-11-10):** górna granica — usunięcie wszystkich krawędzi CHA z
+  `ReflectiveMethodInvocation#proceed`/`JdkDynamicAopProxy#invoke`/
+  `CglibAopProxy` (petclinic 274, WebGoat 281, JPetStore 244) nie odbiera
+  ostatniej ścieżki żadnemu dodatniemu ustaleniu na trzech aplikacjach;
+  reguła stopu, nic nie zbudowano (`TRACE_GAPS.MD`).
+- **Następny krok (wymaga zgody):** `ROADMAP:B3` (koordynator w CLI).
 
 ### FRAMEWORKS:F2 — komponenty Joran logback spoza konfiguracji (`l2-2`) i builder `6` — DONE for this scope (2026-11-10)
 

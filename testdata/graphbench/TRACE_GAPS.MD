@@ -262,6 +262,20 @@ graph edges (relations not in the graph 148 → 127); on JPetStore 6 of 8 (the 2
 `SqlSessionTemplate` → `SqlSessionInterceptor`: Spring creates the template only reflectively, so
 the gate keeps its interceptor out). README, "Framework proxies".
 
+**Spring AOP's interceptor chain (measured 2026-11-10, not built).** Behind
+`JdkDynamicAopProxy#invoke` CHA expands `MethodInterceptor#invoke` and `TargetSource#getTarget` to
+every implementation (petclinic: 60 interceptors, 25 of them never created with `new` anywhere in
+the input — `EventPublicationInterceptor`, the remoting/EJB/JMX interceptors —, and 17 target
+sources). Before building a model that keeps only configured interceptors, an upper bound: in the
+`-roots all` CHA graphs, **every** CHA edge out of `ReflectiveMethodInvocation#proceed`,
+`JdkDynamicAopProxy#invoke` and `CglibAopProxy` removed (petclinic 274, WebGoat 281, JPetStore 244 —
+real ones included, more than any model would remove), then each positive finding's mapped
+methods searched from the application roots: **no finding loses its last path** on any of the
+three. The over-approximation only shortens paths (the 63/23 changed paths above); the stop rule
+applies, nothing built. A model would also need further gates: `LazyInitTargetSource`, on the
+observed path, is created with `new` by `MBeanExporter` and `LazyInitTargetSourceCreator`, which
+CHA reaches too.
+
 ## A second application: JPetStore 6.0.2 (WAR)
 
 2026-11-09: the same measurement on MyBatis JPetStore 6.0.2 (`scripts/prepare-jpetstore.sh`), a
