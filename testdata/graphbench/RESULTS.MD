@@ -1,5 +1,12 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-10 after seven manual sink mappings (HSQLDB CVE-2022-41853, six log4j 1.2
+advisories)**: the first table under "Real applications" is this run. Graphs unchanged; verdicts
+change only where those components are present — JPetStore 7 `UNKNOWN` resolved (3 CHA false
+positives through log4j's appender dispatch, which RTA removes), WebGoat CVE-2022-41853 `UNKNOWN`
+→ `REACHABLE` (a true positive: a SQL injection lesson runs request SQL on HSQLDB 2.5.1). See
+"JPetStore", "HSQLDB and log4j 1.2 mapped".
+
 **Rerun 2026-11-09 with a third application, JPetStore 6.0.2 (`scripts/prepare-jpetstore.sh`)**: a
 WAR (`-app` is the WAR itself, so `web.xml` is read) with Stripes, Spring 4.3 XML configuration,
 MyBatis and HSQLDB. The first table under "Real applications" is this run (petclinic and WebGoat
@@ -126,18 +133,18 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| petclinic | profile | cha | 13.5–14.5 | 1319–1493 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
-| petclinic | profile | rta | 12.6–13.7 | 1318–1349 | 991 057 | 36 111 of 322 104 (35 727) | 17 385 (5 845) | 639 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/68/16/57/6 |
-| petclinic | all | cha | 12.2–12.4 | 1391–1400 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
-| petclinic | all | rta | 13.1–13.3 | 1341–1384 | 1 021 275 | 5 893 of 322 104 (59 461) | 21 852 (9 620) | 679 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
-| WebGoat | profile | cha | 18.9–19.2 | 1710–1784 | 1 434 527 | — | — | 742 of 1194 | 0 | 2 219 | 1 557 (2 269) | 53/37/13/61/0 |
-| WebGoat | profile | rta | 18.9–20.0 | 1698–1811 | 1 350 616 | 83 911 of 570 065 (162 221) | 25 180 (10 659) | 667 of 1201 | 0 | 2 219 | 1 557 (2 269) | 52/35/16/61/0 |
-| WebGoat | all | cha | 18.9–19.4 | 1614–1754 | 1 434 532 | — | — | 743 of 1194 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
-| WebGoat | all | rta | 20.1–20.4 | 1713–1811 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 53/37/13/61/0 |
-| JPetStore | profile | cha | 3.5–3.6 | 289–319 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 0/9/7/19/0 |
-| JPetStore | profile | rta | 3.6–3.6 | 299–317 | 212 542 | 13 164 of 59 637 (16 326) | 3 221 (1 256) | 150 of 365 | 1 | 98 | 0 (0) | 0/8/8/19/0 |
-| JPetStore | all | cha | 3.1–3.2 | 297–305 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 0/9/7/19/0 |
-| JPetStore | all | rta | 3.2–3.2 | 289–319 | 212 721 | 12 985 of 59 637 (16 501) | 3 244 (1 273) | 150 of 365 | 1 | 98 | 0 (0) | 0/8/8/19/0 |
+| petclinic | profile | cha | 13.9–14.4 | 1365–1384 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | profile | rta | 13.0–14.7 | 1349–1441 | 991 057 | 36 111 of 322 104 (35 727) | 17 385 (5 845) | 639 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/68/16/57/6 |
+| petclinic | all | cha | 11.9–12.4 | 1359–1496 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | all | rta | 12.6–13.0 | 1369–1386 | 1 021 275 | 5 893 of 322 104 (59 461) | 21 852 (9 620) | 679 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 19.1–19.2 | 1639–1713 | 1 434 527 | — | — | 742 of 1194 | 0 | 2 219 | 1 557 (2 269) | 54/37/13/60/0 |
+| WebGoat | profile | rta | 19.6–19.9 | 1711–1803 | 1 350 616 | 83 911 of 570 065 (162 221) | 25 180 (10 659) | 667 of 1201 | 0 | 2 219 | 1 557 (2 269) | 53/35/16/60/0 |
+| WebGoat | all | cha | 19.1–19.2 | 1715–1807 | 1 434 532 | — | — | 743 of 1194 | 0 | 2 225 | 1 558 (2 264) | 54/37/13/60/0 |
+| WebGoat | all | rta | 19.9–20.2 | 1710–1714 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 54/37/13/60/0 |
+| JPetStore | profile | cha | 3.4–3.5 | 297–327 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 3/9/11/12/0 |
+| JPetStore | profile | rta | 3.4–3.5 | 299–305 | 212 542 | 13 164 of 59 637 (16 326) | 3 221 (1 256) | 150 of 365 | 1 | 98 | 0 (0) | 0/9/14/12/0 |
+| JPetStore | all | cha | 3.4–3.5 | 291–325 | 225 706 | — | — | 168 of 364 | 1 | 98 | 0 (0) | 3/9/11/12/0 |
+| JPetStore | all | rta | 3.4–3.5 | 287–299 | 212 721 | 12 985 of 59 637 (16 501) | 3 244 (1 273) | 150 of 365 | 1 | 98 | 0 (0) | 0/9/14/12/0 |
 
 <details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
 
@@ -543,6 +550,38 @@ Spring's bootstrap):
 |---|---|---|---|---|
 | profile | CVE-2024-38820 | `invokeInitMethods` → CHA to `ContentNegotiationManagerFactoryBean#afterPropertiesSet` → `MappingMediaTypeFileExtensionResolver` | JPetStore configures no Spring MVC; nothing reachable creates that factory bean; the trace shows the mapped method traced and not entered | **correct** |
 | all | CVE-2026-41851 | Stripes `Log#error` → `Log4JLogger#error` → log4j `AppenderAttachableImpl` → CHA to every `Appender` → … → SpEL | The CHA path is an artifact (no appender of JPetStore's log4j configuration evaluates SpEL); RTA removes it at `Log4JLogger`, which commons-logging's `LogFactoryImpl` creates reflectively (the trace has that `Constructor#newInstance` relation) — RTA drops a body the JVM runs. `SpelParserConfiguration#<init>` does run, from Spring's bootstrap, which `-roots all` does not root | artifact removed; **false negative** of the `-roots all` scenario (as above), not of RTA's narrowing |
+
+**HSQLDB and log4j 1.2 mapped (2026-11-10).** 7 of JPetStore's unmapped advisories now have
+manual sink mappings ([audit](../cve-control/MANUAL_MAPPING_AUDIT.MD), "HSQLDB and log4j 1.2
+sinks"): 25 of 35 mapped. All 7 were `UNKNOWN` (no mapping); now, the same in both root
+scenarios:
+
+| Advisory | Mapped (sink) | CHA | RTA | Check (trace: every mapped method traced on entry, **none entered**) |
+|---|---|---|---|---|
+| CVE-2022-41853 (HSQLDB) | `Routine#getMethods`, `#invokeJavaMethod` | REACHABLE | FRAMEWORK | CHA: Stripes `Log#trace` → log4j → CHA to every `Appender` → `JDBCAppender#execute` → `JDBCStatement#executeUpdate` → … → `StatementSchema#getResult` → `Routine#resolveReferences` → `getMethods` — an artifact (JPetStore configures only a `ConsoleAppender`). RTA: `ContextLoaderListener#contextDestroyed` → Spring `EmbeddedDatabaseFactory#shutdownDatabase` → `Statement#execute` → HSQLDB's statement execution → `getMethods`. That path exists for *some* SQL text (a statement creating a Java routine); the graph does not model the text (here `SHUTDOWN`), so `FRAMEWORK` is "may run", not proof — the exploit condition (attacker-controlled SQL) is outside the analysis either way |
+| CVE-2021-4104 | `JMSAppender#activateOptions`, `#lookup` | REACHABLE | NOT_REACHABLE | CHA: log4j's `PropertySetter#activate` → CHA to every `OptionHandler#activateOptions` — artifact; nothing reachable creates a `JMSAppender` (log4j creates appenders reflectively from its configuration file, which names only `ConsoleAppender`): RTA correct |
+| CVE-2022-23305 | `JDBCAppender#getLogStatement`, `#flushBuffer`, `#execute` | REACHABLE | NOT_REACHABLE | the same `Appender#doAppend` artifact as above; RTA correct |
+| CVE-2019-17571, CVE-2022-23302, CVE-2022-23307, CVE-2023-26464 | `SocketNode#run`, `JMSSink`, Chainsaw `Slurper#run` | NOT_REACHABLE | NOT_REACHABLE | receivers the application never starts; correct (`MODEL_INCOMPLETE` kept: reflection gaps) |
+
+Verdicts: CHA 0/9/7/19/0 → **3/9/11/12/0**, RTA 0/8/8/19/0 → **0/9/14/12/0**. The 3 CHA
+`REACHABLE` are false positives through log4j's appender dispatch, the case RTA already removed
+for CVE-2026-41851; RTA gets all 7 right except that HSQLDB's `FRAMEWORK` is SQL-text-insensitive.
+
+**What this says about `j1`:** nothing new. The `Statement` edge on both HSQLDB paths exists
+without `j1` — `service-provider:dispatch` (`p1`) expands `java.sql` *product* interfaces of the
+`java.sql.Driver` HSQLDB registers in `META-INF/services` to HSQLDB's own implementations. The
+analyzer before `j1` (`95d7c85^`) with the new table (`-vuln-methods`) gives the same verdicts and
+paths for all 7 in `-roots profile`; in `-roots all` it differs only by the web.xml roots fixed
+since (the RTA path starts at a web.xml listener). An application whose driver is not registered
+as a service, or whose statements come from a pool, is where `j1` matters; JPetStore is neither.
+
+**WebGoat (HSQLDB 2.5.1) changes too:** CVE-2022-41853 `UNKNOWN` → `REACHABLE` in all four
+configurations (CHA 53/37/13/61/0 → 54/37/13/60/0; RTA one `UNKNOWN` → `REACHABLE` likewise). A
+true positive with its exploit condition met: `SqlInjectionLesson4#completed(@RequestParam String
+query)` runs the request parameter with `Statement#executeUpdate`, so attacker SQL can create and
+call a Java routine. The reported (shortest) path starts at `LessonConnectionInvocationHandler#invoke`;
+the analyzer before `j1` gives the same verdict (the `Statement` edge again from `p1`). petclinic
+(H2, logback) unchanged.
 
 ## Every verdict change, checked by hand
 

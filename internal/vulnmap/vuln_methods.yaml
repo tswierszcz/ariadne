@@ -90,6 +90,108 @@ CVE-2022-42889: # Text4Shell
         - org.apache.commons.text.StringSubstitutor#replace([C)Ljava/lang/String;
         - org.apache.commons.text.StringSubstitutor#replace([CII)Ljava/lang/String;
 
+CVE-2022-41853: # HSQLDB: SQL can call any public static Java method (RCE)
+  # OSV: org.hsqldb:hsqldb (,2.7.1). No git fix commit (the project is in
+  # SVN); checked in the bytecode of 2.0.0, 2.2.9, 2.3.4, 2.5.0, 2.6.1,
+  # 2.7.0 and 2.7.1. Every Java routine — CREATE FUNCTION ... EXTERNAL NAME
+  # 'CLASSPATH:a.B.m' and a direct CALL "a.B.m"(...) — resolves its class
+  # by name in Routine#getMethods (Class.forName + getMethods, public
+  # static only) and runs it in Routine#invokeJavaMethod (Method.invoke).
+  # 2.7.x gates getMethods on HsqlDatabaseProperties#supportsJavaMethod
+  # (property hsqldb.method_class_names); Routine is byte-identical in
+  # 2.7.0 and 2.7.1, the fix changed only that gate's properties. Reaching
+  # these methods means the database can run Java routines, not that an
+  # attacker controls the SQL: that is the exploitability condition.
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.hsqldb:hsqldb
+      versions: "[2.0.0,2.7.1)"
+      methods:
+        - org.hsqldb.Routine#getMethods
+        - org.hsqldb.Routine#invokeJavaMethod
+
+# log4j 1.2 (EOL, no fixed release). OSV: log4j:log4j up to and including
+# 1.2.17. Every method below checked in the bytecode of 1.2.8, 1.2.9,
+# 1.2.12, 1.2.14, 1.2.15, 1.2.16 and 1.2.17, with the dangerous call named
+# per entry. None of these classes is used by log4j's default
+# configuration: an application reaches them only by configuring the
+# appender or starting the receiver.
+CVE-2019-17571: # SocketServer: deserialization of a received LoggingEvent
+  # SocketNode (created per connection by SocketServer/SimpleSocketServer)
+  # reads each event with ObjectInputStream#readObject in run().
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: log4j:log4j
+      versions: "[1.2.8,1.2.17]"
+      methods:
+        - org.apache.log4j.net.SocketNode#run
+CVE-2021-4104: # JMSAppender: JNDI lookup of configured names
+  # activateOptions() looks up TopicConnectionFactoryBindingName and
+  # TopicBindingName through lookup(Context, String) -> Context#lookup.
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: log4j:log4j
+      versions: "[1.2.8,1.2.17]"
+      methods:
+        - org.apache.log4j.net.JMSAppender#activateOptions
+        - org.apache.log4j.net.JMSAppender#lookup
+CVE-2022-23302: # JMSSink: JNDI lookup and ObjectMessage deserialization
+  # The constructor looks up the connection factory and topic
+  # (Context#lookup); onMessage deserializes with ObjectMessage#getObject.
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: log4j:log4j
+      versions: "[1.2.8,1.2.17]"
+      methods:
+        - org.apache.log4j.net.JMSSink#<init>
+        - org.apache.log4j.net.JMSSink#onMessage
+CVE-2022-23305: # JDBCAppender: SQL built from the formatted log message
+  # getLogStatement formats the configured SQL with a PatternLayout (the
+  # message is not escaped); flushBuffer passes it to execute, which runs
+  # Statement#executeUpdate.
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: log4j:log4j
+      versions: "[1.2.8,1.2.17]"
+      methods:
+        - org.apache.log4j.jdbc.JDBCAppender#getLogStatement
+        - org.apache.log4j.jdbc.JDBCAppender#flushBuffer
+        - org.apache.log4j.jdbc.JDBCAppender#execute
+CVE-2022-23307: # Chainsaw: deserialization of received events
+  # LoggingReceiver's per-connection Slurper reads events with
+  # ObjectInputStream#readObject in run().
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: log4j:log4j
+      versions: "[1.2.8,1.2.17]"
+      methods:
+        - org.apache.log4j.chainsaw.LoggingReceiver$Slurper#run
+CVE-2023-26464: # DoS through a deeply nested Hashtable on the same streams
+  # The two socket receivers above (SocketServer, Chainsaw). OSV also lists
+  # org.apache.logging.log4j:log4j-core [1.0.4,2.0), which has no release
+  # with these classes; such an instance gets no variant.
+  role: sink
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: log4j:log4j
+      versions: "[1.2.8,1.2.17]"
+      methods:
+        - org.apache.log4j.net.SocketNode#run
+        - org.apache.log4j.chainsaw.LoggingReceiver$Slurper#run
+
 # XStream (WebGoat's control case). An unconfigured XStream's
 # fromXML/fromXML-family entry points are the shared attack surface for
 # essentially every one of these — each CVE is a different gadget chain
