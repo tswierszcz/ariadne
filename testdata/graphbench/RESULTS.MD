@@ -1,5 +1,11 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-10 with the logback appender model (`l2`, `internal/logbackconfig`) and builder
+`5`**: the first table under "Real applications" is this run. Edges: petclinic −288 (CHA), WebGoat
+−755, JPetStore −7; **no verdict changed** in any app or mode (`verdict-changes.tsv` unchanged). The
+logback paths through unconfigured appenders are gone, but two logback advisories stay `FRAMEWORK`
+through CHA over logback's `LifeCycle` calls — see "logback appender model".
+
 **Rerun 2026-11-10 with the log4j 1.2 appender model (`l1`, `internal/log4jconfig`)**: the first
 table under "Real applications" is this run. JPetStore CHA 225 706 → 225 536 edges, verdicts
 3/9/11/12/0 → 0/10/13/12/0 (the three false positives through log4j's appender dispatch are gone);
@@ -140,18 +146,18 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| petclinic | profile | cha | 13.7–14.1 | 1350–1432 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
-| petclinic | profile | rta | 12.8–14.7 | 1343–1374 | 991 057 | 36 111 of 322 104 (35 727) | 17 385 (5 845) | 639 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/68/16/57/6 |
-| petclinic | all | cha | 12.1–12.2 | 1333–1367 | 1 027 168 | — | — | 681 of 1096 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
-| petclinic | all | rta | 12.7–12.9 | 1345–1355 | 1 021 275 | 5 893 of 322 104 (59 461) | 21 852 (9 620) | 679 of 1097 | 5 | 4 108 | 1 629 (2 524) | 6/72/12/57/6 |
-| WebGoat | profile | cha | 18.4–18.8 | 1703–1803 | 1 434 527 | — | — | 742 of 1194 | 0 | 2 219 | 1 557 (2 269) | 54/37/13/60/0 |
-| WebGoat | profile | rta | 19.3–19.5 | 1652–1819 | 1 350 616 | 83 911 of 570 065 (162 221) | 25 180 (10 659) | 667 of 1201 | 0 | 2 219 | 1 557 (2 269) | 53/35/16/60/0 |
-| WebGoat | all | cha | 18.0–18.6 | 1628–1753 | 1 434 532 | — | — | 743 of 1194 | 0 | 2 225 | 1 558 (2 264) | 54/37/13/60/0 |
-| WebGoat | all | rta | 19.5–19.8 | 1727–1908 | 1 419 769 | 14 763 of 570 065 (104 410) | 32 224 (13 214) | 745 of 1201 | 0 | 2 225 | 1 558 (2 264) | 54/37/13/60/0 |
-| JPetStore | profile | cha | 3.4–3.4 | 315–327 | 225 536 | — | — | 157 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
-| JPetStore | profile | rta | 3.4–3.5 | 310–313 | 212 436 | 13 100 of 59 467 (16 224) | 3 205 (1 263) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
-| JPetStore | all | cha | 3.4–3.4 | 313–327 | 225 536 | — | — | 157 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
-| JPetStore | all | rta | 3.5–3.5 | 296–303 | 212 615 | 12 921 of 59 467 (16 399) | 3 228 (1 280) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
+| petclinic | profile | cha | 13.2–14.1 | 1345–1501 | 1 026 880 | — | — | 679 of 1096 | 5 | 4 031 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | profile | rta | 12.4–12.8 | 1335–1351 | 990 892 | 35 988 of 321 823 (35 674) | 17 379 (5 847) | 639 of 1097 | 5 | 4 031 | 1 629 (2 524) | 6/68/16/57/6 |
+| petclinic | all | cha | 12.0–12.2 | 1317–1492 | 1 026 880 | — | — | 679 of 1096 | 5 | 4 031 | 1 629 (2 524) | 6/72/12/57/6 |
+| petclinic | all | rta | 12.7–12.8 | 1355–1398 | 1 020 982 | 5 898 of 321 823 (59 362) | 21 843 (9 650) | 677 of 1097 | 5 | 4 031 | 1 629 (2 524) | 6/72/12/57/6 |
+| WebGoat | profile | cha | 18.5–18.9 | 1677–1886 | 1 433 772 | — | — | 740 of 1194 | 0 | 2 187 | 1 557 (2 269) | 54/37/13/60/0 |
+| WebGoat | profile | rta | 19.2–19.6 | 1644–1719 | 1 350 454 | 83 318 of 569 312 (162 166) | 25 173 (10 661) | 667 of 1201 | 0 | 2 187 | 1 557 (2 269) | 53/35/16/60/0 |
+| WebGoat | all | cha | 21.8–23.8 | 1635–1712 | 1 433 777 | — | — | 741 of 1194 | 0 | 2 193 | 1 558 (2 264) | 54/37/13/60/0 |
+| WebGoat | all | rta | 19.7–20.4 | 1712–1882 | 1 419 009 | 14 768 of 569 312 (103 839) | 32 215 (13 244) | 743 of 1201 | 0 | 2 193 | 1 558 (2 264) | 54/37/13/60/0 |
+| JPetStore | profile | cha | 3.4–3.5 | 297–321 | 225 529 | — | — | 157 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
+| JPetStore | profile | rta | 3.5–3.6 | 291–300 | 212 429 | 13 100 of 59 460 (16 217) | 3 205 (1 263) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
+| JPetStore | all | cha | 3.4–3.4 | 296–310 | 225 529 | — | — | 157 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
+| JPetStore | all | rta | 3.4–3.5 | 305–319 | 212 608 | 12 921 of 59 460 (16 392) | 3 228 (1 280) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
 
 <details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
 
@@ -602,6 +608,34 @@ already). Control app `scripts/prepare-log4j1-demo.sh` (same classes, console-on
 `JDBCAppender` configuration, run on the JVM): CVE-2022-23305 `NOT_REACHABLE`/`REACHABLE`,
 CVE-2021-4104 `NOT_REACHABLE` in both — matching the JVM; before the model all four were
 `REACHABLE`.
+
+**logback appender model (`l2`, builder `5`, 2026-11-10).** petclinic and WebGoat have no logback
+file, so Spring Boot's default configuration decides: `ConsoleAppender` on, the other 15 appenders
+in the input off (`internal/logbackconfig`). `-graph-compare` with `main`:
+
+| App | CHA edges | RTA edges | Findings changed |
+|---|---|---|---|
+| petclinic | −288 (both roots) | −165 profile, −293 all | CVE-2023-6378 (logback-core instance) `FRAMEWORK` → `NOT_REACHABLE` (CHA, and RTA `all`) |
+| WebGoat | −755 (both roots) | −162 profile, −760 all | the same |
+| JPetStore | −7 (builder `5` over `l1`'s exclusions) | −7 | none |
+
+No advisory verdict changes. The three appender paths checked by hand (all artifacts: Boot's
+defaults configure no `DBAppender`, `SMTPAppender` or file appender) are gone, but:
+- CVE-2023-6378 stays `REACHABLE` through its logback-classic instance (`LoggingEventVO#readObject`
+  from a real deserialization entry — ehcache's `FileBasedStateRepository` on petclinic, the
+  vulnerable-components lesson on WebGoat);
+- CVE-2021-42550 and CVE-2024-12798 stay `FRAMEWORK` through **another** CHA over-approximation:
+  logback's `LifeCycle#start`/`#stop`/`#isStarted` calls (`StatusListenerConfigHelper#initAndAddListener`
+  → every `LifeCycle` → `JaninoEventEvaluatorBase#start`; `ContextJNDISelector` →
+  `LifeCycleManager#reset` → `ConnectionSourceBase#isStarted`). Those components are created by
+  Joran from the configuration too; the model covers appenders only.
+
+Control app `scripts/prepare-logback-demo.sh` (Spring Boot 2.4.5, logback 1.2.3; the same classes
+with Boot's defaults, with `logging.file.name`, and with a `logback-spring.xml` adding a
+`SMTPAppender` with a Janino evaluator): the model's appenders equal the root logger's appenders
+the JVM prints in all three. CVE-2024-12798's path goes through `SMTPAppender#append` →
+`JaninoEventEvaluatorBase#evaluate` only in the SMTP variant; in the other two it is the
+`LifeCycle#start` path above.
 
 ## Every verdict change, checked by hand
 

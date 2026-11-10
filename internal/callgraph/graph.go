@@ -26,7 +26,10 @@ type EdgeBasis string
 // Servlet#service/Filter#doFilter edges to registered servlets/filters.
 // 3: CHA targets the body a concrete subtype inherits from outside the
 // call's type. 4: SAM-call materialization (internal/samcall, BasisSAM).
-const BuilderVersion = "4"
+// 5: with an Exclude, a body declared in an abstract class or interface
+// is not a CHA target when every concrete subtype selecting it is
+// excluded.
+const BuilderVersion = "5"
 
 const (
 	// BasisDirect is a direct edge to exactly the call site's own symbolic
