@@ -32,6 +32,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
 	"ariadne/internal/jdbcdispatch"
+	"ariadne/internal/log4jconfig"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/models"
 	"ariadne/internal/profile"
@@ -672,18 +673,57 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		warnings = append(warnings, "reading packaged Spring Boot configuration: "+err.Error())
 	}
 	bootFeatures := bootfeatures.Decide(h, bootConfig, servletdispatch.IsBootApplication(h))
+	var excludes []func(string) bool
+	var excludeRules []string
 	if bootFeatures.Applies {
 		log("Undertow features (Spring Boot, %s; config %s): %s", bootfeatures.Version, strings.Join(bootConfig.Files, ", "), bootFeatureSummary(bootFeatures))
 		if off := bootFeatures.Off(); len(off) > 0 {
-			rule := "Undertow features off in this Spring Boot application not expanded (" + bootfeatures.Version + ": " + strings.Join(off, ", ") + ")"
-			switch s := strategy.(type) {
-			case callgraph.CHA:
-				s.Exclude, s.ExcludeRule = bootFeatures.Excluded, rule
-				strategy = s
-			case callgraph.RTA:
-				s.Exclude, s.ExcludeRule = bootFeatures.Excluded, rule
-				strategy = s
+			excludes = append(excludes, bootFeatures.Excluded)
+			excludeRules = append(excludeRules, "Undertow features off in this Spring Boot application not expanded ("+bootfeatures.Version+": "+strings.Join(off, ", ")+")")
+		}
+	}
+	// log4j 1.2 appenders the packaged configuration leaves out
+	// (internal/log4jconfig, FRAMEWORKS:F2 l1): not CHA/RTA targets.
+	log4jJars := []log4jconfig.Jar{{Path: prepared.AppClassesJar, Name: "application"}}
+	for _, dj := range depJars {
+		name := filepath.Base(dj.Path)
+		if entry, ok := prepared.LibEntries[name]; ok {
+			name = entry
+		}
+		log4jJars = append(log4jJars, log4jconfig.Jar{Path: dj.Path, Name: name})
+	}
+	log4jConfig, err := log4jconfig.ReadConfig(log4jJars, prepared.WebXMLs)
+	if err != nil {
+		warnings = append(warnings, "reading packaged log4j configuration: "+err.Error())
+	}
+	log4jAppenders := log4jconfig.Decide(h, log4jConfig)
+	switch {
+	case log4jAppenders.Applies:
+		log("log4j 1.2 appenders (%s; config %s): on %s; off %s", log4jconfig.Version, strings.Join(log4jConfig.Files, ", "), strings.Join(log4jAppenders.On(), ", "), strings.Join(log4jAppenders.Off(), ", "))
+		if off := log4jAppenders.Off(); len(off) > 0 {
+			excludes = append(excludes, log4jAppenders.Excluded)
+			excludeRules = append(excludeRules, "log4j 1.2 appenders not in the packaged configuration not expanded ("+log4jconfig.Version+": "+strings.Join(off, ", ")+")")
+		}
+	case log4jAppenders.Why != "log4j 1.2 not in the input":
+		log("log4j 1.2 appenders (%s): every appender kept — %s", log4jconfig.Version, log4jAppenders.Why)
+	}
+	if len(excludes) > 0 {
+		exclude := func(class string) bool {
+			for _, ex := range excludes {
+				if ex(class) {
+					return true
+				}
 			}
+			return false
+		}
+		rule := strings.Join(excludeRules, "; ")
+		switch s := strategy.(type) {
+		case callgraph.CHA:
+			s.Exclude, s.ExcludeRule = exclude, rule
+			strategy = s
+		case callgraph.RTA:
+			s.Exclude, s.ExcludeRule = exclude, rule
+			strategy = s
 		}
 	}
 	log("building call graph (mode %s)", strategy.Mode())
