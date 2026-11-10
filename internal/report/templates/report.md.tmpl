@@ -953,13 +953,13 @@ None found.
 {{end}}
 {{end}}
 
-## web.xml-declared roots (`-roots profile`)
+## web.xml-declared roots
 
 Every lifecycle method a web.xml-declared servlet/filter/listener class actually
-declares (FRAMEWORKS F2) — added as a real entry point under `-roots profile`,
-shown here regardless of which `-roots` mode this run used. A plain old servlet
-with no annotation at all previously contributed nothing under `-roots profile`;
-only `-roots all` (every application method) happened to still cover it.
+declares (FRAMEWORKS F2) — a real entry point in both `-roots` scenarios: under
+`-roots profile` next to the profile's own entry points, under `-roots all` next to
+every application method (which alone misses a WAR's library classes the container
+calls, e.g. Spring's `ContextLoaderListener`).
 {{if not .WebXMLRoots}}
 None found.
 {{else}}

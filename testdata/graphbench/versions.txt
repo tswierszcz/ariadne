@@ -1,19 +1,19 @@
-commit	fac65dcdf672e0afaf6089338d050aa449d99b9c (dirty)
+commit	35aef73f4a4838b7e114a5112a4ebd08258c4b78 (dirty)
 go version go1.27.3 linux/amd64
 repeat	3
 profile	spring
 offline	true
-cha.tool	v0.0.0-20261109162754-fac65dcdf672+dirty
+cha.tool	v0.0.0-20261109214011-35aef73f4a48+dirty
 cha.builder	4
-cha.skip_rule	receiver types under java., javax., jdk., sun. are not expanded; Undertow features off in this Spring Boot application not expanded (u1: http2, ajp, proxy-protocol, write-timeout, undertow-authentication, http-client)
+cha.skip_rule	receiver types under java., javax., jdk., sun. are not expanded
 cha.unknown_allocation_policy	all-subtypes
 cha.catalog	p1-2
 cha.rta	
 cha.servlet_dispatch	s2
 cha.samcall	l1-1
-rta.tool	v0.0.0-20261109162754-fac65dcdf672+dirty
+rta.tool	v0.0.0-20261109214011-35aef73f4a48+dirty
 rta.builder	4
-rta.skip_rule	receiver types under java., javax., jdk., sun. are not expanded; Undertow features off in this Spring Boot application not expanded (u1: http2, ajp, proxy-protocol, write-timeout, undertow-authentication, http-client)
+rta.skip_rule	receiver types under java., javax., jdk., sun. are not expanded
 rta.unknown_allocation_policy	cha-fallback-with-gap
 rta.catalog	p1-2
 rta.rta	p2-1

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # GRAPH_PRECISION P4: call-graph strategy benchmark on the prepared real
-# applications (scripts/prepare-petclinic.sh, scripts/prepare-webgoat.sh),
+# applications (scripts/prepare-petclinic.sh, scripts/prepare-webgoat.sh,
+# scripts/prepare-jpetstore.sh),
 # offline, -profile spring. For every app, roots scenario (profile, all)
 # and mode (cha, rta) it runs bin/ariadne and records, per run: wall time
 # and peak RSS of the analyzer process, graph size, CHA edges (and with
@@ -45,16 +46,18 @@ python3 -I - "$root" "$cache" "$out" "$work" "$repeat" <<'PY'
 import json, os, re, subprocess, sys, time
 
 root, cache, out, work, repeat = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+# app -> the input arguments (JPetStore: the WAR itself, so web.xml is read).
 apps = {
-    "petclinic": ("work/spring-petclinic", "work/spring-petclinic/target/dependency"),
-    "webgoat": ("work/WebGoat", "work/WebGoat/app-dependency"),
+    "petclinic": ["-app", "work/spring-petclinic/app-classes.jar", "-deps", "work/spring-petclinic/target/dependency",
+                  "-deps-list", "work/spring-petclinic/deps.txt"],
+    "webgoat": ["-app", "work/WebGoat/app-classes.jar", "-deps", "work/WebGoat/app-dependency", "-deps-list", "work/WebGoat/deps.txt"],
+    "jpetstore": ["-app", "work/jpetstore/target/jpetstore.war", "-deps-list", "work/jpetstore/deps.txt"],
 }
 
 def run(app, roots, mode, rep, graph):
-    w, deps = apps[app]
     base = os.path.join(work, f"{app}-{roots}-{mode}-{rep}")
     args = [os.path.join(root, "bin/ariadne"), "-offline", "-cache-dir", cache,
-            "-app", f"{w}/app-classes.jar", "-deps", deps, "-deps-list", f"{w}/deps.txt",
+            *apps[app],
             "-profile", "spring", "-roots", roots, "-callgraph-mode", mode,
             "-out", base + ".md", "-json", base + ".json", "-json-format", "v2"]
     if graph and mode == "cha":
