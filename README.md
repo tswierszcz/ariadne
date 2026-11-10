@@ -513,6 +513,24 @@ in its own jar, a registered provider and a product, an unregistered
 provider and a product implementation in another jar — every observed body
 reached, the other jar never a target).
 
+**One fixed point for models and gates (ROADMAP B3, coordinator `b3-2`).**
+The registered library models (ServiceLoader, servlet container dispatch,
+service-provider dispatch) and the creator gates (SAM calls, servlet
+objects, JDBC objects, framework proxies) can unlock each other: a gate
+edge can make a modeled call site reachable, a model edge can make a
+creator reachable. `internal/analysis.Run` iterates both kinds together —
+every gate, then one model pass — until an iteration adds nothing, within
+a budget it reports (the remaining participants are named when the budget
+ends). The order of the participants does not change the result. Log line:
+`models and gates (ROADMAP B3 fixed point): N iterations of at most M; …
+model edges; gate edges sam-calls N, …`; snapshots record
+`analysis.coordinator`. Before `b3-2` the CLI ran the gates, then the
+models to their own fixed point, then the gates once more, which misses an
+edge behind a model → gate → model chain (`TestRun_stepsAndModelsShareOneFixedPoint`).
+On petclinic, WebGoat, JPetStore and the log4j/logback control apps the
+joint fixed point gives the same graph and results (1–5 iterations): those
+inputs had no such chain.
+
 **Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x1`).**
 Some framework objects exist only as JDK dynamic proxies: a MyBatis mapper
 interface (`CategoryMapper`) has no implementation in the input — MyBatis
@@ -1198,7 +1216,9 @@ The entry call line also names the call kind, the resolution rule
 class-hierarchy-analysis expanded it to a subtype, so trust it less;
 `synthetic`: a profile's `synthetic_edges`, with no real call site at
 all; `model`: a reachable call site connected to a modeled target
-(currently the ServiceLoader classpath provider model, ROADMAP B3);
+(the B3 registry models — ServiceLoader, servlet container dispatch,
+service-provider dispatch — and the creator-gated models: servlet and JDBC
+objects, framework proxies);
 `callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged` registration connected to the
 callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
 a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,

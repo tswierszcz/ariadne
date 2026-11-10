@@ -1161,27 +1161,36 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	proxyGate := callgraph.NewCreatorGate(g, h, proxies.Edges, callgraph.BasisModel)
 	proxyTime := time.Since(proxyStart)
-	applyGates := func() (callgraph.SAMStats, callgraph.SAMStats, callgraph.SAMStats, callgraph.SAMStats) {
-		var sam, obj, jdbc, proxy callgraph.SAMStats
-		for {
-			before := sam.Added + obj.Added + jdbc.Added + proxy.Added
-			sam = samGate.Apply(g, roots)
-			obj = objGate.Apply(g, roots)
-			jdbc = jdbcGate.Apply(g, roots)
-			proxy = proxyGate.Apply(g, roots)
-			if sam.Added+obj.Added+jdbc.Added+proxy.Added == before {
-				return sam, obj, jdbc, proxy
-			}
-		}
+	// ROADMAP B3: the creator gates are steps of the coordinator's fixed
+	// point, alongside the registered models — a gate edge can expose a
+	// modeled call site and a model edge can make a creator reachable, in
+	// any order, until nothing is added (or the budget, reported, ends).
+	gateStep := func(name string, gate *callgraph.SAMGate) analysis.Step {
+		prev := 0
+		return analysis.Step{Name: name, Apply: func(g *callgraph.Graph, roots []uint32) int {
+			total := gate.Apply(g, roots).Added
+			n := total - prev
+			prev = total
+			return n
+		}}
 	}
-	applyGates() // DYNAMIC_LINKAGE L1, the servlet and the JDBC objects, before the models see the graph
-	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: modelBudget})
+	steps := []analysis.Step{
+		gateStep("sam-calls", samGate),
+		gateStep(servletdispatch.ModelID+" objects", objGate),
+		gateStep(jdbcdispatch.ModelID, jdbcGate),
+		gateStep(proxycatalog.ModelID, proxyGate),
+	}
+	// Each gate runs to its own fixed point within a step; a joint
+	// iteration is needed only when a step and a model unlock each other.
+	jointBudget := modelBudget + 2*len(steps)
+	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: jointBudget, Steps: steps})
 	if err != nil {
 		return fmt.Errorf("coordinating library models: %w", err)
 	}
-	log("models: %d facts, %d edges added, %d iterations (incomplete=%t)", len(modelResult.Facts), modelResult.AddedEdges, modelResult.Iterations, modelResult.Incomplete)
-	// Model edges can make more creators reachable.
-	samApplied, objApplied, jdbcApplied, proxyApplied := applyGates()
+	log("models and gates (ROADMAP B3 fixed point): %d iterations of at most %d; %d model facts, %d model edges; gate edges %s (incomplete=%t)",
+		modelResult.Iterations, jointBudget, len(modelResult.Facts), modelResult.AddedEdges, stepSummary(steps, modelResult.StepEdges), modelResult.Incomplete)
+	// Final totals (no edge is added at the fixed point).
+	samApplied, objApplied, jdbcApplied, proxyApplied := samGate.Apply(g, roots), objGate.Apply(g, roots), jdbcGate.Apply(g, roots), proxyGate.Apply(g, roots)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1742,6 +1751,14 @@ func bootFeatureSummary(r bootfeatures.Result) string {
 		parts = append(parts, p+")")
 	}
 	return strings.Join(parts, "; ")
+}
+
+func stepSummary(steps []analysis.Step, added map[string]int) string {
+	parts := make([]string, len(steps))
+	for i, st := range steps {
+		parts[i] = fmt.Sprintf("%s %d", st.Name, added[st.Name])
+	}
+	return strings.Join(parts, ", ")
 }
 
 func proxySummary(by map[string]int) string {

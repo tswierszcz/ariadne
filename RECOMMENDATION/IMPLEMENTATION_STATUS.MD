@@ -12,7 +12,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
-| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: kontrakt i pierwsza iteracyjna koordynacja modeli zaimplementowane częściowo; integracja CLI, realny model biblioteki, invalidation i pełne B0–B4 pozostają. B0–B2, B4: UNASSESSED | `internal/analysis` osiąga punkt stały dla osiągalnych wywołań i dodaje modelowane krawędzie do metod obecnych w hierarchii. To fundament biblioteki, jeszcze niewłączony do CLI; szczegóły i ograniczenia w najnowszym wpisie ROADMAP:B3. |
+| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, wybór modeli z profilu, invalidation. B0–B2, B4: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE (overloads/inheritance; bridge/default-method real-bytecode verification closed 2026-11-07 by GRAPH_PRECISION P0 — `testdata/callgraph`, JVM oracle; korekta 2026-11-08, PR #29: CHA celuje też w ciała dziedziczone spoza typu wywołania, builder `3`) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty; ograniczenie G2 domknięte i korekta CHA (addendum w COMPLETION.md). Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5, zarchiwizowane](../archive/2026-11-07/data_flow/COMPLETION.md) | D0–D5: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (D5 — PR #13) | IR/CFG/wartości lokalne (D0–D2), pięć wycinków międzyproceduralnych wartości i streszczenia zależności `internal/flowsum` (D3), pilotaż taint `-taint` opt-in (D4), kwalifikacja: wyrocznia JVM, kształty, pomiar (D5, `docs/TAINT_QUALIFICATION.MD`). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -29,6 +29,40 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### ROADMAP:B3 — drugi przyrost: wspólny punkt stały modeli i bramek twórców (`b3-2`) — DONE for this scope (2026-11-10)
+
+- **Zakres (zatwierdzony):** bramki twórców (SAM, obiekty servletów,
+  JDBC, proxy frameworków) jako kroki koordynatora `internal/analysis`
+  obok modeli z rejestru; jeden punkt stały z raportowanym budżetem;
+  niezależność od kolejności. Poprawka nieaktualnego wiersza ROADMAP w
+  tabeli (koordynator był w CLI od 2026-10-25).
+- **Zrealizowane:** `analysis.Options.Steps` (`Step{Name, Apply}`),
+  iteracja = wszystkie kroki, potem przebieg modeli; koniec, gdy nic nie
+  dodano; `Result.StepEdges`, `LastAdders` (uczestnicy wciąż dodający
+  przy wyczerpaniu budżetu); `CoordinatorVersion` `b3-2` w snapshotach
+  (`analysis.coordinator`). `cmd/ariadne`: dawna sekwencja bramki →
+  modele → bramki zastąpiona krokami; linia logu `models and gates
+  (ROADMAP B3 fixed point): …`.
+- **Weryfikacja:** `TestRun_stepsAndModelsShareOneFixedPoint` (łańcuch
+  model → bramka → model; ta sama fixtura pokazuje, że dawna sekwencja
+  gubi ostatnią krawędź), `TestRun_stepBudgetIsVisible`,
+  `TestRun_orderDoesNotChangeTheGraph`. Integracyjnie 24 przebiegi
+  (petclinic, WebGoat, JPetStore, aplikacje kontrolne log4j/logback ×
+  `-roots profile/all` × CHA/RTA) z `-graph-compare` względem binarki
+  sprzed zmiany: 0 krawędzi dodanych/usuniętych, `results.json` bajtowo
+  identyczne; punkt stały w 1–5 iteracjach (budżet 14–62), żaden przebieg
+  nie dobił do limitu („incomplete” pochodzi z istniejących faktów
+  ServiceLoader). `go test ./...`, `go vet ./...`.
+- **Ograniczenia / pozostałe kryteria B3:** jednorazowe przebiegi
+  (krawędzie syntetyczne, callbacki, uchwyty, refleksja, deserializacja)
+  zostają przed punktem stałym — dodają krawędzie we wszystkich miejscach
+  niezależnie od osiągalności (bez korzeni), więc ich kolejność nie
+  zmienia wyniku; brak wyboru modeli z profilu; brak invalidation
+  zależnych wyników poza wersjami algorytmów w snapshotach.
+- **Dokumentacja:** README, `docs/SUPPORT.MD`, ten rejestr.
+- **Następny krok (wymaga zgody):** wybór modeli z profilu albo inny
+  obszar (RUNTIME N2, FRAMEWORKS F4).
 
 ### FRAMEWORKS:F3 — wycinek 3: katalogowy model proxy (`internal/proxycatalog`, `framework:proxies` `x1`) — DONE for this scope (2026-11-10)
 
