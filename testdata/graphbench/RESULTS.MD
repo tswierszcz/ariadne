@@ -1,5 +1,11 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-10 with logback's Joran components (`l2-2`) and builder `6`**: the first table
+under "Real applications" is this run. petclinic and WebGoat: CVE-2024-12798 `FRAMEWORK` →
+`NOT_REACHABLE` in every mode (no evaluator configured), CHA 6/72/12/57/6 → 6/71/13/57/6 and
+54/37/13/60/0 → 54/36/14/60/0; JPetStore verdicts unchanged (+9 edges builder `5` had wrongly
+dropped). See "logback Joran components".
+
 **Rerun 2026-11-10 with the logback appender model (`l2`, `internal/logbackconfig`) and builder
 `5`**: the first table under "Real applications" is this run. Edges: petclinic −288 (CHA), WebGoat
 −755, JPetStore −7; **no verdict changed** in any app or mode (`verdict-changes.tsv` unchanged). The
@@ -146,18 +152,18 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| petclinic | profile | cha | 13.2–14.1 | 1345–1501 | 1 026 880 | — | — | 679 of 1096 | 5 | 4 031 | 1 629 (2 524) | 6/72/12/57/6 |
-| petclinic | profile | rta | 12.4–12.8 | 1335–1351 | 990 892 | 35 988 of 321 823 (35 674) | 17 379 (5 847) | 639 of 1097 | 5 | 4 031 | 1 629 (2 524) | 6/68/16/57/6 |
-| petclinic | all | cha | 12.0–12.2 | 1317–1492 | 1 026 880 | — | — | 679 of 1096 | 5 | 4 031 | 1 629 (2 524) | 6/72/12/57/6 |
-| petclinic | all | rta | 12.7–12.8 | 1355–1398 | 1 020 982 | 5 898 of 321 823 (59 362) | 21 843 (9 650) | 677 of 1097 | 5 | 4 031 | 1 629 (2 524) | 6/72/12/57/6 |
-| WebGoat | profile | cha | 18.5–18.9 | 1677–1886 | 1 433 772 | — | — | 740 of 1194 | 0 | 2 187 | 1 557 (2 269) | 54/37/13/60/0 |
-| WebGoat | profile | rta | 19.2–19.6 | 1644–1719 | 1 350 454 | 83 318 of 569 312 (162 166) | 25 173 (10 661) | 667 of 1201 | 0 | 2 187 | 1 557 (2 269) | 53/35/16/60/0 |
-| WebGoat | all | cha | 21.8–23.8 | 1635–1712 | 1 433 777 | — | — | 741 of 1194 | 0 | 2 193 | 1 558 (2 264) | 54/37/13/60/0 |
-| WebGoat | all | rta | 19.7–20.4 | 1712–1882 | 1 419 009 | 14 768 of 569 312 (103 839) | 32 215 (13 244) | 743 of 1201 | 0 | 2 193 | 1 558 (2 264) | 54/37/13/60/0 |
-| JPetStore | profile | cha | 3.4–3.5 | 297–321 | 225 529 | — | — | 157 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
-| JPetStore | profile | rta | 3.5–3.6 | 291–300 | 212 429 | 13 100 of 59 460 (16 217) | 3 205 (1 263) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
-| JPetStore | all | cha | 3.4–3.4 | 296–310 | 225 529 | — | — | 157 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
-| JPetStore | all | rta | 3.4–3.5 | 305–319 | 212 608 | 12 921 of 59 460 (16 392) | 3 228 (1 280) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
+| petclinic | profile | cha | 14.2–14.7 | 1347–1403 | 1 026 586 | — | — | 678 of 1096 | 5 | 4 019 | 1 629 (2 524) | 6/71/13/57/6 |
+| petclinic | profile | rta | 12.8–13.0 | 1355–1377 | 990 810 | 35 776 of 321 532 (35 610) | 17 376 (5 849) | 638 of 1097 | 5 | 4 019 | 1 629 (2 524) | 6/67/17/57/6 |
+| petclinic | all | cha | 11.9–12.4 | 1353–1431 | 1 026 586 | — | — | 678 of 1096 | 5 | 4 019 | 1 629 (2 524) | 6/71/13/57/6 |
+| petclinic | all | rta | 11.9–13.7 | 1353–1426 | 1 020 688 | 5 898 of 321 532 (59 095) | 21 837 (9 665) | 676 of 1097 | 5 | 4 019 | 1 629 (2 524) | 6/71/13/57/6 |
+| WebGoat | profile | cha | 17.2–17.6 | 1645–1781 | 1 433 485 | — | — | 739 of 1194 | 0 | 2 181 | 1 557 (2 269) | 54/36/14/60/0 |
+| WebGoat | profile | rta | 18.1–18.2 | 1717–1776 | 1 350 379 | 83 106 of 569 025 (162 106) | 25 171 (10 663) | 666 of 1201 | 0 | 2 181 | 1 557 (2 269) | 53/34/17/60/0 |
+| WebGoat | all | cha | 17.4–17.6 | 1712–1730 | 1 433 490 | — | — | 740 of 1194 | 0 | 2 187 | 1 558 (2 264) | 54/36/14/60/0 |
+| WebGoat | all | rta | 18.2–19.3 | 1735–1768 | 1 418 722 | 14 768 of 569 025 (103 576) | 32 209 (13 258) | 742 of 1201 | 0 | 2 187 | 1 558 (2 264) | 54/36/14/60/0 |
+| JPetStore | profile | cha | 3.1–3.2 | 299–325 | 225 538 | — | — | 161 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
+| JPetStore | profile | rta | 3.2–3.2 | 310–317 | 212 438 | 13 100 of 59 469 (16 226) | 3 205 (1 263) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
+| JPetStore | all | cha | 3.1–3.2 | 303–313 | 225 538 | — | — | 161 of 364 | 1 | 93 | 0 (0) | 0/10/13/12/0 |
+| JPetStore | all | rta | 3.2–3.2 | 297–311 | 212 617 | 12 921 of 59 469 (16 401) | 3 228 (1 280) | 144 of 365 | 1 | 93 | 0 (0) | 0/9/14/12/0 |
 
 <details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
 
@@ -636,6 +642,29 @@ with Boot's defaults, with `logging.file.name`, and with a `logback-spring.xml` 
 the JVM prints in all three. CVE-2024-12798's path goes through `SMTPAppender#append` →
 `JaninoEventEvaluatorBase#evaluate` only in the SMTP variant; in the other two it is the
 `LifeCycle#start` path above.
+
+**logback Joran components (`l2-2`, builder `6`, 2026-11-10).** The configuration now also decides
+logback's Joran-only components (concrete `LifeCycle` classes no code creates with `new`, minus
+appenders and pattern converters): on petclinic and WebGoat 30 of 32 are off. `-graph-compare` with
+`main` (before `l2`):
+
+| App | CHA edges | RTA edges | Findings changed vs `l2-1` |
+|---|---|---|---|
+| petclinic | −582 (both roots) | −247 profile, −587 all | CVE-2024-12798 `FRAMEWORK` → `NOT_REACHABLE` (all 4 runs) |
+| WebGoat | +4 / −1 046 | +4 / −241 profile, −1 051 all | the same |
+| JPetStore | +9 / −7 | +9 / −7 | none |
+
+The `+` edges are builder `6`: builder `5` also dropped a kept class's body inherited from an
+excluded declaring class (log4j's `ConsoleAppender` lost `WriterAppender#append`; logback's
+`OutputStreamAppender#append` likewise) — a false narrowing, corrected; against `main` no edge
+the model should keep is missing. CVE-2024-12798 checked: Boot's defaults create no evaluator, so
+`JaninoEventEvaluator` never exists — `NOT_REACHABLE` is right. CVE-2021-42550 stays `FRAMEWORK`
+through `StaticLoggerBinder` → `ContextJNDISelector#getLoggerContext`/`findConfigFileURL`: logback
+creates that selector with `new`, but only when `-Dlogback.ContextSelector=JNDI` is set — real code,
+switched by a JVM setting the input does not show. Control app, fourth variant (`EvaluatorFilter`
+with a class-less `<evaluator>`): the JVM logs `Assuming default type [JaninoEventEvaluator] for
+[evaluator] property`; the model keeps it on and CVE-2024-12798 stays `FRAMEWORK` there and in the
+SMTP variant, `NOT_REACHABLE` in the default and file variants.
 
 ## Every verdict change, checked by hand
 

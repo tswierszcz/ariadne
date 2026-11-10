@@ -28,8 +28,10 @@ type EdgeBasis string
 // call's type. 4: SAM-call materialization (internal/samcall, BasisSAM).
 // 5: with an Exclude, a body declared in an abstract class or interface
 // is not a CHA target when every concrete subtype selecting it is
-// excluded.
-const BuilderVersion = "5"
+// excluded. 6: a kept subtype's inherited body is a target even when its
+// declaring class is excluded (5 dropped it: log4j's ConsoleAppender lost
+// WriterAppender#append).
+const BuilderVersion = "6"
 
 const (
 	// BasisDirect is a direct edge to exactly the call site's own symbolic

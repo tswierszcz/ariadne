@@ -719,9 +719,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	switch {
 	case logbackAppenders.Applies:
 		log("logback appenders (%s; %s): on %s; off %s", logbackconfig.Version, logbackAppenders.Source, strings.Join(logbackAppenders.On(), ", "), strings.Join(logbackAppenders.Off(), ", "))
-		if off := logbackAppenders.Off(); len(off) > 0 {
+		compOff := logbackAppenders.ComponentsOff()
+		log("logback Joran-only components (%s): %d on, %d off (%s)", logbackconfig.Version, logbackAppenders.ComponentsOn(), len(compOff), strings.Join(compOff, ", "))
+		if off := logbackAppenders.Off(); len(off) > 0 || len(compOff) > 0 {
 			excludes = append(excludes, logbackAppenders.Excluded)
-			excludeRules = append(excludeRules, "logback appenders not in the configuration not expanded ("+logbackconfig.Version+": "+strings.Join(off, ", ")+")")
+			rule := "logback appenders and Joran-only components not in the configuration not expanded (" + logbackconfig.Version + ": " + strings.Join(off, ", ")
+			if len(compOff) > 0 {
+				rule += "; components: " + strings.Join(compOff, ", ")
+			}
+			excludeRules = append(excludeRules, rule+")")
 		}
 	case logbackAppenders.Why != logbackconfig.NotInInput:
 		log("logback appenders (%s): every appender kept — %s", logbackconfig.Version, logbackAppenders.Why)

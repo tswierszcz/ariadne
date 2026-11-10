@@ -47,8 +47,12 @@ func TestExcludeAbstractBodies(t *testing.T) {
 		cls("p.Net", "p.NetBase", false, m("append", false)),
 		// No concrete subtype in the input: CHA's usual treatment.
 		cls("p.Orphan", "p.Base", true, m("append", false)),
+		// log4j's WriterAppender/ConsoleAppender shape: the declaring
+		// class is excluded, a kept subtype inherits its body.
+		cls("p.Writer", "p.Base", false, m("append", false)),
+		cls("p.Console", "p.Writer", false),
 	})
-	excluded := map[string]bool{"p.Mail": true, "p.RollingFile": true}
+	excluded := map[string]bool{"p.Mail": true, "p.RollingFile": true, "p.Writer": true}
 	targets := func(s Strategy) map[string]bool {
 		out := map[string]bool{}
 		for _, t := range s.DispatchTargets(h, caller.Methods[0].Calls[0]) {
@@ -57,7 +61,7 @@ func TestExcludeAbstractBodies(t *testing.T) {
 		return out
 	}
 	with := targets(CHA{Exclude: func(c string) bool { return excluded[c] }, ExcludeRule: "test"})
-	for target, want := range map[string]bool{"p.MailBase": false, "p.FileBase": true, "p.Net": true, "p.Orphan": true} {
+	for target, want := range map[string]bool{"p.MailBase": false, "p.FileBase": true, "p.Net": true, "p.Orphan": true, "p.Writer": true} {
 		if with[target] != want {
 			t.Errorf("with Exclude: %s target = %v, want %v (targets %v)", target, with[target], want, with)
 		}
