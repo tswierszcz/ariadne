@@ -621,6 +621,18 @@ trace that closed all 22 JDBC relations the graph used to miss. A
 `DataSource` class only instantiated by name (Spring Boot's
 `DataSourceBuilder`) has no creator, so it gets no edge from this model.
 
+**And a MyBatis mapper or a Spring Data repository — an interface with no
+implementation?** The framework implements it at run time with a JDK proxy,
+so the graph used to stop at the interface method. Since
+`framework:proxies` `x1` a catalog says which interfaces which framework
+proxies (MyBatis mappers found from mapper XML, `@Mapper` or a mapper scan;
+Spring Data repositories; Spring ORM's `EntityManager`, `Query`,
+`EntityManagerFactory`) and adds an edge to the proxy's `InvocationHandler`
+once code creating that handler is reachable. On JPetStore that connects the
+application's mapper calls to MyBatis and on to the database: HSQLDB's
+CVE-2022-41853 became `REACHABLE`. It does not look inside the handler's
+`Method#invoke`.
+
 **Why could `-roots all` see less than `-roots profile`?** `-roots all` meant
 "every application method", and in a WAR the methods the container calls
 first are often not application methods: `web.xml` registers library

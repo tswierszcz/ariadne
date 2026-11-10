@@ -513,6 +513,44 @@ in its own jar, a registered provider and a product, an unregistered
 provider and a product implementation in another jar — every observed body
 reached, the other jar never a target).
 
+**Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x1`).**
+Some framework objects exist only as JDK dynamic proxies: a MyBatis mapper
+interface (`CategoryMapper`) has no implementation in the input — MyBatis
+hands out a proxy whose `MapperProxy#invoke` runs the SQL — and neither has a
+Spring Data repository interface (Spring AOP's `JdkDynamicAopProxy`) nor the
+`EntityManager`/`Query`/`EntityManagerFactory` Spring ORM injects. A general
+rule cannot tell which interfaces a `Proxy.newProxyInstance` call implements
+(FRAMEWORKS F3 slice 2 measured: bounded at none of the sites behind the
+traced relations), so this model takes them from a catalog: calls on a
+**MyBatis mapper** (an interface named as the `namespace` of a mapper XML in
+the input, annotated `@Mapper`, or in a package a `@MapperScan`, a
+`<mybatis:scan base-package>` or a `MapperScannerConfigurer` in the input
+scans) → `MapperProxy#invoke`; `SqlSessionTemplate`'s calls on its
+`SqlSession` proxy → `SqlSessionTemplate$SqlSessionInterceptor#invoke`; a
+**Spring Data repository** interface → `JdkDynamicAopProxy#invoke`;
+`EntityManager` → Spring ORM's shared and extended EntityManager handlers,
+`Query`/`TypedQuery`/`StoredProcedureQuery` → its deferred-query handler,
+`EntityManagerFactory` → the managed factory handler (javax and jakarta).
+Each edge (basis `model`) waits for the same creator gate as the JDBC
+objects: a method creating the handler must be reachable from the roots.
+Checked in the bytecode of mybatis 3.4.1–3.5.16, mybatis-spring
+1.3.0–3.0.3, spring-aop/spring-orm 4.3.4–6.1.14. Log line `framework
+proxies (framework:proxies x1): N MyBatis mappers, N Spring Data
+repositories; N candidates (…), N edges added, …`; snapshots record
+`framework.proxies`. Measured on runtime traces: petclinic's 13 `proxy`
+relations and 6 of JPetStore's 8 are graph edges now; JPetStore's
+CVE-2022-41853 (HSQLDB) is `REACHABLE` under `-roots all` through the
+application's own mapper calls (it was `FRAMEWORK`, through Spring's
+database shutdown only). Limits: the edge stops at the handler —
+what it then calls through `Method#invoke` is reflection; a mapper
+registered only in code (`Configuration#addMapper`) or scanned by an XML
+outside the input (a WAR's `WEB-INF/applicationContext.xml`) is not found;
+`SqlSessionTemplate`'s interceptor is gated out when Spring creates the
+template only reflectively (JPetStore); behind `JdkDynamicAopProxy#invoke`
+CHA expands Spring AOP's interceptor chain and target sources, so some paths
+through repositories are CHA over-approximations (petclinic/WebGoat: paths
+changed, no verdict).
+
 **JDBC objects (`jdbc:objects`, `internal/jdbcdispatch`, version `j1`).**
 The service-provider model reaches a driver's classes, but a real
 application rarely talks to the driver directly: Hibernate or Spring's
