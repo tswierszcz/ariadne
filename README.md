@@ -399,6 +399,32 @@ enables HTTP/2 that way is outside what the input shows. On WebGoat: 4
 Undertow advisories leave `REACHABLE` (HTTP/2 HPACK, AJP, PROXY protocol,
 Undertow form authentication).
 
+**log4j 1.2 appenders the packaged configuration leaves out
+(`internal/log4jconfig`, `l1`).** log4j 1.2 creates its appenders
+reflectively from `log4j.properties`/`log4j.xml`, so every call log4j makes
+on an appender (`Appender#doAppend`, `OptionHandler#activateOptions`,
+`AppenderSkeleton`'s own `this.append`) is expanded by CHA to all 18 appenders
+log4j ships — `JDBCAppender`'s SQL, `JMSAppender`'s JNDI lookup, the socket
+appenders. When log4j 1.2 itself is in the input (not the log4j-over-slf4j
+bridge) and a packaged configuration is found, ariadne reads every
+`log4j.properties`/`log4j.xml` at a class-path root of the application and of
+its dependency jars (`log4j.appender.<name>=<class>`, `<appender class="…">`)
+and the application classes (a call, `new` or static read of an appender);
+log4j's own appenders that neither names are not CHA/RTA targets (direct calls
+are untouched; an application's own appender classes are never left out). The
+model leaves every appender on when the configuration may come from
+elsewhere: no packaged file (`-Dlog4j.configuration`, an external file), a
+`${…}` class name, an unparsable XML file, a `web.xml` `log4jConfigLocation`
+other than a `classpath:` root file it read, or application code calling
+`PropertyConfigurator`/`DOMConfigurator` `configure*` or Spring's
+`Log4jConfigurer#initLogging`. Log line: `log4j 1.2 appenders (l1-1; config
+…): on …; off …` (or why every appender is kept); the graph's skip rule names
+those left out. Control app: `scripts/prepare-log4j1-demo.sh` (the same
+classes with a console-only and a `JDBCAppender` configuration, run on the
+JVM: CVE-2022-23305 `REACHABLE` only where `JDBCAppender` runs). On
+JPetStore (CHA): CVE-2021-4104 and CVE-2022-23305 `REACHABLE` →
+`NOT_REACHABLE`, CVE-2022-41853 `REACHABLE` → `FRAMEWORK`.
+
 **A second bounded exception: JDK/javax service-provider interfaces.**
 A provider-based API — Bean Validation, JDBC, JCache — calls its provider
 through an interface in a skipped package (`javax.validation.spi.

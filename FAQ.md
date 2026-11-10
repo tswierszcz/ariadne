@@ -588,6 +588,16 @@ Undertow's own authentication, its HTTP client, TLS and a write timeout
 unless the packaged configuration or application code turns them on — are
 no longer CHA targets; that removed 4 of those 11.
 
+**And logging — log4j 1.2's `Appender#doAppend`?** Same mechanism, different
+library. log4j 1.2 creates appenders reflectively from its configuration file,
+so CHA sent every log call to every appender log4j ships, `JDBCAppender` and
+`JMSAppender` included — on JPetStore, whose configuration has a
+`ConsoleAppender` only, that made three advisories falsely `REACHABLE`. Since
+`internal/log4jconfig` (`l1`) the appenders the packaged
+`log4j.properties`/`log4j.xml` and the application code do not name are no
+longer CHA/RTA targets — but only when a packaged configuration is found and
+fully readable, since a deployment can point log4j at another file.
+
 **And JDBC — `connection.prepareStatement(…)`, `rs.getInt(…)`?** Same story,
 same answer. `java.sql` is under the skip rule, and the service-provider
 model only reaches classes in the drivers' own jars — not the connection
