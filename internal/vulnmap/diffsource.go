@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -19,9 +20,17 @@ import (
 // trailing "#diff-..." fragment some advisories append.
 var githubCommitRe = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/commit/([0-9a-fA-F]{7,40})`)
 
+// githubPullRe matches a pull-request reference (CVE:F10): resolved to the
+// commit that merged it.
+var githubPullRe = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+
 type commitRef struct {
 	owner, repo, sha string
 	refType          string // the OSV reference type: "FIX" when any reference to the commit is one
+	// pull is "#N" when the commit is the one that merged pull request N
+	// (CVE:F10); a two-parent merge commit is then read against its first
+	// parent, the branch the pull request was merged into.
+	pull string
 }
 
 // Fix-commit bases (CVE:F5): which pre-fix revision the old side of a
@@ -76,6 +85,9 @@ type FixCommit struct {
 	// Error is why the commit's diff itself could not be obtained; such
 	// a commit contributes no methods.
 	Error string `json:"error,omitempty"`
+	// PullRequest is "#N" when the advisory referenced pull request N and
+	// this is the commit that merged it (CVE:F10).
+	PullRequest string `json:"pull_request,omitempty"`
 }
 
 // FixFile is one non-test .java file of a fix commit.
@@ -103,6 +115,10 @@ const (
 	BytecodeParamMismatch = "params_mismatch" // overloads exist, none matches the source parameters: name selector
 	BytecodeMethodMissing = "method_missing"  // the class is present, no method of that name
 	BytecodeClassMissing  = "class_missing"   // the class is not among the analyzed classes
+	// BytecodeAllConstructors: an instance field initializer or
+	// initializer block (CVE:F10), compiled into every constructor — the
+	// name selector "C#<init>" is meant, not a guess.
+	BytecodeAllConstructors = "all_constructors"
 )
 
 // Release fit of a fix commit (CVE:F5b).
@@ -195,7 +211,13 @@ func isContractError(err error) bool {
 // recorded and skipped; only a contract error is returned.
 func (r *Resolver) resolveFromDiffs(ctx context.Context, cve cves.CVE) ([]string, []FixCommit, error) {
 	var commits []FixCommit
-	for _, commit := range fixCommits(cve) {
+	refs := fixCommits(cve)
+	pulls, failed, err := r.pullCommits(ctx, cve, refs)
+	if err != nil {
+		return nil, nil, err
+	}
+	commits = append(commits, failed...)
+	for _, commit := range append(refs, pulls...) {
 		fc, err := r.resolveFromCommit(ctx, commit)
 		if err != nil {
 			return nil, nil, err
@@ -205,20 +227,39 @@ func (r *Resolver) resolveFromDiffs(ctx context.Context, cve cves.CVE) ([]string
 	r.noteReleaseLine(ctx, cve, commits)
 	r.noteReleaseFit(commits)
 
-	var methods []string
-	seen := make(map[string]bool)
+	var methods, initializers []string
+	seen, seenInit := make(map[string]bool), make(map[string]bool)
 	for _, fc := range commits {
 		if fc.Excluded != "" {
 			continue
 		}
 		for _, f := range fc.Files {
 			for _, m := range f.Methods {
-				if m.Kind != FixMethodAdded && !seen[m.Selector] {
+				if m.Kind == FixMethodAdded {
+					continue
+				}
+				// An explicit constructor and the instance initializers can
+				// share the selector "C#<init>": the explicit one is a
+				// changed method.
+				if fromInitializer(m) {
+					if !seenInit[m.Selector] {
+						seenInit[m.Selector] = true
+						initializers = append(initializers, m.Selector)
+					}
+				} else if !seen[m.Selector] {
 					seen[m.Selector] = true
 					methods = append(methods, m.Selector)
 				}
 			}
 		}
+	}
+	// A field initializer or initializer block the fix changed (CVE:F10)
+	// counts only when the fix changed no method: next to changed
+	// methods it is usually a new or adjusted constant those methods use,
+	// and its <clinit>/<init> runs whenever the class is used — far
+	// broader than the vulnerable code.
+	if len(methods) == 0 {
+		methods = initializers
 	}
 	return collapseSelectors(methods), commits, nil
 }
@@ -314,11 +355,26 @@ type commitMeta struct {
 }
 
 func (r *Resolver) resolveFromCommit(ctx context.Context, commit commitRef) (FixCommit, error) {
-	fc := FixCommit{Repo: commit.owner + "/" + commit.repo, SHA: commit.sha, RefType: commit.refType}
+	fc := FixCommit{Repo: commit.owner + "/" + commit.repo, SHA: commit.sha, RefType: commit.refType, PullRequest: commit.pull}
 	diffURL := fmt.Sprintf("%s/%s/%s/commit/%s.diff", r.GithubBaseURL, commit.owner, commit.repo, commit.sha)
+	// A pull request merged with a merge commit: the change it brought is
+	// the merge commit against its first parent (CVE:F10).
+	var pullMeta *commitMeta
+	if commit.pull != "" {
+		// Metadata is an enrichment here too: without it (offline cache
+		// miss, rate limit) the merge commit is read like any commit whose
+		// parents are unknown.
+		if m, err := r.commitMeta(ctx, commit); err == nil && len(m.Parents) == 2 {
+			pullMeta = &m
+			diffURL = fmt.Sprintf("%s/%s/%s/compare/%s...%s.diff", r.GithubBaseURL, commit.owner, commit.repo, m.Parents[0].SHA, m.SHA)
+		}
+	}
 	diffBody, err := r.fetch(ctx, diffURL, nil)
 	if err != nil {
-		if isContractError(err) {
+		// A commit the advisory names is data the run needs; one derived
+		// from a pull request is followed only when it can be (see
+		// pullCommits) — except in a snapshot replay.
+		if isContractError(err) && (commit.pull == "" || errors.Is(err, httpcache.ErrNotInSnapshot)) {
 			return fc, fmt.Errorf("fetching fix commit diff %s: %w", diffURL, err)
 		}
 		fc.Error = fmt.Sprintf("fetching diff: %v", err)
@@ -338,6 +394,9 @@ func (r *Resolver) resolveFromCommit(ctx context.Context, commit commitRef) (Fix
 	fc.Base = BaseNewSideOnly
 	meta, err := r.commitMeta(ctx, commit)
 	switch {
+	case err == nil && pullMeta != nil:
+		fc.Base, fc.Parent = BaseParent, meta.Parents[0].SHA
+		fc.BaseReason = "merge commit of pull request " + commit.pull + ": read against its first parent"
 	case err != nil:
 		fc.BaseReason = "commit metadata unavailable: " + err.Error()
 	case len(meta.Parents) == 0:
@@ -477,6 +536,8 @@ func (r *Resolver) verify(ms []FixMethod) {
 			m.Bytecode = BytecodeClassMissing
 		case len(descs) == 0:
 			m.Bytecode = BytecodeMethodMissing
+		case reflect.DeepEqual(m.SourceParams, javadiff.InitializerParams):
+			m.Bytecode = BytecodeAllConstructors
 		default:
 			var match []string
 			for _, d := range descs {
@@ -657,4 +718,80 @@ func (r *Resolver) fetch(ctx context.Context, url string, hdr http.Header) ([]by
 		noteEvidence(ctx, b)
 	}
 	return b, err
+}
+
+// pullMeta is the part of GitHub's "get a pull request" response used here.
+type pullMeta struct {
+	Merged         bool   `json:"merged"`
+	MergeCommitSHA string `json:"merge_commit_sha"`
+	Commits        int    `json:"commits"`
+}
+
+// pullCommits resolves every pull-request reference of cve (CVE:F10) to
+// the commit that merged it, skipping one whose merge commit is already
+// among refs. A pull request that was not merged, or whose metadata
+// cannot be read, becomes a FixCommit with Error (no methods); only a
+// contract error is returned.
+func (r *Resolver) pullCommits(ctx context.Context, cve cves.CVE, refs []commitRef) ([]commitRef, []FixCommit, error) {
+	have := map[string]bool{}
+	for _, c := range refs {
+		have[c.owner+"/"+c.repo+"@"+strings.ToLower(c.sha)] = true
+	}
+	var out []commitRef
+	var failed []FixCommit
+	seen := map[string]bool{}
+	for _, ref := range cve.References {
+		m := githubPullRe.FindStringSubmatch(ref.URL)
+		if m == nil {
+			continue
+		}
+		owner, repo, num := m[1], m[2], m[3]
+		if strings.EqualFold(owner+"/"+repo, "github/advisory-database") {
+			continue // an edit of the advisory record, not a fix
+		}
+		key := owner + "/" + repo + "#" + num
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		url := fmt.Sprintf("%s/repos/%s/%s/pulls/%s", r.GithubAPIBaseURL, owner, repo, num)
+		b, err := r.fetch(ctx, url, r.apiHeader())
+		if err != nil {
+			// Like commit metadata, a pull request's metadata is an
+			// enrichment: a lookup that failed online (an issue number,
+			// a rate limit) is not cached, so offline it is a miss — the
+			// same outcome, recorded per reference, never a stopped run.
+			// A snapshot replay still refuses a lookup it did not record.
+			if errors.Is(err, httpcache.ErrNotInSnapshot) {
+				return nil, nil, fmt.Errorf("reading pull request %s: %w", key, err)
+			}
+			failed = append(failed, FixCommit{Repo: owner + "/" + repo, PullRequest: "#" + num, RefType: ref.Type, Error: fmt.Sprintf("reading pull request: %v", err)})
+			continue
+		}
+		var pm pullMeta
+		if err := json.Unmarshal(b, &pm); err != nil {
+			failed = append(failed, FixCommit{Repo: owner + "/" + repo, PullRequest: "#" + num, RefType: ref.Type, Error: fmt.Sprintf("decoding %s: %v", url, err)})
+			continue
+		}
+		if !pm.Merged || pm.MergeCommitSHA == "" {
+			failed = append(failed, FixCommit{Repo: owner + "/" + repo, PullRequest: "#" + num, RefType: ref.Type, Error: "pull request not merged"})
+			continue
+		}
+		if have[owner+"/"+repo+"@"+strings.ToLower(pm.MergeCommitSHA)] {
+			continue
+		}
+		have[owner+"/"+repo+"@"+strings.ToLower(pm.MergeCommitSHA)] = true
+		out = append(out, commitRef{owner: owner, repo: repo, sha: pm.MergeCommitSHA, refType: ref.Type, pull: "#" + num})
+	}
+	return out, failed, nil
+}
+
+// fromInitializer reports a candidate that stands for field initializers
+// or initializer blocks: any <clinit>, or <init> for every constructor.
+func fromInitializer(m FixMethod) bool {
+	_, name, _ := strings.Cut(m.Selector, "#")
+	if i := strings.Index(name, "("); i >= 0 {
+		name = name[:i]
+	}
+	return name == "<clinit>" || (name == "<init>" && reflect.DeepEqual(m.SourceParams, javadiff.InitializerParams))
 }

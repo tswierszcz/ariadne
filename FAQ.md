@@ -812,7 +812,19 @@ release in history containing it", not "your line" — which is why it
 never overrides the fit rule. No verdict changed on the CVE:F0 inputs;
 the paths now rest on the right line's methods.
 
-Source 3 is an LLM reading the advisory + fix diff, opt-in with `-llm`
+**And when OSV lists no fix commit?** That was the most common reason for
+`UNKNOWN`: across petclinic, WebGoat and JPetStore, 52 of 69 unmapped
+advisories had no commit reference at all (projects rarely name the CVE in
+commit messages either: 1 hit in 8 searches). Since CVE:F10 a pull-request
+reference is followed to its merge commit, a fix that only changes a field
+initializer maps to `<clinit>`/the constructors, and — when the advisory
+names a class — the bytecode of the release before the fix and the fixing
+patch release is compared: the changed methods of the named classes become
+an unreviewed `release-diff` mapping (95 % of its methods were real fix
+methods on 130 advisories where the fix commit is known). `UNKNOWN`
+dropped from 57/60/12 to 49/45/8.
+
+Source 4 is an LLM reading the advisory + fix diff, opt-in with `-llm`
 (design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
 runs only for CVEs sources 1 and 2 left unmapped, and each method it
 names is checked to exist in the analyzed bytecode. When it saw only the

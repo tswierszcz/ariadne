@@ -978,7 +978,46 @@ For each CVE, in priority order:
    unknown and changes nothing. These lookups are GitHub API requests —
    set `GITHUB_TOKEN` when filling a cache; offline runs read them from
    the cache.
-3. **An LLM (opt-in, `-llm`).** Only for a CVE sources 1 and 2 found
+   **Pull requests and field initializers (CVE:F10).** A reference to a
+   GitHub pull request (`github.com/<o>/<r>/pull/<n>`) is resolved through
+   the API to the commit that merged it (a two-parent merge commit is read
+   against its first parent, the change the pull request brought); a pull
+   request that was not merged is recorded with an error; references into
+   `github/advisory-database` (edits of the advisory itself) are skipped.
+   Unlike a commit the advisory names directly, a pull request whose
+   metadata or diff cannot be read (an issue number, a rate limit — or,
+   offline, a lookup that failed online and so was never cached) is
+   recorded per reference instead of stopping the run; a snapshot replay
+   still refuses a lookup it did not record. Changed lines of
+   a field initializer or an initializer block count for the method their
+   code compiles into — `<clinit>` for static ones, every constructor
+   (`C#<init>`) for instance ones — but only when the fix changed no
+   method: next to changed methods such a change is usually a constant
+   those methods use, and its `<clinit>` runs whenever the class is used.
+
+3. **The released bytecode (CVE:F10, `-release-diff`, on by default).** For
+   a CVE sources 1 and 2 left unmapped, the methods whose code differs
+   between the last release before the fix and the fixing release, read
+   from Maven Central (through the cache), **in the classes the advisory
+   text names** — CamelCase identifiers with at least two humps, or any
+   identifier the text marks as code with backticks. Only patch releases
+   are compared (the release before the fix must be in the same
+   major.minor line; the OSV version is matched to the published one,
+   `2.2.10` → `2.2.10.Final`); a changed constructor or `<clinit>` counts
+   only when no other method of the class changed; more than 40 methods is
+   too broad to map. Labelled `source: release-diff`, vulnerable/partial/
+   unreviewed, with `release_diffs` evidence (releases compared, named
+   classes, counts) in v2. Validated against 130 advisories that have a
+   fix-commit mapping: 25 of the 80 that name a class get a mapping, 24 of
+   them contain a method of the real fix; 52 of 55 methods are methods the
+   fix commit changed (95 %), and 52 of the 61 fix methods in the named
+   classes are found ([validation](testdata/cve-control/RELEASE_DIFF_VALIDATION.MD)).
+   Central requests are serialized and spaced (750 ms, `User-Agent:
+   ariadne`); offline, a jar the cache lacks is read from `~/.m2/repository`
+   (a snapshot replay never does). An advisory that names no class, or a
+   fix first released in a new minor line, stays unmapped.
+
+4. **An LLM (opt-in, `-llm`).** Only for a CVE sources 1–3 found
    nothing for. The model gets the advisory (summary + details) and,
    when the CVE links a fix commit, that commit's non-test `.java` diff;
    it answers with a JSON list of methods. Since CVE:F5c the prompt also

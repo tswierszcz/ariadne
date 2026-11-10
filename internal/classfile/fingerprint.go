@@ -69,6 +69,26 @@ func FingerprintWith(cf *ClassFile, rs relocate.Set) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// MethodFingerprint renders a method's code (and exception table) by what
+// its instructions name, never by constant-pool index, so the same body
+// compiled into two builds gives the same string (CVE:F10's release diff).
+// An abstract or native method gives "".
+func (cf *ClassFile) MethodFingerprint(m Method) (string, error) {
+	if m.Code == nil {
+		return "", nil
+	}
+	code, err := cf.codeFingerprint(m.Code, relocate.Set{})
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	b.WriteString(code)
+	for _, h := range m.ExceptionTable {
+		fmt.Fprintf(&b, "|eh %d %d %d %s", h.StartPC, h.EndPC, h.HandlerPC, h.CatchType)
+	}
+	return b.String(), nil
+}
+
 func (cf *ClassFile) codeFingerprint(code []byte, rs relocate.Set) (string, error) {
 	if code == nil {
 		return "", nil

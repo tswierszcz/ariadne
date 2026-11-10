@@ -125,7 +125,7 @@ func analysisConfig(cfg config) map[string]string {
 	return map[string]string{
 		"profile": cfg.profile, "roots": cfg.roots, "target-java": strconv.Itoa(cfg.targetJava),
 		"active-profiles": cfg.activeProfiles, "jpms-scenario": cfg.jpmsScenario, "jpms-module-path": cfg.jpmsModulePath,
-		"llm": strconv.FormatBool(cfg.llm), "llm-model": cfg.llmConfig.Model, "llm-reask-changed": strconv.FormatBool(cfg.llmReaskChanged),
+		"release-diff": strconv.FormatBool(cfg.releaseDiff), "llm": strconv.FormatBool(cfg.llm), "llm-model": cfg.llmConfig.Model, "llm-reask-changed": strconv.FormatBool(cfg.llmReaskChanged),
 		"exploit-check": strconv.FormatBool(cfg.exploitCheck), "framework-check": strconv.FormatBool(cfg.frameworkCheck),
 		"data-ttl": cfg.dataTTL.String(), "max-data-age": cfg.maxDataAge.String(),
 		"refresh": strconv.FormatBool(cfg.refresh), "taint": strconv.FormatBool(cfg.taint), "callgraph-mode": cfg.callgraphMode, "allow-stale": strconv.FormatBool(cfg.allowStale),

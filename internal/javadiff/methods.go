@@ -45,8 +45,14 @@ type frame struct {
 	kind   frameKind
 	name   string
 	params []string
-	line   int // the line the body opened on
+	line   int  // the line the body opened on
+	iface  bool // a frameClass for an interface or annotation type (its fields are static)
 }
+
+// InitializerParams marks the "<init>" MethodRef of instance field
+// initializers and initializer blocks: the compiler copies them into every
+// constructor, so they belong to all overloads, not to one.
+var InitializerParams = []string{"*"}
 
 // MethodRef identifies a method declared in a source file (CVE:F5b).
 // Class is its declaring class's binary name relative to the package —
@@ -181,6 +187,34 @@ func scanMethods(cleaned string) ([]int, []MethodRef) {
 		}
 		return strings.Join(names, "$"), len(names) > 0
 	}
+	headerLine := 1
+	// Field initializers and initializer blocks (CVE:F10): their code is
+	// the class's <clinit> (static) or every constructor (instance) in
+	// bytecode. One synthetic MethodRef per class and kind.
+	initDecl := map[string]int{}
+	initializer := func(static bool) int {
+		cls, ok := classPath()
+		if !ok {
+			return -1
+		}
+		name, params := "<init>", InitializerParams
+		if static {
+			name, params = "<clinit>", nil
+		}
+		k := cls + "#" + name
+		if i, ok := initDecl[k]; ok {
+			return i
+		}
+		initDecl[k] = len(decl)
+		decl = append(decl, MethodRef{Class: cls, Name: name, Params: params, StartLine: currentLine})
+		return initDecl[k]
+	}
+	topIsClass := func() (frame, bool) {
+		if n := len(stack); n > 0 && stack[n-1].kind == frameClass {
+			return stack[n-1], true
+		}
+		return frame{}, false
+	}
 	currentClass := func() string {
 		for i := len(stack) - 1; i >= 0; i-- {
 			if stack[i].kind == frameClass {
@@ -198,7 +232,8 @@ func scanMethods(cleaned string) ([]int, []MethodRef) {
 			}
 			currentLine++
 		case '{':
-			f := classifyHeader(cleaned[headerStart:i], currentClass())
+			header := cleaned[headerStart:i]
+			f := classifyHeader(header, currentClass())
 			f.line = currentLine
 			idx := -1
 			if f.kind == frameMethod {
@@ -206,6 +241,23 @@ func scanMethods(cleaned string) ([]int, []MethodRef) {
 					idx = len(decl)
 					decl = append(decl, MethodRef{Class: cls, Name: f.name, Params: f.params, StartLine: currentLine})
 				}
+			} else if f.kind == frameOther {
+				// An initializer block directly in a class body.
+				if _, ok := topIsClass(); ok {
+					switch trimSpace(header) {
+					case "static":
+						if idx = initializer(true); idx >= 0 {
+							f.kind = frameMethod
+						}
+					case "":
+						if idx = initializer(false); idx >= 0 {
+							f.kind = frameMethod
+						}
+					}
+				}
+			}
+			if f.kind == frameClass {
+				f.iface = isInterfaceHeader(header)
 			}
 			stack = append(stack, f)
 			stackDecl = append(stackDecl, idx)
@@ -214,17 +266,40 @@ func scanMethods(cleaned string) ([]int, []MethodRef) {
 			if idx >= 0 && owner[currentLine] < 0 {
 				owner[currentLine] = innermost()
 			}
-			headerStart = i + 1
+			headerStart, headerLine = i+1, currentLine
 		case '}':
 			if n := len(stack); n > 0 {
-				if d := stackDecl[n-1]; d >= 0 {
+				if d := stackDecl[n-1]; d >= 0 && currentLine > decl[d].EndLine {
 					decl[d].EndLine = currentLine
 				}
 				stack, stackDecl = stack[:n-1], stackDecl[:n-1]
 			}
-			headerStart = i + 1
+			headerStart, headerLine = i+1, currentLine
 		case ';':
-			headerStart = i + 1
+			// A field declaration with an initializer directly in a class
+			// body: its lines belong to <clinit> or the constructors.
+			if cls, ok := topIsClass(); ok {
+				if static, isField := fieldInitializer(cleaned[headerStart:i], cls.iface); isField {
+					if d := initializer(static); d >= 0 {
+						start := headerLine
+						if headerStart < i && cleaned[headerStart] == '\n' {
+							start++
+						}
+						for l := start; l <= currentLine && l < len(owner); l++ {
+							if owner[l] < 0 || l == currentLine {
+								owner[l] = d
+							}
+						}
+						if decl[d].StartLine > start || decl[d].StartLine == 0 {
+							decl[d].StartLine = start
+						}
+						if currentLine > decl[d].EndLine {
+							decl[d].EndLine = currentLine
+						}
+					}
+				}
+			}
+			headerStart, headerLine = i+1, currentLine
 		}
 	}
 	if owner[currentLine] < 0 {
@@ -371,4 +446,44 @@ func trimSpace(s string) string {
 
 func isSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+var wordInterface = regexp.MustCompile(`(^|\s)(@?interface)\s`)
+
+func isInterfaceHeader(header string) bool {
+	return wordInterface.MatchString(" " + header + " ")
+}
+
+var wordStatic = regexp.MustCompile(`(^|[\s>])static\s`)
+
+// fieldInitializer reports whether a class-body statement (the text up
+// to its ';') declares a field with an initializer — an '=' outside
+// parentheses and brackets, with no parenthesis before it (a method
+// declaration has one) — and whether that field is static (an
+// interface's fields always are).
+func fieldInitializer(stmt string, inInterface bool) (static, ok bool) {
+	depth := 0
+	for i := 0; i < len(stmt); i++ {
+		switch stmt[i] {
+		case '(', '[', '<':
+			if stmt[i] == '(' && depth == 0 {
+				// "@Annotation(x = 1) int f = 2;" keeps going; a method
+				// header "int f(int a)" never has a top-level '=' after.
+				if j := strings.LastIndex(stmt[:i], "@"); j < 0 || strings.ContainsAny(stmt[j:i], " \t\n") {
+					return false, false
+				}
+			}
+			depth++
+		case ')', ']', '>':
+			if depth > 0 {
+				depth--
+			}
+		case '=':
+			if depth == 0 && (i+1 >= len(stmt) || stmt[i+1] != '=') {
+				head := stmt[:i]
+				return inInterface || wordStatic.MatchString(" "+head), true
+			}
+		}
+	}
+	return false, false
 }

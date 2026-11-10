@@ -66,7 +66,7 @@ type Result struct {
 	CVE     string   `json:"cve"`
 	Status  Status   `json:"status"`
 	Methods []string `json:"methods,omitempty"` // from vulnmap, carried through for the report
-	Source  string   `json:"source,omitempty"`  // vulnmap source: "manual", "diff" or "llm"
+	Source  string   `json:"source,omitempty"`  // vulnmap source: "manual", "diff", "release-diff" or "llm"
 	// Model/Evidence are set for Source "llm": the model id, and whether
 	// it saw a fix diff ("diff") or only the advisory text ("advisory").
 	Model    string `json:"model,omitempty"`

@@ -58,6 +58,9 @@ type Entry struct {
 	// references but none could be read and no other source mapped it
 	// (reason SOURCE_UNAVAILABLE).
 	SourceError string `json:"source_error,omitempty"`
+	// ReleaseDiffs is a release-diff mapping's evidence (CVE:F10): per
+	// component, the two releases compared and the named classes.
+	ReleaseDiffs []ReleaseDiff `json:"release_diffs,omitempty"`
 }
 
 // Mapped reports whether the entry names at least one method.
@@ -67,7 +70,7 @@ func (e Entry) Mapped() bool { return len(e.Methods) > 0 }
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "5" // 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
+const ResolverVersion = "6" // 6: CVE:F10 pull requests, field initializers, release diff; 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -109,6 +112,8 @@ func (e Entry) WithDefaults() Entry {
 		e.Role, e.Coverage, e.Review = orDefault(e.Role, RoleVulnerable), orDefault(e.Coverage, CoveragePartial), orDefault(e.Review, ReviewUnreviewed)
 	case SourceLLM:
 		e.Role, e.Coverage, e.Review = orDefault(e.Role, RoleVulnerable), orDefault(e.Coverage, CoverageUnknown), orDefault(e.Review, ReviewUnreviewed)
+	case SourceReleaseDiff:
+		e.Role, e.Coverage, e.Review = orDefault(e.Role, RoleVulnerable), orDefault(e.Coverage, CoveragePartial), orDefault(e.Review, ReviewUnreviewed)
 	case SourceManual:
 		e.Coverage, e.Review = orDefault(e.Coverage, CoveragePartial), orDefault(e.Review, ReviewReviewed)
 	}
@@ -148,6 +153,15 @@ type Resolver struct {
 	// the model's answer in the analyzed bytecode (nil skips the check).
 	LLM          *LLMSource
 	MethodExists func(fqcn, method string) bool
+	// ReleaseDiff enables the release-diff source (CVE:F10): for a CVE no
+	// earlier source mapped, the methods changed between the last release
+	// before the fix and the fixing release, in the classes the advisory
+	// names. CentralBaseURL overrides Maven Central (tests).
+	ReleaseDiff    bool
+	CentralBaseURL string
+	// LocalMavenRepo is read for a jar the cache lacks when offline
+	// (default ~/.m2/repository; set to a missing directory to disable).
+	LocalMavenRepo string
 	// Bytecode, when set, verifies fix-diff candidates in the analyzed
 	// classes (CVE:F5b): the descriptors of the methods named name that
 	// class fqcn declares, and whether the class is present at all.
@@ -199,6 +213,16 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 	if len(methods) > 0 {
 		sort.Strings(methods)
 		return Entry{Methods: methods, Source: SourceDiff, FixCommits: commits}.WithDefaults(), true, nil
+	}
+
+	if r.ReleaseDiff {
+		ms, diffs, err := r.resolveFromReleaseDiff(ctx, cve)
+		if err != nil {
+			return Entry{}, false, err
+		}
+		if len(ms) > 0 {
+			return Entry{Methods: ms, Source: SourceReleaseDiff, FixCommits: commits, ReleaseDiffs: diffs}.WithDefaults(), true, nil
+		}
 	}
 
 	if r.LLM != nil {

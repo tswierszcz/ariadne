@@ -254,6 +254,8 @@ type Mapping struct {
 	// file, the methods the fix changed, removed or added. Added methods
 	// are not in Methods: they are not code of the vulnerable release.
 	FixCommits []vulnmap.FixCommit `json:"fix_commits,omitempty"`
+	// ReleaseDiffs: a release-diff mapping's evidence (CVE:F10).
+	ReleaseDiffs []vulnmap.ReleaseDiff `json:"release_diffs,omitempty"`
 	// NewSideOnly: some fix commit or file was read on the post-fix side
 	// only (reason MAPPING_NEW_SIDE_ONLY on the v1 row).
 	NewSideOnly bool `json:"new_side_only,omitempty"`
@@ -535,7 +537,7 @@ func Build(in Inputs) Document {
 			adv.Mapping = &Mapping{
 				Methods: methods, MatchPrecision: vulnmap.MappingPrecision(methods), Source: e.Source,
 				Role: e.Role, Coverage: e.Coverage, Review: e.Review, Model: e.Model, Evidence: e.Evidence,
-				MethodRoles: e.MethodRoles, FixCommits: e.FixCommits, NewSideOnly: e.Source == vulnmap.SourceDiff && e.NewSideOnly(),
+				MethodRoles: e.MethodRoles, FixCommits: e.FixCommits, ReleaseDiffs: e.ReleaseDiffs, NewSideOnly: e.Source == vulnmap.SourceDiff && e.NewSideOnly(),
 			}
 			for _, v := range e.Variants {
 				adv.Mapping.Variants = append(adv.Mapping.Variants, MappingVariant{Package: v.Package, Versions: v.Versions, Methods: v.Methods})
