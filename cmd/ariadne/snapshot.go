@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"ariadne/internal/alloc"
+	"ariadne/internal/analysis"
 	"ariadne/internal/bootfeatures"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
@@ -77,6 +78,9 @@ func algorithmVersions(mode string) map[string]string {
 		"jdbc.objects": jdbcdispatch.Version,
 		// Framework proxies: creator-gated edges in every mode.
 		"framework.proxies": proxycatalog.Version,
+		// ROADMAP B3: how models and the creator gates reach their joint
+		// fixed point.
+		"analysis.coordinator": analysis.CoordinatorVersion,
 		// Undertow features a Spring Boot application leaves off: CHA/RTA
 		// targets in every mode.
 		"boot.features": bootfeatures.Version,

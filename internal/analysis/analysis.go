@@ -1,6 +1,16 @@
 // Package analysis coordinates registered library models with the
 // hierarchy-built call graph. It owns fixed-point iteration; models and
 // profiles remain data/evaluation providers.
+//
+// Two kinds of participant share one fixed point (ROADMAP B3): registered
+// models, evaluated at reachable call sites matched by exact signature,
+// and steps (Options.Steps) — passes with their own rule that add edges
+// given the graph and the roots, such as the creator gates
+// (callgraph.NewCreatorGate: SAM calls, servlet and JDBC objects,
+// framework proxies). Each iteration runs every step, then one model pass;
+// the analysis stops when an iteration adds no edge. Every participant
+// only adds edges and decides from reachability, which only grows, so the
+// fixed point does not depend on the order of the participants.
 package analysis
 
 import (
@@ -12,16 +22,39 @@ import (
 	"ariadne/internal/models"
 )
 
+// CoordinatorVersion versions the fixed-point rules: b3-1 iterated the
+// registered models alone; b3-2 iterates models and steps (the creator
+// gates) together. Snapshots record it.
+const CoordinatorVersion = "b3-2"
+
 // Options bounds work. MaxIterations must be positive; each iteration
-// processes the currently reachable call sites, then propagates new edges.
-type Options struct{ MaxIterations int }
+// runs every step, then processes the currently reachable call sites.
+type Options struct {
+	MaxIterations int
+	Steps         []Step
+}
+
+// Step is a fixed-point participant other than a registered model. Apply
+// adds the edges its rule admits for the graph and roots as they are now
+// and returns how many it added in this call (0 when it has nothing new).
+type Step struct {
+	Name  string
+	Apply func(g *callgraph.Graph, roots []uint32) int
+}
 
 // Result reports the mutated graph and the completeness of model analysis.
 type Result struct {
 	Graph      *callgraph.Graph
 	Facts      []models.Fact
 	Iterations int
+	// AddedEdges counts the model edges; StepEdges the edges each step
+	// added, by name.
 	AddedEdges int
+	StepEdges  map[string]int
+	// LastAdders names the participants (step names, "models") that still
+	// added edges in the final iteration — empty at a fixed point reached
+	// before the limit, the culprits when the limit stopped the analysis.
+	LastAdders []string
 	Incomplete bool
 	Reasons    []string
 }
@@ -46,10 +79,19 @@ func Run(h *hierarchy.Hierarchy, g *callgraph.Graph, registry *models.Registry, 
 			}
 		}
 	}
-	result := Result{Graph: g}
+	result := Result{Graph: g, StepEdges: map[string]int{}}
 	evaluated := make(map[string]bool)
 	for iteration := 1; iteration <= opts.MaxIterations; iteration++ {
 		result.Iterations = iteration
+		var adders []string
+		stepAdded := 0
+		for _, st := range opts.Steps {
+			if n := st.Apply(g, roots); n > 0 {
+				result.StepEdges[st.Name] += n
+				stepAdded += n
+				adders = append(adders, st.Name)
+			}
+		}
 		reachable := reachableNodes(g, roots)
 		var edges []callgraph.ModelEdge
 		for _, id := range reachable {
@@ -103,12 +145,16 @@ func Run(h *hierarchy.Hierarchy, g *callgraph.Graph, registry *models.Registry, 
 		}
 		added := callgraph.ApplyModelEdges(g, edges)
 		result.AddedEdges += added
-		if added == 0 {
+		if added > 0 {
+			adders = append(adders, "models")
+		}
+		result.LastAdders = adders
+		if added == 0 && stepAdded == 0 {
 			return result, nil
 		}
 	}
 	result.Incomplete = true
-	result.Reasons = appendUnique(result.Reasons, fmt.Sprintf("model analysis reached iteration limit (%d) before fixed point", opts.MaxIterations))
+	result.Reasons = appendUnique(result.Reasons, fmt.Sprintf("model analysis reached iteration limit (%d) before fixed point (still adding: %s)", opts.MaxIterations, joinOr(result.LastAdders)))
 	return result, nil
 }
 
@@ -156,6 +202,17 @@ func splitMethodKey(key string) (string, string, string, bool) {
 		return "", "", "", false
 	}
 	return key[:hash], key[hash+1 : open], key[open:], true
+}
+
+func joinOr(names []string) string {
+	if len(names) == 0 {
+		return "nothing"
+	}
+	out := names[0]
+	for _, n := range names[1:] {
+		out += ", " + n
+	}
+	return out
 }
 
 func appendUnique(in []string, value string) []string {
