@@ -442,7 +442,7 @@ default configuration creates it: `ConsoleAppender`, plus
 with no packaged file and no Spring Boot, with Boot's `logging.config` set, a
 Groovy configuration, a `Configurator` service, a `${…}` or unimported class,
 an include by file or URL, or application code running Joran. Log line:
-`logback appenders (l2-1; …): on …; off …`. Since builder `5`, a body an
+`logback appenders (l2-2; …): on …; off …`. Since builder `5`, a body an
 abstract class declares (`SMTPAppenderBase#append`, `DBAppenderBase#append`)
 is not a CHA target when every concrete subtype that inherits it is excluded
 by such a model. Control app: `scripts/prepare-logback-demo.sh` (Boot 2.4.5
@@ -450,9 +450,33 @@ defaults, `logging.file.name`, a `logback-spring.xml` with `SMTPAppender` —
 the model's appenders match the JVM's in all three). On petclinic and
 WebGoat (Boot defaults: console only) the appender paths are gone, but only
 CVE-2023-6378's logback-core instance changes (`FRAMEWORK` → `NOT_REACHABLE`):
-CVE-2021-42550 and CVE-2024-12798 stay `FRAMEWORK` through CHA over logback's
+CVE-2021-42550 and CVE-2024-12798 stayed `FRAMEWORK` through CHA over logback's
 `LifeCycle#start`/`#stop` (e.g. `StatusListenerConfigHelper` → every
-`LifeCycle`), which this model does not cover.
+`LifeCycle`).
+
+**logback's other Joran components (`l2-2`).** The same configuration now also
+decides the rest of what Joran creates: a *Joran-only component* is a concrete
+logback class (`ch.qos.logback.*`) implementing `LifeCycle` — not an appender,
+not a pattern converter (`PatternLayout`/`FileNamePattern` create those from
+their own maps) — that no code in the input creates with `new`: filters,
+turbo filters, evaluators, connection sources, rolling/triggering policies,
+layouts, receivers, discriminators, status listeners. It is a CHA/RTA target
+only when a class attribute anywhere in the packaged configuration names it,
+when it is Joran's default class of an element present without one
+(`<layout>` → `PatternLayout`, `<encoder>` → `PatternLayoutEncoder`,
+`<evaluator>` → `JaninoEventEvaluator`, `<discriminator>` →
+`MDCBasedDiscriminator`), when application code references it, or when Joran
+could create it from a one-argument setter's parameter type. Log line:
+`logback Joran-only components (l2-2): N on, M off (…)`. On petclinic and
+WebGoat (Boot defaults) 30 such components are off, and CVE-2024-12798
+(`JaninoEventEvaluator`) is `NOT_REACHABLE` instead of `FRAMEWORK`; the control
+app's `<evaluator>`-without-class variant keeps it (`FRAMEWORK`), as the JVM
+does (`Assuming default type [JaninoEventEvaluator]`). CVE-2021-42550 stays
+`FRAMEWORK` through `ContextJNDISelector`, which logback creates only under
+`-Dlogback.ContextSelector=JNDI` — a JVM setting the input does not show.
+Builder `6`: an excluded class's body is still a target when a kept subtype
+inherits it (`ConsoleAppender` runs `OutputStreamAppender#append`; builder
+`5` dropped such bodies).
 
 **A second bounded exception: JDK/javax service-provider interfaces.**
 A provider-based API — Bean Validation, JDBC, JCache — calls its provider

@@ -601,8 +601,12 @@ logback got the same model (`internal/logbackconfig`, `l2`), with Spring
 Boot's default configuration (console only, a file appender when
 `logging.file.*` is set) standing in when no logback file is packaged. On
 petclinic and WebGoat that removes the appender paths, yet two logback
-advisories stay `FRAMEWORK`: CHA reaches the same vulnerable classes through
+advisories stayed `FRAMEWORK`: CHA reaches the same vulnerable classes through
 logback's `LifeCycle#start`/`#stop` calls, a different over-approximation.
+Since `l2-2` the configuration also decides those components (evaluators,
+filters, connection sources… — anything only Joran creates), which takes
+CVE-2024-12798 to `NOT_REACHABLE` on both; CVE-2021-42550 remains `FRAMEWORK`
+through a context selector a JVM system property switches on.
 
 **And JDBC — `connection.prepareStatement(…)`, `rs.getInt(…)`?** Same story,
 same answer. `java.sql` is under the skip rule, and the service-provider

@@ -74,6 +74,7 @@ func TestReadConfig(t *testing.T) {
 	}
 	want := []string{
 		"ch.qos.logback.classic.AsyncAppender",
+		"ch.qos.logback.classic.boolex.JaninoEventEvaluator",
 		"ch.qos.logback.classic.net.SMTPAppender",
 		"ch.qos.logback.core.ConsoleAppender",
 		"ch.qos.logback.core.rolling.RollingFileAppender",
@@ -85,6 +86,9 @@ func TestReadConfig(t *testing.T) {
 	sort.Strings(got)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("classes %v", got)
+	}
+	if !c.Bare["expression"] || !c.Bare["root"] || c.Bare["evaluator"] {
+		t.Errorf("bare elements %v", c.Bare)
 	}
 
 	for name, files := range map[string]map[string]string{
@@ -211,5 +215,77 @@ func TestDecide(t *testing.T) {
 		if r.Applies || r.Excluded(smtp) || !strings.Contains(r.Why, tc.why) {
 			t.Errorf("%s: %+v", name, r)
 		}
+	}
+}
+
+// TestDecideComponents (l2-2): Joran-only components follow the
+// configuration; converters, created classes, setter parameter types and
+// appenders are never in the rule.
+func TestDecideComponents(t *testing.T) {
+	const (
+		lc        = "ch.qos.logback.core.spi.LifeCycle"
+		janino    = "ch.qos.logback.classic.boolex.JaninoEventEvaluator"
+		janBase   = "ch.qos.logback.core.boolex.JaninoEventEvaluatorBase"
+		dsSource  = "ch.qos.logback.core.db.DataSourceConnectionSource"
+		threshold = "ch.qos.logback.classic.filter.ThresholdFilter"
+		conv      = "ch.qos.logback.classic.pattern.LevelConverter"
+		matcher   = "ch.qos.logback.core.boolex.Matcher"
+		encoder   = "ch.qos.logback.classic.encoder.PatternLayoutEncoder"
+		helper    = "ch.qos.logback.core.util.StatusListenerConfigHelper"
+	)
+	iface := func(fqcn string, ifs ...string) *hierarchy.ClassInfo {
+		return &hierarchy.ClassInfo{FQCN: fqcn, SuperClass: "java.lang.Object", Interfaces: ifs, AccessFlags: classfile.AccInterface | classfile.AccAbstract,
+			Methods: []hierarchy.Method{method("start", "()V", true)}}
+	}
+	extra := []*hierarchy.ClassInfo{
+		iface(lc),
+		iface("ch.qos.logback.core.pattern.Converter", lc),
+		{FQCN: janBase, SuperClass: "java.lang.Object", Interfaces: []string{lc}, AccessFlags: classfile.AccAbstract, Methods: []hierarchy.Method{method("start", "()V", false)}},
+		class(janino, janBase, nil, false),
+		class(dsSource, "java.lang.Object", []string{lc}, false, method("start", "()V", false)),
+		class(threshold, "java.lang.Object", []string{lc}, false, method("start", "()V", false)),
+		class(conv, "java.lang.Object", []string{"ch.qos.logback.core.pattern.Converter"}, false, method("start", "()V", false)),
+		class(matcher, "java.lang.Object", []string{lc}, false, method("start", "()V", false)),
+		class(encoder, "java.lang.Object", []string{lc}, false, method("start", "()V", false)),
+		// JaninoEventEvaluatorBase's host: an adder typed with Matcher, and
+		// a `new PatternLayoutEncoder` (Spring Boot's defaults).
+		class("ch.qos.logback.core.boolex.Host", "java.lang.Object", nil, false,
+			method("addMatcher", "(L"+strings.ReplaceAll(matcher, ".", "/")+";)V", false),
+			hierarchy.Method{Method: classfile.Method{Name: "boot", Descriptor: "()V"}, InitRefs: []classfile.InitRef{{Kind: classfile.InitNew, Owner: encoder}}}),
+		// StatusListenerConfigHelper's shape: LifeCycle#start on a
+		// reflectively created object.
+		class(helper, "java.lang.Object", nil, false,
+			method("initAndAddListener", "()V", false, classfile.Call{Kind: classfile.CallInterface, Owner: lc, Name: "start", Desc: "()V", PC: 1})),
+	}
+	h := fixture(true, extra...)
+	noBoot := bootfeatures.Config{Values: map[string][]string{}}
+	r := Decide(h, Config{Classes: map[string]string{}, Bare: map[string]bool{}}, noBoot)
+	got := map[string]bool{}
+	for _, st := range r.Components {
+		got[st.Class] = st.On
+	}
+	want := map[string]bool{janino: false, dsSource: false, threshold: false, matcher: true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("components %v, want %v (converter, created encoder and abstract base never in the rule)", got, want)
+	}
+	g := callgraph.BuildWith(h, callgraph.CHA{Exclude: r.Excluded, ExcludeRule: "test"})
+	from, _ := g.ID(helper, "initAndAddListener", "()V")
+	reaches := func(owner string) bool {
+		to, ok := g.ID(owner, "start", "()V")
+		if !ok {
+			return false
+		}
+		_, ok = g.EdgeBetween(from, to)
+		return ok
+	}
+	if reaches(janBase) || reaches(dsSource) || !reaches(matcher) || !reaches(conv) || !reaches(encoder) {
+		t.Error("LifeCycle#start targets do not follow the component decision")
+	}
+
+	// A bare <evaluator> turns on its default class, a class attribute
+	// the class it names.
+	r = Decide(h, Config{Files: []string{"app.jar!/logback.xml"}, Classes: map[string]string{dsSource: "app.jar!/logback.xml"}, Bare: map[string]bool{"evaluator": true}}, noBoot)
+	if r.Excluded(janino) || r.Excluded(dsSource) || !r.Excluded(threshold) {
+		t.Errorf("configured components: %+v", r.Components)
 	}
 }

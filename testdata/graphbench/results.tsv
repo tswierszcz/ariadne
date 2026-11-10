@@ -1,13 +1,13 @@
 app	roots	mode	wall_s	peak_rss_mb	nodes	edges	cha_edges	cha_removed	cha_kept_by_fallback	reachable_methods	live_classes	live_only_by_fallback	active_alloc_gaps	catalog_types	catalog_gaps	model_gap_sites	model_gap_sites_reachable	servlet_registrations	model_edges	sam_edges	sam_edges_gated	R/F/NR/U/NA	edges_removed_vs_cha	edges_added_vs_cha	findings_changed_vs_cha	verdicts_changed_vs_cha
-petclinic	profile	cha	13.2-14.1	1345-1501	257640	1026880	321823	0	0					17764	328	1096	679	5	4031	1629	2524	6/72/12/57/6				
-petclinic	profile	rta	12.4-12.8	1335-1351	257640	990892	321823	35988	35674	120801	17379	5847	container-proxy=4,dynamic-proxy=37,reflection-unresolved=152,service-unresolved=4,unsafe-allocation=1	17764	328	1097	639	5	4031	1629	2524	6/68/16/57/6	35988	0	9	4
-petclinic	all	cha	12.0-12.2	1317-1492	257640	1026880	321823	0	0					17763	329	1096	679	5	4031	1629	2524	6/72/12/57/6				
-petclinic	all	rta	12.7-12.8	1355-1398	257640	1020982	321823	5898	59362	131334	21843	9650	container-proxy=4,dynamic-proxy=38,external-input=1,reflection-unresolved=163,service-unresolved=5,unsafe-allocation=1	17763	329	1097	677	5	4031	1629	2524	6/72/12/57/6	5898	0	1	0
-webgoat	profile	cha	18.5-18.9	1677-1886	320293	1433772	569312	0	0					26598	327	1194	740	0	2187	1557	2269	54/37/13/60/0				
-webgoat	profile	rta	19.2-19.6	1644-1719	320293	1350454	569312	83318	162166	147648	25173	10661	constructor-handle=2,container-proxy=2,dynamic-proxy=32,reflection-unresolved=145,service-unresolved=4,unsafe-allocation=4	26598	327	1201	667	0	2187	1557	2269	53/35/16/60/0	83318	0	6	3
-webgoat	all	cha	21.8-23.8	1635-1712	320293	1433777	569312	0	0					26594	328	1194	741	0	2193	1558	2264	54/37/13/60/0				
-webgoat	all	rta	19.7-20.4	1712-1882	320293	1419009	569312	14768	103839	169785	32215	13244	constructor-handle=2,container-proxy=2,dynamic-proxy=35,external-input=1,reflection-unresolved=172,service-unresolved=5,unsafe-allocation=4	26594	328	1201	743	0	2193	1558	2264	54/37/13/60/0	14768	0	1	0
-jpetstore	profile	cha	3.4-3.5	297-321	58592	225529	59460	0	0					4258	87	364	157	1	93	0	0	0/10/13/12/0				
-jpetstore	profile	rta	3.5-3.6	291-300	58592	212429	59460	13100	16217	20208	3205	1263	dynamic-proxy=14,reflection-unresolved=27,unsafe-allocation=1	4258	87	365	144	1	93	0	0	0/9/14/12/0	13100	0	1	1
-jpetstore	all	cha	3.4-3.4	296-310	58592	225529	59460	0	0					4258	88	364	157	1	93	0	0	0/10/13/12/0				
-jpetstore	all	rta	3.4-3.5	305-319	58592	212608	59460	12921	16392	20530	3228	1280	dynamic-proxy=14,external-input=1,reflection-unresolved=27,unsafe-allocation=1	4258	88	365	144	1	93	0	0	0/9/14/12/0	12921	0	1	1
+petclinic	profile	cha	14.2-14.7	1347-1403	257640	1026586	321532	0	0					17764	328	1096	678	5	4019	1629	2524	6/71/13/57/6				
+petclinic	profile	rta	12.8-13.0	1355-1377	257640	990810	321532	35776	35610	120749	17376	5849	container-proxy=4,dynamic-proxy=37,reflection-unresolved=152,service-unresolved=4,unsafe-allocation=1	17764	328	1097	638	5	4019	1629	2524	6/67/17/57/6	35776	0	9	4
+petclinic	all	cha	11.9-12.4	1353-1431	257640	1026586	321532	0	0					17763	329	1096	678	5	4019	1629	2524	6/71/13/57/6				
+petclinic	all	rta	11.9-13.7	1353-1426	257640	1020688	321532	5898	59095	131101	21837	9665	container-proxy=4,dynamic-proxy=38,external-input=1,reflection-unresolved=163,service-unresolved=5,unsafe-allocation=1	17763	329	1097	676	5	4019	1629	2524	6/71/13/57/6	5898	0	1	0
+webgoat	profile	cha	17.2-17.6	1645-1781	320293	1433485	569025	0	0					26598	327	1194	739	0	2181	1557	2269	54/36/14/60/0				
+webgoat	profile	rta	18.1-18.2	1717-1776	320293	1350379	569025	83106	162106	147622	25171	10663	constructor-handle=2,container-proxy=2,dynamic-proxy=32,reflection-unresolved=145,service-unresolved=4,unsafe-allocation=4	26598	327	1201	666	0	2181	1557	2269	53/34/17/60/0	83106	0	6	3
+webgoat	all	cha	17.4-17.6	1712-1730	320293	1433490	569025	0	0					26594	328	1194	740	0	2187	1558	2264	54/36/14/60/0				
+webgoat	all	rta	18.2-19.3	1735-1768	320293	1418722	569025	14768	103576	169581	32209	13258	constructor-handle=2,container-proxy=2,dynamic-proxy=35,external-input=1,reflection-unresolved=172,service-unresolved=5,unsafe-allocation=4	26594	328	1201	742	0	2187	1558	2264	54/36/14/60/0	14768	0	1	0
+jpetstore	profile	cha	3.1-3.2	299-325	58592	225538	59469	0	0					4258	87	364	161	1	93	0	0	0/10/13/12/0				
+jpetstore	profile	rta	3.2-3.2	310-317	58592	212438	59469	13100	16226	20247	3205	1263	dynamic-proxy=14,reflection-unresolved=27,unsafe-allocation=1	4258	87	365	144	1	93	0	0	0/9/14/12/0	13100	0	1	1
+jpetstore	all	cha	3.1-3.2	303-313	58592	225538	59469	0	0					4258	88	364	161	1	93	0	0	0/10/13/12/0				
+jpetstore	all	rta	3.2-3.2	297-311	58592	212617	59469	12921	16401	20569	3228	1280	dynamic-proxy=14,external-input=1,reflection-unresolved=27,unsafe-allocation=1	4258	88	365	144	1	93	0	0	0/9/14/12/0	12921	0	1	1

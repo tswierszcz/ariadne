@@ -147,7 +147,10 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 			continue
 		}
 		decl, ok := h.ResolveExact(sub, call.Name, call.Desc)
-		if !ok || decl == call.Owner || seen[decl] || skip(decl) || excluded(decl) {
+		// The declaring class may itself be excluded (log4j's WriterAppender,
+		// logback's OutputStreamAppender): an exclusion is about the runtime
+		// type, and sub — kept — runs this body (builder 6).
+		if !ok || decl == call.Owner || seen[decl] || skip(decl) {
 			continue
 		}
 		declInfo, ok := h.Lookup(decl)
