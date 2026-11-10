@@ -597,6 +597,12 @@ so CHA sent every log call to every appender log4j ships, `JDBCAppender` and
 `log4j.properties`/`log4j.xml` and the application code do not name are no
 longer CHA/RTA targets — but only when a packaged configuration is found and
 fully readable, since a deployment can point log4j at another file.
+logback got the same model (`internal/logbackconfig`, `l2`), with Spring
+Boot's default configuration (console only, a file appender when
+`logging.file.*` is set) standing in when no logback file is packaged. On
+petclinic and WebGoat that removes the appender paths, yet two logback
+advisories stay `FRAMEWORK`: CHA reaches the same vulnerable classes through
+logback's `LifeCycle#start`/`#stop` calls, a different over-approximation.
 
 **And JDBC — `connection.prepareStatement(…)`, `rs.getInt(…)`?** Same story,
 same answer. `java.sql` is under the skip rule, and the service-provider

@@ -20,6 +20,7 @@ import (
 	"ariadne/internal/alloc"
 	"ariadne/internal/analysis"
 	"ariadne/internal/aop"
+	"ariadne/internal/appref"
 	"ariadne/internal/atomicfile"
 	"ariadne/internal/bootfeatures"
 	"ariadne/internal/callback"
@@ -33,6 +34,7 @@ import (
 	"ariadne/internal/input"
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/log4jconfig"
+	"ariadne/internal/logbackconfig"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/models"
 	"ariadne/internal/profile"
@@ -684,15 +686,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	// log4j 1.2 appenders the packaged configuration leaves out
 	// (internal/log4jconfig, FRAMEWORKS:F2 l1): not CHA/RTA targets.
-	log4jJars := []log4jconfig.Jar{{Path: prepared.AppClassesJar, Name: "application"}}
+	classPathJars := []appref.Jar{{Path: prepared.AppClassesJar, Name: "application"}}
 	for _, dj := range depJars {
 		name := filepath.Base(dj.Path)
 		if entry, ok := prepared.LibEntries[name]; ok {
 			name = entry
 		}
-		log4jJars = append(log4jJars, log4jconfig.Jar{Path: dj.Path, Name: name})
+		classPathJars = append(classPathJars, appref.Jar{Path: dj.Path, Name: name})
 	}
-	log4jConfig, err := log4jconfig.ReadConfig(log4jJars, prepared.WebXMLs)
+	log4jConfig, err := log4jconfig.ReadConfig(classPathJars, prepared.WebXMLs)
 	if err != nil {
 		warnings = append(warnings, "reading packaged log4j configuration: "+err.Error())
 	}
@@ -706,6 +708,23 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 	case log4jAppenders.Why != "log4j 1.2 not in the input":
 		log("log4j 1.2 appenders (%s): every appender kept — %s", log4jconfig.Version, log4jAppenders.Why)
+	}
+	// logback appenders the configuration (or Spring Boot's default
+	// configuration) leaves out (internal/logbackconfig, FRAMEWORKS:F2 l2).
+	logbackConfig, err := logbackconfig.ReadConfig(classPathJars)
+	if err != nil {
+		warnings = append(warnings, "reading packaged logback configuration: "+err.Error())
+	}
+	logbackAppenders := logbackconfig.Decide(h, logbackConfig, bootConfig)
+	switch {
+	case logbackAppenders.Applies:
+		log("logback appenders (%s; %s): on %s; off %s", logbackconfig.Version, logbackAppenders.Source, strings.Join(logbackAppenders.On(), ", "), strings.Join(logbackAppenders.Off(), ", "))
+		if off := logbackAppenders.Off(); len(off) > 0 {
+			excludes = append(excludes, logbackAppenders.Excluded)
+			excludeRules = append(excludeRules, "logback appenders not in the configuration not expanded ("+logbackconfig.Version+": "+strings.Join(off, ", ")+")")
+		}
+	case logbackAppenders.Why != logbackconfig.NotInInput:
+		log("logback appenders (%s): every appender kept — %s", logbackconfig.Version, logbackAppenders.Why)
 	}
 	if len(excludes) > 0 {
 		exclude := func(class string) bool {

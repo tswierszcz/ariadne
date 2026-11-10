@@ -24,6 +24,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/log4jconfig"
+	"ariadne/internal/logbackconfig"
 	"ariadne/internal/reach"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/runtimeevents"
@@ -79,6 +80,9 @@ func algorithmVersions(mode string) map[string]string {
 		// log4j 1.2 appenders the packaged configuration leaves out:
 		// CHA/RTA targets in every mode.
 		"log4j.appenders": log4jconfig.Version,
+		// logback appenders the configuration leaves out: CHA/RTA targets
+		// in every mode.
+		"logback.appenders": logbackconfig.Version,
 	}
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the

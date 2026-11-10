@@ -44,7 +44,7 @@ import (
 	"sort"
 	"strings"
 
-	"ariadne/internal/classfile"
+	"ariadne/internal/appref"
 	"ariadne/internal/hierarchy"
 )
 
@@ -106,10 +106,7 @@ type Config struct {
 }
 
 // Jar is a jar to look in, with the name to report it by.
-type Jar struct {
-	Path string
-	Name string
-}
+type Jar = appref.Jar
 
 // ReadConfig reads log4j.properties and log4j.xml at the root of every
 // jar (the application's classes first), plus the class-path file a
@@ -288,9 +285,9 @@ func Decide(h *hierarchy.Hierarchy, c Config) Result {
 	if len(c.Unreadable) > 0 {
 		return Result{Why: strings.Join(c.Unreadable, "; ")}
 	}
-	refs := appReferences(h)
+	refs := appref.Collect(h)
 	for _, cfg := range configurators {
-		if by, ok := refs.member(cfg); ok {
+		if by, ok := refs.Member(cfg); ok {
 			return Result{Why: fmt.Sprintf("application code loads a configuration itself (%s calls %s)", by, cfg)}
 		}
 	}
@@ -302,7 +299,7 @@ func Decide(h *hierarchy.Hierarchy, c Config) Result {
 		st := State{Class: class}
 		if file, ok := c.Classes[class]; ok {
 			st.On, st.Why = true, "configured in "+file
-		} else if by, ok := refs.owner(class); ok {
+		} else if by, ok := refs.Owner(class); ok {
 			st.On, st.Why = true, "referenced by "+by
 		} else {
 			st.Why = "not configured or referenced"
@@ -342,54 +339,6 @@ func (r Result) On() []string {
 	for _, st := range r.States {
 		if st.On {
 			out = append(out, st.Class[strings.LastIndex(st.Class, ".")+1:])
-		}
-	}
-	return out
-}
-
-type references map[string]string // "owner#member" -> first referencing application class
-
-func (rf references) member(symbol string) (string, bool) {
-	by, ok := rf[symbol]
-	return by, ok
-}
-
-func (rf references) owner(class string) (string, bool) {
-	best := ""
-	for k, by := range rf {
-		if o, _, _ := strings.Cut(k, "#"); o == class && (best == "" || by < best) {
-			best = by
-		}
-	}
-	return best, best != ""
-}
-
-// appReferences collects every symbol application classes call, create
-// or read statically.
-func appReferences(h *hierarchy.Hierarchy) references {
-	out := references{}
-	note := func(k, by string) {
-		if prev, ok := out[k]; !ok || by < prev {
-			out[k] = by
-		}
-	}
-	for _, fqcn := range h.SortedFQCNs() {
-		ci, _ := h.Lookup(fqcn)
-		if !ci.IsApp {
-			continue
-		}
-		for _, m := range ci.Methods {
-			for _, c := range m.Calls {
-				note(c.Owner+"#"+c.Name, fqcn)
-			}
-			for _, ref := range m.InitRefs {
-				switch ref.Kind {
-				case classfile.InitNew:
-					note(ref.Owner+"#<init>", fqcn)
-				case classfile.InitGetStatic:
-					note(ref.Owner+"#"+ref.Name, fqcn)
-				}
-			}
 		}
 	}
 	return out

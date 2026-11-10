@@ -425,6 +425,35 @@ JVM: CVE-2022-23305 `REACHABLE` only where `JDBCAppender` runs). On
 JPetStore (CHA): CVE-2021-4104 and CVE-2022-23305 `REACHABLE` →
 `NOT_REACHABLE`, CVE-2022-41853 `REACHABLE` → `FRAMEWORK`.
 
+**logback appenders the configuration leaves out (`internal/logbackconfig`,
+`l2`).** The same for logback: CHA sends `Appender#doAppend` and the base
+classes' `this.append` to all 20 appenders logback-core/classic ship
+(`DBAppender`, `SMTPAppender` with its evaluator, `RollingFileAppender`'s
+rollover…). An appender stays a target when a packaged `logback.xml`,
+`logback-test.xml`, `logback-spring.xml` or `logback-test-spring.xml` names it
+(`<appender class>` anywhere, `<include resource>` followed into the input's
+jars — Spring Boot's `base.xml` includes its file appender — short names
+through `<import>`), when application code references it, or — with no
+packaged file and Spring Boot's logging system in the input — when Boot's
+default configuration creates it: `ConsoleAppender`, plus
+`RollingFileAppender` if a packaged `application*` file sets
+`logging.file.name`/`logging.file.path` (or the older
+`logging.file`/`logging.path`; a placeholder counts). Every appender stays on
+with no packaged file and no Spring Boot, with Boot's `logging.config` set, a
+Groovy configuration, a `Configurator` service, a `${…}` or unimported class,
+an include by file or URL, or application code running Joran. Log line:
+`logback appenders (l2-1; …): on …; off …`. Since builder `5`, a body an
+abstract class declares (`SMTPAppenderBase#append`, `DBAppenderBase#append`)
+is not a CHA target when every concrete subtype that inherits it is excluded
+by such a model. Control app: `scripts/prepare-logback-demo.sh` (Boot 2.4.5
+defaults, `logging.file.name`, a `logback-spring.xml` with `SMTPAppender` —
+the model's appenders match the JVM's in all three). On petclinic and
+WebGoat (Boot defaults: console only) the appender paths are gone, but only
+CVE-2023-6378's logback-core instance changes (`FRAMEWORK` → `NOT_REACHABLE`):
+CVE-2021-42550 and CVE-2024-12798 stay `FRAMEWORK` through CHA over logback's
+`LifeCycle#start`/`#stop` (e.g. `StatusListenerConfigHelper` → every
+`LifeCycle`), which this model does not cover.
+
 **A second bounded exception: JDK/javax service-provider interfaces.**
 A provider-based API — Bean Validation, JDBC, JCache — calls its provider
 through an interface in a skipped package (`javax.validation.spi.

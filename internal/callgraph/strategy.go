@@ -127,6 +127,9 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 		// it resolves like any declared method and its own Calls carry the
 		// analysis to the covariant implementation.
 		if _, ok := subInfo.MethodByNameAndDesc(call.Name, call.Desc); ok {
+			if c.Exclude != nil && onlyExcludedInherit(h, sub, subInfo, call, skip, excluded) {
+				continue
+			}
 			if !seen[sub] {
 				seen[sub] = true
 				out = append(out, sub)
@@ -160,6 +163,35 @@ func (c CHA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 		out = append(out, decl)
 	}
 	return out
+}
+
+// onlyExcludedInherit reports whether the body an abstract class or an
+// interface declares runs only for excluded classes: concrete subtypes
+// select it, and every one of them is excluded (or skipped). Such a body
+// is not a target — the exclusion says those classes do not run here
+// (logback's SMTPAppenderBase#append, inherited only by the SMTPAppender
+// the configuration leaves out). A body no concrete subtype in the input
+// selects keeps CHA's usual treatment; only a strategy with an Exclude
+// asks.
+func onlyExcludedInherit(h *hierarchy.Hierarchy, decl string, info *hierarchy.ClassInfo, call classfile.Call, skip SkipFunc, excluded func(string) bool) bool {
+	if info.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) == 0 {
+		return false
+	}
+	inheritors := 0
+	for _, s := range h.Subtypes(decl) {
+		si, ok := h.Lookup(s)
+		if !ok || si.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) != 0 {
+			continue
+		}
+		if d, ok := h.ResolveExact(s, call.Name, call.Desc); !ok || d != decl {
+			continue
+		}
+		if !skip(s) && !excluded(s) {
+			return false
+		}
+		inheritors++
+	}
+	return inheritors > 0
 }
 
 // StrategyFor returns the strategy of a -callgraph-mode value.
