@@ -254,6 +254,14 @@ were exactly these handlers passing their `Method` on), and Spring Data's reposi
 `SimpleJpaRepository` through the profile's synthetic edges. Expected effect on reachability:
 small; not started.
 
+**Built afterwards as a catalog (2026-11-10, `framework:proxies` `x1`):** the interface sets are
+taken from what the frameworks document — MyBatis mappers, `SqlSessionTemplate`'s `SqlSession`,
+Spring Data repositories, Spring ORM's `EntityManager`/`Query`/`EntityManagerFactory` — and each
+edge waits for the handler's creator. On a new petclinic recording all 13 `proxy` relations are
+graph edges (relations not in the graph 148 → 127); on JPetStore 6 of 8 (the 2 left are
+`SqlSessionTemplate` → `SqlSessionInterceptor`: Spring creates the template only reflectively, so
+the gate keeps its interceptor out). README, "Framework proxies".
+
 ## A second application: JPetStore 6.0.2 (WAR)
 
 2026-11-09: the same measurement on MyBatis JPetStore 6.0.2 (`scripts/prepare-jpetstore.sh`), a

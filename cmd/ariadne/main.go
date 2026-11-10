@@ -38,6 +38,7 @@ import (
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/models"
 	"ariadne/internal/profile"
+	"ariadne/internal/proxycatalog"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/report"
@@ -1149,15 +1150,27 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	jdbcEdges := jdbcdispatch.ObjectEdges(h)
 	jdbcGate := callgraph.NewCreatorGate(g, h, jdbcEdges, callgraph.BasisModel)
 	jdbcTime := time.Since(jdbcStart)
-	applyGates := func() (callgraph.SAMStats, callgraph.SAMStats, callgraph.SAMStats) {
-		var sam, obj, jdbc callgraph.SAMStats
+	// Framework proxies (FRAMEWORKS F3 slice 3, framework:proxies): calls
+	// on MyBatis mappers, Spring Data repositories and Spring ORM's JPA
+	// interfaces reach the InvocationHandler the framework's proxy runs,
+	// once a method creating that handler is reachable.
+	proxyStart := time.Now()
+	proxies, err := proxycatalog.Find(h, classPathJars)
+	if err != nil {
+		warnings = append(warnings, "framework proxies: "+err.Error())
+	}
+	proxyGate := callgraph.NewCreatorGate(g, h, proxies.Edges, callgraph.BasisModel)
+	proxyTime := time.Since(proxyStart)
+	applyGates := func() (callgraph.SAMStats, callgraph.SAMStats, callgraph.SAMStats, callgraph.SAMStats) {
+		var sam, obj, jdbc, proxy callgraph.SAMStats
 		for {
-			before := sam.Added + obj.Added + jdbc.Added
+			before := sam.Added + obj.Added + jdbc.Added + proxy.Added
 			sam = samGate.Apply(g, roots)
 			obj = objGate.Apply(g, roots)
 			jdbc = jdbcGate.Apply(g, roots)
-			if sam.Added+obj.Added+jdbc.Added == before {
-				return sam, obj, jdbc
+			proxy = proxyGate.Apply(g, roots)
+			if sam.Added+obj.Added+jdbc.Added+proxy.Added == before {
+				return sam, obj, jdbc, proxy
 			}
 		}
 	}
@@ -1168,11 +1181,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	log("models: %d facts, %d edges added, %d iterations (incomplete=%t)", len(modelResult.Facts), modelResult.AddedEdges, modelResult.Iterations, modelResult.Incomplete)
 	// Model edges can make more creators reachable.
-	samApplied, objApplied, jdbcApplied := applyGates()
+	samApplied, objApplied, jdbcApplied, proxyApplied := applyGates()
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		jdbcdispatch.ModelID, jdbcdispatch.Version, len(jdbcEdges), jdbcApplied.Added, jdbcApplied.Covered, jdbcApplied.Gated, jdbcTime.Round(time.Millisecond))
+	log("framework proxies (%s %s): %d MyBatis mappers, %d Spring Data repositories; %d candidates (%s), %d edges added, %d already in the graph, %d left out (no method creating the handler is reachable from the roots)%s, in %s",
+		proxycatalog.ModelID, proxycatalog.Version, len(proxies.Mappers), len(proxies.Repositories), len(proxies.Edges), proxySummary(proxies.ByProxy),
+		proxyApplied.Added, proxyApplied.Covered, proxyApplied.Gated, noCreatorSummary(proxies.NoCreator), proxyTime.Round(time.Millisecond))
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
 		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)
@@ -1726,6 +1742,29 @@ func bootFeatureSummary(r bootfeatures.Result) string {
 		parts = append(parts, p+")")
 	}
 	return strings.Join(parts, "; ")
+}
+
+func proxySummary(by map[string]int) string {
+	if len(by) == 0 {
+		return "none"
+	}
+	names := make([]string, 0, len(by))
+	for n := range by {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	parts := make([]string, len(names))
+	for i, n := range names {
+		parts[i] = fmt.Sprintf("%s %d", n, by[n])
+	}
+	return strings.Join(parts, ", ")
+}
+
+func noCreatorSummary(entries []string) string {
+	if len(entries) == 0 {
+		return ""
+	}
+	return "; handler never created in the input: " + strings.Join(entries, ", ")
 }
 
 func servletRegistrationSummary(regs []servletdispatch.Registration) string {

@@ -25,6 +25,7 @@ import (
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
+	"ariadne/internal/proxycatalog"
 	"ariadne/internal/reach"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/runtimeevents"
@@ -74,6 +75,8 @@ func algorithmVersions(mode string) map[string]string {
 		"spi.dispatch":     spidispatch.Version,
 		// JDBC objects: creator-gated edges in every mode.
 		"jdbc.objects": jdbcdispatch.Version,
+		// Framework proxies: creator-gated edges in every mode.
+		"framework.proxies": proxycatalog.Version,
 		// Undertow features a Spring Boot application leaves off: CHA/RTA
 		// targets in every mode.
 		"boot.features": bootfeatures.Version,
