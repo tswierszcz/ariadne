@@ -67,9 +67,12 @@ type Header struct {
 	SAMLine  string
 	// TargetRuntime (CVE:F8a): the deployed runtime and the state of its
 	// assessment, one line.
-	TargetRuntime   string
-	UnresolvedDyn   int
-	UnresolvedOwner int
+	TargetRuntime string
+	// RuntimeAdvisories (CVE:F8b): the runtime\'s affected and undetermined
+	// advisories (not_affected ones are only counted).
+	RuntimeAdvisories []RuntimeAdvisory
+	UnresolvedDyn     int
+	UnresolvedOwner   int
 	// Model gaps (contract §4): unresolved dynamic sites, those reachable
 	// from the roots, and those of them with no bounded candidate set.
 	GapSites, GapsReachable, GapsUnbounded int
@@ -751,4 +754,10 @@ func (r Runtime) MultiDefinedText() string {
 		return "none"
 	}
 	return strings.Join(r.Result.MultiDefined, ", ")
+}
+
+// RuntimeAdvisory is one row of "Target runtime advisories".
+type RuntimeAdvisory struct {
+	CVE, Advisory, URL, Component, Applicability, LastAffected, Reason string
+	CVSS                                                               float64
 }
