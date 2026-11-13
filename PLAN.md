@@ -221,6 +221,11 @@ this; artifacts live under the gitignored `work/`. Findings:
   2. `vulnerable-components` depends on `webgoat-container` as `provided`, which is only
      resolvable from the local repo, so `webgoat-container` needs `mvn install` (not just
      `package`) before `dependency:copy-dependencies`/`dependency:list` work on the lesson.
+  - **Superseded 2026-11-13:** the input is now what the deployable (`webgoat-server`)
+    contains — the container, every lesson (compiled with `resources:resources
+    compiler:compile` called directly, so the cross-site-scripting lesson's asciidoctor
+    step never runs) and the `StartWebGoat` launcher; dependencies are `webgoat-server`'s
+    own resolution (131 jars). See RECOMMENDATION/IMPLEMENTATION_STATUS.MD.
   - `app-classes.jar` merges both modules' `target/classes`. 126 runtime dependency jars.
     `deps.txt` confirms `com.thoughtworks.xstream:xstream:jar:1.4.5` — old XStream, as
     section 2 expects for the control case.

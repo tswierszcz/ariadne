@@ -30,6 +30,48 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### GRAPH_PRECISION — pełne wejście WebGoata (`webgoat-full-input`) — DONE for this scope (2026-11-13)
+
+- **Zakres (zatwierdzony 2026-11-13):** wejście WebGoata = zawartość
+  wdrożenia `webgoat-server` (kontener, wszystkie lekcje, launcher), zależności
+  z rozwiązania `webgoat-server`.
+- **Zmiana (`scripts/prepare-webgoat.sh`):** instalacja pom-ów rodziców (`-N`)
+  i kontenera; lekcje kompilowane przez bezpośrednie wywołanie celów
+  `resources:resources compiler:compile` (lekcja cross-site-scripting nie
+  uruchamia wtedy asciidoctora, który pod JDK 17 pada); każda lekcja
+  instalowana jako jar (`install:install-file`), potem `webgoat-server`
+  kompilowany Mavenem (koniec obejścia `javac` + Lombok z PR #51) i jego
+  zależności (`dependency:copy-dependencies`/`list`, bez modułów WebGoata i
+  opcjonalnego `spring-boot-devtools`). Do `app-classes.jar` trafiają klasy
+  kontenera (z zasobami), klasy lekcji (bez zasobów — nieczytane przez
+  ariadne, i18n ma kolizje nazw) i launchera.
+- **Wynik (WebGoat):** 72 → 246 klas aplikacji, 126 → 131 jarów zależności
+  (+ PostgreSQL JDBC, jsoup, jjwt, zxcvbn, commons-lang 2.6, checker-qual;
+  − `jakarta.activation-api`, mediowany przez Mavena); 7 rejestracji servletów
+  (+ `@WebServlet` `ImageServlet` lekcji challenge); +39 173 krawędzi (CHA
+  `-roots all`); 164 → 172 advisories, **żaden z dotychczasowych 164
+  werdyktów się nie zmienił** (offline, ten sam cache). Nowe: PostgreSQL
+  CVE-2022-21724, CVE-2022-41946, CVE-2024-1597 `REACHABLE` przez sterownik
+  rejestrowany w `META-INF/services` (domyślna konfiguracja WebGoata używa
+  HSQLDB — użycie zależy od URL JDBC), CVE-2022-31197 `NOT_REACHABLE`, 2
+  `UNKNOWN`; jsoup CVE-2026-75140 `REACHABLE` przez `Jsoup.parse` lekcji XSS,
+  CVE-2022-36033 `UNKNOWN`. CHA 62/65/14/23/0 → 66/65/15/26/0 w obu
+  scenariuszach korzeni; RTA bez nowych zmian werdyktów.
+- **Weryfikacja:** przebiegi WebGoata stare/nowe wejście × `-roots all/profile`
+  offline na tym samym cache (po jednym przebiegu online uzupełniającym dane
+  OSV nowych zależności); `scripts/graph-benchmark.sh --repeat 2`.
+  **Skrypt nie był uruchomiony w całości** (brak JDK 17 `javac`/`jar`): kroki
+  Mavena (instalacje, `build-classpath`, `copy-dependencies`, `list` dla
+  `webgoat-server`) wykonane tu; kompilacja lekcji i launchera przez API
+  kompilatora JDK 25 z `-proc:full` i Lombokiem 1.18.42 (`-source/-target 15`),
+  bo `maven-compiler-plugin` 3.8.0 nie przekaże `-proc:full`, a JDK 23+ bez
+  niego nie uruchamia Lomboka. `vulnerable-components` w zmierzonym jarze to
+  dotychczasowe klasy (JDK 17).
+- **Ograniczenia:** WebWolf (osobna aplikacja) poza wejściem; zasoby lekcji
+  (migracje SQL, szablony) nie są analizowane.
+- **Następny krok (wymaga zgody):** inny obszar (B3 — jednorazowe przebiegi,
+  CVE:F8).
+
 ### ROADMAP:B3 — trzeci przyrost: wybór uczestników z profilu (`b3-3`) — DONE for this scope (2026-11-13)
 
 - **Zakres (zatwierdzony 2026-11-13):** kryterium B3 „`internal/profile`
@@ -113,7 +155,7 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   JDK 17; te same kroki (kompilacja dwóch plików z Lombokiem, dołożenie
   do jara) wykonane ręcznie przez API kompilatora JDK 25 z Lombokiem
   1.18.42, `-source/-target 15` jak reszta WebGoata.
-- **Ograniczenia:** wejście nadal zawiera tylko jedną lekcję (pozostałe ~30
+- **Ograniczenia:** (rozwiązane wpisem `webgoat-full-input` powyżej) wejście nadal zawiera tylko jedną lekcję (pozostałe ~30
   lekcji wdrożenia `webgoat-server` są poza nim).
 - **Następny krok (wymaga zgody):** pełne wejście WebGoata (wszystkie
   lekcje) albo ROADMAP B3.

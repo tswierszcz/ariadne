@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
-# Clones WebGoat at tag v8.2.2, builds the webgoat-container module and the
-# vulnerable-components lesson (old XStream 1.4.5, the control case) with
-# JDK 17, and produces under work/WebGoat/:
-#   app-classes.jar (container + vulnerable-components classes combined,
-#     plus webgoat-server's two classes: the @SpringBootApplication launcher
-#     StartWebGoat and HSQLDBDatabaseConfig),
-#   app-dependency/*.jar, deps.txt
+# Clones WebGoat at tag v8.2.2, builds what its real deployable
+# (webgoat-server) contains with JDK 17, and produces under work/WebGoat/:
+#   app-classes.jar: webgoat-container (classes and resources), the classes
+#     of every lesson (webgoat-lessons/*, the vulnerable-components lesson
+#     with old XStream 1.4.5 included) and webgoat-server's two classes —
+#     the @SpringBootApplication launcher StartWebGoat and
+#     HSQLDBDatabaseConfig,
+#   app-dependency/*.jar, deps.txt: webgoat-server's runtime dependencies
+#     (the set Maven resolves for the deployable, so one version per
+#     artifact), without WebGoat's own modules and without
+#     spring-boot-devtools (optional; Boot's repackaged jar leaves it out).
 #
 # Notes on quirks hit while building this:
-#  - webgoat-lessons/cross-site-scripting runs the asciidoctor-maven-plugin
-#    at build time (to render its lesson plan to HTML) and that plugin's
-#    embedded JRuby fails under JDK 17's module system. We don't need that
-#    lesson, so we build only the modules we do need (-pl), which skips it
-#    entirely rather than patching around it.
-#  - webgoat-lessons/vulnerable-components depends on webgoat-container as a
-#    "provided" dependency, so webgoat-container must be `mvn install`-ed to
-#    the local repo first, or dependency:copy-dependencies on the lesson
-#    module fails to resolve it.
-#  - webgoat-server (the launcher module of the real deployable) depends on
-#    every lesson, including cross-site-scripting, so it is not built with
-#    Maven: its two source files are compiled with javac against the
-#    container and its runtime dependencies, Lombok as the annotation
-#    processor (the version the parent pom pins, from the local repository
-#    the container build filled; override with LOMBOK_JAR). Without the
-#    launcher no class enables Boot auto-configuration, so ariadne registers
-#    no DispatcherServlet and the whole MVC request path is unreachable.
+#  - webgoat-lessons/cross-site-scripting binds the asciidoctor-maven-plugin
+#    to generate-resources (to render its lesson plan to HTML), and that
+#    plugin's embedded JRuby fails under JDK 17's module system. The lessons
+#    are therefore compiled with the plugin goals called directly
+#    (resources:resources compiler:compile), which runs no other plugin,
+#    instead of a lifecycle phase.
+#  - The lessons depend on webgoat-container ("provided", and its test jar)
+#    and webgoat-server on every lesson, so the container is `mvn install`-ed,
+#    the parent poms are installed (-N), and each lesson's classes are
+#    installed as its jar (install:install-file) before webgoat-server is
+#    compiled and its dependencies resolved.
+#  - Lesson resources (lesson plans, HTML, i18n, SQL migrations) are not put
+#    into app-classes.jar: ariadne reads none of them, and the lessons'
+#    i18n files share names.
+#  - Without the launcher no class enables Boot auto-configuration, so
+#    ariadne registers no DispatcherServlet and the whole MVC request path
+#    is unreachable.
 #
 # Usage: scripts/prepare-webgoat.sh [JAVA_HOME for JDK 17+] [tag]
 set -euo pipefail
@@ -46,6 +50,7 @@ if [ ! -d WebGoat ]; then
     git clone https://github.com/WebGoat/WebGoat
 fi
 cd WebGoat
+wg="$PWD"
 
 echo "checking out WebGoat @ $TAG"
 git checkout -q "$TAG"
@@ -54,31 +59,35 @@ export JAVA_HOME="$JAVA17_HOME"
 export PATH="$JAVA_HOME/bin:$PATH"
 java -version
 
+mvn -q -N install
 mvn -q -pl webgoat-container -DskipTests install
-mvn -q -pl webgoat-lessons/vulnerable-components -DskipTests package
+mvn -q -f webgoat-lessons/pom.xml -N install -DskipTests
 
+lessons=()
+for d in webgoat-lessons/*/; do
+    [ -f "$d/pom.xml" ] && lessons+=("${d%/}")
+done
+mvn -q -pl "$(IFS=,; echo "${lessons[*]}")" resources:resources compiler:compile
+for d in "${lessons[@]}"; do
+    name="$(basename "$d")"
+    "$JAVA_HOME/bin/jar" cf "$d/target/$name.jar" -C "$d/target/classes" .
+    mvn -q install:install-file -Dfile="$d/target/$name.jar" -DpomFile="$d/pom.xml"
+done
+mvn -q -pl webgoat-server resources:resources compiler:compile
+
+exclude=(-DexcludeGroupIds=org.owasp.webgoat,org.owasp.webgoat.lesson -DexcludeArtifactIds=spring-boot-devtools)
 rm -rf app-dependency
-mvn -q -pl webgoat-container dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory="$PWD/app-dependency"
-mvn -q -pl webgoat-lessons/vulnerable-components dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory="$PWD/app-dependency"
-
-mvn -q -pl webgoat-container dependency:list -DincludeScope=runtime -DoutputFile="$PWD/deps-container.txt"
-mvn -q -pl webgoat-lessons/vulnerable-components dependency:list -DincludeScope=runtime -DoutputFile="$PWD/deps-vc.txt"
-sed 's/\x1b\[[0-9;]*m//g' deps-container.txt deps-vc.txt | grep -E '^   [a-zA-Z0-9_.-]+:' | sort -u > deps.txt
-rm -f deps-container.txt deps-vc.txt
-
-lombok_version="$(sed -n 's:.*<lombok.version>\(.*\)</lombok.version>.*:\1:p' pom.xml)"
-LOMBOK_JAR="${LOMBOK_JAR:-$HOME/.m2/repository/org/projectlombok/lombok/$lombok_version/lombok-$lombok_version.jar}"
-[ -f "$LOMBOK_JAR" ] || mvn -q dependency:get -Dartifact="org.projectlombok:lombok:$lombok_version"
-rm -rf webgoat-server/target/classes
-mkdir -p webgoat-server/target/classes
-"$JAVA_HOME/bin/javac" -nowarn -source 15 -target 15 -processorpath "$LOMBOK_JAR" \
-    -cp "webgoat-container/target/classes:$(ls app-dependency/*.jar | tr '\n' ':')$LOMBOK_JAR" \
-    -d webgoat-server/target/classes webgoat-server/src/main/java/org/owasp/webgoat/*.java
+mvn -q -pl webgoat-server dependency:copy-dependencies -DincludeScope=runtime "${exclude[@]}" -DoutputDirectory="$wg/app-dependency"
+mvn -q -pl webgoat-server dependency:list -DincludeScope=runtime "${exclude[@]}" -DoutputFile="$wg/deps-server.txt"
+sed 's/\x1b\[[0-9;]*m//g' deps-server.txt | grep -E '^   [a-zA-Z0-9_.-]+:' | sort -u > deps.txt
+rm -f deps-server.txt
 
 "$JAVA_HOME/bin/jar" cf app-classes.jar -C webgoat-container/target/classes .
-(cd webgoat-lessons/vulnerable-components/target/classes && "$JAVA_HOME/bin/jar" uf "$PWD/../../../../app-classes.jar" .)
-"$JAVA_HOME/bin/jar" uf app-classes.jar -C webgoat-server/target/classes .
+for d in "${lessons[@]}" webgoat-server; do
+    (cd "$d/target/classes" && find . -name '*.class' | sort > ../classes.lst && "$JAVA_HOME/bin/jar" uf "$wg/app-classes.jar" @../classes.lst)
+done
 
 echo "done: $work/WebGoat/{app-classes.jar,deps.txt,app-dependency/}"
 grep -i xstream deps.txt || echo "WARNING: xstream not found in deps.txt"
 unzip -l app-classes.jar | grep -q org/owasp/webgoat/StartWebGoat.class || echo "WARNING: StartWebGoat (Boot launcher) not in app-classes.jar"
+unzip -l app-classes.jar | grep -q org/owasp/webgoat/sql_injection/ || echo "WARNING: lesson classes (sql-injection) not in app-classes.jar"
