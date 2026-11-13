@@ -9,6 +9,7 @@ package resultsv2
 import (
 	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
+	"ariadne/internal/runtimeinfo"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -58,6 +59,21 @@ type Document struct {
 	// metadata, completeness and correlation counts. Evidence only: never
 	// part of reachability.
 	Runtime *runtimeevents.Result `json:"runtime,omitempty"`
+	// TargetRuntime (CVE:F8a, additive): the runtime the application is
+	// deployed on, as described by -jdk-home/-runtime-file, and whether
+	// its own advisories were assessed.
+	TargetRuntime *TargetRuntime `json:"target_runtime,omitempty"`
+}
+
+// Runtime assessment states.
+const AssessmentNotPerformed = "not_performed"
+
+// TargetRuntime is the target runtime and its assessment state.
+type TargetRuntime struct {
+	RulesVersion string               `json:"rules_version"`
+	Assessment   string               `json:"assessment"`
+	Reason       string               `json:"reason,omitempty"`
+	Runtime      *runtimeinfo.Runtime `json:"runtime,omitempty"`
 }
 
 // CallGraph describes the run's call graph.

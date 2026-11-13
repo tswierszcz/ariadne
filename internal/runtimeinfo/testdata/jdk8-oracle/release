@@ -1,0 +1,7 @@
+JAVA_VERSION="1.8.0_391"
+OS_NAME="Linux"
+OS_VERSION="2.6"
+OS_ARCH="amd64"
+SOURCE=".:git:6ae5bce9e7c8"
+IMPLEMENTOR="Oracle Corporation"
+JAVA_RUNTIME_VERSION="1.8.0_391-b13"

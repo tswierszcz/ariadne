@@ -4,6 +4,7 @@ package main
 
 import (
 	"ariadne/internal/flowsum"
+	"ariadne/internal/runtimeinfo"
 	"bytes"
 	"context"
 	"flag"
@@ -96,6 +97,8 @@ type config struct {
 	graphOut       string
 	graphCompare   string
 	runtimeTrace   string
+	jdkHome        string
+	runtimeFile    string
 	runtimeFilter  string
 	runtimeStatus  string
 
@@ -146,6 +149,8 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
 	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback)`)
 	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
+	fs.StringVar(&cfg.jdkHome, "jdk-home", "", "the target runtime's installation directory (CVE:F8a): its release file identifies vendor, version, OS and architecture; nothing is run, and the scanner's own JDK is never assumed. Exclusive with -runtime-file")
+	fs.StringVar(&cfg.runtimeFile, "runtime-file", "", "a YAML description of the target runtime (CVE:F8a): vendor, distribution, version, os, arch, libc, package{name, version, distro}. Exclusive with -jdk-home")
 	fs.StringVar(&cfg.runtimeTrace, "runtime-trace", "", "import a runtime trace (RUNTIME_NATIVE N1, format ariadne-runtime-trace-1, docs/RUNTIME_TRACE.MD; e.g. from scripts/JfrToTrace.java): loaded classes, methods seen executing and measured caller → callee relations, matched to the analyzed classes by content hash and shown next to the static results; it never changes the graph or a verdict, and the absence of an event proves nothing")
 	fs.StringVar(&cfg.runtimeFilter, "runtime-filter-out", "", "write a JFR settings file (.jfc) that traces, on entry, the mapped vulnerable methods of this run's findings (jdk.MethodTrace, JDK 25+), to record the next run with: java -XX:StartFlightRecording=settings=profile,settings=FILE ...; then import the converted recording with -runtime-trace")
 	fs.StringVar(&cfg.runtimeStatus, "runtime-filter-status", defaultRuntimeFilterStatus, "with -runtime-filter-out: comma-separated verdicts whose mapped methods are traced")
@@ -246,6 +251,9 @@ func validate(cfg config) error {
 	if cfg.targetJava < 0 {
 		return fmt.Errorf("-target-java must be a positive Java feature version, got %d", cfg.targetJava)
 	}
+	if cfg.jdkHome != "" && cfg.runtimeFile != "" {
+		return fmt.Errorf("-jdk-home and -runtime-file describe the same runtime: give one")
+	}
 	scenario, err := serviceload.ParseScenario(cfg.jpmsScenario)
 	if err != nil {
 		return fmt.Errorf("-jpms-scenario: %w", err)
@@ -266,9 +274,22 @@ func validate(cfg config) error {
 func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log := func(format string, a ...any) { fmt.Fprintf(stdout, format+"\n", a...) }
 
+	// CVE:F8a: the target runtime is identified first, so a bad
+	// description fails before the analysis.
+	targetRuntime, err := loadTargetRuntime(cfg)
+	if err != nil {
+		return err
+	}
 	sr, err := newSnapshotRun(cfg)
 	if err != nil {
 		return err
+	}
+	sr.config["target-runtime"] = targetRuntimeKey(targetRuntime)
+	if targetRuntime != nil {
+		log("target runtime (CVE:F8a %s): %s", runtimeinfo.Version, targetRuntime.Describe())
+		for _, u := range targetRuntime.Unresolved {
+			log("target runtime: unresolved %s", u)
+		}
 	}
 	// GRAPH_PRECISION P0: the earlier graph is read first, so a bad file
 	// fails before the analysis.
@@ -1479,6 +1500,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		ModelEdges:         g.ModelEdgeCount(),
 		SAMEdges:           g.SAMEdgeCount(),
 		SAMLine:            samLine,
+		TargetRuntime:      targetRuntimeLine(targetRuntime),
 		UnresolvedDyn:      g.UnresolvedDynamicCount(),
 		UnresolvedOwner:    g.UnresolvedOwnerCount(),
 		GapSites:           len(gapSites),
@@ -1539,6 +1561,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult},
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
+	doc.TargetRuntime = targetRuntimeResult(targetRuntime)
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}

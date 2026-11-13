@@ -269,7 +269,7 @@ Dopasowywać znany komponent po zmianie nazw jego klas i odwołań.
 
 Rozpoznawać podatności konkretnej dystrybucji i wydania runtime’u bez wnioskowania z samego bytecode’u.
 
-### F8a. Identyfikacja i kontrakt źródła
+### F8a. Identyfikacja i kontrakt źródła — DONE (2026-11-13; zob. IMPLEMENTATION_STATUS, [studium źródeł](../docs/RUNTIME_SOURCES.MD); pierwszy dostawca F8b: upstream OpenJDK)
 
 1. Dodać `internal/runtimeinfo` z proponowanymi wejściami `-jdk-home` i `-runtime-file`; w MVP wzajemnie wykluczającymi się.
 2. Czytać dostępne metadane instalacji i deklarowany opis. Nie uruchamiać automatycznie docelowego `java`; nie wybierać domyślnie runtime’u hosta skanera.
