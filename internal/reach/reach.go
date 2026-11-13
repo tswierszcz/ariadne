@@ -133,7 +133,7 @@ type InstanceFinding struct {
 // EngineVersion versions the reachability semantics (statuses, per-instance
 // findings, aggregation, gap rule). Bump it on any change that can change
 // a result for the same graph and mapping; snapshots record it (CVE:F3).
-const EngineVersion = "2" // 2: CVE:F4 descriptor selectors, variant selection
+const EngineVersion = "3" // 3: ROADMAP B0 b0-2 — a path with no CHA-only step is reported when one exists; 2: CVE:F4 descriptor selectors, variant selection
 
 // Engine holds everything needed to answer "is this CVE reachable" for
 // every CVE in one run: the call graph, the class hierarchy (for roots,
@@ -152,6 +152,13 @@ type Engine struct {
 	// since both are independent of which CVE is being checked.
 	appOnly bfsResult
 	full    bfsResult
+	// appOnlyNoCHA and fullNoCHA are the same passes without CHA-only
+	// steps (ROADMAP B0 b0-2). They never decide a status — a target
+	// reachable only through CHA keeps its verdict — they choose which
+	// path is reported: one with no CHA-only step when one exists, even if
+	// it is longer.
+	appOnlyNoCHA bfsResult
+	fullNoCHA    bfsResult
 
 	// webAssetPkgs holds "group:artifact" of dependencies that are WebJars
 	// (see input.DepJar.WebAssetsOnly); set with SetWebAssetPackages.
@@ -207,6 +214,8 @@ func NewWithRoots(g *callgraph.Graph, h *hierarchy.Hierarchy, framework *Framewo
 	isFramework := e.isFrameworkNode
 	e.appOnly = bfs(g, e.roots, isFramework)
 	e.full = bfs(g, e.roots, func(uint32) bool { return false })
+	e.appOnlyNoCHA = bfsKeep(g, e.roots, isFramework, noCHA)
+	e.fullNoCHA = bfsKeep(g, e.roots, func(uint32) bool { return false }, noCHA)
 	return e
 }
 
@@ -384,12 +393,18 @@ func (e *Engine) classify(result *Result, matched []uint32) {
 	// back to the shortest FRAMEWORK path only if no matched node is
 	// REACHABLE at all.
 	if _, path, ok := shortestOf(e.appOnly, matched); ok {
+		if _, strict, ok := shortestOf(e.appOnlyNoCHA, matched); ok {
+			path = strict
+		}
 		result.Status = StatusReachable
 		result.Path = renderPath(e.g, path)
 		result.Entry = e.entryEdge(path)
 		return
 	}
 	if _, path, ok := shortestOf(e.full, matched); ok {
+		if _, strict, ok := shortestOf(e.fullNoCHA, matched); ok {
+			path = strict
+		}
 		result.Status = StatusFramework
 		result.Path = renderPath(e.g, path)
 		result.Entry = e.entryEdge(path)

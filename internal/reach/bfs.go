@@ -24,6 +24,16 @@ type bfsResult struct {
 // typically reflection-mediated and the static call graph can't see
 // where they actually go.
 func bfs(g *callgraph.Graph, roots []uint32, isSink func(id uint32) bool) bfsResult {
+	return bfsKeep(g, roots, isSink, nil)
+}
+
+// noCHA keeps every edge except a CHA expansion. A target that another
+// rule also reaches from the same caller stays reachable through that
+// edge, so only CHA-only steps are cut (ROADMAP B0 b0-2).
+func noCHA(_ uint32, e callgraph.Edge) bool { return e.Basis != callgraph.BasisCHA }
+
+// bfsKeep is bfs over the edges keep admits (every edge when keep is nil).
+func bfsKeep(g *callgraph.Graph, roots []uint32, isSink func(id uint32) bool, keep func(u uint32, e callgraph.Edge) bool) bfsResult {
 	n := g.NodeCount()
 	res := bfsResult{
 		visited: make([]bool, n),
@@ -49,7 +59,7 @@ func bfs(g *callgraph.Graph, roots []uint32, isSink func(id uint32) bool) bfsRes
 			continue
 		}
 		for _, e := range g.Edges(u) {
-			if res.visited[e.To] {
+			if res.visited[e.To] || (keep != nil && !keep(u, e)) {
 				continue
 			}
 			res.visited[e.To] = true

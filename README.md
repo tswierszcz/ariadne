@@ -1316,10 +1316,13 @@ edge) or `heuristic` (a CHA expansion only — some subtype's override
 assumed possible); a step a bytecode call also backs is `jvm_rule`. The
 report marks the other steps in the path (`→[heuristic: cha]`) and adds a
 "Path evidence" line; v2 findings carry `path_edges` and `character`.
-These are kinds of evidence, not a confidence score, and they describe the
-reported (shortest) path only, not every path. Measured on the default
-runs: 106 of 109 positive findings on petclinic, 89 of 137 on WebGoat and
-16 of 16 on JPetStore have at least one CHA-only step on that path.
+These are kinds of evidence, not a confidence score. **Since `b0-2`** the
+reported path is one with no CHA-only step whenever such a path exists
+(even a longer one; the verdict itself is decided as before), so a
+`heuristic` character means the method is reachable only through some
+CHA expansion. Measured on the default runs: 99 of 109 positive findings on
+petclinic, 81 of 137 on WebGoat and 16 of 16 on JPetStore depend on a CHA
+expansion (before `b0-2` the shortest path showed 106, 89 and 16).
 An advisory no source could map is `UNKNOWN` with `MAPPING_MISSING` (also
 in v1's `reasons`).
 
