@@ -25,6 +25,9 @@ const (
 	MappingEntrypointOnly ReasonCode = "MAPPING_ENTRYPOINT_ONLY"
 	MethodNotFound        ReasonCode = "METHOD_NOT_FOUND"
 	SourceUnavailable     ReasonCode = "SOURCE_UNAVAILABLE"
+	// ROADMAP B0: no source produced any mapping for the advisory, so no
+	// verdict is possible (the UNKNOWN row says why).
+	MappingMissing ReasonCode = "MAPPING_MISSING"
 	// CVE:F4: versioned mappings.
 	MappingVersionUncovered ReasonCode = "MAPPING_VERSION_UNCOVERED"
 	MappingConflict         ReasonCode = "MAPPING_CONFLICT"
@@ -41,7 +44,7 @@ const (
 // All lists every defined reason code, in documentation order.
 var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict, VersionCandidates,
-	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable,
+	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable, MappingMissing,
 	MappingVersionUncovered, MappingConflict, MappingNewSideOnly,
 	ModelIncomplete,
 	RuntimeUnsupported,

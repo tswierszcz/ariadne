@@ -12,7 +12,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
-| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności; od 2026-11-13 (`b3-3`) wybór uczestników z profilu (`models.disable`) zapisany w raporcie, v2, ustawieniach grafu i snapshocie. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, invalidation zależnych wyników po zmianie modelu (poza wersjami algorytmów). B0–B2, B4: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
+| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności; od 2026-11-13 (`b3-3`) wybór uczestników z profilu (`models.disable`) zapisany w raporcie, v2, ustawieniach grafu i snapshocie. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, invalidation zależnych wyników po zmianie modelu (poza wersjami algorytmów). B0: IN_PROGRESS — oceniony 2026-11-13, przyrost `b0-1` (dowód każdego kroku ścieżki, charakter ustalenia, `MAPPING_MISSING`); B4: oceniony 2026-11-13 (macierz obszarów, braki wyroczni dla refleksji, callbacków, uchwytów, proxy, JDBC, DI). B1: częściowo przez `b0-1`; B2: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: F8a DONE (2026-11-13, identyfikacja runtime'u); F8b DONE dla mechanizmu (2026-11-13: dostawca upstream OpenJDK przez kuratorowany katalog — warunki openjdk.org wykluczają automatyczny dostęp; katalog pusty do pierwszej kuracji), F8c UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06); F10: DONE (2026-11-10, kontynuacja 2026-11-13; PR #48, #49, [zarchiwizowane](../archive/2026-11-13/cve/CVE_F10.md)) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. F10 (2026-11-10) i ręczne mapowania z diffów wydań (2026-11-13, 46 → 68 wpisów; `UNKNOWN` 49/45/8 → 27/23/5). Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE (overloads/inheritance; bridge/default-method real-bytecode verification closed 2026-11-07 by GRAPH_PRECISION P0 — `testdata/callgraph`, JVM oracle; korekta 2026-11-08, PR #29: CHA celuje też w ciała dziedziczone spoza typu wywołania, builder `3`) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty; ograniczenie G2 domknięte i korekta CHA (addendum w COMPLETION.md). Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5, zarchiwizowane](../archive/2026-11-07/data_flow/COMPLETION.md) | D0–D5: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (D5 — PR #13) | IR/CFG/wartości lokalne (D0–D2), pięć wycinków międzyproceduralnych wartości i streszczenia zależności `internal/flowsum` (D3), pilotaż taint `-taint` opt-in (D4), kwalifikacja: wyrocznia JVM, kształty, pomiar (D5, `docs/TAINT_QUALIFICATION.MD`). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -29,6 +29,95 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### ROADMAP:B0 — ocena i pierwszy przyrost (`b0-1`): dowód kroku ścieżki, charakter ustalenia, `MAPPING_MISSING` — IN_PROGRESS (2026-11-13)
+
+- **Zakres (zatwierdzony 2026-11-13):** ocena B0 i B4 punkt po punkcie oraz
+  pierwszy przyrost B0.
+- **Ocena B0 (przed `b0-1`):**
+  1. *Jeden wersjonowany schemat wyniku, instancji i dowodu* — spełnione
+     przez v2 (CVE F0/F1); dowody innych torów (deserializacja, ślady,
+     taint, `target_runtime`) to osobne sekcje addytywne, nie wspólny typ.
+  2. *Rozdzielone osie* (tożsamość, mapowanie, osiągalność, dane,
+     obserwacja) — spełnione: kontrakt wyników, taint i ślady osobno.
+  3. *Kod powodu, miejsce, wersja modelu, warunki* — częściowo: kody i
+     wersje algorytmów są, ale ścieżka była listą nazw metod; podstawę
+     (direct/CHA/model…) miała tylko krawędź wejścia z aplikacji.
+  4. *Charakter ustalenia* (reguła JVM / model / heurystyka / deklaracja /
+     obserwacja) — **brak** → `b0-1`.
+  5. *Wpływ luk na wynik* — częściowo: luki globalne i per ustalenie są
+     rozdzielone, ale `MODEL_INCOMPLETE` jest tylko informacyjne i pokrywa
+     wszystkie `NOT_REACHABLE`, więc niczego nie różnicuje (otwarte).
+  6. *Znaczenie `NOT_REACHABLE`/`NOT_APPLICABLE`* — spełnione (kontrakt).
+  *Kryterium „eksport legacy nie ukrywa niepewności”* — prawie: v1 niesie
+  kody powodów i luki, ale 20 z 27 wierszy `UNKNOWN` petclinic (advisory
+  bez mapowania) nie miało żadnego kodu → `b0-1`. *„Ta sama luka nie jest
+  różnie interpretowana przez dwa analizatory”* — nie zweryfikowane:
+  słowniki luk są osobne (globalne miejsca modeli, luki RTA nieznanych
+  alokacji, luki SAM, nierozwiązane fakty B3); ujednolicenie to dalszy
+  przyrost.
+- **Zrealizowane w `b0-1`:** `reach.PathEdge`/`EdgeEvidence`: każdy krok
+  zgłoszonej ścieżki odbudowany z grafu ze **wszystkimi** krawędziami między
+  dwiema metodami (`kind`, `basis`, offsety wywołań — kryterium B1 „dwa
+  powody tej samej krawędzi zachowane”, `callgraph.EdgesBetween`), charakter
+  kroku (najsilniejszy dowód: krok poparty też wywołaniem bytecode to
+  `jvm_rule`) i zbiór charakterów ustalenia: `jvm_rule`, `library_model`,
+  `input_declaration`, `heuristic` (tylko CHA), `unclassified`. v2
+  `findings[].path_edges`, `findings[].character`; raport: strzałki kroków
+  innych niż `jvm_rule` opisane (`→[heuristic: cha]`) i linia „Path
+  evidence”; v1 bez tych pól. Nowy kod `MAPPING_MISSING` (advisory, którego
+  żadne źródło nie zmapowało) — także w `reasons` v1.
+- **Weryfikacja:** `TestPathEvidence` (fixture overload: liczba kroków,
+  dowody, podstawy, brak pól w v1), `TestBasisCharacterAndLines`,
+  `TestReasonCodesDocumented`; `go test ./...`, `go vet ./...`. Względem
+  binarki z `main`: petclinic, WebGoat, JPetStore — **0 zmian werdyktów**,
+  jedyna różnica v1 to `MAPPING_MISSING` na 20/19/2 wierszach; żaden
+  `UNKNOWN` bez powodu. Pomiar charakteru (zgłoszona najkrótsza ścieżka,
+  nie wszystkie ścieżki): ustalenia pozytywne z co najmniej jednym krokiem
+  tylko-CHA — petclinic 106 z 109, WebGoat 89 z 137, JPetStore 16 z 16;
+  tylko `jvm_rule`: 3, 39, 0.
+- **Dokumentacja:** `docs/RESULTS_CONTRACT.MD` (kod, pola v2), README,
+  `docs/SUPPORT.MD`, ten rejestr.
+- **Ograniczenia:** charakter opisuje zgłoszoną ścieżkę, nie wszystkie
+  możliwe; nie zmienia werdyktu; obserwacja (ślady) nie jest jeszcze
+  charakterem kroku; ujednolicenie słowników luk i różnicujące użycie luk
+  w negatywnych werdyktach — otwarte.
+- **Następny krok (wymaga zgody):** preferowanie ścieżki bez kroków
+  tylko-CHA przy wyborze zgłaszanej ścieżki (ta sama osiągalność, lepszy
+  dowód) albo wspólny słownik luk.
+
+### ROADMAP:B4 — ocena (2026-11-13)
+
+Stan punktów B4: *fixtures w repo, testy Go bez JDK i sieci* — spełnione;
+*porównywanie grafów, przyczyn i werdyktów na tej samej konfiguracji* —
+spełnione (`-graph-compare`, `-snapshot-compare`, `scripts/graph-benchmark.sh`);
+*pomiar pominiętych celów, błędnych krawędzi, nierozstrzygniętych miejsc,
+czasu i pamięci* — spełnione dla grafu (benchmark, `TRACE_GAPS`, wyrocznie),
+nie dla każdego modelu; *`go test`/`go vet` przed wydaniem* — spełnione;
+*dokumentacja z dokładnymi wersjami* — `docs/SUPPORT.MD`.
+Macierz obszarów (na podstawie testów i fixtures w repo; „wyrocznia” =
+zachowanie zmierzone na prawdziwym JVM i zapisane w fixture):
+
+| Obszar / model | Przypadki +/−/nierozstrz. | Wyrocznia JVM | Prawdziwa aplikacja |
+|---|---|---|---|
+| Graf wywołań (JVM_GRAPH) | tak (`testdata/callgraph`) | tak (`callgraph-oracle.sh`) | benchmark 3 aplikacji |
+| RTA, typy tworzone (GRAPH_PRECISION) | tak (`testdata/rta`, `alloc`) | tak (`rta-oracle.sh`, `alloc-oracle.sh`) | benchmark |
+| ServiceLoader (SERVICE_LOADING) | tak, z jawnymi lukami (`testdata/oracle`) | tak | petclinic/WebGoat |
+| Dispatch servletów, SPI | tak (`testdata/servletdispatch`, `spidispatch`) | tak (`observed.txt`) | petclinic/WebGoat |
+| Lambdy/SAM (DYNAMIC_LINKAGE L1) | tak (`testdata/samcall`) | tak | ślad petclinic |
+| Deserializacja, taint | tak (`testdata/deserialize`, `taint`) | tak | WebGoat, aplikacje kontrolne |
+| log4j 1.2 / logback | testy jednostkowe | aplikacje kontrolne na JVM (`prepare-*-demo.sh`) | JPetStore, petclinic |
+| Obiekty JDBC, proxy frameworków | testy jednostkowe | **brak fixture**; ślady petclinic/JPetStore | tak |
+| Refleksja (R0–R2) | testy jednostkowe | **brak** | petclinic/WebGoat (efekt zmierzony) |
+| Callbacki (ASYNC A0–A2), MethodHandle (L0/L2) | testy jednostkowe | **brak** | liczby na petclinic/WebGoat |
+| DI/adnotacje/konfiguracja (FRAMEWORKS F1–F2) | testy jednostkowe | **brak** | petclinic/WebGoat |
+| Mapowania CVE | zestaw kontrolny 33 przypadków (`testdata/cve-control`), baseline | nie dotyczy | 3 aplikacje |
+| Runtime JDK (CVE F8) | syntetyczne (katalog pusty) | nie dotyczy | — |
+
+**Braki B4 (kolejne kroki):** wyrocznie JVM w fixture dla refleksji,
+callbacków/MethodHandle, obiektów JDBC i proxy oraz DI; przypadki
+„nierozstrzygnięte” jawnie tylko tam, gdzie fixture ma zapisane luki
+(ServiceLoader, deserializacja, RTA).
 
 ### CVE:F8b — ocena wydania runtime'u: dostawca upstream OpenJDK (katalog kuratorowany) — DONE dla mechanizmu (2026-11-13)
 

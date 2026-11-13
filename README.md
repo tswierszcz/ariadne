@@ -1307,6 +1307,22 @@ The underlying call graph also keeps every call site that produced an
 edge (not just the first one that happened to be seen) as evidence,
 even when several calls to the same target collapse into one edge.
 
+**Every step of a path, not only the entry (ROADMAP B0/B1, 2026-11-13).**
+Each step of a REACHABLE/FRAMEWORK path is rebuilt from the graph with
+every edge between its two methods (kind, basis, call-site offsets), and
+gets a character: `jvm_rule` (a bytecode call or class initialization),
+`library_model` (a modeled API), `input_declaration` (a profile's declared
+edge) or `heuristic` (a CHA expansion only — some subtype's override
+assumed possible); a step a bytecode call also backs is `jvm_rule`. The
+report marks the other steps in the path (`→[heuristic: cha]`) and adds a
+"Path evidence" line; v2 findings carry `path_edges` and `character`.
+These are kinds of evidence, not a confidence score, and they describe the
+reported (shortest) path only, not every path. Measured on the default
+runs: 106 of 109 positive findings on petclinic, 89 of 137 on WebGoat and
+16 of 16 on JPetStore have at least one CHA-only step on that path.
+An advisory no source could map is `UNKNOWN` with `MAPPING_MISSING` (also
+in v1's `reasons`).
+
 **Outputs are written together (CVE:F9a).** The report, the results
 file and a `-snapshot-out` manifest are rendered first and written only
 at the end of a successful run, all or nothing — a run that fails

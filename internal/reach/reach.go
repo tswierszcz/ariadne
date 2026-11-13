@@ -103,6 +103,11 @@ type Result struct {
 	// (advisory × instance), from which Status is aggregated. Not part of
 	// v1 JSON; the report shows them, v2 (CVE:F1c) will export them.
 	Findings []InstanceFinding `json:"-"`
+	// PathEdges and Character (ROADMAP B0/B1): the evidence of each step
+	// of Path and the set of its characters. Not part of v1 JSON; v2
+	// exports them per finding.
+	PathEdges []PathEdge `json:"-"`
+	Character []string   `json:"-"`
 }
 
 // InstanceFinding is one advisory's result for one affected component
@@ -120,6 +125,9 @@ type InstanceFinding struct {
 	// selector that matched the path's target (vulnmap.Precision*): a
 	// path to a name-only match is weaker evidence than an exact one.
 	MatchPrecision string
+	// PathEdges and Character: as Result's, for this instance's path.
+	PathEdges []PathEdge
+	Character []string
 }
 
 // EngineVersion versions the reachability semantics (statuses, per-instance
@@ -253,6 +261,12 @@ func (e *Engine) Analyze(list []cves.CVE, vm map[string]vulnmap.Entry) []Result 
 		results[i] = e.analyzeOne(cve, vm)
 		e.fillFindings(&results[i], cve)
 		e.notePrecision(&results[i], vm[cve.ID])
+		r := &results[i]
+		r.PathEdges, r.Character = pathEvidence(e.g, r.Path)
+		for j := range r.Findings {
+			f := &r.Findings[j]
+			f.PathEdges, f.Character = pathEvidence(e.g, f.Path)
+		}
 	}
 	return results
 }
@@ -274,7 +288,7 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 		}
 	}
 	if !ok {
-		return Result{CVE: cve.ID, Status: StatusUnknown}
+		return Result{CVE: cve.ID, Status: StatusUnknown, Reasons: []findings.ReasonCode{findings.MappingMissing}}
 	}
 	if !entry.Mapped() {
 		// Fix-commit references existed but none could be read (CVE:F5).
