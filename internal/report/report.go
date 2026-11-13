@@ -63,8 +63,11 @@ type Header struct {
 	ModelEdges  int
 	// SAMEdges/SAMLine: DYNAMIC_LINKAGE L1's SAM-call edges and the
 	// site/gap summary (internal/samcall).
-	SAMEdges        int
-	SAMLine         string
+	SAMEdges int
+	SAMLine  string
+	// TargetRuntime (CVE:F8a): the deployed runtime and the state of its
+	// assessment, one line.
+	TargetRuntime   string
 	UnresolvedDyn   int
 	UnresolvedOwner int
 	// Model gaps (contract §4): unresolved dynamic sites, those reachable
