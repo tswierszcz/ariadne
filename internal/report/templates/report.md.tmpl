@@ -252,8 +252,11 @@ None.
 ### {{.CVE}}
 
 ```
-{{range $i, $node := .Path}}{{if $i}} → {{end}}{{$node}}
+{{range .PathLines}}{{.}}
 {{end}}```
+{{if .PathSummary}}
+**Path evidence (ROADMAP B0):** {{.PathSummary}} — `jvm_rule` a bytecode call or class initialization, `library_model` a modeled API, `input_declaration` a profile's declared edge, `heuristic` a CHA expansion (any subtype's override assumed possible); a step a bytecode call also backs counts as `jvm_rule`.
+{{end}}
 {{if .Entry}}
 **Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}` ({{.Entry.Kind}} call, resolution: {{.Entry.Basis}}{{if .Entry.PCString}}, {{.Entry.PCString}}{{end}})
 {{end}}
@@ -278,8 +281,11 @@ None.
 ### {{.CVE}}
 
 ```
-{{range $i, $node := .Path}}{{if $i}} → {{end}}{{$node}}
+{{range .PathLines}}{{.}}
 {{end}}```
+{{if .PathSummary}}
+**Path evidence (ROADMAP B0):** {{.PathSummary}} — `jvm_rule` a bytecode call or class initialization, `library_model` a modeled API, `input_declaration` a profile's declared edge, `heuristic` a CHA expansion (any subtype's override assumed possible); a step a bytecode call also backs counts as `jvm_rule`.
+{{end}}
 {{if .Entry}}
 **Entry call (app → dependency):** `{{.Entry.From}}` → `{{.Entry.To}}` ({{.Entry.Kind}} call, resolution: {{.Entry.Basis}}{{if .Entry.PCString}}, {{.Entry.PCString}}{{end}})
 {{end}}

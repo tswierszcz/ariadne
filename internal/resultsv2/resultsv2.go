@@ -312,8 +312,13 @@ type Finding struct {
 	ReasonCodes        []findings.ReasonCode `json:"reason_codes,omitempty"`
 	ModelGaps          map[string]int        `json:"model_gaps,omitempty"`
 	Path               []string              `json:"path,omitempty"`
-	Entry              *reach.EntryEdge      `json:"entry,omitempty"`
-	Note               string                `json:"note,omitempty"`
+	// PathEdges and Character (ROADMAP B0/B1): every step's edges with
+	// kind, basis and call-site offsets, and the set of the steps'
+	// characters (jvm_rule, library_model, input_declaration, heuristic).
+	PathEdges []reach.PathEdge `json:"path_edges,omitempty"`
+	Character []string         `json:"character,omitempty"`
+	Entry     *reach.EntryEdge `json:"entry,omitempty"`
+	Note      string           `json:"note,omitempty"`
 	// DeserializationChains (DESERIALIZATION Z4): catalog chains naming
 	// this advisory on this instance — evidence only, never a verdict.
 	DeserializationChains []ChainRef `json:"deserialization_chains,omitempty"`
@@ -581,7 +586,7 @@ func Build(in Inputs) Document {
 				AdvisoryID: cve.ID, ComponentInstanceID: f.Instance, Identity: identity[f.Instance],
 				Applicability: applicability, ApplicabilityCheck: check,
 				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
-				ModelGaps: f.ModelGaps, Path: f.Path, Entry: f.Entry, Note: f.Note,
+				ModelGaps: f.ModelGaps, Path: f.Path, PathEdges: f.PathEdges, Character: f.Character, Entry: f.Entry, Note: f.Note,
 				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
 				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
 				RuntimeTraced:         in.RuntimeTraced[cve.ID][f.Instance],

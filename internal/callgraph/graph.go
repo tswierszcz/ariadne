@@ -362,6 +362,28 @@ func (g *Graph) EdgeBetween(from, to uint32) (Edge, bool) {
 	return Edge{}, false
 }
 
+// EdgesBetween returns every edge from -> to (ROADMAP B1: when several
+// rules produced the same pair — a direct call and a CHA expansion, two
+// call kinds — each reason is kept).
+func (g *Graph) EdgesBetween(from, to uint32) []Edge {
+	if int(from) >= len(g.adjacency) {
+		return nil
+	}
+	var out []Edge
+	for _, e := range g.adjacency[from] {
+		if e.To == to {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// IDOfKey returns the id of a "fqcn#name(desc)" node key.
+func (g *Graph) IDOfKey(key string) (uint32, bool) {
+	id, ok := g.idOf[key]
+	return id, ok
+}
+
 func methodKey(fqcn, name, desc string) string {
 	return fqcn + "#" + name + desc
 }
