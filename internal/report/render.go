@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"text/template"
 
 	"ariadne/internal/reach"
@@ -17,7 +18,7 @@ var markdownTemplate string
 
 // RenderMarkdown fills the embedded report.md template with data.
 func RenderMarkdown(data Data) (string, error) {
-	tmpl, err := template.New("report.md").Funcs(template.FuncMap{"gapCounts": GapCounts}).Parse(markdownTemplate)
+	tmpl, err := template.New("report.md").Funcs(template.FuncMap{"gapCounts": GapCounts, "join": strings.Join}).Parse(markdownTemplate)
 	if err != nil {
 		return "", fmt.Errorf("parsing report template: %w", err)
 	}

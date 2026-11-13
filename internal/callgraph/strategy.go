@@ -219,6 +219,12 @@ type Config struct {
 	// the target JDK the analysis used.
 	Roots      string `json:"roots,omitempty"`
 	TargetJava int    `json:"target_java,omitempty"`
+	// Participants are the models and creator gates the coordinator ran,
+	// as "id@version", sorted (ROADMAP B3 b3-3): a graph built with
+	// another selection is a different derivation.
+	Participants []string `json:"participants,omitempty"`
+	// DisabledParticipants are the ones the profile turned off.
+	DisabledParticipants []string `json:"disabled_participants,omitempty"`
 }
 
 // Differences lists the fields in which two configs differ, sorted.
@@ -235,6 +241,7 @@ func (c Config) Differences(o Config) []string {
 	add("unknown_allocation_policy", c.UnknownAllocationPolicy, o.UnknownAllocationPolicy)
 	add("roots", c.Roots, o.Roots)
 	add("target_java", fmt.Sprint(c.TargetJava), fmt.Sprint(o.TargetJava))
+	add("participants", strings.Join(c.Participants, ","), strings.Join(o.Participants, ","))
 	sort.Strings(out)
 	return out
 }

@@ -345,3 +345,31 @@ func TestCatalogAddFile_overridesByName(t *testing.T) {
 		t.Errorf("Names() = %v, want exactly one entry (replacing an existing name must not add a duplicate)", got)
 	}
 }
+
+// TestModelsSection (ROADMAP B3 b3-3): models.disable is read as data,
+// the embedded profiles disable nothing, and merging keeps every
+// disabled ID once.
+func TestModelsSection(t *testing.T) {
+	p, err := parseProfile([]byte("name: x\nmodels:\n  disable: [jdbc:objects, framework:proxies]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := p.Models.Disable; len(got) != 2 || got[0] != "jdbc:objects" {
+		t.Fatalf("disable = %v", got)
+	}
+	c, err := LoadDefaultCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range c.Names() {
+		q, _ := c.Get(name)
+		if len(q.Models.Disable) != 0 {
+			t.Errorf("embedded profile %s disables %v", name, q.Models.Disable)
+		}
+	}
+	other, _ := parseProfile([]byte("name: y\nmodels:\n  disable: [framework:proxies, dynamic-linkage:sam-calls]\n"))
+	m := merge([]Profile{p, other})
+	if got := m.Models.Disable; len(got) != 3 || got[0] != "dynamic-linkage:sam-calls" || got[1] != "framework:proxies" || got[2] != "jdbc:objects" {
+		t.Errorf("merged disable = %v", got)
+	}
+}

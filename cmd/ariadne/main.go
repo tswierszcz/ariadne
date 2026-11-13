@@ -596,6 +596,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("selecting profile: %w", err)
 	}
 	log("profile: %s", prof.Name)
+	// ROADMAP B3 b3-3: the profile chooses the fixed point's participants;
+	// an unknown ID stops the run before any work.
+	activeParts, disabledParts, err := analysis.Select(participantCatalog(), prof.Models.Disable)
+	if err != nil {
+		return fmt.Errorf("profile %s: %w", prof.Name, err)
+	}
+	partOff := map[string]bool{}
+	for _, p := range disabledParts {
+		partOff[p.ID] = true
+	}
+	// The selection is part of the run's configuration: a replay or a
+	// -snapshot-compare with another selection reports the difference,
+	// and the v2 analysis_id differs (callgraph.participants).
+	sr.config["models"] = strings.Join(analysis.Labels(activeParts), ",")
+	sr.config["models-disabled"] = strings.Join(analysis.Labels(disabledParts), ",")
 
 	// FRAMEWORKS F1: real Spring MVC route/bean-name/@Profile values,
 	// sourced from the annotation element values classfile.Annotation
@@ -1126,6 +1141,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	spiCatalog := spidispatch.Find(h, spiRegs, callgraph.DefaultSkip)
 	spidispatch.Register(registry, spiCatalog)
+	for _, p := range disabledParts {
+		if p.Kind == analysis.KindModel {
+			registry.Remove(p.ID)
+		}
+	}
 	spiServices := 0
 	for range spiCatalog.Providers {
 		spiServices++
@@ -1177,11 +1197,19 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			return n
 		}}
 	}
-	steps := []analysis.Step{
-		gateStep("sam-calls", samGate),
-		gateStep(servletdispatch.ModelID+" objects", objGate),
-		gateStep(jdbcdispatch.ModelID, jdbcGate),
-		gateStep(proxycatalog.ModelID, proxyGate),
+	gates := []struct {
+		id   string
+		gate *callgraph.SAMGate
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {proxycatalog.ModelID, proxyGate}}
+	var steps []analysis.Step
+	for _, gt := range gates {
+		if !partOff[gt.id] {
+			steps = append(steps, gateStep(gt.id, gt.gate))
+		}
+	}
+	g.SetParticipants(analysis.Labels(activeParts), analysis.Labels(disabledParts))
+	if len(disabledParts) > 0 {
+		log("models and gates disabled by profile %s: %s", prof.Name, strings.Join(analysis.Labels(disabledParts), ", "))
 	}
 	// Each gate runs to its own fixed point within a step; a joint
 	// iteration is needed only when a step and a model unlock each other.
@@ -1193,7 +1221,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("models and gates (ROADMAP B3 fixed point): %d iterations of at most %d; %d model facts, %d model edges; gate edges %s (incomplete=%t)",
 		modelResult.Iterations, jointBudget, len(modelResult.Facts), modelResult.AddedEdges, stepSummary(steps, modelResult.StepEdges), modelResult.Incomplete)
 	// Final totals (no edge is added at the fixed point).
-	samApplied, objApplied, jdbcApplied, proxyApplied := samGate.Apply(g, roots), objGate.Apply(g, roots), jdbcGate.Apply(g, roots), proxyGate.Apply(g, roots)
+	// A disabled gate adds nothing and reports zeros.
+	applyGate := func(id string, gate *callgraph.SAMGate) callgraph.SAMStats {
+		if partOff[id] {
+			return callgraph.SAMStats{}
+		}
+		return gate.Apply(g, roots)
+	}
+	samApplied, objApplied, jdbcApplied, proxyApplied := applyGate(samGateID, samGate), applyGate(servletGateID, objGate), applyGate(jdbcdispatch.ModelID, jdbcGate), applyGate(proxycatalog.ModelID, proxyGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",

@@ -249,6 +249,13 @@ func (g *Graph) SetAnalysis(roots string, targetJava int) {
 	g.config.Roots, g.config.TargetJava = roots, targetJava
 }
 
+// SetParticipants records the models and gates (id@version) the
+// coordinator ran over this graph and the ones the profile disabled.
+func (g *Graph) SetParticipants(active, disabled []string) {
+	g.config.Participants = append([]string(nil), active...)
+	g.config.DisabledParticipants = append([]string(nil), disabled...)
+}
+
 // NodeCount is the number of distinct methods in the graph.
 func (g *Graph) NodeCount() int { return len(g.keys) }
 

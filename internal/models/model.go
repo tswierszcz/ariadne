@@ -23,6 +23,7 @@ package models
 import (
 	"ariadne/internal/classfile"
 	"ariadne/internal/input"
+	"sort"
 )
 
 // Signature identifies one library API call a Model knows how to
@@ -147,6 +148,44 @@ func (r *Registry) Register(m *Model) {
 	for _, s := range m.Signatures {
 		r.byKey[s] = append(r.byKey[s], m)
 	}
+}
+
+// IDs lists the IDs of the registered models, sorted, each once.
+func (r *Registry) IDs() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, ms := range r.byKey {
+		for _, m := range ms {
+			if !seen[m.ID] {
+				seen[m.ID] = true
+				out = append(out, m.ID)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Remove drops every registration of the model with this ID (ROADMAP B3
+// b3-3: a profile disabled it) and reports how many signatures it held.
+func (r *Registry) Remove(id string) int {
+	n := 0
+	for sig, ms := range r.byKey {
+		kept := ms[:0]
+		for _, m := range ms {
+			if m.ID == id {
+				n++
+				continue
+			}
+			kept = append(kept, m)
+		}
+		if len(kept) == 0 {
+			delete(r.byKey, sig)
+		} else {
+			r.byKey[sig] = kept
+		}
+	}
+	return n
 }
 
 // Lookup returns every registered Model matching sig, restricted by
