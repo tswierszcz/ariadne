@@ -184,3 +184,27 @@ adds the version span; it does **not** change their role or coverage (`sink`/`en
 - **Baseline:** [testdata/baseline/](../testdata/baseline/README.MD) — the current
   version's results on petclinic and WebGoat with hashes of every input and of every
   network response used. A baseline is a reference for change, **not ground truth**.
+
+## Gap vocabulary
+
+(ROADMAP B0 b0-3, 2026-11-13, `internal/gaps` version `b0-3`.) Every analyzer that reports a model gap keeps its own codes — they are part of its output and are never renamed — and each code maps to exactly one **mechanism**, so the same gap reads the same way wherever it is reported. Sources: `site` — the unresolved dynamic sites of the model-gap rule (§4, `model_gaps` keys); `allocation` — the created-type catalog's unknown allocations (GRAPH_PRECISION P1/P2); `lambda` — SAM-call resolution gaps (DYNAMIC_LINKAGE L1); `runtime` — causes of measured calls missing from the graph (RUNTIME_NATIVE N1); `coordinator` — incomplete model facts of the B3 coordinator. The mapping is a reading aid: it changes no verdict and no reason code; only `site` gaps take part in the model-gap rule. v2: `coverage.gaps[]` (`mechanism`, `source`, `detail` — the source's own code —, `count`, and for `site` `reachable`) and `findings[].gaps[]` (the finding's `model_gaps` in this form). `TestVocabularyDocumented` keeps this table and the code identical.
+
+| Mechanism | Meaning | Source codes |
+|---|---|---|
+| `reflection` | Method#invoke, Constructor#newInstance, Class.forName with an unresolved value | site/`reflection`, allocation/`reflection-unresolved`, runtime/`reflection` |
+| `method_handle` | MethodHandle#invoke*, Lookup#find* with an unresolved value | site/`methodhandle`, allocation/`constructor-handle`, runtime/`method-handle` |
+| `callback_async` | a task or callback handed to a thread, executor or framework | site/`callback`, runtime/`async` |
+| `service_loader` | ServiceLoader use whose service or providers are unknown | site/`serviceloader`, allocation/`service-unresolved` |
+| `deserialization` | a deserialization entry whose input classes are open | site/`deserialization` |
+| `dynamic_proxy` | a JDK Proxy / generated InvocationHandler dispatch | allocation/`dynamic-proxy`, runtime/`proxy` |
+| `container_proxy` | a container-generated implementation (repository, AOP proxy) | allocation/`container-proxy` |
+| `unknown_allocation` | an object created where the type is unknown (Unsafe, constructor handles) | site/`allocation`, allocation/`unsafe-allocation` |
+| `external_input` | `-roots all`: a root's parameters may be any subtype | allocation/`external-input` |
+| `lambda` | a functional-interface call whose lambda / method reference is unresolved | lambda/`bootstrap`, lambda/`budget`, lambda/`call-result`, lambda/`depth`, lambda/`field`, lambda/`instance-call`, lambda/`parameter`, lambda/`sam-argument`, lambda/`unknown-value`, runtime/`invokedynamic`, runtime/`sam-call` |
+| `skipped_receiver` | a call on `java.`/`javax.`/`jdk.`/`sun.` types, never CHA-expanded | runtime/`skipped-receiver` |
+| `virtual_dispatch` | a virtual call target the graph has no edge for (RTA pruning, inherited bodies) | runtime/`dispatch-missing`, runtime/`inherited-impl`, runtime/`rta-pruned` |
+| `class_init` | a class initializer the JVM runs implicitly | runtime/`class-init` |
+| `model_incomplete` | a library model that could not resolve a site (B3 coordinator; detail: model id) | coordinator/*model id* |
+| `trace_alignment` | a measured call not attributable to one site (dropped frames, inlining) | runtime/`indirect`, runtime/`no-call-at-site` |
+| `unclassified` | no mechanism known | runtime/`unclassified` |
+

@@ -1326,6 +1326,20 @@ expansion (before `b0-2` the shortest path showed 106, 89 and 16).
 An advisory no source could map is `UNKNOWN` with `MAPPING_MISSING` (also
 in v1's `reasons`).
 
+**One gap vocabulary (ROADMAP B0 b0-3).** Each analyzer that reports model
+gaps — the unresolved sites of the model-gap rule, the created-type
+catalog's unknown allocations, the SAM-call gaps, the B3 coordinator's
+incomplete facts, a trace's causes of calls missing from the graph — keeps
+its own codes, and each code maps to one mechanism (`reflection`,
+`method_handle`, `callback_async`, `service_loader`, `deserialization`,
+`dynamic_proxy`, `container_proxy`, `unknown_allocation`, `external_input`,
+`lambda`, `skipped_receiver`, `virtual_dispatch`, `class_init`,
+`model_incomplete`, …; `internal/gaps`, table in
+[docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD)). The report's "Model
+gaps by mechanism" table and v2 `coverage.gaps`/`findings[].gaps` use it.
+It is a reading aid: only the `site` gaps take part in the model-gap rule,
+and no verdict or reason code changes (v1 is byte-identical).
+
 **Outputs are written together (CVE:F9a).** The report, the results
 file and a `-snapshot-out` manifest are rendered first and written only
 at the end of a successful run, all or nothing — a run that fails

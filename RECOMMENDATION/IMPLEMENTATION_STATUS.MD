@@ -12,7 +12,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
-| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności; od 2026-11-13 (`b3-3`) wybór uczestników z profilu (`models.disable`) zapisany w raporcie, v2, ustawieniach grafu i snapshocie. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, invalidation zależnych wyników po zmianie modelu (poza wersjami algorytmów). B0: IN_PROGRESS — oceniony 2026-11-13, przyrost `b0-1` (dowód każdego kroku ścieżki, charakter ustalenia, `MAPPING_MISSING`), `b0-2` (zgłaszana ścieżka bez kroków tylko-CHA, gdy istnieje); B4: oceniony 2026-11-13 (macierz obszarów, braki wyroczni dla refleksji, callbacków, uchwytów, proxy, JDBC, DI). B1: częściowo przez `b0-1`; B2: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
+| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności; od 2026-11-13 (`b3-3`) wybór uczestników z profilu (`models.disable`) zapisany w raporcie, v2, ustawieniach grafu i snapshocie. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, invalidation zależnych wyników po zmianie modelu (poza wersjami algorytmów). B0: IN_PROGRESS — oceniony 2026-11-13, przyrost `b0-1` (dowód każdego kroku ścieżki, charakter ustalenia, `MAPPING_MISSING`), `b0-2` (zgłaszana ścieżka bez kroków tylko-CHA, gdy istnieje), `b0-3` (wspólny słownik luk, bez zmiany reguły); B4: oceniony 2026-11-13 (macierz obszarów, braki wyroczni dla refleksji, callbacków, uchwytów, proxy, JDBC, DI). B1: częściowo przez `b0-1`; B2: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: F8a DONE (2026-11-13, identyfikacja runtime'u); F8b DONE dla mechanizmu (2026-11-13: dostawca upstream OpenJDK przez kuratorowany katalog — warunki openjdk.org wykluczają automatyczny dostęp; katalog pusty do pierwszej kuracji), F8c UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06); F10: DONE (2026-11-10, kontynuacja 2026-11-13; PR #48, #49, [zarchiwizowane](../archive/2026-11-13/cve/CVE_F10.md)) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. F10 (2026-11-10) i ręczne mapowania z diffów wydań (2026-11-13, 46 → 68 wpisów; `UNKNOWN` 49/45/8 → 27/23/5). Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE (overloads/inheritance; bridge/default-method real-bytecode verification closed 2026-11-07 by GRAPH_PRECISION P0 — `testdata/callgraph`, JVM oracle; korekta 2026-11-08, PR #29: CHA celuje też w ciała dziedziczone spoza typu wywołania, builder `3`) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty; ograniczenie G2 domknięte i korekta CHA (addendum w COMPLETION.md). Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5, zarchiwizowane](../archive/2026-11-07/data_flow/COMPLETION.md) | D0–D5: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (D5 — PR #13) | IR/CFG/wartości lokalne (D0–D2), pięć wycinków międzyproceduralnych wartości i streszczenia zależności `internal/flowsum` (D3), pilotaż taint `-taint` opt-in (D4), kwalifikacja: wyrocznia JVM, kształty, pomiar (D5, `docs/TAINT_QUALIFICATION.MD`). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -29,6 +29,43 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### ROADMAP:B0 — trzeci przyrost (`b0-3`): wspólny słownik luk — DONE for this scope (2026-11-13)
+
+- **Zakres (zatwierdzony 2026-11-13):** słownik i mapowanie, **bez zmiany
+  reguły luk** (decyzja użytkownika: wariant bez rozszerzania
+  `MODEL_INCOMPLETE`).
+- **Inwentaryzacja przed zmianą:** sześć osobnych słowników — miejsca reguły
+  luk (`reflection`, `methodhandle`, `callback`, `serviceloader`,
+  `deserialization`, `allocation`), nieznane alokacje katalogu typów
+  (`reflection-unresolved`, `dynamic-proxy`, `container-proxy`,
+  `unsafe-allocation`, `constructor-handle`, `service-unresolved`,
+  `external-input`), luki SAM (`parameter`, `field`, `call-result`, …),
+  tekstowe powody koordynatora B3, przyczyny śladu (`reflection`,
+  `method-handle`, `proxy`, `async`, `sam-call`, `skipped-receiver`, …),
+  luki taint/servletów/proxy. Ten sam mechanizm pod 2–3 nazwami (refleksja,
+  uchwyty, ServiceLoader, wątki).
+- **Zrealizowane:** `internal/gaps` (wersja `b0-3`): 16 mechanizmów,
+  mapowanie każdego kodu pięciu źródeł (`site`, `allocation`, `lambda`,
+  `runtime`, `coordinator` — szczegół = id modelu) na jeden mechanizm;
+  kody źródeł bez zmian. v2 `coverage.gaps` (mechanizm, źródło, kod,
+  liczba, dla `site` liczba osiągalnych), `findings[].gaps` (`model_gaps`
+  w nowym słowniku); raport: tabela „Model gaps by mechanism”; tabela w
+  kontrakcie wyników generowana z mapowania.
+- **Weryfikacja:** `TestEveryProducerCodeMapped` (każda stała luk alloc,
+  samcall, runtimeevents i każdy rodzaj miejsca ma mechanizm),
+  `TestVocabularyDocumented`, `TestFromCountsAndSummary`; `go test ./...`,
+  `go vet ./...`. petclinic, WebGoat, JPetStore: v1 **bajtowo identyczne**
+  z `main`; v2/raport z tabelą (petclinic m.in. `reflection` 816 miejsc,
+  510 osiągalnych + 258 alokacji; `lambda` 1 138 luk SAM).
+- **Ograniczenia (świadome):** reguła luk nadal bierze tylko miejsca `site`
+  — nierozwiązane wywołania SAM i pomijane odbiorcy `java.*`/`javax.*` są
+  raportowane, ale nie osłabiają `NOT_REACHABLE`; pomijani odbiorcy nie
+  mają jeszcze licznika statycznego (tylko przyczyna w śladzie); luki
+  taint, rejestracji servletów i proxy bez twórcy nie są jeszcze w
+  słowniku.
+- **Następny krok (wymaga zgody):** rozszerzenie reguły luk (SAM, pomijani
+  odbiorcy) z pomiarem wpływu na v1 albo brakujące wyrocznie B4.
 
 ### ROADMAP:B0 — drugi przyrost (`b0-2`): zgłaszana ścieżka bez kroków tylko-CHA — DONE for this scope (2026-11-13)
 

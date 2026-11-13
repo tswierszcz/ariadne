@@ -821,6 +821,15 @@ func (e *Engine) ReachableGaps() (reachable, unbounded int) {
 	return len(e.gaps), unbounded
 }
 
+// ReachableGapsByKind counts the reachable unresolved sites by kind.
+func (e *Engine) ReachableGapsByKind() map[string]int {
+	out := map[string]int{}
+	for _, g := range e.gaps {
+		out[g.site.Kind]++
+	}
+	return out
+}
+
 // relevantGaps counts, by kind, the reachable unresolved sites that could
 // dispatch into one of the instances (contract §4): those with no bounded
 // candidate set, and those with a candidate in one of the instances. With

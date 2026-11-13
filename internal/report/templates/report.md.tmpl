@@ -1024,7 +1024,15 @@ None found.
 {{end}}
 {{end}}
 
-## Limitations
+{{if .Gaps}}## Model gaps by mechanism
+
+Every analyzer's gaps of this run in one vocabulary (ROADMAP B0, docs/RESULTS_CONTRACT.MD "Gap vocabulary"): the mechanism through which the static model may miss a call, the analyzer that reported it, its own code, and how many. Only `site` gaps take part in the model-gap rule (`MODEL_INCOMPLETE`); the others are reported here and change no verdict.
+
+| Mechanism | Source | Detail | Count | Reachable from the roots |
+|---|---|---|---|---|
+{{range .Gaps}}| `{{.Mechanism}}` | {{.Source}} | `{{.Detail}}` | {{.Count}} | {{if .Reachable}}{{deref .Reachable}}{{else}}—{{end}} |
+{{end}}
+{{end}}## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
   and `invokedynamic` sites other than lambdas/method references** are invisible to a

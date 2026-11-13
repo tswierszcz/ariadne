@@ -6,6 +6,7 @@ package report
 import (
 	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
+	"ariadne/internal/gaps"
 	"fmt"
 	"sort"
 	"strings"
@@ -28,6 +29,8 @@ import (
 
 // Header carries everything section 6's report header asks for.
 type Header struct {
+	// Gaps (ROADMAP B0 b0-3): the run's gaps in the shared vocabulary.
+	Gaps           []gaps.Gap
 	App            string
 	GeneratedAt    time.Time
 	AriadneVersion string
