@@ -822,7 +822,10 @@ names a class — the bytecode of the release before the fix and the fixing
 patch release is compared: the changed methods of the named classes become
 an unreviewed `release-diff` mapping (95 % of its methods were real fix
 methods on 130 advisories where the fix commit is known). `UNKNOWN`
-dropped from 57/60/12 to 49/45/8.
+dropped from 57/60/12 to 49/45/8. The biggest groups left after that (Spring MVC, SpEL,
+Thymeleaf, SnakeYAML: advisories with no commit and no class name) got
+22 hand-reviewed manual entries, each from a release diff read by hand
+and checked over a span of releases: `UNKNOWN` 49/45/8 → 27/23/5.
 
 Source 4 is an LLM reading the advisory + fix diff, opt-in with `-llm`
 (design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
