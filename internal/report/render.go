@@ -18,7 +18,7 @@ var markdownTemplate string
 
 // RenderMarkdown fills the embedded report.md template with data.
 func RenderMarkdown(data Data) (string, error) {
-	tmpl, err := template.New("report.md").Funcs(template.FuncMap{"gapCounts": GapCounts, "join": strings.Join}).Parse(markdownTemplate)
+	tmpl, err := template.New("report.md").Funcs(template.FuncMap{"gapCounts": GapCounts, "join": strings.Join, "deref": func(p *int) int { return *p }}).Parse(markdownTemplate)
 	if err != nil {
 		return "", fmt.Errorf("parsing report template: %w", err)
 	}

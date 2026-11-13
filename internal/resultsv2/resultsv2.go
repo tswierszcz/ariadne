@@ -9,6 +9,7 @@ package resultsv2
 import (
 	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
+	"ariadne/internal/gaps"
 	"ariadne/internal/runtimeinfo"
 	"ariadne/internal/runtimevuln"
 	"crypto/sha256"
@@ -311,7 +312,9 @@ type Finding struct {
 	Reachability       string                `json:"reachability"`
 	ReasonCodes        []findings.ReasonCode `json:"reason_codes,omitempty"`
 	ModelGaps          map[string]int        `json:"model_gaps,omitempty"`
-	Path               []string              `json:"path,omitempty"`
+	// Gaps (ROADMAP B0 b0-3): ModelGaps in the shared gap vocabulary.
+	Gaps []gaps.Gap `json:"gaps,omitempty"`
+	Path []string   `json:"path,omitempty"`
 	// PathEdges and Character (ROADMAP B0/B1): every step's edges with
 	// kind, basis and call-site offsets, and the set of the steps'
 	// characters (jvm_rule, library_model, input_declaration, heuristic).
@@ -336,6 +339,11 @@ type Finding struct {
 // Coverage is what the findings do not say per instance.
 type Coverage struct {
 	GlobalGaps GlobalGaps `json:"global_gaps"`
+	// Gaps (ROADMAP B0 b0-3): every analyzer's gaps of the run in one
+	// vocabulary — mechanism, source, the source's own code, count
+	// (docs/RESULTS_CONTRACT.MD "Gap vocabulary"). Additive; changes no
+	// verdict.
+	Gaps []gaps.Gap `json:"gaps,omitempty"`
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`
@@ -586,7 +594,7 @@ func Build(in Inputs) Document {
 				AdvisoryID: cve.ID, ComponentInstanceID: f.Instance, Identity: identity[f.Instance],
 				Applicability: applicability, ApplicabilityCheck: check,
 				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
-				ModelGaps: f.ModelGaps, Path: f.Path, PathEdges: f.PathEdges, Character: f.Character, Entry: f.Entry, Note: f.Note,
+				ModelGaps: f.ModelGaps, Gaps: gaps.FromCounts(gaps.SourceSite, f.ModelGaps), Path: f.Path, PathEdges: f.PathEdges, Character: f.Character, Entry: f.Entry, Note: f.Note,
 				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
 				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
 				RuntimeTraced:         in.RuntimeTraced[cve.ID][f.Instance],

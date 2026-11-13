@@ -1498,7 +1498,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("call graph comparison with %s: %d → %d edges, %d added, %d removed, %d with other call-site evidence; %d findings changed; settings: %s",
 			cfg.graphCompare, c.EdgesBefore, c.EdgesAfter, len(c.Added), len(c.Removed), c.EvidenceChanged, len(c.Findings), graphSettings(c.ConfigDifferences))
 	}
+	runGapList := runGaps(gapSites, engine.ReachableGapsByKind(), allocSummary.Gaps, samStats.Gaps, modelGapReasons, runtimeResult)
 	header := report.Header{
+		Gaps:               runGapList,
 		App:                cfg.app,
 		GeneratedAt:        time.Now(),
 		AriadneVersion:     version(),
@@ -1580,6 +1582,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
 	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
+	doc.Coverage.Gaps = runGapList
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}
