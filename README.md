@@ -524,13 +524,40 @@ every gate, then one model pass — until an iteration adds nothing, within
 a budget it reports (the remaining participants are named when the budget
 ends). The order of the participants does not change the result. Log line:
 `models and gates (ROADMAP B3 fixed point): N iterations of at most M; …
-model edges; gate edges sam-calls N, …`; snapshots record
+model edges; gate edges dynamic-linkage:sam-calls N, …`; snapshots record
 `analysis.coordinator`. Before `b3-2` the CLI ran the gates, then the
 models to their own fixed point, then the gates once more, which misses an
 edge behind a model → gate → model chain (`TestRun_stepsAndModelsShareOneFixedPoint`).
 On petclinic, WebGoat, JPetStore and the log4j/logback control apps the
 joint fixed point gives the same graph and results (1–5 iterations): those
 inputs had no such chain.
+
+**Choosing the participants (coordinator `b3-3`).** A profile can turn
+models and gates off by ID — data only, no code:
+
+```yaml
+models:
+  disable:
+    - servlet-container:dispatch
+    - servlet-container:objects
+```
+
+The IDs are `jdk:service-loader-classpath-provider`,
+`jdk:service-loader-consumption`, `jdk:service-loader-provider-dispatch`,
+`servlet-container:dispatch`, `service-provider:dispatch` (models) and
+`dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
+`framework:proxies` (gates). An ID the analyzer does not know stops the run
+with the list of known ones; profiles merged by auto-detection disable the
+union of their lists; the embedded profiles disable nothing. A disabled
+model is removed from the registry and a disabled gate adds no edge. The
+participants that ran are recorded as `id@version` in the report's call
+graph line, in v2 `callgraph.participants` (with
+`disabled_participants`, so the `analysis_id` differs), in `-graph-out`
+settings (a `-graph-compare` against another selection says so) and in a
+snapshot's configuration (`models`, `models-disabled`). Disabling the two
+servlet participants on petclinic removes 5 918 edges and turns 13
+`FRAMEWORK` into `NOT_REACHABLE` — a way to see what a model contributes,
+not a recommended setting.
 
 **Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x1`).**
 Some framework objects exist only as JDK dynamic proxies: a MyBatis mapper

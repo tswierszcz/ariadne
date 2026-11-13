@@ -18,6 +18,8 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"slices"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -133,6 +135,18 @@ type Profile struct {
 	Roots             Roots              `yaml:"roots"`
 	FrameworkPackages []FrameworkPackage `yaml:"framework_packages"`
 	SyntheticEdges    []SyntheticEdge    `yaml:"synthetic_edges"`
+	// Models chooses which call-graph models and creator gates take part
+	// in the coordinator's fixed point (ROADMAP B3 b3-3). Data only: the
+	// IDs are checked against the analyzer's participant catalog when the
+	// run starts, never interpreted here.
+	Models ModelSelection `yaml:"models"`
+}
+
+// ModelSelection lists participant IDs (e.g. "jdbc:objects") a profile
+// turns off. Every participant runs unless some selected profile
+// disables it.
+type ModelSelection struct {
+	Disable []string `yaml:"disable"`
 }
 
 // Catalog is the set of profiles -profile can select by name or
@@ -269,7 +283,11 @@ func merge(profiles []Profile) Profile {
 		m.Roots.Main = m.Roots.Main || p.Roots.Main
 		m.FrameworkPackages = append(m.FrameworkPackages, p.FrameworkPackages...)
 		m.SyntheticEdges = append(m.SyntheticEdges, p.SyntheticEdges...)
+		m.Models.Disable = append(m.Models.Disable, p.Models.Disable...)
 	}
+	// A participant disabled by any merged profile stays off.
+	sort.Strings(m.Models.Disable)
+	m.Models.Disable = slices.Compact(m.Models.Disable)
 	m.Name = strings.Join(names, "+")
 	return m
 }

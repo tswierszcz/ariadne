@@ -15,6 +15,8 @@ package analysis
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"ariadne/internal/callgraph"
 	"ariadne/internal/hierarchy"
@@ -24,8 +26,72 @@ import (
 
 // CoordinatorVersion versions the fixed-point rules: b3-1 iterated the
 // registered models alone; b3-2 iterates models and steps (the creator
-// gates) together. Snapshots record it.
-const CoordinatorVersion = "b3-2"
+// gates) together; b3-3 runs only the participants the profile selects
+// (Select). Snapshots record it.
+const CoordinatorVersion = "b3-3"
+
+// Participant kinds.
+const (
+	KindModel = "model" // a registered model (models.Registry)
+	KindGate  = "gate"  // a step: a creator gate
+)
+
+// Participant is one entry of the analyzer's catalog of fixed-point
+// participants: a stable ID a profile can name, the version of its
+// rules, and its kind.
+type Participant struct {
+	ID      string
+	Version string
+	Kind    string
+}
+
+// Label is "id@version".
+func (p Participant) Label() string { return p.ID + "@" + p.Version }
+
+// Select splits the catalog into the participants that run and the ones
+// disable names (ROADMAP B3 b3-3). An ID the catalog does not know is an
+// error, never ignored: a typo in a profile would otherwise silently
+// leave a model on. Both lists keep the catalog's order.
+func Select(catalog []Participant, disable []string) (active, disabled []Participant, err error) {
+	known := map[string]bool{}
+	for _, p := range catalog {
+		known[p.ID] = true
+	}
+	off := map[string]bool{}
+	var unknown []string
+	for _, id := range disable {
+		if !known[id] {
+			unknown = append(unknown, fmt.Sprintf("%q", id))
+			continue
+		}
+		off[id] = true
+	}
+	if len(unknown) > 0 {
+		var ids []string
+		for _, p := range catalog {
+			ids = append(ids, p.ID)
+		}
+		return nil, nil, fmt.Errorf("unknown model or gate %s in the profile's models.disable (known: %s)", strings.Join(unknown, ", "), strings.Join(ids, ", "))
+	}
+	for _, p := range catalog {
+		if off[p.ID] {
+			disabled = append(disabled, p)
+		} else {
+			active = append(active, p)
+		}
+	}
+	return active, disabled, nil
+}
+
+// Labels returns the participants' labels, sorted.
+func Labels(ps []Participant) []string {
+	out := make([]string, 0, len(ps))
+	for _, p := range ps {
+		out = append(out, p.Label())
+	}
+	sort.Strings(out)
+	return out
+}
 
 // Options bounds work. MaxIterations must be positive; each iteration
 // runs every step, then processes the currently reachable call sites.

@@ -14,6 +14,16 @@ const serviceLoaderModelID = "jdk:service-loader-classpath-provider"
 const serviceLoaderConsumptionModelID = "jdk:service-loader-consumption"
 const serviceLoaderDispatchModelID = "jdk:service-loader-provider-dispatch"
 
+// Exported model IDs and the version of their rules (labelled by the
+// SERVICE_LOADING phase that closed the area, S4), for the coordinator's participant
+// catalog (ROADMAP B3 b3-3).
+const (
+	LoadModelID        = serviceLoaderModelID
+	ConsumptionModelID = serviceLoaderConsumptionModelID
+	DispatchModelID    = serviceLoaderDispatchModelID
+	ModelVersion       = "s4"
+)
+
 // RegisterModel adds the classpath ServiceLoader semantics implemented
 // by the S0-S2 inventory and resolver. Its exact API signatures are kept
 // in sync with FindLoadSites; modules and custom classloaders remain gaps.

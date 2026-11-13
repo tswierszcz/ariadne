@@ -134,3 +134,31 @@ func TestRouterSendsEachModelToItsEvaluator(t *testing.T) {
 		t.Errorf("no evaluator: %+v", f)
 	}
 }
+
+// TestRegistry_removeAndIDs (ROADMAP B3 b3-3): removing a model drops it
+// from every signature it was registered under and leaves the others.
+func TestRegistry_removeAndIDs(t *testing.T) {
+	r := NewRegistry()
+	s1 := Signature{Owner: "a.B", Name: "m", Desc: "()V"}
+	s2 := Signature{Owner: "a.B", Name: "n", Desc: "()V"}
+	r.Register(&Model{ID: "x", Signatures: []Signature{s1, s2}})
+	r.Register(&Model{ID: "y", Signatures: []Signature{s1}})
+	if got := r.IDs(); len(got) != 2 || got[0] != "x" || got[1] != "y" {
+		t.Fatalf("IDs = %v", got)
+	}
+	if n := r.Remove("x"); n != 2 {
+		t.Errorf("Remove(x) = %d, want 2", n)
+	}
+	if got := r.Lookup(s1, nil); len(got) != 1 || got[0].ID != "y" {
+		t.Errorf("s1 after removal = %v", got)
+	}
+	if got := r.Lookup(s2, nil); len(got) != 0 {
+		t.Errorf("s2 after removal = %v", got)
+	}
+	if n := r.Remove("absent"); n != 0 {
+		t.Errorf("Remove(absent) = %d", n)
+	}
+	if got := r.IDs(); len(got) != 1 || got[0] != "y" {
+		t.Errorf("IDs after removal = %v", got)
+	}
+}
