@@ -1,5 +1,20 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-13 with WebGoat's full input**: `scripts/prepare-webgoat.sh` now builds what
+the deployable `webgoat-server` contains — the container, all 27 lesson modules (174 more
+classes; 246 in all) and the launcher — with `webgoat-server`'s own dependency resolution (131
+jars: + PostgreSQL JDBC, jsoup, jjwt, zxcvbn, commons-lang 2.6, checker-qual; − one
+`jakarta.activation-api` Maven mediates away). The first table under "Real applications" is this
+run. petclinic and JPetStore unchanged. WebGoat: 7 registrations (+ the challenge lesson's
+`@WebServlet` `ImageServlet`, through `@ServletComponentScan`), +39 173 edges (CHA `-roots all`),
+172 advisories instead of 164; **no verdict of the 164 changed** (offline, same cache), the 8 new
+advisories belong to the new dependencies — PostgreSQL CVE-2022-21724, CVE-2022-41946,
+CVE-2024-1597 `REACHABLE` through the JDBC driver its `META-INF/services` registers (WebGoat's
+default configuration uses HSQLDB, so their use depends on the configured JDBC URL),
+CVE-2022-31197 `NOT_REACHABLE`, two `UNKNOWN`; jsoup CVE-2026-75140 `REACHABLE` through the XSS
+lesson's own `Jsoup.parse`, CVE-2022-36033 `UNKNOWN`. RTA verdict changes unchanged (one RTA row's
+removed-edge evidence names another Undertow path).
+
 **Rerun 2026-11-13 with WebGoat's Boot launcher in the input**: `scripts/prepare-webgoat.sh`
 now compiles `webgoat-server`'s `StartWebGoat` (`@SpringBootApplication`) and
 `HSQLDBDatabaseConfig` into `app-classes.jar`; the first table under "Real applications" is this
@@ -196,18 +211,18 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| petclinic | profile | cha | 12.8–13.8 | 1377–1439 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
-| petclinic | profile | rta | 13.4–13.8 | 1401–1405 | 991 892 | 35 216 of 321 532 (34 854) | 17 451 (5 796) | 661 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/91/22/27/6 |
-| petclinic | all | cha | 13.0–13.2 | 1398–1519 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
-| petclinic | all | rta | 13.9–14.0 | 1423–1433 | 1 021 212 | 5 896 of 321 532 (57 892) | 21 864 (9 567) | 703 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
-| WebGoat | profile | cha | 20.5–20.5 | 1749–1775 | 1 435 759 | — | — | 778 of 1194 | 6 | 1 351 | 1 633 (1 973) | 62/65/14/23/0 |
-| WebGoat | profile | rta | 21.9–23.8 | 1680–1711 | 1 359 004 | 76 755 of 569 037 (158 457) | 25 704 (10 245) | 706 of 1201 | 6 | 1 351 | 1 633 (1 973) | 61/63/17/23/0 |
-| WebGoat | all | cha | 19.0–19.1 | 1751–1796 | 1 435 761 | — | — | 779 of 1194 | 6 | 1 353 | 1 633 (1 971) | 62/65/14/23/0 |
-| WebGoat | all | rta | 19.7–20.1 | 1798–1882 | 1 421 018 | 14 743 of 569 037 (95 614) | 32 329 (12 533) | 782 of 1201 | 6 | 1 353 | 1 633 (1 971) | 62/65/14/23/0 |
-| JPetStore | profile | cha | 3.4–3.5 | 295–314 | 225 554 | — | — | 161 of 364 | 1 | 77 | 0 (0) | 0/14/16/5/0 |
-| JPetStore | profile | rta | 3.5–3.6 | 314–317 | 212 454 | 13 100 of 59 469 (16 226) | 3 205 (1 263) | 144 of 365 | 1 | 77 | 0 (0) | 0/12/18/5/0 |
-| JPetStore | all | cha | 3.5–3.5 | 302–316 | 225 713 | — | — | 167 of 364 | 1 | 380 | 0 (0) | 2/13/15/5/0 |
-| JPetStore | all | rta | 3.5–3.5 | 311–313 | 212 792 | 12 921 of 59 469 (16 401) | 3 229 (1 276) | 145 of 365 | 1 | 380 | 0 (0) | 0/12/18/5/0 |
+| petclinic | profile | cha | 12.8–14.3 | 1343–1404 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
+| petclinic | profile | rta | 13.4–13.6 | 1386–1386 | 991 892 | 35 216 of 321 532 (34 854) | 17 451 (5 796) | 661 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/91/22/27/6 |
+| petclinic | all | cha | 12.8–12.8 | 1329–1403 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
+| petclinic | all | rta | 12.2–13.0 | 1395–1521 | 1 021 212 | 5 896 of 321 532 (57 892) | 21 864 (9 567) | 703 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
+| WebGoat | profile | cha | 18.2–18.6 | 1753–1819 | 1 474 931 | — | — | 789 of 1228 | 7 | 2 658 | 1 640 (1 953) | 66/65/15/26/0 |
+| WebGoat | profile | rta | 19.2–19.3 | 1740–1770 | 1 398 449 | 76 482 of 572 380 (158 235) | 26 578 (10 334) | 719 of 1235 | 7 | 2 658 | 1 640 (1 953) | 65/63/18/26/0 |
+| WebGoat | all | cha | 18.4–18.5 | 1699–1798 | 1 474 934 | — | — | 791 of 1228 | 7 | 2 668 | 1 640 (1 950) | 66/65/15/26/0 |
+| WebGoat | all | rta | 19.3–19.5 | 1783–1805 | 1 460 186 | 14 748 of 572 380 (95 345) | 33 410 (12 856) | 794 of 1235 | 7 | 2 668 | 1 640 (1 950) | 66/65/15/26/0 |
+| JPetStore | profile | cha | 3.2–3.2 | 295–297 | 225 554 | — | — | 161 of 364 | 1 | 77 | 0 (0) | 0/14/16/5/0 |
+| JPetStore | profile | rta | 3.3–3.3 | 293–295 | 212 454 | 13 100 of 59 469 (16 226) | 3 205 (1 263) | 144 of 365 | 1 | 77 | 0 (0) | 0/12/18/5/0 |
+| JPetStore | all | cha | 3.2–3.3 | 293–295 | 225 713 | — | — | 167 of 364 | 1 | 380 | 0 (0) | 2/13/15/5/0 |
+| JPetStore | all | rta | 3.3–3.3 | 299–318 | 212 792 | 12 921 of 59 469 (16 401) | 3 229 (1 276) | 145 of 365 | 1 | 380 | 0 (0) | 0/12/18/5/0 |
 
 <details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
 
