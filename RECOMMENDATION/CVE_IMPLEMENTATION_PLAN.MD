@@ -304,6 +304,31 @@ F8c nie jest warunkiem pierwszego wydania oceny podatności JDK.
 - Nieznany vendor, niepełny build, brak danych historycznych i backport mają jawne rozstrzygnięcia lub brak rozstrzygnięcia.
 - Pierwszy adapter jest udokumentowany i nie udaje wsparcia całego ekosystemu OpenJDK.
 
+## F10. Pokrycie mapowań bez commita poprawki — DONE (2026-11-10; zob. IMPLEMENTATION_STATUS)
+
+### Cel
+
+Zmniejszyć liczbę `UNKNOWN` wynikających z braku mapowania. Pomiar 2026-11-10 (petclinic,
+WebGoat, JPetStore): z 69 niezmapowanych advisories 52 nie mają w OSV commita poprawki, 10 mają
+tylko pull request, 5 commit z diffem bez metod.
+
+### Zadania
+
+1. Odnośnik do pull requestu → commit, który go zmergował (merge dwurodzicowy względem
+   pierwszego rodzica); PR niezmergowany jako błąd odnośnika.
+2. Zmienione inicjalizatory pól i bloki inicjalizacyjne → `<clinit>`/wszystkie konstruktory,
+   tylko gdy poprawka nie zmieniła żadnej metody.
+3. Źródło `release-diff`: metody zmienione między wydaniem przed poprawką a wydaniem patch z
+   poprawką, w klasach nazwanych w advisory; walidacja względem mapowań z commitów i reguła
+   włączenia domyślnego zależna od precyzji.
+
+### Kryteria ukończenia
+
+- Testy jednostkowe dla PR, inicjalizatorów i porównania wydań; walidacja precyzji źródła 3
+  ([testdata/cve-control/RELEASE_DIFF_VALIDATION.MD](../testdata/cve-control/RELEASE_DIFF_VALIDATION.MD)).
+- Pomiar `UNKNOWN` i zmian werdyktów na aplikacjach referencyjnych, ręczna kontrola próby.
+- Odpowiedzialny ruch do Maven Central (szeregowanie, cache, User-Agent).
+
 ## F9. Integracja, migracja i kwalifikacja wydania — DONE dla przyrostów pierwszego i drugiego, F0–F7 (F9a 2026-11-06: zadania 4, 5, 8, 9; F9b 2026-11-06: 3, 6, 7, 8 — rate limit; 1–2 zrealizowane w F1–F7); przy trzecim przyroście (F8) zadania F9 trzeba powtórzyć; zob. IMPLEMENTATION_STATUS
 
 ### Cel

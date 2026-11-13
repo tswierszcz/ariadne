@@ -1,9 +1,9 @@
-commit	80364fba291c2db6a52626de8bc7c51845390356 (dirty)
+commit	03cf639d78e1bb6b6d5299cc88023c3bb322da28 (dirty)
 go version go1.27.3 linux/amd64
 repeat	3
 profile	spring
 offline	true
-cha.tool	v0.0.0-20261110114911-80364fba291c+dirty
+cha.tool	v0.0.0-20261110135131-03cf639d78e1+dirty
 cha.builder	6
 cha.skip_rule	receiver types under java., javax., jdk., sun. are not expanded; log4j 1.2 appenders not in the packaged configuration not expanded (l1-1: AsyncAppender, DailyRollingFileAppender, FileAppender, RollingFileAppender, WriterAppender, JDBCAppender, LF5Appender, JMSAppender, SMTPAppender, SocketAppender, SocketHubAppender, SyslogAppender, TelnetAppender, NTEventLogAppender, RewriteAppender, ExternallyRolledFileAppender, NullAppender)
 cha.unknown_allocation_policy	all-subtypes
@@ -11,7 +11,7 @@ cha.catalog	p1-2
 cha.rta	
 cha.servlet_dispatch	s2
 cha.samcall	l1-1
-rta.tool	v0.0.0-20261110114911-80364fba291c+dirty
+rta.tool	v0.0.0-20261110135131-03cf639d78e1+dirty
 rta.builder	6
 rta.skip_rule	receiver types under java., javax., jdk., sun. are not expanded; log4j 1.2 appenders not in the packaged configuration not expanded (l1-1: AsyncAppender, DailyRollingFileAppender, FileAppender, RollingFileAppender, WriterAppender, JDBCAppender, LF5Appender, JMSAppender, SMTPAppender, SocketAppender, SocketHubAppender, SyslogAppender, TelnetAppender, NTEventLogAppender, RewriteAppender, ExternallyRolledFileAppender, NullAppender)
 rta.unknown_allocation_policy	cha-fallback-with-gap

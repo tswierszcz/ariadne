@@ -61,6 +61,7 @@ func main() {
 
 type config struct {
 	githubToken     string // GITHUB_TOKEN: authenticates fix-commit metadata requests (CVE:F5)
+	releaseDiff     bool   // CVE:F10: map from the bytecode of the releases around the fix
 	centralURL      string // ARIADNE_MAVEN_CENTRAL: repository root for embedded-component reference jars (CVE:F6a); default Maven Central
 	app             string
 	deps            string
@@ -154,6 +155,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.DurationVar(&cfg.dataTTL, "data-ttl", httpcache.DefaultTTL, "how long a fetched OSV/advisory response counts as fresh before it is fetched again (CVE:F2)")
 	fs.DurationVar(&cfg.maxDataAge, "max-data-age", 0, "hard limit on the age of any OSV/advisory data used, offline included; data of unknown age (cached before CVE:F2) fails it. 0 = no limit")
 	fs.BoolVar(&cfg.offline, "offline", false, "serve only from the cache; fail clearly on a miss instead of touching the network")
+	fs.BoolVar(&cfg.releaseDiff, "release-diff", true, "map a CVE that has no fix commit from Maven Central's bytecode: methods changed between the last release before the fix and the fixing patch release, in the classes the advisory names (CVE:F10; unreviewed, labelled source release-diff)")
 	fs.BoolVar(&cfg.llm, "llm", false, "also map CVEs no other source could to vulnerable methods by asking an LLM (needs ARIADNE_LLM_API_KEY and a model)")
 	fs.BoolVar(&cfg.llmReaskChanged, "llm-reask-changed", false, "with -llm: ask again when a CVE's advisory text or fix diff changed since its cached answer (default: reuse the previous answer, with a warning, so a data refresh never triggers paid requests by itself)")
 	fs.StringVar(&cfg.llmModel, "llm-model", "", "LLM model id; overrides ARIADNE_LLM_MODEL")
@@ -1048,6 +1050,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	resolver := vulnmap.NewResolver(manual, cache)
 	resolver.GithubToken = cfg.githubToken
+	resolver.ReleaseDiff = cfg.releaseDiff
 	resolver.Bytecode = declaredOverloads(h)
 	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
 		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)

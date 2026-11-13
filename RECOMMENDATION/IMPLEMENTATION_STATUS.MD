@@ -30,6 +30,62 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### CVE:F10 — pokrycie mapowań bez commita poprawki — DONE for this scope (2026-11-10)
+
+- **Pomiar wyjściowy:** 69 niezmapowanych advisories (petclinic, WebGoat,
+  JPetStore): 52 bez commita poprawki w OSV, 10 tylko z PR, 5 z diffem bez
+  metod, 2 inne. Szukanie numeru CVE w commitach: 1 trafienie na 8.
+- **A — pull requesty:** odnośnik `…/pull/N` → commit merge (API GitHub);
+  merge dwurodzicowy czytany względem pierwszego rodzica (`compare`),
+  squash jak zwykły commit; PR niezmergowany i PR-y w
+  `github/advisory-database` pomijane z adnotacją; brak metadanych/diffu
+  PR (także offline) jest błędem odnośnika, nie przebiegu (snapshot nadal
+  odrzuca).
+- **B — inicjalizatory pól:** `javadiff` przypisuje zmienione inicjalizatory
+  i bloki inicjalizacyjne do `<clinit>`/`<init>(*)` (wszystkie
+  konstruktory, `BytecodeAllConstructors`); w mapowaniu tylko gdy poprawka
+  nie zmieniła żadnej metody (inaczej ETag CVE-2024-38809 mapowałby się na
+  `<clinit>` osiągalny przy każdym użyciu klasy). Wynik: CVE-2018-1272
+  (`MimeTypeUtils#<clinit>`), CVE-2018-11040, CVE-2026-83557;
+  CVE-2016-1000027 i Tomcat CVE-2025-49124 słusznie bez metod (javadoc /
+  instalator).
+- **C — `release-diff`:** metody zmienione między wydaniem przed poprawką a
+  wydaniem patch z poprawką (Maven Central, normalizowany bytecode
+  `classfile.MethodFingerprint`), w klasach nazwanych w advisory;
+  ta sama linia major.minor, dopasowanie nazwy wersji (`.Final`,
+  `.RELEASE`), konstruktory/`<clinit>` tylko bez innych zmian, ≤ 40 metod.
+  **Walidacja** na 130 mapowaniach z commitów: precyzja metod 95 % (52/55),
+  pokrycie w nazwanych klasach 85 %
+  (`testdata/cve-control/RELEASE_DIFF_VALIDATION.MD`) → domyślnie włączone
+  (`-release-diff=false`). Ruch do Central szeregowany co 750 ms z własnym
+  User-Agentem po odpowiedzi HTTP 429 przy pierwszym podejściu; offline
+  zapas z `~/.m2/repository` (nigdy w odtwarzaniu snapshotu).
+- **Wynik:** `UNKNOWN` petclinic 57 → 49, WebGoat 60 → 45, JPetStore 12 → 8
+  (`-roots all`, CHA). Zmieniają się tylko dotychczasowe `UNKNOWN` oraz
+  CVE-2024-6162 na WebGoat (`NOT_REACHABLE` → `REACHABLE`: backport z PR
+  #1612 do linii WebGoata). Ręcznie sprawdzone mapowania `release-diff`
+  (UriComponentsBuilder, RegexRequestMatcher, LoadBalancerDrainingValve,
+  ApplicationTemp, HardenedObjectInputStream, CookieRequestCache) oraz
+  JPetStore CVE-2020-26945 (MyBatis, `<cache />` we wszystkich mapperach →
+  `SerializedCache#deserialize` — ścieżka zgodna z konfiguracją;
+  wykorzystanie wymaga wpływu na zawartość cache).
+- **Weryfikacja:** testy `TestFixDiff_pullRequest*`,
+  `TestFixDiff_fieldInitializers`,
+  `TestFixDiff_constructorNextToFieldInitializer`, `TestInitializers`,
+  `TestReleaseDiff_*`, `TestReleaseBefore`; `go test ./...`,
+  `go vet ./...`, `scripts/graph-benchmark.sh --repeat 3` (offline).
+  `ResolverVersion` 6, flaga `release-diff` w konfiguracji snapshotu, v2
+  `release_diffs`.
+- **Przy okazji:** naprawiony regex `scripts/graph-benchmark.sh` po zmianie
+  linii logu w B3 (`b3-2`, PR #47) — benchmark nie działał od tamtej
+  zmiany.
+- **Ograniczenia:** advisory bez nazwy klasy lub z poprawką w nowym wydaniu
+  minor zostaje `UNKNOWN`; `release-diff` to heurystyka (unreviewed); PR z
+  rebase wielu commitów czytany przez ostatni commit.
+- **Następny krok (wymaga zgody):** ręczne mapowania dla największych
+  pozostałych grup (Spring webmvc/expression bez nazw klas, Thymeleaf,
+  SnakeYAML) albo inny obszar.
+
 ### ROADMAP:B3 — drugi przyrost: wspólny punkt stały modeli i bramek twórców (`b3-2`) — DONE for this scope (2026-11-10)
 
 - **Zakres (zatwierdzony):** bramki twórców (SAM, obiekty servletów,
