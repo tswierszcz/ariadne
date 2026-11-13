@@ -916,6 +916,12 @@ For each CVE, in priority order:
    checked against the installed Maven's own `ComparableVersion` on 38809
    pairs and `VersionRange` on 396 cases). The embedded table's
    CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
+   The table has 68 entries (audit:
+   `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`); 22 of them (2026-11-13)
+   cover advisories with neither a fix commit nor a class name — SnakeYAML
+   DoS, Spring MVC static resources/SSE/script templates, SpEL, Spring log
+   injection, Thymeleaf — each read by hand from a release diff and
+   versioned over the releases where the methods were checked.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only non-test `.java` files

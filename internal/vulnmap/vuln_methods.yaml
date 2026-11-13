@@ -242,3 +242,303 @@ CVE-2021-43859: *xstream-entry-points
 CVE-2022-40151: *xstream-entry-points
 CVE-2022-41966: *xstream-entry-points
 CVE-2024-47072: *xstream-entry-points
+
+# ---------------------------------------------------------------------------
+# Advisories with no usable fix commit and no class name (CVE:F10 follow-up,
+# 2026-11-13). Each list comes from a release diff by hand: the normalized
+# bytecode (classfile.MethodFingerprint) of the last release before the fix
+# against the fixing release, read in full and attributed to the advisory by
+# its text. Every method is then checked by name in the bytecode of the
+# releases each variant names (`checked:` in the comments); a version outside
+# a variant gets MAPPING_VERSION_UNCOVERED, never a guess. The 2026 Spring
+# advisories were fixed only in 6.2.x/7.0.x on Maven Central (5.3.x fixes are
+# commercial), so the methods are taken from the 6.2 diff and their 5.3/6.0/
+# 6.1 counterparts are the same-named methods of the same classes.
+
+# SnakeYAML: stack overflow while composing deeply nested untrusted YAML.
+# 1.31 bounds the nesting depth in Composer#composeNode; 1.32 (CVE-2022-38752,
+# CVE-2022-41854) also bounds code points and fixes recursive toString. Every
+# loading API (Yaml#load/loadAs/loadAll/compose, and Spring Boot's
+# OriginTrackedYamlLoader) builds its node graph through these two Composer
+# methods, so they are the shared entry points, as for XStream below.
+# checked: 1.17, 1.23, 1.26, 1.27, 1.28, 1.29, 1.30 (and 1.31 for the 1.32 fixes).
+CVE-2022-38749: &snakeyaml-compose-131
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.yaml:snakeyaml
+      versions: "[1.17,1.31)"
+      methods:
+        - org.yaml.snakeyaml.composer.Composer#getSingleNode
+        - org.yaml.snakeyaml.composer.Composer#getNode
+CVE-2022-38750: *snakeyaml-compose-131
+CVE-2022-38751: *snakeyaml-compose-131
+CVE-2022-38752: &snakeyaml-compose-132
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.yaml:snakeyaml
+      versions: "[1.17,1.32)"
+      methods:
+        - org.yaml.snakeyaml.composer.Composer#getSingleNode
+        - org.yaml.snakeyaml.composer.Composer#getNode
+CVE-2022-41854: *snakeyaml-compose-132
+
+# Spring MVC (spring-webmvc). checked: 5.3.0, 5.3.4, 5.3.6, 5.3.20, 5.3.39,
+# 6.0.0, 6.0.23, 6.1.0, 6.1.21, 6.2.0 and the last 6.2 release before each fix.
+CVE-2026-22735: # SSE stream corruption: event fields not checked for line breaks
+  # 6.2.16 -> 6.2.17: SseEventBuilderImpl gains checkEvent and writes data
+  # through writeStringData; every builder method below changed.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.17)"
+      methods:
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#id
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#name
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#comment
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#data
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#append
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#saveAppendedText
+        - org.springframework.web.servlet.mvc.method.annotation.SseEmitter$SseEventBuilderImpl#build
+CVE-2026-22737: # script template views read files outside the configured locations
+  # 6.2.16 -> 6.2.17: ScriptTemplateView#getResource (and the setter of the
+  # loader path) changed.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.17)"
+      methods:
+        - org.springframework.web.servlet.view.script.ScriptTemplateView#getResource
+CVE-2026-22741: # resource cache poisoned with the wrong encoding
+  # 6.2.17 -> 6.2.18, the encoding half of that diff: the cache key's
+  # content coding and Accept-Encoding parsing.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.18)"
+      methods:
+        - org.springframework.web.servlet.resource.CachingResourceResolver#getContentCodingKey
+        - org.springframework.web.servlet.resource.EncodedResourceResolver#resolveResourceInternal
+        - org.springframework.web.servlet.resource.EncodedResourceResolver#getAcceptEncoding
+CVE-2026-22745: # slow static resource resolution on Windows (DoS)
+  # 6.2.17 -> 6.2.18, the other half: ResourceHttpRequestHandler.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.18)"
+      methods:
+        - org.springframework.web.servlet.resource.ResourceHttpRequestHandler#getResource
+        - org.springframework.web.servlet.resource.ResourceHttpRequestHandler#handleRequest
+CVE-2026-41841: # information disclosure through the static resource cache
+  # 6.2.18 -> 6.2.19: CachingResourceResolver's cache key.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.19)"
+      methods:
+        - org.springframework.web.servlet.resource.CachingResourceResolver#computeKey
+        - org.springframework.web.servlet.resource.CachingResourceResolver#resolveResourceInternal
+CVE-2026-41842: &spring-versioned-resources # DoS through versioned resources
+  # 6.2.18 -> 6.2.19: VersionResourceResolver and the file-name version
+  # strategy. CVE-2026-41843 (path traversal through the same versioned
+  # resources) is fixed by the same change; 6.2.19's isInvalidPath change
+  # is in ResourceHandlerUtils, a class 5.3 does not have.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.19)"
+      methods:
+        - org.springframework.web.servlet.resource.VersionResourceResolver#resolveResourceInternal
+        - org.springframework.web.servlet.resource.AbstractVersionStrategy$FileNameVersionPathStrategy#removeVersion
+CVE-2026-41843: *spring-versioned-resources
+CVE-2026-41853: # multipart request smuggling
+  # 6.2.18 -> 6.2.19 changes no servlet-side class (Spring MVC reads
+  # multipart through the servlet container's Part API); the change is in
+  # spring-web's reactive multipart parser. A servlet application that
+  # never reaches it is NOT_REACHABLE for Spring's part of this advisory.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.19)"
+      methods:
+        - org.springframework.http.codec.multipart.MultipartParser$HeadersState#onNext
+        - org.springframework.http.codec.multipart.DefaultPartHttpMessageReader#read
+
+# SpEL (spring-expression), fixed in 6.2.19. checked: 4.3.0, 4.3.4, 4.3.30,
+# 5.0.0, 5.2.25, 5.3.0, 5.3.4, 5.3.6, 5.3.39, 6.0.0, 6.1.21, 6.2.0, 6.2.18.
+# All three need an attacker-supplied expression.
+CVE-2026-41849: # integer overflow in string repetition/concatenation size checks
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-expression
+      versions: "[4.3.0.RELEASE,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.19)"
+      methods:
+        - org.springframework.expression.spel.ast.OpMultiply#getValueInternal
+        - org.springframework.expression.spel.ast.OpPlus#getValueInternal
+CVE-2026-41850: # algorithmic DoS: no bound on the operations of one evaluation
+  # 6.2.19 adds an operation counter (ExpressionState#trackOperation)
+  # called from nearly every AST node, so the evaluation itself is the
+  # entry point.
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-expression
+      versions: "[4.3.0.RELEASE,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.19)"
+      methods:
+        - org.springframework.expression.spel.standard.SpelExpression#getValue
+CVE-2026-41852: # zero-argument method invocation through property access
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-expression
+      versions: "[4.3.0.RELEASE,5.3.39],[6.0.0,6.1.21],[6.2.0,6.2.19)"
+      methods:
+        - org.springframework.expression.spel.support.ReflectivePropertyAccessor#findGetterForProperty
+
+# Spring log injection (spring-core). 5.3.10 -> 5.3.11 makes
+# LogFormatUtils#formatValue escape line breaks (and adds an overload);
+# 5.3.13 -> 5.3.14 extends the escaping to other control characters. The
+# callers changed alongside are mostly WebFlux or exception resolvers that
+# go through formatValue. checked: 5.2.0, 5.2.17, 5.3.0, 5.3.4, 5.3.6, 5.3.10
+# (and 5.2.18, 5.3.11, 5.3.13 for CVE-2021-22060).
+CVE-2021-22096:
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-core
+      versions: "[5.2.0.RELEASE,5.2.18.RELEASE),[5.3.0,5.3.11)"
+      methods:
+        - org.springframework.core.log.LogFormatUtils#formatValue
+CVE-2021-22060:
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-core
+      versions: "[5.2.0.RELEASE,5.2.19.RELEASE),[5.3.0,5.3.14)"
+      methods:
+        - org.springframework.core.log.LogFormatUtils#formatValue
+
+# Thymeleaf. The restricted-expression checks were renamed twice:
+# contains*InstantiationOrStatic (3.0.12, 3.0.13), ...OrStaticOrParam
+# (3.0.14 to 3.1.3), containsExternalAccess (3.1.4). The OGNL classes are
+# the evaluator without Spring; with thymeleaf-spring5 the SpEL ones run.
+CVE-2021-43466: # view-name template injection (thymeleaf-spring5 3.0.13)
+  # 3.0.12 -> 3.0.13: the check that the view name is not taken from the
+  # request, and the SpEL instantiation/static check it uses.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.0.12.RELEASE,3.0.13.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.util.SpringRequestUtils#checkViewNameNotInRequest
+        - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsSpELInstantiationOrStatic
+CVE-2026-40477: # sensitive objects reachable from expressions (fixed 3.1.4)
+  # 3.1.3 -> 3.1.4 restricts variables and expression objects in both
+  # evaluators (checkRestrictedVariables, OGNLExpressionObjectsWrapper,
+  # ThymeleafEvaluationContext#lookupVariable). checked: 3.0.11, 3.0.12,
+  # 3.0.13, 3.0.14, 3.0.15, 3.1.0, 3.1.3.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.thymeleaf:thymeleaf
+      versions: "[3.0.11.RELEASE,3.1.4.RELEASE)"
+      methods:
+        - org.thymeleaf.standard.expression.OGNLVariableExpressionEvaluator#evaluate
+        - org.thymeleaf.standard.expression.OGNLExpressionObjectsWrapper#get
+        - org.thymeleaf.standard.expression.OGNLContextPropertyAccessor#getProperty
+        - org.thymeleaf.standard.expression.OGNLShortcutExpression#getContextProperty
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.0.11.RELEASE,3.1.4.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.expression.SPELVariableExpressionEvaluator#evaluate
+        - org.thymeleaf.spring5.expression.ThymeleafEvaluationContext#lookupVariable
+        - org.thymeleaf.spring5.expression.ThymeleafEvaluationContextWrapper#lookupVariable
+        - org.thymeleaf.spring5.expression.SPELContextMapWrapper#containsKey
+CVE-2026-40478: # syntax patterns that bypass the expression checks (fixed 3.1.4)
+  # 3.1.3 -> 3.1.4 rewrites the restricted-expression check and fragment
+  # expression parsing. Before 3.0.12 there is no check to bypass.
+  # checked: 3.0.12, 3.0.13 / 3.0.14, 3.0.15, 3.1.0, 3.1.3.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.thymeleaf:thymeleaf
+      versions: "[3.0.12.RELEASE,3.0.14.RELEASE)"
+      methods:
+        - org.thymeleaf.standard.util.StandardExpressionUtils#containsOGNLInstantiationOrStatic
+        - org.thymeleaf.standard.expression.FragmentExpression#indexOfLastParenthesesGroup
+    - package: org.thymeleaf:thymeleaf
+      versions: "[3.0.14.RELEASE,3.1.4.RELEASE)"
+      methods:
+        - org.thymeleaf.standard.util.StandardExpressionUtils#containsOGNLInstantiationOrStaticOrParam
+        - org.thymeleaf.standard.expression.FragmentExpression#indexOfLastParenthesesGroup
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.0.12.RELEASE,3.0.14.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsSpELInstantiationOrStatic
+        - org.thymeleaf.spring5.util.SpringRequestUtils#checkViewNameNotInRequest
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.0.14.RELEASE,3.1.4.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsSpELInstantiationOrStaticOrParam
+        - org.thymeleaf.spring5.util.SpringRequestUtils#checkViewNameNotInRequest
+CVE-2026-41901: # expressions executed in sandboxed contexts (fixed 3.1.5)
+  # 3.1.4 -> 3.1.5: the restricted-expression check again, and fragment
+  # insertion. checked: as CVE-2026-40478, plus 3.1.4.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.thymeleaf:thymeleaf
+      versions: "[3.0.12.RELEASE,3.0.14.RELEASE)"
+      methods:
+        - org.thymeleaf.standard.util.StandardExpressionUtils#containsOGNLInstantiationOrStatic
+        - org.thymeleaf.standard.processor.AbstractStandardFragmentInsertionTagProcessor#doProcess
+    - package: org.thymeleaf:thymeleaf
+      versions: "[3.0.14.RELEASE,3.1.4.RELEASE)"
+      methods:
+        - org.thymeleaf.standard.util.StandardExpressionUtils#containsOGNLInstantiationOrStaticOrParam
+        - org.thymeleaf.standard.processor.AbstractStandardFragmentInsertionTagProcessor#doProcess
+    - package: org.thymeleaf:thymeleaf
+      versions: "[3.1.4.RELEASE,3.1.5.RELEASE)"
+      methods:
+        - org.thymeleaf.standard.util.StandardExpressionUtils#containsExternalAccess
+        - org.thymeleaf.standard.processor.AbstractStandardFragmentInsertionTagProcessor#doProcess
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.0.12.RELEASE,3.0.14.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsSpELInstantiationOrStatic
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.0.14.RELEASE,3.1.4.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsSpELInstantiationOrStaticOrParam
+    - package: org.thymeleaf:thymeleaf-spring5
+      versions: "[3.1.4.RELEASE,3.1.5.RELEASE)"
+      methods:
+        - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsExternalAccess

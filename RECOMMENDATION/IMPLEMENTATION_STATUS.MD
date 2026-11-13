@@ -13,7 +13,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
 | ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, wybór modeli z profilu, invalidation. B0–B2, B4: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
-| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
+| CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. F10 (2026-11-10) i ręczne mapowania z diffów wydań (2026-11-13, 46 → 68 wpisów; `UNKNOWN` 49/45/8 → 27/23/5). Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE (overloads/inheritance; bridge/default-method real-bytecode verification closed 2026-11-07 by GRAPH_PRECISION P0 — `testdata/callgraph`, JVM oracle; korekta 2026-11-08, PR #29: CHA celuje też w ciała dziedziczone spoza typu wywołania, builder `3`) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty; ograniczenie G2 domknięte i korekta CHA (addendum w COMPLETION.md). Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5, zarchiwizowane](../archive/2026-11-07/data_flow/COMPLETION.md) | D0–D5: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (D5 — PR #13) | IR/CFG/wartości lokalne (D0–D2), pięć wycinków międzyproceduralnych wartości i streszczenia zależności `internal/flowsum` (D3), pilotaż taint `-taint` opt-in (D4), kwalifikacja: wyrocznia JVM, kształty, pomiar (D5, `docs/TAINT_QUALIFICATION.MD`). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05; po zamknięciu: dispatch SPI na pomijanych odbiorcach (`service-provider:dispatch`, 2026-11-08) | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -29,6 +29,66 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### CVE:F10 (kontynuacja) — ręczne mapowania z diffów wydań — DONE for this scope (2026-11-13)
+
+- **Zakres (zatwierdzony 2026-11-13):** największe grupy advisories
+  wciąż niezmapowanych po F10 — bez commita poprawki i bez nazwy klasy w
+  tekście, więc ani źródło diffu, ani `release-diff` nie miały z czego
+  korzystać: Spring webmvc/expression, Thymeleaf, SnakeYAML; dodatkowo
+  dwa advisories Springa o wstrzykiwaniu do logów (spring-core).
+- **Metoda:** dla każdej poprawki ręcznie przeczytany diff wydań
+  (znormalizowany bytecode `classfile.MethodFingerprint`, ostatnie wydanie
+  przed poprawką vs wydanie z poprawką, Maven Central), zmienione metody
+  przypisane do advisory po jego treści, potem każda metoda odnaleziona z
+  nazwy w bytecode całego zakresu wydań wariantu (np. webmvc 5.3.0, 5.3.4,
+  5.3.6, 5.3.20, 5.3.39, 6.0.0, 6.0.23, 6.1.0, 6.1.21, 6.2.0 i ostatnie 6.2
+  przed poprawką; SpEL 4.3.0–6.2.18 na 13 wydaniach; Thymeleaf
+  3.0.11–3.1.4 na 8; SnakeYAML 1.17–1.31 na 8). Poprawki Springa z 2026 r.
+  są na Central tylko dla 6.2.x (5.3.x komercyjne) — warianty 5.3/6.0/6.1
+  nazywają te same metody tych samych klas. Wersja spoza sprawdzonego
+  zakresu → `MAPPING_VERSION_UNCOVERED`.
+- **Wynik:** 22 wpisy schematu v2 (46 → 68): SnakeYAML DoS ×5 i SpEL DoS
+  jako `entrypoint` (`Composer#getSingleNode/getNode`,
+  `SpelExpression#getValue`), reszta `vulnerable` (webmvc ×8, SpEL ×2,
+  `LogFormatUtils#formatValue` ×2, Thymeleaf ×4). Szczegóły i decyzje
+  w `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`.
+- **Wpływ (`-roots all`, CHA):** `UNKNOWN` petclinic 49 → 27, WebGoat
+  45 → 23, JPetStore 8 → 5; zmieniają się wyłącznie dotychczasowe
+  `UNKNOWN`. petclinic 7/96/17/27/6, WebGoat 62/53/26/23/0, JPetStore
+  2/13/15/5/0. Nowe `REACHABLE`: CVE-2026-41850 (obie aplikacje, ścieżki
+  do ewaluacji SpEL przez Spring Data / Spring Security — wejście, nie
+  dowód, że wyrażenie jest od atakującego), CVE-2026-40477 na WebGoat
+  (przez `PreInvocationAuthorizationAdviceVoter`, długa ścieżka CHA).
+- **Ręcznie sprawdzone wątpliwe werdykty:** na WebGoat zasoby statyczne
+  (CVE-2026-22741/-22745/-41841/-41842/-41843), CVE-2021-43466 i
+  CVE-2026-40478/-41901 są `NOT_REACHABLE` z `MODEL_INCOMPLETE`, a na
+  petclinic `FRAMEWORK` — to znana luka WebGoata (launcher poza wejściem,
+  0 zarejestrowanych servletów, więc `DispatcherServlet` nie jest
+  osiągalny), prawdopodobnie fałszywie negatywne. CVE-2026-41853 na
+  WebGoat `FRAMEWORK` przez `UndertowHttpHandlerAdapter` (reaktywny
+  adapter, artefakt CHA w aplikacji servletowej). CVE-2026-22735 (SSE)
+  `NOT_REACHABLE` na obu — żadna nie używa `SseEmitter`.
+- **Weryfikacja:** `TestReleaseDiffManualMappings` (każde sprawdzone
+  wydanie pokryte dokładnie jednym wariantem z oczekiwanymi metodami,
+  wydanie z poprawką i wersje spoza zakresu bez wariantu),
+  `TestLoadManualMeta_embeddedTable` (68 wpisów: 44 entrypoint, 8 sink,
+  16 vulnerable); `go test ./...`, `go vet ./...`; trzy aplikacje offline
+  przed/po; `scripts/graph-benchmark.sh --repeat 2` — grafy bez zmian
+  (liczby krawędzi identyczne we wszystkich 12 konfiguracjach), dwa nowe
+  wiersze `verdict-changes.tsv` (WebGoat `-roots profile`, RTA usuwa
+  artefakty CHA: CVE-2026-41853 przez reaktywny adapter Undertow,
+  CVE-2026-40477 przez `EvaluationContext` Spring Security → Thymeleaf).
+- **Ograniczenia:** gdy jedno wydanie poprawia dwa advisories
+  (CVE-2026-22741/-22745, CVE-2026-40477/-40478), podział jego metod
+  między nie wynika z treści advisories (decyzja ręczna);
+  CVE-2026-41842/-41843 dzielą jedną listę. Bez mapowania zostają
+  CVE-2025-41242 (webmvc 6.2.9 → 6.2.10 nie zmienia żadnej metody webmvc)
+  i CVE-2024-38828 (poprawka tylko w komercyjnym 5.3.42).
+- **Następny krok (wymaga zgody):** pozostałe `UNKNOWN` to w większości
+  advisories bez kodu w JVM (instalator Tomcata, konfiguracja) albo
+  produkty bez publicznego kodu poprawki (MySQL Connector/J, Oracle);
+  albo inny obszar.
 
 ### CVE:F10 — pokrycie mapowań bez commita poprawki — DONE for this scope (2026-11-10)
 
