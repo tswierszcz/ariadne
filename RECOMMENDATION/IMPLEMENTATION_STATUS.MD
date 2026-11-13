@@ -30,6 +30,53 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### GRAPH_PRECISION / FRAMEWORKS F2 — launcher Boot WebGoata w wejściu (`webgoat-boot-launcher`) — DONE for this scope (2026-11-13)
+
+- **Zakres (zatwierdzony 2026-11-13):** domknięcie wielokrotnie odkładanego
+  kroku „WebGoat bez launchera Boot w wejściu” — zmiana przygotowania
+  wejścia, nie modelu.
+- **Przyczyna:** `scripts/prepare-webgoat.sh` budował tylko
+  `webgoat-container` i lekcję vulnerable-components; `StartWebGoat`
+  (`@SpringBootApplication`, `@ServletComponentScan`) jest w
+  `webgoat-server`, więc żadna klasa wejścia nie włączała
+  auto-konfiguracji Boot, model `servlet-container:dispatch` nie
+  rejestrował nic (0 servletów/filtrów) i cała ścieżka żądania MVC była
+  nieosiągalna.
+- **Zmiana:** skrypt kompiluje dwie klasy `webgoat-server` (`StartWebGoat`,
+  `HSQLDBDatabaseConfig`) przez `javac` z classpathem kontenera i jego
+  zależności oraz Lombokiem w wersji z pom-u rodzica (`LOMBOK_JAR` do
+  nadpisania) i dokłada je do `app-classes.jar`. Mavenem się nie da:
+  `webgoat-server` zależy od wszystkich lekcji, w tym cross-site-scripting,
+  które nie buduje się pod JDK 17. Skrypt ostrzega, gdy launchera brak w
+  jarze.
+- **Wynik (WebGoat):** 6 rejestracji (`DispatcherServlet`,
+  `OrderedCharacterEncodingFilter`, `OrderedFormContentFilter`,
+  `OrderedRequestContextFilter`, `DelegatingFilterProxy`,
+  `FilterChainProxy`); +1 709 krawędzi (CHA, `-roots all`); CHA
+  62/53/26/23/0 → 62/65/14/23/0 w obu scenariuszach korzeni — 12
+  `NOT_REACHABLE` → `FRAMEWORK` (zasoby statyczne CVE-2026-22741/-22745/
+  -41841/-41842/-41843/-41844, CVE-2024-38819, CVE-2025-22233,
+  CVE-2022-22968, Thymeleaf CVE-2021-43466/-40478/-41901) przez
+  dispatch Undertow → `DispatcherServlet`; to dokładnie podejrzewane
+  fałszywie negatywne z wpisu CVE:F10 (kontynuacja). RTA `-roots
+  profile`: **CVE-2024-38809 przestaje być fałszywie negatywne**
+  (otwarte od GRAPH_PRECISION P4); CVE-2026-40477 zostaje `REACHABLE` w
+  obu trybach (z osiągalnym renderowaniem widoków
+  `ThymeleafEvaluationContext` jest żywy dla RTA — nadal nadmiarowa
+  ścieżka z doradcy Spring Security). petclinic i JPetStore bez zmian.
+- **Weryfikacja:** WebGoat ze starym i nowym `app-classes.jar` w obu
+  scenariuszach korzeni, ręcznie sprawdzona ścieżka CVE-2026-22745
+  (`ServletHandler#handleRequest` → `HttpServlet#service` →
+  `DispatcherServlet#doService`); `scripts/graph-benchmark.sh --repeat 2`.
+  **Skrypt nie był uruchomiony w całości** — na tej maszynie nie ma `javac`
+  JDK 17; te same kroki (kompilacja dwóch plików z Lombokiem, dołożenie
+  do jara) wykonane ręcznie przez API kompilatora JDK 25 z Lombokiem
+  1.18.42, `-source/-target 15` jak reszta WebGoata.
+- **Ograniczenia:** wejście nadal zawiera tylko jedną lekcję (pozostałe ~30
+  lekcji wdrożenia `webgoat-server` są poza nim).
+- **Następny krok (wymaga zgody):** pełne wejście WebGoata (wszystkie
+  lekcje) albo ROADMAP B3.
+
 ### CVE:F10 (kontynuacja) — ręczne mapowania z diffów wydań — DONE for this scope (2026-11-13)
 
 - **Archiwum:** [archive/2026-11-13/cve/CVE_F10.md](../archive/2026-11-13/cve/CVE_F10.md) (zmergowane: PR #48 `4b88699`, PR #49 `8d9ff45`).
@@ -62,7 +109,7 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   do ewaluacji SpEL przez Spring Data / Spring Security — wejście, nie
   dowód, że wyrażenie jest od atakującego), CVE-2026-40477 na WebGoat
   (przez `PreInvocationAuthorizationAdviceVoter`, długa ścieżka CHA).
-- **Ręcznie sprawdzone wątpliwe werdykty:** na WebGoat zasoby statyczne
+- **Ręcznie sprawdzone wątpliwe werdykty** (WebGoat — rozwiązane wpisem `webgoat-boot-launcher` powyżej): na WebGoat zasoby statyczne
   (CVE-2026-22741/-22745/-41841/-41842/-41843), CVE-2021-43466 i
   CVE-2026-40478/-41901 są `NOT_REACHABLE` z `MODEL_INCOMPLETE`, a na
   petclinic `FRAMEWORK` — to znana luka WebGoata (launcher poza wejściem,
