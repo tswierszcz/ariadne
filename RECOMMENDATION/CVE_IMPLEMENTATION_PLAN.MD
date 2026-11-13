@@ -278,7 +278,7 @@ Rozpoznawać podatności konkretnej dystrybucji i wydania runtime’u bez wniosk
 5. Wybrać pierwszego dostawcę na podstawie docelowych wdrożeń. Oracle jest możliwym pilotażem, ale nie jest narzuconym wyborem użytkownika.
 6. Przed budową adaptera zbadać dostępność, strukturę, sposób pobierania, warunki użycia oraz historyczne pokrycie danych. Jeśli brak stabilnego formatu, zacząć od wersjonowanego katalogu wpisów z odnośnikami do oficjalnych advisory.
 
-### F8b. Ocena wydania
+### F8b. Ocena wydania — DONE dla mechanizmu (2026-11-13; katalog kuratorowany, pusty do pierwszej kuracji; zob. IMPLEMENTATION_STATUS)
 
 1. Dodać interfejs `RuntimeAdvisoryProvider` i jeden adapter, np. w `internal/runtimevuln`.
 2. W rekordzie zachować produkt, dystrybucję, zakresy/wyliczone wydania, ograniczenia platformy, źródło, daty, komponent JDK i informacje o poprawce, jeśli źródło je podaje.

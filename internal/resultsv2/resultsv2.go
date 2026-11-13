@@ -10,6 +10,7 @@ import (
 	"ariadne/internal/alloc"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/runtimeinfo"
+	"ariadne/internal/runtimevuln"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -74,6 +75,9 @@ type TargetRuntime struct {
 	Assessment   string               `json:"assessment"`
 	Reason       string               `json:"reason,omitempty"`
 	Runtime      *runtimeinfo.Runtime `json:"runtime,omitempty"`
+	// Advisories (CVE:F8b): the provider's answer — its catalog, the
+	// applicability of each advisory, coverage notes.
+	Advisories *runtimevuln.Assessment `json:"advisories,omitempty"`
 }
 
 // CallGraph describes the run's call graph.

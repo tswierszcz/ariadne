@@ -3,6 +3,8 @@ package main
 import (
 	"ariadne/internal/deserialize"
 	"ariadne/internal/flowsum"
+	"ariadne/internal/runtimeinfo"
+	"ariadne/internal/runtimevuln"
 	"ariadne/internal/samcall"
 	"crypto/sha256"
 	"encoding/hex"
@@ -90,6 +92,10 @@ func algorithmVersions(mode string) map[string]string {
 		// logback appenders the configuration leaves out: CHA/RTA targets
 		// in every mode.
 		"logback.appenders": logbackconfig.Version,
+		// CVE:F8a/F8b: target runtime identification rules and the curated
+		// OpenJDK advisory catalog.
+		"runtime.identity":        runtimeinfo.Version,
+		"runtime.openjdk_catalog": runtimevuln.EmbeddedCatalogVersion(),
 	}
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the

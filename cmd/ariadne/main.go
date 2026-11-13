@@ -5,6 +5,7 @@ package main
 import (
 	"ariadne/internal/flowsum"
 	"ariadne/internal/runtimeinfo"
+	"ariadne/internal/runtimevuln"
 	"bytes"
 	"context"
 	"flag"
@@ -99,6 +100,7 @@ type config struct {
 	runtimeTrace   string
 	jdkHome        string
 	runtimeFile    string
+	openjdkCatalog string
 	runtimeFilter  string
 	runtimeStatus  string
 
@@ -150,6 +152,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback)`)
 	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
 	fs.StringVar(&cfg.jdkHome, "jdk-home", "", "the target runtime's installation directory (CVE:F8a): its release file identifies vendor, version, OS and architecture; nothing is run, and the scanner's own JDK is never assumed. Exclusive with -runtime-file")
+	fs.StringVar(&cfg.openjdkCatalog, "openjdk-catalog", "", "use this curated OpenJDK advisory catalog (YAML, from cmd/openjdk-catalog) instead of the embedded one (CVE:F8b) — e.g. to check a draft before committing it")
 	fs.StringVar(&cfg.runtimeFile, "runtime-file", "", "a YAML description of the target runtime (CVE:F8a): vendor, distribution, version, os, arch, libc, package{name, version, distro}. Exclusive with -jdk-home")
 	fs.StringVar(&cfg.runtimeTrace, "runtime-trace", "", "import a runtime trace (RUNTIME_NATIVE N1, format ariadne-runtime-trace-1, docs/RUNTIME_TRACE.MD; e.g. from scripts/JfrToTrace.java): loaded classes, methods seen executing and measured caller → callee relations, matched to the analyzed classes by content hash and shown next to the static results; it never changes the graph or a verdict, and the absence of an event proves nothing")
 	fs.StringVar(&cfg.runtimeFilter, "runtime-filter-out", "", "write a JFR settings file (.jfc) that traces, on entry, the mapped vulnerable methods of this run's findings (jdk.MethodTrace, JDK 25+), to record the next run with: java -XX:StartFlightRecording=settings=profile,settings=FILE ...; then import the converted recording with -runtime-trace")
@@ -285,10 +288,24 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return err
 	}
 	sr.config["target-runtime"] = targetRuntimeKey(targetRuntime)
+	runtimeAssessment, catalogVersion, err := assessTargetRuntime(targetRuntime, cfg.openjdkCatalog)
+	if err != nil {
+		return err
+	}
+	if cfg.openjdkCatalog != "" {
+		sr.config["openjdk-catalog"] = catalogVersion
+	}
 	if targetRuntime != nil {
 		log("target runtime (CVE:F8a %s): %s", runtimeinfo.Version, targetRuntime.Describe())
 		for _, u := range targetRuntime.Unresolved {
 			log("target runtime: unresolved %s", u)
+		}
+		if runtimeAssessment.State == runtimevuln.Performed {
+			log("target runtime advisories (%s, catalog %s through %s): %d affected, %d undetermined, %d not affected",
+				runtimeAssessment.Provider, runtimeAssessment.CatalogVersion, runtimeAssessment.CuratedThrough,
+				runtimeAssessment.Counts[runtimevuln.Affected], runtimeAssessment.Counts[runtimevuln.Undetermined], runtimeAssessment.Counts[runtimevuln.NotAffected])
+		} else {
+			log("target runtime advisories: not assessed (%s)", runtimeAssessment.Reason)
 		}
 	}
 	// GRAPH_PRECISION P0: the earlier graph is read first, so a bad file
@@ -1500,7 +1517,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		ModelEdges:         g.ModelEdgeCount(),
 		SAMEdges:           g.SAMEdgeCount(),
 		SAMLine:            samLine,
-		TargetRuntime:      targetRuntimeLine(targetRuntime),
+		TargetRuntime:      targetRuntimeLine(targetRuntime, runtimeAssessment),
+		RuntimeAdvisories:  runtimeAdvisoryRows(runtimeAssessment),
 		UnresolvedDyn:      g.UnresolvedDynamicCount(),
 		UnresolvedOwner:    g.UnresolvedOwnerCount(),
 		GapSites:           len(gapSites),
@@ -1561,7 +1579,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult},
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
-	doc.TargetRuntime = targetRuntimeResult(targetRuntime)
+	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}

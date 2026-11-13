@@ -1,0 +1,21 @@
+# Curated catalog of the OpenJDK Vulnerability Group's advisories
+# (https://openjdk.org/groups/vulnerability/advisories/), CVE:F8b.
+#
+# The OpenJDK web site's terms of use do not allow automated access, so
+# ariadne never fetches these pages. A maintainer saves each advisory page
+# by hand, converts the saved files with `go run ./cmd/openjdk-catalog`,
+# checks the result against the page, and commits it here. Every entry is
+# one advisory:
+#   date: YYYY-MM-DD (the advisory's own date; url ends with it)
+#   url: https://openjdk.org/groups/vulnerability/advisories/YYYY-MM-DD
+#   last_affected: {"8": "8u461", "17": "17.0.16", "25": "25"}
+#     the last affected release the advisory names per feature line; a line
+#     not listed is not covered by the advisory (no data, not unaffected)
+#   earlier_affected: true only when the advisory states that earlier
+#     releases are affected too
+#   cves: [{id, component, cvss, lines: [8, 17, 25]}] — the risk matrix
+schema: 1
+version: "0"
+source: OpenJDK Vulnerability Group advisories (curated by hand)
+note: empty until the first advisories are curated
+advisories: []

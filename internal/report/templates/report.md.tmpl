@@ -61,7 +61,15 @@ the affected component.
 | {{$sev}} | {{$count}} |
 {{end}}
 
-## CVEs
+{{if .RuntimeAdvisories}}## Target runtime advisories
+
+The runtime's own advisories (CVE:F8b, OpenJDK Vulnerability Group, curated catalog): applicability only — reachability of the runtime's code is not assessed, and these rows are not part of the verdicts below. `not_affected` advisories are counted in the header, not listed.
+
+| CVE | Advisory | Component | CVSS | Applicability | Last affected | Note |
+|---|---|---|---|---|---|---|
+{{range .RuntimeAdvisories}}| {{.CVE}} | [{{.Advisory}}]({{.URL}}) | {{.Component}} | {{.CVSS}} | {{.Applicability}} | {{.LastAffected}} | {{.Reason}} |
+{{end}}
+{{end}}## CVEs
 
 | CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source | Reasons |
 |---|---|---|---|---|---|---|---|
