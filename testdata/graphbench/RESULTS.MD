@@ -1,5 +1,23 @@
 # GRAPH_PRECISION P4 — call-graph strategy benchmark (CHA vs RTA)
 
+**Rerun 2026-11-13 with WebGoat's Boot launcher in the input**: `scripts/prepare-webgoat.sh`
+now compiles `webgoat-server`'s `StartWebGoat` (`@SpringBootApplication`) and
+`HSQLDBDatabaseConfig` into `app-classes.jar`; the first table under "Real applications" is this
+run. petclinic and JPetStore unchanged. WebGoat registers 6 servlets/filters (`DispatcherServlet`,
+three Boot filters, Spring Security's `DelegatingFilterProxy`/`FilterChainProxy`): +1 709 edges
+(CHA, `-roots all`), CHA 62/53/26/23/0 → 62/65/14/23/0 in both root scenarios — 12
+`NOT_REACHABLE` → `FRAMEWORK` (static resources CVE-2026-22741/-22745/-41841/-41842/-41843/-41844,
+CVE-2024-38819, CVE-2025-22233, CVE-2022-22968, Thymeleaf CVE-2021-43466/-40478/-41901), the
+paths now running through Undertow's dispatch into `DispatcherServlet`. In `verdict-changes.tsv`
+WebGoat's RTA row for **CVE-2024-38809 is gone** (the false negative described under "Decision"
+and in the RTA verdict table: `FRAMEWORK` in every mode now) and so is CVE-2026-40477's: with view
+rendering reachable, RTA counts `ThymeleafEvaluationContext` as live and keeps the CHA path from
+Spring Security's pre-invocation advice into its `lookupVariable` — an over-approximation in both
+modes now. The "Model edges" column drops (`-roots all`: 2 459 → 1 353) while the graph grows: the
+gates, which run first in each iteration of the joint fixed point, add more (servlet-object
+calls 3 368 → 4 895, JDBC objects 4 650 → 5 851), and a pair a gate added first is not counted
+again as a model edge (see the F10 note below).
+
 **Rerun 2026-11-13 after 22 manual mappings from hand-read release diffs** (SnakeYAML DoS,
 Spring MVC static resources/SSE/script templates, SpEL, Spring log injection, Thymeleaf; see
 `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`): the first table under "Real applications" is
@@ -178,18 +196,18 @@ in either mode.
 
 | App | Roots | Mode | Time (s) | Peak RSS (MB) | Edges | CHA edges removed (kept only by fallback) | Live classes (only by fallback) | Reachable gap sites | Servlets/filters registered | Model edges | SAM-call edges (left out: creator unreachable) | R/F/NR/U/NA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| petclinic | profile | cha | 14.0–14.2 | 1323–1328 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
-| petclinic | profile | rta | 15.1–15.2 | 1366–1390 | 991 892 | 35 216 of 321 532 (34 854) | 17 451 (5 796) | 661 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/91/22/27/6 |
-| petclinic | all | cha | 12.7–13.3 | 1391–1399 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
-| petclinic | all | rta | 13.3–13.4 | 1357–1438 | 1 021 212 | 5 896 of 321 532 (57 892) | 21 864 (9 567) | 703 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
-| WebGoat | profile | cha | 19.1–19.6 | 1786–1794 | 1 434 047 | — | — | 771 of 1194 | 0 | 2 453 | 1 597 (2 104) | 62/53/26/23/0 |
-| WebGoat | profile | rta | 19.6–20.9 | 1727–1888 | 1 351 506 | 82 541 of 569 025 (161 228) | 25 287 (10 581) | 695 of 1201 | 0 | 2 453 | 1 597 (2 104) | 60/50/31/23/0 |
-| WebGoat | all | cha | 19.8–19.9 | 1635–1776 | 1 434 052 | — | — | 772 of 1194 | 0 | 2 459 | 1 598 (2 099) | 62/53/26/23/0 |
-| WebGoat | all | rta | 20.6–20.7 | 1695–1911 | 1 419 286 | 14 766 of 569 025 (102 240) | 32 262 (13 137) | 774 of 1201 | 0 | 2 459 | 1 598 (2 099) | 62/53/26/23/0 |
-| JPetStore | profile | cha | 3.5–3.5 | 321–323 | 225 554 | — | — | 161 of 364 | 1 | 77 | 0 (0) | 0/14/16/5/0 |
-| JPetStore | profile | rta | 3.6–3.7 | 312–314 | 212 454 | 13 100 of 59 469 (16 226) | 3 205 (1 263) | 144 of 365 | 1 | 77 | 0 (0) | 0/12/18/5/0 |
-| JPetStore | all | cha | 3.5–3.5 | 293–295 | 225 713 | — | — | 167 of 364 | 1 | 380 | 0 (0) | 2/13/15/5/0 |
-| JPetStore | all | rta | 3.6–3.6 | 297–298 | 212 792 | 12 921 of 59 469 (16 401) | 3 229 (1 276) | 145 of 365 | 1 | 380 | 0 (0) | 0/12/18/5/0 |
+| petclinic | profile | cha | 12.8–13.8 | 1377–1439 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
+| petclinic | profile | rta | 13.4–13.8 | 1401–1405 | 991 892 | 35 216 of 321 532 (34 854) | 17 451 (5 796) | 661 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/91/22/27/6 |
+| petclinic | all | cha | 13.0–13.2 | 1398–1519 | 1 027 108 | — | — | 705 of 1096 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
+| petclinic | all | rta | 13.9–14.0 | 1423–1433 | 1 021 212 | 5 896 of 321 532 (57 892) | 21 864 (9 567) | 703 of 1097 | 5 | 3 614 | 1 678 (2 361) | 7/96/17/27/6 |
+| WebGoat | profile | cha | 20.5–20.5 | 1749–1775 | 1 435 759 | — | — | 778 of 1194 | 6 | 1 351 | 1 633 (1 973) | 62/65/14/23/0 |
+| WebGoat | profile | rta | 21.9–23.8 | 1680–1711 | 1 359 004 | 76 755 of 569 037 (158 457) | 25 704 (10 245) | 706 of 1201 | 6 | 1 351 | 1 633 (1 973) | 61/63/17/23/0 |
+| WebGoat | all | cha | 19.0–19.1 | 1751–1796 | 1 435 761 | — | — | 779 of 1194 | 6 | 1 353 | 1 633 (1 971) | 62/65/14/23/0 |
+| WebGoat | all | rta | 19.7–20.1 | 1798–1882 | 1 421 018 | 14 743 of 569 037 (95 614) | 32 329 (12 533) | 782 of 1201 | 6 | 1 353 | 1 633 (1 971) | 62/65/14/23/0 |
+| JPetStore | profile | cha | 3.4–3.5 | 295–314 | 225 554 | — | — | 161 of 364 | 1 | 77 | 0 (0) | 0/14/16/5/0 |
+| JPetStore | profile | rta | 3.5–3.6 | 314–317 | 212 454 | 13 100 of 59 469 (16 226) | 3 205 (1 263) | 144 of 365 | 1 | 77 | 0 (0) | 0/12/18/5/0 |
+| JPetStore | all | cha | 3.5–3.5 | 302–316 | 225 713 | — | — | 167 of 364 | 1 | 380 | 0 (0) | 2/13/15/5/0 |
+| JPetStore | all | rta | 3.5–3.5 | 311–313 | 212 792 | 12 921 of 59 469 (16 401) | 3 229 (1 276) | 145 of 365 | 1 | 380 | 0 (0) | 0/12/18/5/0 |
 
 <details><summary>JDBC objects <code>j1</code>, petclinic and WebGoat only (first run, analyzer <code>jdbc-objects</code>)</summary>
 
@@ -468,7 +486,9 @@ on `PetClinicApplication`): `DispatcherServlet` (DispatcherServletAutoConfigurat
 `OrderedCharacterEncodingFilter` (HttpEncodingAutoConfiguration), `OrderedFormContentFilter`
 and `OrderedRequestContextFilter` (WebMvcAutoConfiguration); no `web.xml`, no
 `@WebServlet`/`@WebFilter`, no servlet/filter bean, Spring Security absent (so no
-`DelegatingFilterProxy`). WebGoat: **none** — the prepared input is `webgoat-container` plus
+`DelegatingFilterProxy`). WebGoat (until 2026-11-13; since then its launcher is in the input and
+it registers `DispatcherServlet`, three Boot filters and Spring Security's two — see the rerun
+note at the top): **none** — the prepared input was `webgoat-container` plus
 the vulnerable-components lesson (`scripts/prepare-webgoat.sh`); its launcher
 `StartWebGoat` (`@SpringBootApplication`, `@ServletComponentScan`) lives in `webgoat-server`,
 which is not part of the analyzed input, so nothing in the input enables Boot
@@ -742,7 +762,8 @@ P4 analysis of all 8 for the record:
 So of P4's 8 changes: 5 correct, 1 undetermined, 2 (one advisory, both apps) a false
 negative. After the servlet dispatch model, 6 remain: the 5 correct ones and WebGoat's
 CVE-2024-38809, still a false negative of this *input* (its launcher is not analyzed;
-`-roots profile` has no root that reaches Undertow's dispatch registered to anything).
+`-roots profile` has no root that reaches Undertow's dispatch registered to anything). **Resolved 2026-11-13:** with WebGoat's launcher in the input, CVE-2024-38809 is `FRAMEWORK`
+under RTA too.
 The false negative is not RTA's fixed point going wrong — RTA removed exactly the absurd
 edge it should — but it shows that a narrower graph turns a gap that CHA's
 over-approximation happened to paper over (the unexpanded servlet dispatch) into a
@@ -759,7 +780,8 @@ after the servlet dispatch model:
    visible servlet path. What remains of RTA's verdict changes on petclinic are the four
    correct Tomcat removals.
 2. **But a false negative of the same kind remains wherever the input does not show the
-   registration** — WebGoat's analyzed input lacks its Boot launcher, and the model's own
+   registration** — WebGoat's analyzed input lacked its Boot launcher (fixed in the input
+   2026-11-13), and the model's own
    gaps (servlets/filters registered by a `ServletContainerInitializer`, Actuator, Spring
    Security's inner chain, `ServletContext#addServlet`, `FilterRegistrationBean` with an
    unknown class) are not all reported as gaps of a finding. RTA turns such a missing

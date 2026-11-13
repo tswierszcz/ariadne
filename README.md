@@ -269,9 +269,10 @@ NOT_REACHABLE in P4, 5 correctly, 1 undetermined and 2 wrongly — container →
 servlet dispatch was a skipped `javax.*` call in both modes. With the servlet
 container dispatch model (below) petclinic's wrong one (CVE-2024-38809) and
 the undetermined one are `FRAMEWORK` through the real request path, leaving
-4 correct changes there; WebGoat's analyzed input does not contain its Boot
-launcher, so nothing registers `DispatcherServlet` and its CVE-2024-38809
-change remains. Use RTA as a second opinion next to a CHA run
+4 correct changes there; WebGoat's too since its prepared input includes its
+Boot launcher (`StartWebGoat`, 2026-11-13) and `DispatcherServlet` is
+registered. An input without the class that enables Boot auto-configuration
+registers nothing — check the `servlet dispatch` log line. Use RTA as a second opinion next to a CHA run
 (`-graph-compare`) and check the `servlet dispatch` log line. Checked
 against the real JVM on `testdata/rta` (`scripts/rta-oracle.sh`). Checked against the real JVM on
 `testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
