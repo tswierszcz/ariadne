@@ -116,6 +116,23 @@ its own axis.
   `NOT_REACHABLE` and adds `MODEL_INCOMPLETE` with the gap counts by kind (v1 `model_gaps`).
   The `UNKNOWN` form of the rule waits until gap resolution (REFLECTION, DYNAMIC_LINKAGE,
   ASYNC_CALLBACKS) makes it selective; control case ARIADNE-TEST-0004 records that target.
+- **Probe of rule variants (ROADMAP B0 b0-4, 2026-11-14, report-only).** Every run measures,
+  per `NOT_REACHABLE` finding, the gaps four variants of the rule would count (v2
+  `findings[].gap_probe`: `unbounded`, `bounded` with `bounded_by_kind`, `lambda`,
+  `skipped_receiver`, `skipped_receiver_object`; `coverage.gap_probe`: how many findings each
+  variant marks; report "Gap-rule probe"). `current` = the rule above; `scoped` = bounded
+  sites only; `+lambda` adds reachable functional-interface calls left unresolved by
+  DYNAMIC_LINKAGE L1 whose interface (or a subinterface) has a lambda created by a class of
+  the instance; `+skipped` adds reachable direct virtual/interface calls on a
+  `java.`/`javax.`/`jdk.`/`sun.` type whose expansion — the one CHA skips — would select a
+  body in the instance (`-object`: excluding `java.lang.Object` methods). It changes no
+  verdict, reason code or `model_gaps`; v1 does not carry it. Measured on the default runs
+  (petclinic / WebGoat / JPetStore, 18 / 18 / 15 findings): `current` 18 / 18 / 15,
+  `scoped` 17 / 15 / 14, `scoped+lambda` 17 / 16 / 14, both `+skipped` variants 18 / 18 / 15.
+  Adding lambda or skipped-receiver gaps to the rule therefore changes **no** mark (the
+  unbounded sites — 611 / 681 / 161 reachable — already mark everything), and the skipped
+  receivers land in **every** instance (hundreds to thousands of calls each, also without
+  `Object` methods): as a rule term they carry no information. The rule stays as it is.
 
 ## 5. JSON compatibility
 

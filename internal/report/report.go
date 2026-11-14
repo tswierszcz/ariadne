@@ -30,7 +30,11 @@ import (
 // Header carries everything section 6's report header asks for.
 type Header struct {
 	// Gaps (ROADMAP B0 b0-3): the run's gaps in the shared vocabulary.
-	Gaps           []gaps.Gap
+	Gaps []gaps.Gap
+	// GapProbe and GapProbeRows (ROADMAP B0 b0-4): the report-only
+	// measurement of model-gap rule variants over NOT_REACHABLE findings.
+	GapProbe       *reach.ProbeSummary
+	GapProbeRows   []reach.ProbeRow
 	App            string
 	GeneratedAt    time.Time
 	AriadneVersion string

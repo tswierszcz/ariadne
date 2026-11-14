@@ -1343,6 +1343,17 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	engine.SetWebAssetPackages(webAssets)
 	results := engine.Analyze(cveList, vm)
 
+	// ROADMAP B0 b0-4: measure, report-only, which NOT_REACHABLE findings
+	// a narrower (instance-scoped) or wider (lambda, skipped-receiver)
+	// model-gap rule would mark. No verdict or reason code depends on it.
+	probeStart := time.Now()
+	engine.SetProbe(lambdaProbeSites(h, samResults), callgraph.DefaultSkip)
+	engine.ApplyProbe(results)
+	gapProbe := reach.SummarizeProbe(results)
+	probeLambda, probeTargets, probeCalls := engine.ProbeInputs()
+	log("gap-rule probe (ROADMAP B0 %s, report-only): %d reachable unresolved lambda calls, %d skipped JDK targets (%d reachable calls); NOT_REACHABLE findings marked by variant: %s; in %s",
+		reach.GapProbeVersion, probeLambda, probeTargets, probeCalls, probeLine(gapProbe), time.Since(probeStart).Round(time.Millisecond))
+
 	// RUNTIME_NATIVE N1: the exact-entry tracing selection for a recorded
 	// run (-runtime-filter-out; the file is written with the other outputs).
 	var runtimeFilterSel RuntimeFilter
@@ -1501,6 +1512,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	runGapList := runGaps(gapSites, engine.ReachableGapsByKind(), allocSummary.Gaps, samStats.Gaps, modelGapReasons, runtimeResult)
 	header := report.Header{
 		Gaps:               runGapList,
+		GapProbe:           gapProbe,
+		GapProbeRows:       reach.ProbeRows(results),
 		App:                cfg.app,
 		GeneratedAt:        time.Now(),
 		AriadneVersion:     version(),
@@ -1583,6 +1596,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	})
 	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
 	doc.Coverage.Gaps = runGapList
+	doc.Coverage.GapProbe = gapProbe
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}

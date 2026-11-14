@@ -314,7 +314,10 @@ type Finding struct {
 	ModelGaps          map[string]int        `json:"model_gaps,omitempty"`
 	// Gaps (ROADMAP B0 b0-3): ModelGaps in the shared gap vocabulary.
 	Gaps []gaps.Gap `json:"gaps,omitempty"`
-	Path []string   `json:"path,omitempty"`
+	// GapProbe (ROADMAP B0 b0-4): for NOT_REACHABLE, the gaps a narrower
+	// or wider model-gap rule would count. Measurement only.
+	GapProbe *reach.GapProbe `json:"gap_probe,omitempty"`
+	Path     []string        `json:"path,omitempty"`
 	// PathEdges and Character (ROADMAP B0/B1): every step's edges with
 	// kind, basis and call-site offsets, and the set of the steps'
 	// characters (jvm_rule, library_model, input_declaration, heuristic).
@@ -344,6 +347,9 @@ type Coverage struct {
 	// (docs/RESULTS_CONTRACT.MD "Gap vocabulary"). Additive; changes no
 	// verdict.
 	Gaps []gaps.Gap `json:"gaps,omitempty"`
+	// GapProbe (ROADMAP B0 b0-4): how many NOT_REACHABLE findings each
+	// variant of the model-gap rule would mark. Measurement only.
+	GapProbe *reach.ProbeSummary `json:"gap_probe,omitempty"`
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`
@@ -594,7 +600,7 @@ func Build(in Inputs) Document {
 				AdvisoryID: cve.ID, ComponentInstanceID: f.Instance, Identity: identity[f.Instance],
 				Applicability: applicability, ApplicabilityCheck: check,
 				MatchPrecision: f.MatchPrecision, Reachability: string(f.Status), ReasonCodes: f.Reasons,
-				ModelGaps: f.ModelGaps, Gaps: gaps.FromCounts(gaps.SourceSite, f.ModelGaps), Path: f.Path, PathEdges: f.PathEdges, Character: f.Character, Entry: f.Entry, Note: f.Note,
+				ModelGaps: f.ModelGaps, Gaps: gaps.FromCounts(gaps.SourceSite, f.ModelGaps), GapProbe: f.GapProbe, Path: f.Path, PathEdges: f.PathEdges, Character: f.Character, Entry: f.Entry, Note: f.Note,
 				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
 				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
 				RuntimeTraced:         in.RuntimeTraced[cve.ID][f.Instance],

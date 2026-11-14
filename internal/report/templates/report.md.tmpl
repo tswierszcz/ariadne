@@ -1032,6 +1032,18 @@ Every analyzer's gaps of this run in one vocabulary (ROADMAP B0, docs/RESULTS_CO
 |---|---|---|---|---|
 {{range .Gaps}}| `{{.Mechanism}}` | {{.Source}} | `{{.Detail}}` | {{.Count}} | {{if .Reachable}}{{deref .Reachable}}{{else}}—{{end}} |
 {{end}}
+{{end}}{{with .GapProbe}}## Gap-rule probe (report-only)
+
+A measurement (ROADMAP B0 {{.Version}}), not a rule: for each NOT_REACHABLE finding, which variants of the model-gap rule would mark it. No verdict or reason code depends on it. `current` is the rule as it is (sites with no bounded candidate set, plus bounded sites whose candidates include the instance); `scoped` keeps only the bounded ones; `+lambda` adds unresolved functional-interface calls whose interface has a lambda created in the instance; `+skipped` adds reachable calls on `java.`/`javax.`/`jdk.`/`sun.` types whose skipped CHA expansion would select a body in the instance (`-object`: without `java.lang.Object` methods).
+
+| Variant | NOT_REACHABLE findings marked |
+|---|---|
+{{$n := .NotReachable}}{{range $v, $c := .Marked}}| `{{$v}}` | {{$c}} of {{$n}} |
+{{end}}
+{{end}}{{if .GapProbeRows}}| Advisory | Component | Unbounded | Bounded (by kind) | Lambda | Skipped receiver (`Object`) | Marked by |
+|---|---|---|---|---|---|---|
+{{range .GapProbeRows}}| {{.CVE}} | `{{.GAV}}` | {{.Probe.Unbounded}} | {{.Probe.Bounded}}{{with .Probe.BoundedByKind}} ({{gapCounts .}}){{end}} | {{.Probe.Lambda}} | {{.Probe.SkippedReceiver}} ({{.Probe.SkippedReceiverObject}}) | {{join .Probe.Marks ", "}} |
+{{end}}
 {{end}}## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
