@@ -1614,6 +1614,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/callgraph-oracle.sh         /path/to/jdk17-or-later/JAVA_HOME # real-JVM known-target oracle for the call graph (testdata/callgraph)
 ./scripts/alloc-oracle.sh             /path/to/jdk17-or-later/JAVA_HOME # real-JVM created-type oracle (testdata/alloc)
 ./scripts/rta-oracle.sh               /path/to/jdk17-or-later/JAVA_HOME # real-JVM RTA oracle: method bodies that ran (testdata/rta)
+./scripts/async-oracle.sh             [JAVA_HOME]                       # real-JVM oracle for callbacks (ASYNC A0–A2) and MethodHandle (L2): method bodies that ran (testdata/async)
 ./scripts/runtime-trace-fixture.sh    /path/to/jdk25-or-later/JAVA_HOME # JFR-recorded runtime trace of testdata/runtime (rtm.jar, rtm-v2.jar, run.trace)
 ./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # write petclinic's vulnerable-method JFR settings, run it under JFR with them, send a fixed scenario, convert, import (java 25+ on PATH)
 ./scripts/runtime-trace-jpetstore.sh  [OUT_DIR] [PORT]                  # the same for JPetStore's WAR in Jetty (jetty-runner fetched by Maven)
