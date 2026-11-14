@@ -30,6 +30,33 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### ROADMAP:B4 — ślady JVM po wyroczniach (2026-11-14): pomiar, bez zmian kodu
+
+- **Zakres (zatwierdzony 2026-11-14):** nagrać od nowa petclinic i
+  JPetStore (`scripts/runtime-trace-*.sh`, bez zmian) i przeanalizować oba
+  ślady analizatorem sprzed dzisiejszych poprawek (`8287fba`) i po nich
+  (`c43976e`). Szczegóły: `testdata/graphbench/TRACE_GAPS.MD`, sekcja „Re-recorded
+  after the B4 oracles”.
+- **Wynik 1 — relacje:** petclinic 121 z 2 736 poza grafem (4,4 %),
+  JPetStore 38 z 764 (5,0 %) — **identycznie przed i po** poprawkach.
+  `x2` dodaje krawędzie z miejsca wywołania repozytorium (osiągalność),
+  a zmierzona relacja startuje w `RepositoryMethodInvoker` (refleksja);
+  `p2` — żadna z aplikacji nie łączy się przez `DriverManager`; `j2`/`p3`
+  — relacje statementów HSQLDB nie trafiły na próbkowane stosy. Miara
+  relacji nie nadaje się do oceny modeli skracających krok refleksyjny.
+- **Wynik 2 — fałszywy negatyw werdyktu:** JPetStore CVE-2020-26945
+  (MyBatis, `SerializedCache#deserialize` wykonane 884 razy według
+  dokładnych wejść) ma przy `-roots profile` werdykt `NOT_REACHABLE`
+  (przed i po), przy `-roots all` — `REACHABLE`. Przyczyna zmierzona
+  łańcuchem relacji śladu: Stripes woła handler zdarzenia action beana
+  (`AccountActionBean#signon`) przez `Method#invoke`, więc z korzeni
+  `web.xml` nic pod action beanem nie jest osiągalne. Pozostałe
+  obserwowane metody podatne obu aplikacji mają werdykty pozytywne.
+- **Następny krok (wymaga zgody):** model Stripes — publiczne metody
+  implementacji `ActionBean` zwracające `Resolution` jako punkty wejścia
+  (albo cele miejsca `Method#invoke` w `DispatcherHelper`), z weryfikacją
+  na tym śladzie (CVE-2020-26945 → pozytywny przy `-roots profile`).
+
 ### ROADMAP:B4 — poprawka po `b4-5`: bazowe klasy repozytoriów Spring Data (`framework:proxies` `x2`) — DONE (2026-11-14)
 
 - **Zakres (zatwierdzony 2026-11-14):** zamknąć lukę znalezioną przez
