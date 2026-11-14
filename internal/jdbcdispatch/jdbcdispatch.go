@@ -34,8 +34,9 @@ import (
 const ModelID = "jdbc:objects"
 
 // Version versions the model's semantics (the receiver types). Snapshots
-// record it.
-const Version = "j1"
+// record it. j2: a call on a JDBC interface also reaches classes that
+// implement only one of its JDK subinterfaces (internal/jdkapi).
+const Version = "j2"
 
 // Types are the JDBC interfaces whose calls the model links. All are
 // interfaces under java.sql/javax.sql, implemented by drivers and pools.

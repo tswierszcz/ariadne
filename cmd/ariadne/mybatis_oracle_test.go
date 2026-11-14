@@ -24,12 +24,11 @@ const mybatisFixture = "../../testdata/mybatis/"
 // reachable from main — including the application's own InvocationHandler
 // lambda behind a JDK proxy of an interface that is not a mapper (reached
 // through the lambda's creation edge), which the catalog must not link to
-// MapperProxy (negative case) — with one documented exception:
-// fx.drv.FxStatement#close. MyBatis closes through java.sql.Statement, and
-// the driver's statement implements only PreparedStatement; that
-// PreparedStatement extends Statement is declared in the JDK, which the
-// hierarchy does not read, so jdbc:objects finds no implementation of
-// Statement#close. A measured model gap: the test fails once it closes.
+// MapperProxy (negative case), and fx.drv.FxStatement#close: MyBatis closes
+// through java.sql.Statement, the driver's statement implements only
+// PreparedStatement, and that PreparedStatement extends Statement is a JDK
+// fact the hierarchy does not read — internal/jdkapi supplies it
+// (jdbc:objects j2; b4-4 measured it missing before).
 func TestMyBatisOracle(t *testing.T) {
 	dir := t.TempDir()
 	graph := filepath.Join(dir, "g.txt")
@@ -60,15 +59,9 @@ func TestMyBatisOracle(t *testing.T) {
 	if len(obs) < 45 || !obs["org.apache.ibatis.binding.MapperProxy#invoke(Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;"] {
 		t.Fatalf("observed.txt has %d input bodies; regenerate with scripts/mybatis-oracle.sh", len(obs))
 	}
-	known := map[string]bool{
-		"fx.drv.FxStatement#close()V": true,
-	}
 	var missed []string
 	for b := range obs {
-		switch {
-		case known[b] && reach[b]:
-			t.Errorf("%s is reached: a documented gap closed — update this oracle", b)
-		case !known[b] && !reach[b]:
+		if !reach[b] {
 			missed = append(missed, b)
 		}
 	}

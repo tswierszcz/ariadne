@@ -12,7 +12,7 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 
 | Obszar | Plan | Ocena nowych faz | Wznowienie |
 |---|---|---|---|
-| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności; od 2026-11-13 (`b3-3`) wybór uczestników z profilu (`models.disable`) zapisany w raporcie, v2, ustawieniach grafu i snapshocie. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, invalidation zależnych wyników po zmianie modelu (poza wersjami algorytmów). B0: IN_PROGRESS — oceniony 2026-11-13, przyrost `b0-1` (dowód każdego kroku ścieżki, charakter ustalenia, `MAPPING_MISSING`), `b0-2` (zgłaszana ścieżka bez kroków tylko-CHA, gdy istnieje), `b0-3` (wspólny słownik luk, bez zmiany reguły), `b0-4` (pomiar wariantów reguły luk, report-only: rozszerzenie o SAM/pomijanych odbiorców nie zmienia żadnego oznaczenia — reguła bez zmian); B4: IN_PROGRESS — oceniony 2026-11-13 (macierz obszarów); `b4-1` (2026-11-14) wyrocznia JVM refleksji R0–R2, `b4-2` (2026-11-14) callbacków i MethodHandle, `b4-3` (2026-11-14) obiektów JDBC — znalazła fałszywy negatyw (sterownik przez `DriverManager`), naprawiony tego samego dnia (`service-provider:dispatch` `p2`); `b4-4` (2026-11-14) proxy MyBatis — znalazła lukę `Statement` przez interfejs JDK; brak wyroczni dla Spring Data/JPA, DI. B1: częściowo przez `b0-1`; B2: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
+| ROADMAP | [Kontrakty B0–B4 i przyrosty](ROADMAP.MD) | B3: IN_PROGRESS — koordynator w CLI od 2026-10-25 (modele ServiceLoader, kontenera servletów, SPI); od 2026-11-10 (`b3-2`) wspólny punkt stały modeli i bramek twórców (SAM, servlety, JDBC, proxy) z raportowanym budżetem i niezależnością od kolejności; od 2026-11-13 (`b3-3`) wybór uczestników z profilu (`models.disable`) zapisany w raporcie, v2, ustawieniach grafu i snapshocie. Pozostają: jednorazowe przebiegi krawędzi poza punktem stałym, invalidation zależnych wyników po zmianie modelu (poza wersjami algorytmów). B0: IN_PROGRESS — oceniony 2026-11-13, przyrost `b0-1` (dowód każdego kroku ścieżki, charakter ustalenia, `MAPPING_MISSING`), `b0-2` (zgłaszana ścieżka bez kroków tylko-CHA, gdy istnieje), `b0-3` (wspólny słownik luk, bez zmiany reguły), `b0-4` (pomiar wariantów reguły luk, report-only: rozszerzenie o SAM/pomijanych odbiorców nie zmienia żadnego oznaczenia — reguła bez zmian); B4: IN_PROGRESS — oceniony 2026-11-13 (macierz obszarów); `b4-1` (2026-11-14) wyrocznia JVM refleksji R0–R2, `b4-2` (2026-11-14) callbacków i MethodHandle, `b4-3` (2026-11-14) obiektów JDBC — znalazła fałszywy negatyw (sterownik przez `DriverManager`), naprawiony tego samego dnia (`service-provider:dispatch` `p2`); `b4-4` (2026-11-14) proxy MyBatis — znalazła lukę `Statement` przez interfejs JDK, naprawioną tego samego dnia (`jdkapi`, `j2`/`p3`); brak wyroczni dla Spring Data/JPA, DI. B1: częściowo przez `b0-1`; B2: UNASSESSED | Najnowszy wpis ROADMAP:B3 w rejestrze. |
 | CVE | [F0–F9](CVE_IMPLEMENTATION_PLAN.MD) | F0: DONE (kontrakt, 2026-11-05); F1: DONE (F1a–F1c, 2026-11-05); F2, F3, F4: DONE (2026-11-05); F5: DONE (F5a–F5c, 2026-11-06); F6: DONE (F6a, F6b 2026-11-06); F7: DONE dla jawnej relokacji (F7a, 2026-11-06); F8: F8a DONE (2026-11-13, identyfikacja runtime'u); F8b DONE dla mechanizmu (2026-11-13: dostawca upstream OpenJDK przez kuratorowany katalog — warunki openjdk.org wykluczają automatyczny dostęp; katalog pusty do pierwszej kuracji), F8c UNASSESSED; F9: DONE dla F0–F7 (F9a, F9b 2026-11-06); F10: DONE (2026-11-10, kontynuacja 2026-11-13; PR #48, #49, [zarchiwizowane](../archive/2026-11-13/cve/CVE_F10.md)) | Kontrakt wyników `docs/RESULTS_CONTRACT.MD` (osie, stany z v2 `not_assessed`, kody powodów `internal/findings`, reguła B0 dla luk, zgodność JSON, agregacja v1), audyt 39 mapowań ręcznych (38 punktów wejścia, 1 ujście, 0 pełnych), zestaw kontrolny 33 przypadków pokrywający 5 rozszerzeń i całą macierz §5, odtwarzalny baseline z manifestem odpowiedzi. Szacunek: 7/26 i 6/18 dzisiejszych NOT_REACHABLE to "metoda nie znaleziona". F1b: kody powodów w wynikach, ustalenia per advisory × instancja z agregacją, reguła luk w formie report-only (zmierzona: obejmuje wszystkie NOT_REACHABLE obu aplikacji, więc nie zmienia werdyktu). F1c: `-json-format v2`, v1 jako eksport ustaleń sprawdzany w każdym przebiegu. F2: metadane cache, TTL danych OSV, `-refresh`/`-allow-stale`/`-max-data-age`, wycofane rekordy i aliasy, odświeżenie bez płatnych zapytań LLM. F3: snapshoty danych (`-snapshot-out`/`-snapshot-in`/`-snapshot-compare`), klucze wyprowadzeń. F4: komparator wersji Maven (wyrocznia Maven 3.9.12), wersjonowane mapowania, selektory z deskryptorem. F5a: obie strony diffu (rodzic z GitHub REST API), mapowanie = metody zmienione + usunięte sprzed poprawki, dodane helpery tylko w dowodach, `MAPPING_NEW_SIDE_ONLY`/`SOURCE_UNAVAILABLE`, błąd źródła per CVE. F5b: klasy członkowskie `Outer$Inner`, weryfikacja kandydatów w bytecode (deskryptor tylko przy jednoznacznym przeciążeniu), dopasowanie commita do wydania po obecności kandydatów, `possible_rename`. F5c: linia wydań z historii git (tag badanej wersji + GitHub compare: `descends_from_release`/`in_release`/`other_line`, tag poza gałęzią), wykluczenie commitów z innej linii, prompt LLM v2 z obiema stronami poprawki. F6a: komponenty osadzone z `pom.properties` (moduł projektu vs biblioteka), potwierdzenie klasami względem JAR-a z Maven Central (bajty albo odcisk niezależny od serializacji), osobna instancja z własnymi klasami i zapytaniem OSV, niepotwierdzeni kandydaci jako luka pokrycia. F7a: jawna relokacja z `pom.xml` (maven-shade) i z `-embedded-components` (YAML, SHA-256), porównanie przez odwrotną relokację, przepisywanie selektorów w silniku, kolizje/konflikty/minimalizacja bez potwierdzenia. F10 (2026-11-10) i ręczne mapowania z diffów wydań (2026-11-13, 46 → 68 wpisów; `UNKNOWN` 49/45/8 → 27/23/5). Następny krok: CVE:F6b, CVE:F8 albo inny obszar. |
 | JVM_GRAPH | [G0–G5, zarchiwizowane](../archive/2026-10-22/jvm_graph/COMPLETION.md) | G0, G1, G3, G4, G5: DONE; G2: DONE (overloads/inheritance; bridge/default-method real-bytecode verification closed 2026-11-07 by GRAPH_PRECISION P0 — `testdata/callgraph`, JVM oracle; korekta 2026-11-08, PR #29: CHA celuje też w ciała dziedziczone spoza typu wywołania, builder `3`) | Cały JVM_GRAPH's R0-owy zakres (G0–G5) zamknięty; ograniczenie G2 domknięte i korekta CHA (addendum w COMPLETION.md). Następny krok to inny obszar R0/R1 z ROADMAP.MD, nie JVM_GRAPH. |
 | DATA_FLOW | [D0–D5, zarchiwizowane](../archive/2026-11-07/data_flow/COMPLETION.md) | D0–D5: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (D5 — PR #13) | IR/CFG/wartości lokalne (D0–D2), pięć wycinków międzyproceduralnych wartości i streszczenia zależności `internal/flowsum` (D3), pilotaż taint `-taint` opt-in (D4), kwalifikacja: wyrocznia JVM, kształty, pomiar (D5, `docs/TAINT_QUALIFICATION.MD`). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
@@ -29,6 +29,33 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### ROADMAP:B4 — poprawka po `b4-4`: nadinterfejsy JDK typów JDBC (`jdkapi` `k1`, `jdbc:objects` `j2`, `service-provider:dispatch` `p3`) — DONE (2026-11-14)
+
+- **Zakres (zatwierdzony 2026-11-14):** zamknąć lukę znalezioną przez
+  wyrocznię MyBatis: hierarchia nie czyta JDK, więc nie wie, że
+  `PreparedStatement` rozszerza `Statement`, a klasa implementująca tylko
+  podinterfejs nie jest podtypem nadinterfejsu.
+- **Zrealizowane:** `internal/jdkapi` — tabela bezpośrednich nadinterfejsów
+  `java.sql`/`javax.sql` odczytana refleksją z JDK 25 (stała od JDBC 4.1),
+  `Subinterfaces`, `Subtypes` (podtypy z wejścia dla interfejsu i każdego
+  jego podinterfejsu JDK). Używają jej `callgraph.ObjectEdges`
+  (`jdbc:objects`; model servletów dzieli funkcję, ale tabela nie ma typów
+  servletów) i produkty `service-provider:dispatch`.
+- **Wynik:** `testdata/mybatis` 51 z 51 (było 50); `testdata/jdbc` bez
+  zmian. **Korekta oceny z `b4-4`:** ten kształt ma prawdziwy sterownik —
+  HSQLDB `JDBCPreparedStatement`/`JDBCCallableStatement` implementują tylko
+  podinterfejsy, H2 `JdbcClob` — `NClob`. Aplikacje referencyjne: v1 —
+  werdykty bez zmian; petclinic i WebGoat bajtowo identyczne, JPetStore:
+  zmieniona tylko ścieżka CVE-2022-41853 (nadal `REACHABLE`) — teraz
+  przez `BaseExecutor#closeStatement` → `JDBCPreparedStatement#close`, tak
+  jak MyBatis zamyka statement. Graf: +295 (petclinic: H2, Hibernate
+  `MaterializedNClob`), +526 (WebGoat: 391 do statementów HSQLDB,
+  PostgreSQL), +102 (JPetStore: HSQLDB).
+- **Weryfikacja:** `TestSubinterfaces`, `TestSubtypes`, `TestMyBatisOracle`
+  (teraz bez wyjątków), `TestJDBCOracle`, `TestSPIDispatchOracle`;
+  `go test ./...`, `go vet ./...`.
+- **Następny krok (wymaga zgody):** wyrocznia proxy Spring Data/JPA albo DI.
 
 ### ROADMAP:B4 — przyrost `b4-4`: wyrocznia JVM dla proxy MyBatis — DONE for this scope (2026-11-14); znaleziona luka
 
@@ -54,7 +81,8 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   `PreparedStatement`; dziedziczenie interfejsów JDK nie jest w hierarchii,
   więc `jdbc:objects` (i produkty `service-provider:dispatch`) nie widzą
   implementacji `Statement`. Prawdziwe sterowniki (H2, Hikari) implementują
-  `Statement` zwykle po linii klas, więc wpływ jest pewnie mały; ten sam
+  `Statement` zwykle po linii klas, więc wpływ jest pewnie mały (ocena
+  błędna — patrz poprawka powyżej: HSQLDB ma ten kształt); ten sam
   mechanizm dotyczy `Wrapper#unwrap`, `CallableStatement`.
 - **Weryfikacja:** test mutacyjny; `go test ./...`, `go vet ./...`.
 - **Następny krok (wymaga zgody):** tabela nadinterfejsów JDK dla typów
@@ -370,7 +398,7 @@ zachowanie zmierzone na prawdziwym JVM i zapisane w fixture):
 | Deserializacja, taint | tak (`testdata/deserialize`, `taint`) | tak | WebGoat, aplikacje kontrolne |
 | log4j 1.2 / logback | testy jednostkowe | aplikacje kontrolne na JVM (`prepare-*-demo.sh`) | JPetStore, petclinic |
 | Obiekty JDBC | testy jednostkowe + `testdata/jdbc` (13 dodatnich — pula i sterownik przez `DriverManager`; 2 ujemne poza jarami sterownika/puli) | tak (`jdbc-oracle.sh`, 2026-11-14) | tak |
-| Proxy frameworków | testy jednostkowe + `testdata/mybatis` (MyBatis: 51 ciał ze stosów, 1 ujemny; Spring Data/JPA bez fixture) | tak dla MyBatis (`mybatis-oracle.sh`, 2026-11-14) | tak |
+| Proxy frameworków | testy jednostkowe + `testdata/mybatis` (MyBatis: 51 ciał ze stosów, wszystkie osiągalne; 1 ujemny; Spring Data/JPA bez fixture) | tak dla MyBatis (`mybatis-oracle.sh`, 2026-11-14) | tak |
 | Refleksja (R0–R2) | testy jednostkowe + `testdata/reflection` (6 dodatnich, 2 ujemne, 1 nierozstrzygnięty) | tak (`reflection-oracle.sh`, 2026-11-14) | petclinic/WebGoat (efekt zmierzony) |
 | Callbacki (ASYNC A0–A2), MethodHandle (L0/L2) | testy jednostkowe + `testdata/async` (7 dodatnich, 2 ujemne, 2 nierozstrzygnięte) | tak (`async-oracle.sh`, 2026-11-14) | liczby na petclinic/WebGoat |
 | DI/adnotacje/konfiguracja (FRAMEWORKS F1–F2) | testy jednostkowe | **brak** | petclinic/WebGoat |

@@ -1,6 +1,7 @@
 package callgraph
 
 import (
+	"ariadne/internal/jdkapi"
 	"sort"
 
 	"ariadne/internal/classfile"
@@ -58,7 +59,7 @@ func ObjectEdges(h *hierarchy.Hierarchy, types []string) []SAMEdge {
 			continue
 		}
 		done[k] = true
-		for _, sub := range h.Subtypes(s.call.Owner) {
+		for _, sub := range jdkapi.Subtypes(h, s.call.Owner) {
 			ci, ok := h.Lookup(sub)
 			if !ok || ci.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) != 0 || len(creators[sub]) == 0 {
 				continue
