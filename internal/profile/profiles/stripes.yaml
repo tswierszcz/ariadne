@@ -1,0 +1,31 @@
+# Stripes 1.5/1.6 (net.sourceforge.stripes): action beans. Stripes's
+# DispatcherServlet resolves a request to an ActionBean class and calls the
+# event handler through Method#invoke, so the call graph stops at Stripes
+# (measured on JPetStore: with web.xml roots only, nothing under an action
+# bean was reachable, and CVE-2020-26945's SerializedCache#deserialize —
+# entered 884 times in a recorded run — was NOT_REACHABLE;
+# testdata/graphbench/TRACE_GAPS.MD, 2026-11-14).
+#
+# An event handler has no fixed name and needs no annotation (@HandlesEvent
+# and @DefaultHandler only rename or mark the default one): Stripes treats
+# every public, non-static, no-argument method of an ActionBean returning a
+# Resolution as one — roots.handlers. @Before/@After interceptor methods
+# and @ValidationMethod methods run around the handler; setContext is how
+# Stripes hands the bean its context.
+name: stripes
+detect:
+  - net.sourceforge.stripes.action.ActionBean
+roots:
+  annotations:
+    - net.sourceforge.stripes.action.Before
+    - net.sourceforge.stripes.action.After
+    - net.sourceforge.stripes.validation.ValidationMethod
+  overrides:
+    - net.sourceforge.stripes.action.ActionBean#setContext
+  handlers:
+    - implements: net.sourceforge.stripes.action.ActionBean
+      returns: net.sourceforge.stripes.action.Resolution
+  main: false
+framework_packages:
+  - net.sourceforge.stripes:*
+synthetic_edges: []

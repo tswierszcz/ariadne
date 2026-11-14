@@ -685,7 +685,10 @@ plan bullets name (`servlet`, `jakarta` including CDI, `micronaut`, `quarkus`) i
 implemented; only RTA and `--max-dep-depth` (both called out as optional/a later addition
 above) are not. `internal/profile` implements section 4 as described:
 - YAML profiles (`internal/profile/profiles/{spring,servlet,jakarta,micronaut,quarkus,
-  generic}.yaml`), embedded via
+  stripes,generic}.yaml`; `stripes` added 2026-11-14 with the convention rule
+  `roots.handlers` — public no-argument `ActionBean` methods returning a `Resolution` —
+  after a recorded JPetStore run showed CVE-2020-26945 executed but `NOT_REACHABLE` under
+  `-roots profile`; see FAQ.md), embedded via
   `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
   one profile and replaces any existing one of the same name — not a partial per-field
   merge, matching how `-vuln-methods` already overrides a whole table rather than patching
@@ -1376,7 +1379,7 @@ ariadne/
     hierarchy/               # super/interfaces/subtypes, method resolution, annotations
     profile/                 # profile loading, detection, merging
       profiles/              # spring.yaml, servlet.yaml, jakarta.yaml, micronaut.yaml,
-                             #   quarkus.yaml, generic.yaml
+                             #   quarkus.yaml, stripes.yaml, generic.yaml
     vulnmap/                 # CVE -> methods (manual yaml, diffs, LLM)
       vuln_methods.yaml      # embedded default
     javadiff/                # unified-diff parser + brace-aware Java method scanner

@@ -267,6 +267,23 @@ that one piece.
   either way. No `roots.overrides`/`synthetic_edges`: Quarkus, like
   Micronaut, builds its wiring at build time via Jandex indexing and
   bytecode recording, not runtime proxies with zero bytecode.
+- **A `stripes` profile is supported too** (2026-11-14), and it needed a
+  new kind of root, `roots.handlers`. Stripes calls an action bean's event
+  handler through `Method#invoke`, and a handler has no fixed name and
+  needs no annotation: Stripes treats every public, non-static,
+  no-argument method of an `ActionBean` that returns a `Resolution` (or a
+  subtype) as one. A handler rule (`implements` + `returns`) roots exactly
+  those methods; `@Before`/`@After`/`@ValidationMethod` and
+  `ActionBean#setContext` are roots too. Found by a recorded run, not
+  guessed: on JPetStore the JVM entered MyBatis's
+  `SerializedCache#deserialize` (CVE-2020-26945) 884 times, but with
+  `-roots profile` the verdict was `NOT_REACHABLE`, because nothing under
+  an action bean was reachable from the `web.xml` roots
+  (`testdata/graphbench/TRACE_GAPS.MD`). With the profile JPetStore
+  auto-detects `spring+stripes`, 28 entry points instead of 6;
+  CVE-2020-26945 and CVE-2022-41853 become `REACHABLE` under
+  `-roots profile` (as under `-roots all`), and v1 under `-roots all` and
+  on petclinic/WebGoat is byte-identical.
 
 ### How to prepare a project
 
