@@ -49,8 +49,38 @@ import (
 // ModelID is the registry identifier of this model.
 const ModelID = "service-provider:dispatch"
 
-// Version versions the model's rules (snapshots record it).
-const Version = "p1"
+// Version versions the model's rules (snapshots record it). p2: facades
+// (DriverManager#getConnection → Driver#connect).
+const Version = "p2"
+
+// Facade is a static JDK method that runs a registered service's method
+// itself: the input calls the facade, never the service, so without it the
+// providers are unreachable (ROADMAP B4 b4-3 measured this for JDBC: a
+// driver reached only through DriverManager was invisible). Every
+// overload of Owner#Name is a facade; the call reaches Service#Method
+// (Desc) of every registered provider of Service.
+type Facade struct {
+	Owner, Name           string
+	Service, Method, Desc string
+}
+
+// Facades are the known facades. DriverManager#getConnection asks each
+// registered driver to connect (JDBC 4: drivers are loaded through
+// ServiceLoader and register themselves).
+var Facades = []Facade{
+	{Owner: "java.sql.DriverManager", Name: "getConnection", Service: "java.sql.Driver", Method: "connect",
+		Desc: "(Ljava/lang/String;Ljava/util/Properties;)Ljava/sql/Connection;"},
+}
+
+// facadeOf returns the facade a static call names, if any.
+func facadeOf(owner, name string) (Facade, bool) {
+	for _, f := range Facades {
+		if f.Owner == owner && f.Name == name {
+			return f, true
+		}
+	}
+	return Facade{}, false
+}
 
 // Registration is one META-INF/services entry the model may dispatch to.
 type Registration struct {
@@ -129,6 +159,10 @@ func Find(h *hierarchy.Hierarchy, regs []Registration, skip func(string) bool) C
 				if skip(call.Owner) {
 					addRet(call.Owner, call.Desc)
 				}
+				// A facade call is a call on its service's method.
+				if f, ok := facadeOf(call.Owner, call.Name); ok && call.Kind == classfile.CallStatic {
+					addRet(f.Service, f.Desc)
+				}
 			}
 		}
 	}
@@ -169,6 +203,12 @@ func Find(h *hierarchy.Hierarchy, regs []Registration, skip func(string) bool) C
 		ci, _ := h.Lookup(fqcn)
 		for _, m := range ci.Methods {
 			for _, call := range m.Calls {
+				if f, ok := facadeOf(call.Owner, call.Name); ok && call.Kind == classfile.CallStatic {
+					if _, ok := c.Providers[f.Service]; ok {
+						sigs[models.Signature{Owner: call.Owner, Name: call.Name, Desc: call.Desc}] = true
+					}
+					continue
+				}
 				if call.Kind != classfile.CallInterface && call.Kind != classfile.CallVirtual {
 					continue
 				}
@@ -284,6 +324,12 @@ func NewEvaluator(h *hierarchy.Hierarchy, c Catalog) *Evaluator { return &Evalua
 // Evaluate implements models.Evaluator.
 func (e *Evaluator) Evaluate(m *models.Model, site models.CallSite) models.Fact {
 	fact := models.Fact{ModelID: m.ID}
+	if f, ok := facadeOf(site.Call.Owner, site.Call.Name); ok {
+		if kind, ok := e.callKind(site); ok && kind == classfile.CallStatic {
+			fact.Targets = e.targets(e.c.Providers[f.Service], f.Service, f.Method, f.Desc, classfile.CallInterface)
+		}
+		return fact
+	}
 	providers, ok := e.c.Providers[site.Call.Owner]
 	if !ok {
 		providers = e.c.products[site.Call.Owner] // computed by Find for every matched signature
@@ -295,21 +341,29 @@ func (e *Evaluator) Evaluate(m *models.Model, site models.CallSite) models.Fact 
 	if !ok || (kind != classfile.CallVirtual && kind != classfile.CallInterface) {
 		return fact
 	}
+	fact.Targets = e.targets(providers, site.Call.Owner, site.Call.Name, site.Call.Desc, kind)
+	return fact
+}
+
+// targets: the body each provider runs for owner#name+desc, once per
+// declaring class, sorted.
+func (e *Evaluator) targets(providers []string, owner, name, desc string, kind classfile.CallKind) []models.Target {
+	var out []models.Target
 	seen := map[string]bool{}
 	for _, p := range providers {
-		decl, ok := e.h.ResolveExact(p, site.Call.Name, site.Call.Desc)
-		if !ok || decl == site.Call.Owner || seen[decl] {
+		decl, ok := e.h.ResolveExact(p, name, desc)
+		if !ok || decl == owner || seen[decl] {
 			continue
 		}
 		ci, _ := e.h.Lookup(decl)
-		if meth, ok := ci.MethodByNameAndDesc(site.Call.Name, site.Call.Desc); !ok || meth.IsAbstract() {
+		if meth, ok := ci.MethodByNameAndDesc(name, desc); !ok || meth.IsAbstract() {
 			continue
 		}
 		seen[decl] = true
-		fact.Targets = append(fact.Targets, models.Target{Method: models.Signature{Owner: decl, Name: site.Call.Name, Desc: site.Call.Desc}, Kind: kind})
+		out = append(out, models.Target{Method: models.Signature{Owner: decl, Name: name, Desc: desc}, Kind: kind})
 	}
-	sort.Slice(fact.Targets, func(i, j int) bool { return fact.Targets[i].Method.Owner < fact.Targets[j].Method.Owner })
-	return fact
+	sort.Slice(out, func(i, j int) bool { return out[i].Method.Owner < out[j].Method.Owner })
+	return out
 }
 
 func (e *Evaluator) callKind(site models.CallSite) (classfile.CallKind, bool) {
