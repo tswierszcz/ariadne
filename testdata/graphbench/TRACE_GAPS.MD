@@ -371,3 +371,65 @@ annotation-defined (all `@Bean` methods, all request-mapping methods), which the
 already roots — an edge there would shorten paths, not change a verdict. Configuration-sourced
 names (`spring.factories`, 3 relations) and `setAccessible` were not measured as worth a model.
 Not done.
+
+## Re-recorded after the B4 oracles (2026-11-14)
+
+Both applications recorded again with the unchanged scripts (`scripts/runtime-trace-petclinic.sh`,
+`scripts/runtime-trace-jpetstore.sh`, JDK 25.0.5), after the day's model fixes found by the real-JVM
+oracles (ROADMAP B4: `service-provider:dispatch` `p2` DriverManager facade and `p3`, `jdbc:objects`
+`j2` JDK superinterfaces, `framework:proxies` `x2` Spring Data base repositories). Each trace was
+analyzed by the analyzer **before** the fixes (`8287fba`) and **after** them (`c43976e`), with the
+scripts' own arguments (petclinic `-profile spring`, `-roots all`; JPetStore `-roots profile`).
+
+| App | Measured relations | Not in the static graph, before → after | Causes (after) |
+|---|---|---|---|
+| petclinic | 2 736 | 121 → **121** (4.4%) | `skipped-receiver` 56, `reflection` 40, `sam-call` 14, `class-init` 8, `async` 2, `no-call-at-site` 1 |
+| JPetStore | 764 | 38 → **38** (5.0%) | `skipped-receiver` 21, `reflection` 11, `proxy` 3, `indirect` 2, `no-call-at-site` 1 |
+
+**The fixes close no measured relation.** Why, per fix:
+
+- `x2` (Spring Data base repositories) adds edges from the repository **call site** to
+  `SimpleJpaRepository`'s body — reachability, the oracle's measure — while the run's relation
+  is `RepositoryMethodInvoker` → the body through `Method#invoke` (counted under `reflection`),
+  whose caller the edge does not start from. A relation metric does not credit a model that
+  shortcuts a reflective hop; reachability does (petclinic: controllers now reach
+  `SimpleJpaRepository#save/findById/findAll` directly).
+- `p2` (DriverManager): neither application connects through `DriverManager` (Hikari calls
+  `driver.connect` itself; JPetStore's `SimpleDriverDataSource` too).
+- `j2`/`p3` (JDK superinterfaces): the HSQLDB statement relations of JPetStore are not on the
+  sampled stacks of this scenario.
+
+The relation count is therefore the wrong yardstick for these models; it stays the right one for
+missing edges (the table above is the work list).
+
+### A verdict-level false negative, observed
+
+The traces' exact entries of mapped vulnerable methods (`-runtime-filter-out`) show, on JPetStore,
+**CVE-2020-26945** (MyBatis, deserialization in the second-level cache) with
+`org.apache.ibatis.cache.decorators.SerializedCache#deserialize` **entered 884 times** (traced; 11
+samples) — and the static verdict under the script's `-roots profile` is **`NOT_REACHABLE`**
+(`MAPPING_PARTIAL`, `MODEL_INCOMPLETE`), before and after the fixes. Under the default
+`-roots all` it is `REACHABLE` (path from `AccountService#getAccount`, an application method all
+roots include). Every other observed vulnerable method of both applications has a positive verdict
+(petclinic: 100 `FRAMEWORK`, 18 `REACHABLE` rows; JPetStore: 8 `FRAMEWORK`).
+
+The measured chain, from the trace's caller → callee relations:
+
+```
+net.sourceforge.stripes.controller.DispatcherHelper$6#intercept
+  → (Method#invoke)                          reflection: not in the graph
+org.mybatis.jpetstore.web.actions.AccountActionBean#signon
+  → CglibAopProxy$DynamicAdvisedInterceptor#intercept → MethodProxy#invoke
+org.mybatis.jpetstore.service.AccountService#getAccount(String, String)
+  → MapperProxy#invoke → MapperMethod#execute → SqlSessionTemplate → DefaultSqlSession#selectOne
+  → CachingExecutor#query → TransactionalCacheManager → TransactionalCache → SynchronizedCache
+  → LoggingCache → SerializedCache#getObject → SerializedCache#deserialize
+```
+
+`-roots profile` roots JPetStore at its `web.xml` entries (Stripes' filter and servlet, Spring's
+listener). Stripes calls an action bean's event handler through `Method#invoke` (the 4
+`reflection` relations of 2026-11-09, "A second application"), so with profile roots nothing
+under an action bean is reachable — the advisory's whole path. The 2026-11-09 section listed those
+relations as framework internals; this is their consequence on a verdict. A Stripes model —
+the public `Resolution`-returning methods of `ActionBean` implementations as entry points (or as
+targets of `DispatcherHelper`'s invoke site) — would close it; not built.
