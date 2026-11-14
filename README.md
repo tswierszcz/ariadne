@@ -486,7 +486,7 @@ ValidationProvider#buildValidatorFactory`, `java.sql.Driver#connect`), and
 hands out further objects through other interfaces of the same API
 (`Configuration` → `ValidatorFactory` → `Validator`, `Connection` →
 `Statement` → `ResultSet`, `CacheManager` → `Cache`). The
-`service-provider:dispatch` model (`internal/spidispatch`, version `p1`, a
+`service-provider:dispatch` model (`internal/spidispatch`, version `p2`, a
 B3 registry model with basis `model`) expands a call whose static receiver
 is such an interface:
 
@@ -496,6 +496,13 @@ is such an interface:
   service's package without `.spi`) reached from the service through return
   types of its methods, transitively — → to the implementations of that
   interface found in the **jars of the registered providers** only.
+- a **facade** (since `p2`) — a static JDK method that calls the service
+  itself: `java.sql.DriverManager#getConnection` (every overload) → the
+  registered drivers' `Driver#connect`; its return type makes `Connection`
+  a product as above. Without it a driver reached only through
+  `DriverManager` (Spring `DriverManagerDataSource`, MyBatis
+  `UnpooledDataSource`, Hibernate `DriverManagerConnectionCreator`) was
+  not reached at all (measured by `testdata/jdbc`, `scripts/jdbc-oracle.sh`).
 
 Each target is the method the JVM selects on that class. An interface the
 service does not hand out (a `ServletContainerInitializer` returns
@@ -504,7 +511,7 @@ above. Not modeled: implementations outside the providers' jars,
 providers registered only through a module `provides`, and which provider
 a given call site really receives (the edges are "may run", like CHA's;
 a never-created class in a provider jar is a target too). The log line
-`service-provider dispatch (service-provider:dispatch p1): …` counts the
+`service-provider dispatch (service-provider:dispatch p2): …` counts the
 services and call signatures. Found by a runtime trace: on petclinic the
 JVM ran Hibernate Validator's `HibernateValidator#buildValidatorFactory`
 while the graph stopped at the `ValidationProvider` call
