@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"ariadne/internal/callgraph"
+	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 )
 
@@ -45,6 +46,9 @@ var quarkusYAML []byte
 
 //go:embed profiles/generic.yaml
 var genericYAML []byte
+
+//go:embed profiles/stripes.yaml
+var stripesYAML []byte
 
 // SyntheticEdge mirrors PLAN.md section 4's synthetic_edges entry; see
 // callgraph.SyntheticEdge, which this is converted to 1:1 (profile does
@@ -123,6 +127,23 @@ type Roots struct {
 	ParameterAnnotations []string `yaml:"parameter_annotations"`
 	// Main: every public static "main(String[])" method is also a root.
 	Main bool `yaml:"main"`
+	// Handlers: convention-based entry points with no annotation and no
+	// fixed name — a framework calls them reflectively by their shape.
+	// See Handler and handlerRoots.
+	Handlers []Handler `yaml:"handlers"`
+}
+
+// Handler is one convention: in an app class that is Implements or one of
+// its transitive subtypes, every public, non-static, non-abstract method
+// taking no parameters and returning Returns (or a subtype of it) is a
+// root. Stripes's event handlers are this shape — any public no-argument
+// method of an ActionBean returning a Resolution — and Stripes runs them
+// through Method#invoke, so without the rule nothing under an action bean
+// is reachable from its web.xml roots (measured on JPetStore,
+// testdata/graphbench/TRACE_GAPS.MD, 2026-11-14).
+type Handler struct {
+	Implements string `yaml:"implements"`
+	Returns    string `yaml:"returns"`
 }
 
 // Profile is one framework's knowledge, loaded from YAML.
@@ -182,11 +203,11 @@ func (c *Catalog) put(p Profile) {
 }
 
 // LoadDefaultCatalog parses ariadne's embedded profiles (spring, servlet,
-// jakarta, micronaut, quarkus, generic). generic must always be present:
+// jakarta, micronaut, quarkus, stripes, generic). generic must always be present:
 // it is auto-detection's fallback when nothing else matches.
 func LoadDefaultCatalog() (Catalog, error) {
 	var c Catalog
-	for _, raw := range [][]byte{springYAML, servletYAML, jakartaYAML, micronautYAML, quarkusYAML, genericYAML} {
+	for _, raw := range [][]byte{springYAML, servletYAML, jakartaYAML, micronautYAML, quarkusYAML, stripesYAML, genericYAML} {
 		p, err := parseProfile(raw)
 		if err != nil {
 			return Catalog{}, fmt.Errorf("parsing embedded profile: %w", err)
@@ -281,6 +302,7 @@ func merge(profiles []Profile) Profile {
 		m.Roots.Overrides = append(m.Roots.Overrides, p.Roots.Overrides...)
 		m.Roots.ParameterAnnotations = append(m.Roots.ParameterAnnotations, p.Roots.ParameterAnnotations...)
 		m.Roots.Main = m.Roots.Main || p.Roots.Main
+		m.Roots.Handlers = append(m.Roots.Handlers, p.Roots.Handlers...)
 		m.FrameworkPackages = append(m.FrameworkPackages, p.FrameworkPackages...)
 		m.SyntheticEdges = append(m.SyntheticEdges, p.SyntheticEdges...)
 		m.Models.Disable = append(m.Models.Disable, p.Models.Disable...)
@@ -397,6 +419,37 @@ func (p Profile) AppRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
 		}
 	}
 	roots = append(roots, p.overrideRoots(g, h)...)
+	roots = append(roots, p.handlerRoots(g, h)...)
+	return roots
+}
+
+// handlerRoots implements Roots.Handlers.
+func (p Profile) handlerRoots(g *callgraph.Graph, h *hierarchy.Hierarchy) []uint32 {
+	var roots []uint32
+	for _, rule := range p.Roots.Handlers {
+		returns := map[string]bool{rule.Returns: true}
+		for _, s := range h.Subtypes(rule.Returns) {
+			returns[s] = true
+		}
+		for _, candidate := range h.Subtypes(rule.Implements) {
+			ci, ok := h.Lookup(candidate)
+			if !ok || !ci.IsApp {
+				continue
+			}
+			for _, m := range ci.Methods {
+				if !m.IsPublic() || m.IsAbstract() || m.AccessFlags&classfile.AccStatic != 0 || !strings.HasPrefix(m.Descriptor, "()L") {
+					continue
+				}
+				ret := strings.ReplaceAll(strings.TrimSuffix(m.Descriptor[3:], ";"), "/", ".")
+				if !returns[ret] {
+					continue
+				}
+				if id, ok := g.ID(candidate, m.Name, m.Descriptor); ok {
+					roots = append(roots, id)
+				}
+			}
+		}
+	}
 	return roots
 }
 

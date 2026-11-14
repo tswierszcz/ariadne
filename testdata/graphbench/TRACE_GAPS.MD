@@ -432,4 +432,7 @@ listener). Stripes calls an action bean's event handler through `Method#invoke` 
 under an action bean is reachable — the advisory's whole path. The 2026-11-09 section listed those
 relations as framework internals; this is their consequence on a verdict. A Stripes model —
 the public `Resolution`-returning methods of `ActionBean` implementations as entry points (or as
-targets of `DispatcherHelper`'s invoke site) — would close it; not built.
+targets of `DispatcherHelper`'s invoke site) — would close it. **Built the same day:** the
+`stripes` profile (`roots.handlers`); on this trace JPetStore auto-detects `spring+stripes` (28
+entry points instead of 6) and CVE-2020-26945 is `REACHABLE` under `-roots profile` (path from
+`AccountActionBean#newAccount`); the relation counts are unchanged (roots add no edge).

@@ -30,6 +30,39 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS — profil `stripes` (`roots.handlers`) po śladzie JPetStore — DONE (2026-11-14)
+
+- **Zakres (zatwierdzony 2026-11-14):** zamknąć fałszywy negatyw werdyktu
+  znaleziony przez ślad: Stripes woła handlery zdarzeń action beanów przez
+  `Method#invoke`, więc przy `-roots profile` nic pod action beanem nie
+  było osiągalne.
+- **Zrealizowane:** nowy rodzaj korzenia profilu `roots.handlers`
+  (`implements` + `returns`): publiczne, niestatyczne, nieabstrakcyjne
+  metody bez parametrów klas aplikacji implementujących typ, zwracające
+  `returns` albo jego podtyp (konwencja Stripes — handler nie ma stałej
+  nazwy ani wymaganej adnotacji). Profil `profiles/stripes.yaml`
+  (wykrywany po `ActionBean`): handlery, `@Before`/`@After`/
+  `@ValidationMethod`, `ActionBean#setContext`, pakiet frameworka
+  `net.sourceforge.stripes:*`.
+- **Wynik:** JPetStore wykrywa `spring+stripes`, 28 punktów wejścia (było
+  6). Na tym samym śladzie: CVE-2020-26945 `NOT_REACHABLE` → **`REACHABLE`**
+  przy `-roots profile` (ścieżka z `AccountActionBean#newAccount`), zgodnie
+  z 884 wykonaniami `SerializedCache#deserialize`; CVE-2022-41853
+  `FRAMEWORK` → `REACHABLE` (jak przy `-roots all`); pozostałe zmiany —
+  tylko liczniki `model_gaps`. JPetStore `-roots all`, petclinic, WebGoat:
+  v1 bajtowo identyczne. Relacje śladu bez zmian (korzenie nie dodają
+  krawędzi).
+- **Weryfikacja:** `TestHandlerRoots` (podtyp `Resolution`, metoda w klasie
+  abstrakcyjnej, wykluczone: parametry, prywatna, statyczna, abstrakcyjna,
+  inny typ zwracany, klasa biblioteki), `TestStripesProfile`; `go test
+  ./...`, `go vet ./...`. Dokumentacja: README, PLAN.md (faza 7), FAQ.md,
+  SUPPORT.MD, TRACE_GAPS.MD.
+- **Ograniczenia:** wiązanie parametrów żądania z setterami action beana
+  (też refleksja Stripes) nie jest modelowane; `@HandlesEvent` na metodzie
+  z parametrami — poza konwencją.
+- **Następny krok (wymaga zgody):** dokończenie B4 (DI, JPA) albo B0 —
+  zawężenie nieograniczonych miejsc refleksji.
+
 ### ROADMAP:B4 — ślady JVM po wyroczniach (2026-11-14): pomiar, bez zmian kodu
 
 - **Zakres (zatwierdzony 2026-11-14):** nagrać od nowa petclinic i
@@ -52,10 +85,8 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
   (`AccountActionBean#signon`) przez `Method#invoke`, więc z korzeni
   `web.xml` nic pod action beanem nie jest osiągalne. Pozostałe
   obserwowane metody podatne obu aplikacji mają werdykty pozytywne.
-- **Następny krok (wymaga zgody):** model Stripes — publiczne metody
-  implementacji `ActionBean` zwracające `Resolution` jako punkty wejścia
-  (albo cele miejsca `Method#invoke` w `DispatcherHelper`), z weryfikacją
-  na tym śladzie (CVE-2020-26945 → pozytywny przy `-roots profile`).
+- **Następny krok:** model Stripes — zrobiony tego samego dnia (profil
+  `stripes`, wpis powyżej).
 
 ### ROADMAP:B4 — poprawka po `b4-5`: bazowe klasy repozytoriów Spring Data (`framework:proxies` `x2`) — DONE (2026-11-14)
 

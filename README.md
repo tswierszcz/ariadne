@@ -1440,7 +1440,7 @@ Flags:
 | `-vuln-methods` | no | Override the embedded `vuln_methods.yaml`. |
 | `-embedded-components` | no | YAML file declaring components embedded in dependency jars and the package relocations they sit under, pinned to each jar's SHA-256 (CVE:F7a; example: `testdata/embedded/petclinic-ehcache.yaml`). Declarations are verified against the classes; one for a jar with another hash is reported and ignored. |
 | `-sbom` | no | CycloneDX JSON SBOM (spec 1.4–1.6; CVE:F6b; example: `testdata/sbom/webgoat-jruby.cdx.json`). A component whose SHA-256 is an analyzed dependency jar's is tied to it; Maven components nested in it become embedded candidates of that jar, verified by their classes. Untied components and the dependency graph are not used; a disagreeing identity is reported, never applied. |
-| `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, or a name from `-profile-file`. |
+| `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, `stripes`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners) or `profile` (the active profile's own entry points, plus the same `web.xml` methods). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
@@ -1669,7 +1669,7 @@ internal/
   servletdispatch/        servlet container dispatch model: registered servlets/filters
   profile/                framework knowledge: detect, roots, framework packages, synthetic edges
     profiles/              spring.yaml, servlet.yaml, jakarta.yaml, micronaut.yaml,
-                             quarkus.yaml, generic.yaml (embedded defaults)
+                             quarkus.yaml, stripes.yaml, generic.yaml (embedded defaults)
   vulnmap/                CVE -> vulnerable methods (manual table + fix-commit diffs)
     vuln_methods.yaml      the embedded manual table
   javadiff/               unified-diff parsing + the brace-aware Java method scanner
@@ -1999,12 +1999,16 @@ report:
   receiver that arrives as a method parameter rather than a field or a
   helper-method return value, and any runtime-computed class/method
   name remain unmodeled, so the rest of this limitation still stands.
-- **Six profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
-  `quarkus` and `generic`** — every framework PLAN.md section 4 originally
-  named for Phase 7, plus the `spring`/`generic` pair from the base plan.
+- **Seven profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
+  `quarkus`, `stripes` and `generic`** — every framework PLAN.md section 4
+  originally named for Phase 7, the `spring`/`generic` pair from the base
+  plan, and `stripes` (2026-11-14: Stripes action beans' event handlers,
+  through the convention rule `roots.handlers`, found missing by a recorded
+  JPetStore run).
   The profile system itself (auto-detection and merging, `-roots profile`,
   synthetic edges, the conditional jackson-databind rule,
-  `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`,
+  `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`/
+  `roots.handlers`,
   including CDI's `@Observes`) is implemented (see step 7 above); there is
   no `--max-dep-depth`. See [PLAN.md](PLAN.md)'s Phase 7 for what's left.
 - **An EAR's own top-level modules are never read as app code**, only as
