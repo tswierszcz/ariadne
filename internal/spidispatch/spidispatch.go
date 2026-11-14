@@ -43,6 +43,7 @@ import (
 
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/jdkapi"
 	"ariadne/internal/models"
 )
 
@@ -50,8 +51,9 @@ import (
 const ModelID = "service-provider:dispatch"
 
 // Version versions the model's rules (snapshots record it). p2: facades
-// (DriverManager#getConnection → Driver#connect).
-const Version = "p2"
+// (DriverManager#getConnection → Driver#connect). p3: a product's
+// implementations include those of its JDK subinterfaces (jdkapi).
+const Version = "p3"
 
 // Facade is a static JDK method that runs a registered service's method
 // itself: the input calls the facade, never the service, so without it the
@@ -255,7 +257,7 @@ func (c *Catalog) productsOf(h *hierarchy.Hierarchy, iface string, skip func(str
 	if service, isProduct := c.Products[iface]; isProduct {
 		jars := c.Families[familyRoot(service)]
 		{
-			for _, sub := range h.Subtypes(iface) {
+			for _, sub := range jdkapi.Subtypes(h, iface) {
 				ci, ok := h.Lookup(sub)
 				if ok && jars[ci.SourceJar] && ci.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) == 0 {
 					impls = append(impls, sub)

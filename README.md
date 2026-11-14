@@ -486,7 +486,7 @@ ValidationProvider#buildValidatorFactory`, `java.sql.Driver#connect`), and
 hands out further objects through other interfaces of the same API
 (`Configuration` → `ValidatorFactory` → `Validator`, `Connection` →
 `Statement` → `ResultSet`, `CacheManager` → `Cache`). The
-`service-provider:dispatch` model (`internal/spidispatch`, version `p2`, a
+`service-provider:dispatch` model (`internal/spidispatch`, version `p3`, a
 B3 registry model with basis `model`) expands a call whose static receiver
 is such an interface:
 
@@ -503,6 +503,8 @@ is such an interface:
   `DriverManager` (Spring `DriverManagerDataSource`, MyBatis
   `UnpooledDataSource`, Hibernate `DriverManagerConnectionCreator`) was
   not reached at all (measured by `testdata/jdbc`, `scripts/jdbc-oracle.sh`).
+  Since `p3` a product's implementations include those of its JDK
+  subinterfaces, as for `jdbc:objects` `j2`.
 
 Each target is the method the JVM selects on that class. An interface the
 service does not hand out (a `ServletContainerInitializer` returns
@@ -511,7 +513,7 @@ above. Not modeled: implementations outside the providers' jars,
 providers registered only through a module `provides`, and which provider
 a given call site really receives (the edges are "may run", like CHA's;
 a never-created class in a provider jar is a target too). The log line
-`service-provider dispatch (service-provider:dispatch p2): …` counts the
+`service-provider dispatch (service-provider:dispatch p3): …` counts the
 services and call signatures. Found by a runtime trace: on petclinic the
 JVM ran Hibernate Validator's `HibernateValidator#buildValidatorFactory`
 while the graph stopped at the `ValidationProvider` call
@@ -604,7 +606,7 @@ CHA expands Spring AOP's interceptor chain and target sources, so some paths
 through repositories are CHA over-approximations (petclinic/WebGoat: paths
 changed, no verdict).
 
-**JDBC objects (`jdbc:objects`, `internal/jdbcdispatch`, version `j1`).**
+**JDBC objects (`jdbc:objects`, `internal/jdbcdispatch`, version `j2`).**
 The service-provider model reaches a driver's classes, but a real
 application rarely talks to the driver directly: Hibernate or Spring's
 `JdbcTemplate` call `Connection`/`PreparedStatement`/`ResultSet` methods on
@@ -625,8 +627,15 @@ reachable creates is not a target, nor is one created only reflectively (a
 some reachable method also `new`s it — on petclinic Boot creates
 `HikariDataSource` reflectively, and the gate admits it through Hikari's own
 `new HikariDataSource` in `HikariConnectionProvider`/`HikariJNDIFactory`,
-not through Boot's creation). `java.sql.Driver` is left to the
-service-provider model. The log line `JDBC objects (jdbc:objects j1): N
+not through Boot's creation). Since `j2` an implementation counts also
+when it implements only a JDK subinterface of the receiver type
+(`internal/jdkapi`: `PreparedStatement` extends `Statement`, `NClob` extends
+`Clob`, every JDBC interface extends `Wrapper`, … — JDK facts the hierarchy
+does not read): HSQLDB's `JDBCPreparedStatement` implements only
+`PreparedStatement`, so before `j2` no call through `java.sql.Statement`
+(`close`, `executeBatch`) reached it (found by `testdata/mybatis`).
+`java.sql.Driver` is left to the
+service-provider model. The log line `JDBC objects (jdbc:objects j2): N
 candidates, N edges added, …` counts them; snapshots record
 `jdbc.objects`. Measured on a petclinic trace: every one of the 22
 `java.sql`/`javax.sql` relations the graph missed is an edge now, and the
