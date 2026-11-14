@@ -128,6 +128,9 @@ type InstanceFinding struct {
 	// PathEdges and Character: as Result's, for this instance's path.
 	PathEdges []PathEdge
 	Character []string
+	// GapProbe (ROADMAP B0 b0-4): for a NOT_REACHABLE finding, the gaps a
+	// wider or narrower model-gap rule would count. Measurement only.
+	GapProbe *GapProbe
 }
 
 // EngineVersion versions the reachability semantics (statuses, per-instance
@@ -169,6 +172,8 @@ type Engine struct {
 	components *component.Inventory
 	// gaps are the reachable unresolved sites (SetGaps, contract §4).
 	gaps []gap
+	// probe holds the gap-rule probe's inputs (SetProbe, ROADMAP B0 b0-4).
+	probe *probeState
 }
 
 // SetComponents enables per-instance findings over inv.
@@ -787,7 +792,13 @@ type gap struct {
 // method the roots reach (FRAMEWORK pass) can make a finding UNKNOWN.
 // Call after SetComponents.
 func (e *Engine) SetGaps(sites []GapSite) {
-	e.gaps = nil
+	e.gaps = e.reachableGaps(sites)
+}
+
+// reachableGaps keeps the sites whose calling method the roots reach,
+// with their owners mapped to component instances.
+func (e *Engine) reachableGaps(sites []GapSite) []gap {
+	var out []gap
 	for _, s := range sites {
 		id, ok := e.g.ID(s.CallerFQCN, s.CallerName, s.CallerDesc)
 		if !ok {
@@ -806,8 +817,9 @@ func (e *Engine) SetGaps(sites []GapSite) {
 				}
 			}
 		}
-		e.gaps = append(e.gaps, gp)
+		out = append(out, gp)
 	}
+	return out
 }
 
 // ReachableGaps returns how many recorded gap sites are reachable from

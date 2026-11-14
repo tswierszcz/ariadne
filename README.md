@@ -1340,6 +1340,19 @@ gaps by mechanism" table and v2 `coverage.gaps`/`findings[].gaps` use it.
 It is a reading aid: only the `site` gaps take part in the model-gap rule,
 and no verdict or reason code changes (v1 is byte-identical).
 
+**Gap-rule probe (ROADMAP B0 b0-4).** Every run also measures, report-only,
+which `NOT_REACHABLE` findings a narrower or wider model-gap rule would mark:
+only gaps bounded to the instance (`scoped`), plus unresolved lambda calls
+whose interface has a lambda created in the instance, plus calls on
+`java.*`/`javax.*` types whose skipped CHA expansion would land in the
+instance. The log line "gap-rule probe", the report's "Gap-rule probe"
+section and v2 `findings[].gap_probe`/`coverage.gap_probe` show it. On
+petclinic, WebGoat and JPetStore the wider variants mark exactly what the
+current rule marks (every `NOT_REACHABLE` finding), and the skipped receivers
+reach every instance — so the rule is unchanged ([contract
+§4](docs/RESULTS_CONTRACT.MD)). No verdict or reason code depends on it; v1
+is byte-identical.
+
 **Outputs are written together (CVE:F9a).** The report, the results
 file and a `-snapshot-out` manifest are rendered first and written only
 at the end of a successful run, all or nothing — a run that fails
