@@ -1618,6 +1618,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/runtime-trace-petclinic.sh  [OUT_DIR] [PORT]                  # write petclinic's vulnerable-method JFR settings, run it under JFR with them, send a fixed scenario, convert, import (java 25+ on PATH)
 ./scripts/runtime-trace-jpetstore.sh  [OUT_DIR] [PORT]                  # the same for JPetStore's WAR in Jetty (jetty-runner fetched by Maven)
 ./scripts/spidispatch-oracle.sh       /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for service-provider dispatch (testdata/spidispatch)
+./scripts/reflection-oracle.sh        [JAVA_HOME]                       # real-JVM oracle for reflection R0–R2: method bodies that ran (testdata/reflection)
 ./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
