@@ -568,7 +568,7 @@ servlet participants on petclinic removes 5 918 edges and turns 13
 `FRAMEWORK` into `NOT_REACHABLE` — a way to see what a model contributes,
 not a recommended setting.
 
-**Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x1`).**
+**Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x2`).**
 Some framework objects exist only as JDK dynamic proxies: a MyBatis mapper
 interface (`CategoryMapper`) has no implementation in the input — MyBatis
 hands out a proxy whose `MapperProxy#invoke` runs the SQL — and neither has a
@@ -586,11 +586,22 @@ scans) → `MapperProxy#invoke`; `SqlSessionTemplate`'s calls on its
 `EntityManager` → Spring ORM's shared and extended EntityManager handlers,
 `Query`/`TypedQuery`/`StoredProcedureQuery` → its deferred-query handler,
 `EntityManagerFactory` → the managed factory handler (javax and jakarta).
+Since `x2` a Spring Data repository call also reaches the **base
+repository** body (`spring-data:base-repository`): Spring Data's proxy
+runs it through `RepositoryMethodInvoker` → `Method#invoke`, which no
+literal resolves (measured by `testdata/springdata`). A base class is a
+concrete `Repository` subtype in the input (`SimpleJpaRepository`, a
+store's own), gated by a reachable method that `new`s it or belongs to a
+class naming it as a literal (a factory's `getRepositoryBaseClass`); the
+method is matched as Spring Data does — exact descriptor, else name and
+assignable parameters (`void save(Owner)` → `save(Object)`); query methods
+(an annotation `*.Query`, or no base-class method of that name) and default
+methods get no such edge.
 Each edge (basis `model`) waits for the same creator gate as the JDBC
 objects: a method creating the handler must be reachable from the roots.
 Checked in the bytecode of mybatis 3.4.1–3.5.16, mybatis-spring
 1.3.0–3.0.3, spring-aop/spring-orm 4.3.4–6.1.14. Log line `framework
-proxies (framework:proxies x1): N MyBatis mappers, N Spring Data
+proxies (framework:proxies x2): N MyBatis mappers, N Spring Data
 repositories; N candidates (…), N edges added, …`; snapshots record
 `framework.proxies`. Measured on runtime traces: petclinic's 13 `proxy`
 relations and 6 of JPetStore's 8 are graph edges now; JPetStore's

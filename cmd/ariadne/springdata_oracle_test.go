@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -21,18 +22,12 @@ const springDataFixture = "../../testdata/springdata/"
 // ReflectiveMethodInvocation, Spring Data's interceptors →
 // RepositoryMethodInvoker → Method#invoke → the base class's method.
 //
-// The catalog's edge from the repository call to JdkDynamicAopProxy#invoke
-// must exist, and every observed body of the input must be reachable, with
-// one documented exception and one documented weakness, both from the last
-// hop being reflection (RepositoryMethodInvoker → Method#invoke, a site no
-// literal resolves):
-//   - fx.store.FxRepository#count is not reached;
-//   - save and findById are reached only by accident — through CHA edges
-//     from CrudRepositoryInvoker (Spring Data's web/REST helper, which the
-//     JVM does not run here), never from Spring Data's invocation path
-//     (org.springframework.data.repository.core.support).
-// The test fails once either changes, so a model that closes the hop
-// updates this oracle.
+// Every observed body of the input must be reachable. The catalog links the
+// repository call to JdkDynamicAopProxy#invoke and — since x2
+// (spring-data:base-repository; b4-5 measured the reflective last hop
+// unreached) — to the base repository's save, findById and count; a
+// concrete Repository class nothing creates or names (OrphanRepository) gets
+// no edge.
 func TestSpringDataOracle(t *testing.T) {
 	dir := t.TempDir()
 	graph := filepath.Join(dir, "g.txt")
@@ -64,13 +59,9 @@ func TestSpringDataOracle(t *testing.T) {
 	if len(obs) < 14 || !obs[proxyInvoke] {
 		t.Fatalf("observed.txt has %d input bodies; regenerate with scripts/springdata-oracle.sh", len(obs))
 	}
-	const count = "fx.store.FxRepository#count()J"
 	var missed []string
 	for b := range obs {
-		switch {
-		case b == count && reach[b]:
-			t.Errorf("%s is reached: the reflective hop to the base repository closed — update this oracle", b)
-		case b != count && !reach[b]:
+		if !reach[b] {
 			missed = append(missed, b)
 		}
 	}
@@ -79,16 +70,32 @@ func TestSpringDataOracle(t *testing.T) {
 		t.Errorf("the JVM ran %s, the graph does not reach it from main", b)
 	}
 
+	const query = "fx.app.Main#query()Ljava/lang/String;"
 	proxyEdge := false
+	base := map[string]bool{}
 	for id := range ex.Edges {
-		if id.Basis == string(callgraph.BasisModel) && id.From == "fx.app.Main#query()Ljava/lang/String;" && id.To == proxyInvoke {
+		if id.Basis != string(callgraph.BasisModel) {
+			continue
+		}
+		if id.From == query && id.To == proxyInvoke {
 			proxyEdge = true
 		}
-		if strings.HasPrefix(id.To, "fx.store.FxRepository#") && strings.HasPrefix(id.From, "org.springframework.data.repository.core.support.") {
-			t.Errorf("edge %s -> %s: Spring Data's invocation path now reaches the base repository — update this oracle", id.From, id.To)
+		if strings.HasPrefix(id.To, "fx.store.") {
+			if id.From != query {
+				t.Errorf("base-repository edge from %s (want only the repository call site): -> %s", id.From, id.To)
+			}
+			base[id.To] = true
 		}
 	}
 	if !proxyEdge {
 		t.Error("no framework:proxies edge from the repository call to JdkDynamicAopProxy#invoke")
+	}
+	want := map[string]bool{
+		"fx.store.FxRepository#save(Ljava/lang/Object;)Ljava/lang/Object;":       true,
+		"fx.store.FxRepository#findById(Ljava/lang/Object;)Ljava/util/Optional;": true,
+		"fx.store.FxRepository#count()J":                                         true,
+	}
+	if !reflect.DeepEqual(base, want) {
+		t.Errorf("base-repository edges to %v, want %v (never OrphanRepository)", base, want)
 	}
 }

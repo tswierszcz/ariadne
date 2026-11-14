@@ -58,7 +58,22 @@ import (
 const ModelID = "framework:proxies"
 
 // Version versions the catalog and the mapper rules. Snapshots record it.
-const Version = "x1"
+// x2: Spring Data base repositories (BaseRepositoryEntry).
+const Version = "x2"
+
+// BaseRepositoryEntry names the x2 rule: a call on a Spring Data
+// repository interface also reaches the body a base repository class runs
+// for it. Spring Data's proxy (JdkDynamicAopProxy → its interceptors →
+// RepositoryMethodInvoker) runs the base class's method through
+// Method#invoke, which no literal resolves (ROADMAP B4 b4-5 measured CRUD
+// methods unreached on a real JVM). A base class is a concrete subtype of
+// Repository in the input (SimpleJpaRepository, a store's own); it counts
+// once a reachable method creates it — `new`s it, or belongs to a class
+// naming it as a literal (a factory's getRepositoryBaseClass returns
+// SimpleJpaRepository.class, and Spring instantiates it reflectively).
+// Query methods declared on the repository itself have no base-class body
+// and get no edge.
+const BaseRepositoryEntry = "spring-data:base-repository"
 
 const invokeDesc = "(Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;"
 
@@ -177,6 +192,7 @@ func Find(h *hierarchy.Hierarchy, jars []appref.Jar) (Result, error) {
 			byIface[i] = append(byIface[i], target{p, cr})
 		}
 	}
+	r.Edges = append(r.Edges, baseRepositoryEdges(h, r.Repositories, creators, &r)...)
 	if len(byIface) == 0 {
 		return r, nil
 	}
@@ -202,6 +218,203 @@ func Find(h *hierarchy.Hierarchy, jars []appref.Jar) (Result, error) {
 		}
 	}
 	return r, nil
+}
+
+// baseRepositoryEdges builds the x2 candidates (BaseRepositoryEntry).
+func baseRepositoryEdges(h *hierarchy.Hierarchy, repos []string, creators map[string][]callgraph.MethodRef, r *Result) []callgraph.SAMEdge {
+	if len(repos) == 0 {
+		return nil
+	}
+	isRepo := map[string]bool{}
+	for _, i := range repos {
+		isRepo[i] = true
+	}
+	var bases []string
+	for _, fqcn := range h.Subtypes(springDataRepository) {
+		ci, ok := h.Lookup(fqcn)
+		if ok && ci.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) == 0 {
+			bases = append(bases, fqcn)
+		}
+	}
+	sort.Strings(bases)
+	if len(bases) == 0 {
+		return nil
+	}
+	isBase := map[string]bool{}
+	for _, b := range bases {
+		isBase[b] = true
+	}
+	baseCreators := map[string][]callgraph.MethodRef{}
+	for _, b := range bases {
+		baseCreators[b] = append(baseCreators[b], creators[b]...)
+	}
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		for _, named := range ci.NamedClasses {
+			if !isBase[named] || named == fqcn {
+				continue
+			}
+			for _, m := range ci.Methods {
+				baseCreators[named] = append(baseCreators[named], callgraph.MethodRef{FQCN: fqcn, Name: m.Name, Desc: m.Descriptor})
+			}
+		}
+	}
+	var out []callgraph.SAMEdge
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		for _, m := range ci.Methods {
+			for _, c := range m.Calls {
+				if c.Kind != classfile.CallInterface || !isRepo[c.Owner] || queryOrDefault(h, c.Owner, c.Name, c.Desc) {
+					continue
+				}
+				byDecl := map[string][]callgraph.MethodRef{}
+				var decls []string
+				for _, b := range bases {
+					cr := baseCreators[b]
+					if len(cr) == 0 {
+						continue
+					}
+					decl, declDesc, ok := baseMethodFor(h, b, c.Name, c.Desc)
+					if !ok {
+						continue
+					}
+					k := decl + "#" + declDesc
+					if _, seen := byDecl[k]; !seen {
+						decls = append(decls, k)
+					}
+					byDecl[k] = append(byDecl[k], cr...)
+				}
+				for _, k := range decls {
+					d, dd, _ := strings.Cut(k, "#")
+					out = append(out, callgraph.SAMEdge{
+						CallerFQCN: fqcn, CallerName: m.Name, CallerDesc: m.Descriptor, PC: c.PC, Kind: c.Kind,
+						TargetFQCN: d, TargetName: c.Name, TargetDesc: dd, Creators: dedupe(byDecl[k]),
+					})
+					r.ByProxy[BaseRepositoryEntry]++
+				}
+			}
+		}
+	}
+	return out
+}
+
+// queryOrDefault: the repository's own declaration of the called method is
+// a query method (an annotation named *.Query — Spring Data runs it as a
+// query even when a base class has a method of that name) or a default
+// method (it runs its own body).
+func queryOrDefault(h *hierarchy.Hierarchy, repo, name, desc string) bool {
+	decl, ok := h.ResolveExact(repo, name, desc)
+	if !ok {
+		return false
+	}
+	ci, _ := h.Lookup(decl)
+	m, ok := ci.MethodByNameAndDesc(name, desc)
+	if !ok {
+		return false
+	}
+	if !m.IsAbstract() {
+		return true
+	}
+	for _, a := range m.Annotations {
+		if strings.HasSuffix(a, ".Query") {
+			return true
+		}
+	}
+	return false
+}
+
+// baseMethodFor: the body a base repository class runs for a repository
+// method, the way Spring Data picks it — the exact descriptor, else a method
+// of that name in the class chain with as many parameters, each accepting
+// the call's (an erased type variable is Object and accepts any reference);
+// the return type is not compared. Bridges and synthetic methods are not
+// candidates.
+func baseMethodFor(h *hierarchy.Hierarchy, base, name, desc string) (decl, declDesc string, ok bool) {
+	if d, ok := h.ResolveExact(base, name, desc); ok {
+		dci, _ := h.Lookup(d)
+		if dm, ok := dci.MethodByNameAndDesc(name, desc); ok && !dm.IsAbstract() {
+			return d, desc, true
+		}
+	}
+	want, err := classfile.ParamDescriptors(desc)
+	if err != nil {
+		return "", "", false
+	}
+	for cur := base; cur != ""; {
+		ci, found := h.Lookup(cur)
+		if !found {
+			break
+		}
+		for _, m := range ci.Methods {
+			if m.Name != name || m.IsAbstract() || m.AccessFlags&(accBridge|accSynthetic) != 0 {
+				continue
+			}
+			got, err := classfile.ParamDescriptors(m.Descriptor)
+			if err != nil || len(got) != len(want) {
+				continue
+			}
+			match := true
+			for i := range got {
+				if !accepts(h, got[i], want[i]) {
+					match = false
+					break
+				}
+			}
+			if match {
+				return cur, m.Descriptor, true
+			}
+		}
+		cur = ci.SuperClass
+	}
+	return "", "", false
+}
+
+const (
+	accBridge    = 0x0040
+	accSynthetic = 0x1000
+)
+
+// accepts: a parameter of type param accepts an argument of type arg.
+func accepts(h *hierarchy.Hierarchy, param, arg string) bool {
+	if param == arg {
+		return true
+	}
+	if !strings.HasPrefix(param, "L") || !(strings.HasPrefix(arg, "L") || strings.HasPrefix(arg, "[")) {
+		return false
+	}
+	if param == "Ljava/lang/Object;" {
+		return true
+	}
+	if !strings.HasPrefix(arg, "L") {
+		return false
+	}
+	target := strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(param, "L"), ";"), "/", ".")
+	from := strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(arg, "L"), ";"), "/", ".")
+	seen := map[string]bool{}
+	var walk func(string) bool
+	walk = func(c string) bool {
+		if c == "" || seen[c] {
+			return false
+		}
+		if c == target {
+			return true
+		}
+		seen[c] = true
+		ci, ok := h.Lookup(c)
+		if !ok {
+			return false
+		}
+		if walk(ci.SuperClass) {
+			return true
+		}
+		for _, i := range ci.Interfaces {
+			if walk(i) {
+				return true
+			}
+		}
+		return false
+	}
+	return walk(from)
 }
 
 func dedupe(in []callgraph.MethodRef) []callgraph.MethodRef {
