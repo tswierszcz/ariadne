@@ -9,6 +9,7 @@ import (
 	"ariadne/internal/serviceload"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/spidispatch"
+	"ariadne/internal/springevents"
 )
 
 // Gate IDs of the coordinator's steps.
@@ -34,5 +35,6 @@ func participantCatalog() []analysis.Participant {
 		{ID: jdbcdispatch.ModelID, Version: jdbcdispatch.Version, Kind: analysis.KindGate},
 		{ID: jpadispatch.ModelID, Version: jpadispatch.Version, Kind: analysis.KindGate},
 		{ID: proxycatalog.ModelID, Version: proxycatalog.Version, Kind: analysis.KindGate},
+		{ID: springevents.ModelID, Version: springevents.Version, Kind: analysis.KindGate},
 	}
 }

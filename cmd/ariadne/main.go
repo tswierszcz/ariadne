@@ -54,6 +54,7 @@ import (
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/spidispatch"
+	"ariadne/internal/springevents"
 	"ariadne/internal/springxml"
 	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
@@ -1265,6 +1266,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	proxyGate := callgraph.NewCreatorGate(g, h, proxies.Edges, callgraph.BasisModel)
 	proxyTime := time.Since(proxyStart)
+	// Spring application events (FRAMEWORKS F4 slice 1, spring:events):
+	// a publishEvent call reaches the annotated listener methods of beans
+	// whose event type may match, once a method creating Spring's listener
+	// method adapter is reachable.
+	eventsStart := time.Now()
+	events := springevents.Find(h, springBeanTypes(springBeanNames, springBeanMethods, xmlBeanDefs, xmlInnerBeans))
+	eventsGate := callgraph.NewCreatorGate(g, h, events.Edges, callgraph.BasisModel)
+	eventsTime := time.Since(eventsStart)
 	// ROADMAP B3: the creator gates are steps of the coordinator's fixed
 	// point, alongside the registered models — a gate edge can expose a
 	// modeled call site and a model edge can make a creator reachable, in
@@ -1281,7 +1290,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1311,6 +1320,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	samApplied, objApplied, jdbcApplied, proxyApplied := applyGate(samGateID, samGate), applyGate(servletGateID, objGate), applyGate(jdbcdispatch.ModelID, jdbcGate), applyGate(proxycatalog.ModelID, proxyGate)
 	jpaApplied := applyGate(jpadispatch.ModelID, jpaGate)
+	eventsApplied := applyGate(springevents.ModelID, eventsGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1320,6 +1330,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("framework proxies (%s %s): %d MyBatis mappers, %d Spring Data repositories; %d candidates (%s), %d edges added, %d already in the graph, %d left out (no method creating the handler is reachable from the roots)%s, in %s",
 		proxycatalog.ModelID, proxycatalog.Version, len(proxies.Mappers), len(proxies.Repositories), len(proxies.Edges), proxySummary(proxies.ByProxy),
 		proxyApplied.Added, proxyApplied.Covered, proxyApplied.Gated, noCreatorSummary(proxies.NoCreator), proxyTime.Round(time.Millisecond))
+	log("Spring events (%s %s): %d listener methods (%d on beans), %d publishing sites (%d unbounded, %d forwarding left out); %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the listener adapter is reachable from the roots)%s, in %s",
+		springevents.ModelID, springevents.Version, len(events.Listeners), events.RegisteredCount(), len(events.Sites), events.UnboundedCount(), events.Forwarding,
+		len(events.Edges), eventsApplied.Added, eventsApplied.Covered, eventsApplied.Gated, eventsNoCreator(events), eventsTime.Round(time.Millisecond))
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
 		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)
@@ -1950,6 +1963,39 @@ func proxySummary(by map[string]int) string {
 		parts[i] = fmt.Sprintf("%s %d", n, by[n])
 	}
 	return strings.Join(parts, ", ")
+}
+
+// springBeanTypes are the bean types spring:events checks a listener's
+// class against: stereotype classes, @Bean products, XML beans.
+func springBeanTypes(names, methods []profile.BeanName, xml, inner []springxml.Bean) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(t string) {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	for _, b := range names {
+		add(b.FQCN)
+	}
+	for _, b := range methods {
+		add(b.FQCN)
+	}
+	for _, b := range xml {
+		add(b.Class)
+	}
+	for _, b := range inner {
+		add(b.Class)
+	}
+	return out
+}
+
+func eventsNoCreator(r springevents.Result) string {
+	if r.NoCreator {
+		return "; listener adapter never created in the input"
+	}
+	return ""
 }
 
 func noCreatorSummary(entries []string) string {

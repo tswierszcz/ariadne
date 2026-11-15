@@ -676,6 +676,72 @@ CHA expands Spring AOP's interceptor chain and target sources, so some paths
 through repositories are CHA over-approximations (petclinic/WebGoat: paths
 changed, no verdict).
 
+**Spring application events (`spring:events`, `internal/springevents`,
+version `ev1`; FRAMEWORKS F4 slice 1).** `publishEvent` goes through the
+context's multicaster to every listener whose event type matches. A class
+implementing `ApplicationListener` is called through that interface, and
+CHA already reaches it; an annotated listener method is not — Spring wraps
+it in an `ApplicationListenerMethodAdapter` whose `doInvoke` calls it
+through `Method#invoke`. The model adds an edge (basis `model`) from a
+publishing call site to every annotated listener method that may receive
+the event:
+- a publishing site is a call of `publishEvent(Object)` or
+  `publishEvent(ApplicationEvent)` on `ApplicationEventPublisher` or a
+  subtype, anywhere in the input (the context itself publishes
+  `ContextRefreshedEvent`/`ContextClosedEvent`); a publisher forwarding its
+  own parameter (a child context to its parent) is left out, and the
+  adapter's own re-publishing of a listener's return value publishes the
+  registered listeners' return types (arrays: the element type;
+  collections and futures: unknown);
+- the published type is the argument's local value: `new T(…)` is exactly
+  `T`, a parameter is followed to its callers, anything else is its static
+  type — or the `publishEvent` parameter's type (`Object`: every listener)
+  when nothing narrower is known (counted as an *unbounded* site);
+- a listener method is a method of an application class annotated
+  `@EventListener` or with an annotation meta-annotated with it
+  (`@TransactionalEventListener`); its event types are the annotation's
+  `classes`/`value`, else its one parameter's type;
+- it matches when Spring could deliver the event: the listener type is a
+  supertype of the published type (a payload that is not an
+  `ApplicationEvent` arrives wrapped in a `PayloadApplicationEvent`, so a
+  listener on that type receives it too), or, for a static bound, also a
+  subtype of it;
+- the listener's class must be related (equal, subtype, supertype) to a
+  bean type the spring profile found — a stereotype class, a `@Bean`
+  product, an XML bean; a listener on a class that is no bean gets nothing;
+- gate: a reachable method creating an `ApplicationListenerMethodAdapter`
+  (the `EventListenerFactory` implementations).
+
+The edge says the listener *may* run: a SpEL `condition`, a
+`@TransactionalEventListener`'s phase (it runs only for an event published
+in a transaction, after commit by default), an `@Async` executor and the
+event's generic type arguments are not evaluated. Listener methods of
+library classes and Spring Boot's early events (sent through the
+multicaster directly, before the context exists) are out of scope.
+The profile's annotation roots are unchanged: under `-roots profile` every
+`@EventListener` method is still a root by itself, so the model adds
+mostly paths (publisher → listener) there; a `@TransactionalEventListener`
+is no annotation root and is reached only through this edge. Since the same
+slice the `spring` profile also lists `@Schedules` as a root annotation:
+a method with two `@Scheduled` holds only their `@Repeatable` container in
+the class file, and was no root. Real-JVM oracle `testdata/events`
+(`scripts/events-oracle.sh`, `TestEventsOracle`, Spring 5.3.6): before the
+model the graph missed 5 of the 7 listener bodies the JVM ran (all but the
+`ApplicationListener` and nothing on the `@EventListener` adapter's last
+hop) and the repeated `@Scheduled` method was no root; now every one is
+reached, and the two listeners the JVM never runs (an event type nothing
+publishes; a class that is no bean) get no edge. Log line `Spring events
+(spring:events ev1): N listener methods (N on beans), N publishing sites
+(N unbounded, N forwarding left out); N candidates, N edges added, …`;
+snapshots record `spring.events`. Control app `scripts/prepare-events-demo.sh`
+(Spring Boot 2.4.3, a `@TransactionalEventListener` calling commons-text
+1.9 `StringSubstitutor#replace`): under `-roots profile` CVE-2022-42889 was
+`NOT_REACHABLE` and is now `REACHABLE` through `main` → `OrderService#place`
+→ the listener when the event is published (the JVM runs the listener), and
+stays `NOT_REACHABLE` in the variant publishing another type (the JVM does
+not run it). petclinic, WebGoat and JPetStore have no annotated listener:
+their v1 results are byte-identical (`-roots all`/`profile`, CHA/RTA).
+
 **JDBC objects (`jdbc:objects`, `internal/jdbcdispatch`, version `j2`).**
 The service-provider model reaches a driver's classes, but a real
 application rarely talks to the driver directly: Hibernate or Spring's
