@@ -131,6 +131,12 @@ type Roots struct {
 	// fixed name — a framework calls them reflectively by their shape.
 	// See Handler and handlerRoots.
 	Handlers []Handler `yaml:"handlers"`
+	// Beans: the lifecycle methods the Spring container calls on its beans
+	// reflectively — the constructor it picks, @Autowired/@Inject/
+	// @Resource/@Value methods, @PostConstruct/@PreDestroy, a @Bean's
+	// initMethod/destroyMethod — are roots, in both -roots scenarios. See
+	// BeanLifecycleRoots.
+	Beans bool `yaml:"beans"`
 }
 
 // Handler is one convention: in an app class that is Implements or one of
@@ -303,6 +309,7 @@ func merge(profiles []Profile) Profile {
 		m.Roots.ParameterAnnotations = append(m.Roots.ParameterAnnotations, p.Roots.ParameterAnnotations...)
 		m.Roots.Main = m.Roots.Main || p.Roots.Main
 		m.Roots.Handlers = append(m.Roots.Handlers, p.Roots.Handlers...)
+		m.Roots.Beans = m.Roots.Beans || p.Roots.Beans
 		m.FrameworkPackages = append(m.FrameworkPackages, p.FrameworkPackages...)
 		m.SyntheticEdges = append(m.SyntheticEdges, p.SyntheticEdges...)
 		m.Models.Disable = append(m.Models.Disable, p.Models.Disable...)

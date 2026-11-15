@@ -23,6 +23,10 @@ roots:
     - org.springframework.context.annotation.Bean
   overrides: []
   main: true
+  # The container's reflective calls into its beans: the constructor it
+  # picks, injection methods, @PostConstruct/@PreDestroy, a @Bean's
+  # initMethod/destroyMethod (ROADMAP B4 b4-7, testdata/di).
+  beans: true
 framework_packages:
   - org.apache.tomcat.embed:*
   - org.springframework:spring-web

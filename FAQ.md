@@ -284,6 +284,20 @@ that one piece.
   CVE-2020-26945 and CVE-2022-41853 become `REACHABLE` under
   `-roots profile` (as under `-roots all`), and v1 under `-roots all` and
   on petclinic/WebGoat is byte-identical.
+- **Spring beans' constructors and `@PostConstruct` are roots** (2026-11-15,
+  `roots.beans` in the `spring` profile). Spring creates a bean through
+  `Constructor#newInstance` and calls `@Autowired` setters, `@PostConstruct`/
+  `@PreDestroy` and a `@Bean`'s `initMethod`/`destroyMethod` through
+  `Method#invoke` — nothing the reflection models can resolve. A real-JVM
+  oracle (`testdata/di`) found all of them unreachable under
+  `-roots profile`, so a vulnerable call in a controller's constructor
+  could have come out `NOT_REACHABLE`. The callback interfaces
+  (`InitializingBean`, `Aware`, `FactoryBean`, post-processors, listeners)
+  were fine, because Spring calls them through interfaces CHA expands. A bean
+  whose `@Profile` is inactive under `-active-profiles` is left out; a
+  `@Conditional` or `@Lazy` bean counts, because only the running container
+  knows whether it is created. No verdict changed on petclinic, WebGoat or
+  JPetStore.
 
 ### How to prepare a project
 

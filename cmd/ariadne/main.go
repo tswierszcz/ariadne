@@ -1167,6 +1167,17 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
 		roots, webXMLRootCount = appendNewRoots(reach.AppRoots(g, h), webRoots)
 	}
+	// ROADMAP B4 b4-7: the Spring container's reflective calls into its
+	// beans (constructor, injection methods, @PostConstruct/@PreDestroy,
+	// @Bean init/destroy) are roots in both scenarios — under -roots all
+	// this adds library methods only (a @Bean's inferred close()).
+	beanRootCount := 0
+	var beanRoots []profile.BeanRoot
+	if prof.Roots.Beans {
+		beanRoots = profile.BeanLifecycleRoots(h, activeProfiles)
+		roots, beanRootCount = appendNewRoots(roots, profile.BeanLifecycleAppRoots(g, beanRoots))
+		log("spring bean lifecycle roots: %d methods (%s), %d new roots", len(beanRoots), beanRootSummary(beanRoots), beanRootCount)
+	}
 	var modelGapReasons []string
 	registry := models.NewRegistry()
 	serviceload.RegisterModel(registry)
@@ -1326,10 +1337,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	var engine *reach.Engine
 	if cfg.roots == "profile" {
-		log("roots: profile %q (%d entry-point methods, %d from web.xml)", prof.Name, len(roots), webXMLRootCount)
+		log("roots: profile %q (%d entry-point methods, %d from web.xml, %d bean lifecycle)", prof.Name, len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	} else {
-		log("roots: all (%d methods: every application method, %d more from web.xml)", len(roots), webXMLRootCount)
+		log("roots: all (%d methods: every application method, %d more from web.xml, %d more bean lifecycle)", len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	}
 	engine.SetComponents(components) // CVE:F1b: findings per affected component instance
@@ -1904,6 +1915,25 @@ func servletRegistrationSummary(regs []servletdispatch.Registration) string {
 
 // appendNewRoots appends to roots the extra roots not already in it, in
 // their order, and returns the result with how many were new.
+// beanRootSummary counts bean lifecycle roots per kind, in a fixed order.
+func beanRootSummary(roots []profile.BeanRoot) string {
+	n := map[profile.BeanRootKind]int{}
+	for _, r := range roots {
+		n[r.Kind]++
+	}
+	var parts []string
+	for _, k := range []profile.BeanRootKind{profile.BeanRootConstructor, profile.BeanRootInjection, profile.BeanRootInit,
+		profile.BeanRootDestroy, profile.BeanRootInitMethod, profile.BeanRootDestroyMeth} {
+		if n[k] > 0 {
+			parts = append(parts, fmt.Sprintf("%s %d", k, n[k]))
+		}
+	}
+	if len(parts) == 0 {
+		return "none"
+	}
+	return strings.Join(parts, ", ")
+}
+
 func appendNewRoots(roots, extra []uint32) ([]uint32, int) {
 	seen := make(map[uint32]bool, len(roots))
 	for _, r := range roots {
