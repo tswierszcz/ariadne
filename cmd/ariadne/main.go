@@ -418,11 +418,19 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 
 	// FRAMEWORKS F1: Spring classic XML bean definitions found on the
-	// app's own classpath (never a dependency jar).
+	// app's own classpath (never a dependency jar) and, since b4-8,
+	// directly under a WAR's WEB-INF/ (applicationContext.xml).
 	var springXMLBeans []report.XMLBeanRow
+	var xmlBeanDefs, xmlInnerBeans []springxml.Bean
 	beansXMLResources, beansXMLWarnings, err := input.FindBeansXML(prepared.AppClassesJar)
 	if err != nil {
 		return fmt.Errorf("scanning %s for Spring XML bean definitions: %w", prepared.AppClassesJar, err)
+	}
+	for path, data := range prepared.WebInfBeansXMLs {
+		if beansXMLResources == nil {
+			beansXMLResources = map[string][]byte{}
+		}
+		beansXMLResources[path] = data
 	}
 	if len(beansXMLResources) > 0 {
 		resources := make([]string, 0, len(beansXMLResources))
@@ -438,8 +446,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			for _, b := range parsed.Beans {
 				springXMLBeans = append(springXMLBeans, report.XMLBeanRow{Source: path, ID: b.ID, Class: b.Class, Scope: b.Scope, Primary: b.Primary})
 			}
+			xmlBeanDefs = append(xmlBeanDefs, parsed.Beans...)
+			xmlInnerBeans = append(xmlInnerBeans, parsed.Inner...)
 		}
-		log("Spring XML bean definitions: %d resource(s), %d beans found", len(resources), len(springXMLBeans))
+		log("Spring XML bean definitions: %d resource(s), %d beans found (%d inner)", len(resources), len(springXMLBeans), len(xmlInnerBeans))
 	}
 
 	var depsList []input.GAV
@@ -1175,6 +1185,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var beanRoots []profile.BeanRoot
 	if prof.Roots.Beans {
 		beanRoots = profile.BeanLifecycleRoots(h, activeProfiles)
+		beanRoots = append(beanRoots, profile.XMLBeanLifecycleRoots(h, xmlBeanDefs, xmlInnerBeans)...)
 		roots, beanRootCount = appendNewRoots(roots, profile.BeanLifecycleAppRoots(g, beanRoots))
 		log("spring bean lifecycle roots: %d methods (%s), %d new roots", len(beanRoots), beanRootSummary(beanRoots), beanRootCount)
 	}
@@ -1923,7 +1934,8 @@ func beanRootSummary(roots []profile.BeanRoot) string {
 	}
 	var parts []string
 	for _, k := range []profile.BeanRootKind{profile.BeanRootConstructor, profile.BeanRootInjection, profile.BeanRootInit,
-		profile.BeanRootDestroy, profile.BeanRootInitMethod, profile.BeanRootDestroyMeth} {
+		profile.BeanRootDestroy, profile.BeanRootInitMethod, profile.BeanRootDestroyMeth,
+		profile.XMLRootConstructor, profile.XMLRootSetter, profile.XMLRootInit, profile.XMLRootDestroy, profile.XMLRootFactory} {
 		if n[k] > 0 {
 			parts = append(parts, fmt.Sprintf("%s %d", k, n[k]))
 		}

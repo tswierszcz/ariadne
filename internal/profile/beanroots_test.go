@@ -7,6 +7,7 @@ import (
 
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/springxml"
 )
 
 const (
@@ -155,5 +156,68 @@ func TestSpringProfileHasBeanRoots(t *testing.T) {
 	}
 	if g.Roots.Beans || !merge([]Profile{g, p}).Roots.Beans {
 		t.Error("generic must not set roots.beans; a merge with spring must keep it")
+	}
+}
+
+// TestXMLBeanLifecycleRoots: constructors by argument count, setters in
+// the class and its superclasses (one parameter; not a nested path),
+// explicit, default and inferred init/destroy methods (a default that the
+// class lacks is no root), a parent chain's class and properties, a
+// static and an instance factory-method, an inner bean; nothing for an
+// abstract definition, an abstract class or a class not in the input.
+func TestXMLBeanLifecycleRoots(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		bclass("java.lang.Object", "", false, 0, nil),
+		bclass("x.Base", "java.lang.Object", true, 0, nil,
+			bmethod("setTag", "(Ljava/lang/String;)V", 0)),
+		bclass("x.Svc", "x.Base", true, 0, nil,
+			bmethod("<init>", "()V", 0),
+			bmethod("<init>", "(Lx/Repo;)V", 0),
+			bmethod("<init>", "(Lx/Repo;I)V", 0),
+			bmethod("setName", "(Ljava/lang/String;)V", 0),
+			bmethod("setName", "(Ljava/lang/String;I)V", 0),
+			bmethod("start", "()V", 0),
+			bmethod("close", "()V", 0)),
+		bclass("lib.Pool", "java.lang.Object", false, 0, nil,
+			bmethod("<init>", "()V", 0), bmethod("setUrl", "(Ljava/lang/String;)V", 0), bmethod("shutdown", "()V", 0)),
+		bclass("x.Factory", "java.lang.Object", true, 0, nil,
+			bmethod("<init>", "()V", 0),
+			bmethod("create", "()Lx/Svc;", classfile.AccStatic),
+			bmethod("create", "(I)Lx/Svc;", classfile.AccStatic),
+			bmethod("make", "()Lx/Svc;", 0)),
+		bclass("x.Abstract", "java.lang.Object", true, classfile.AccAbstract, nil, bmethod("<init>", "()V", 0)),
+		bclass("x.Inner", "java.lang.Object", true, 0, nil, bmethod("<init>", "()V", 0), bmethod("setup", "()V", 0)),
+		bclass("x.Ghost", "java.lang.Object", true, 0, nil, bmethod("<init>", "()V", 0)),
+	})
+	beans := []springxml.Bean{
+		{ID: "base", Class: "x.Svc", Abstract: true, Properties: []string{"tag"}, InitMethod: "start"},
+		{ID: "svc", Parent: "base", ConstructorArgs: 1, Properties: []string{"name", "repo.name"}, DefaultInitMethod: "setup", DestroyMethod: "(inferred)"},
+		{ID: "pool", Class: "lib.Pool", Properties: []string{"url"}, DefaultDestroyMethod: "shutdown"},
+		{ID: "made", Class: "x.Factory", FactoryMethod: "create"},
+		{ID: "factory", Class: "x.Factory"},
+		{ID: "byBean", FactoryBean: "factory", FactoryMethod: "make"},
+		{ID: "abstractClass", Class: "x.Abstract"},
+		{ID: "ghost", Class: "x.Ghost", Abstract: true},
+		{ID: "missing", Class: "x.NotThere"},
+	}
+	inner := []springxml.Bean{{Class: "x.Inner", DefaultInitMethod: "setup", DefaultDestroyMethod: "dispose"}}
+	want := []string{
+		"lib.Pool#<init>()V XML constructor",
+		"lib.Pool#setUrl(Ljava/lang/String;)V XML property setter",
+		"lib.Pool#shutdown()V XML destroy-method",
+		"x.Base#setTag(Ljava/lang/String;)V XML property setter",
+		"x.Factory#<init>()V XML constructor",
+		"x.Factory#create()Lx/Svc; XML factory-method",
+		"x.Factory#create(I)Lx/Svc; XML factory-method",
+		"x.Factory#make()Lx/Svc; XML factory-method",
+		"x.Inner#<init>()V XML constructor",
+		"x.Inner#setup()V XML init-method",
+		"x.Svc#<init>(Lx/Repo;)V XML constructor",
+		"x.Svc#close()V XML destroy-method",
+		"x.Svc#setName(Ljava/lang/String;)V XML property setter",
+		"x.Svc#start()V XML init-method",
+	}
+	if got := rootSet(XMLBeanLifecycleRoots(h, beans, inner)); !reflect.DeepEqual(got, want) {
+		t.Errorf("roots:\n got %q\nwant %q", got, want)
 	}
 }

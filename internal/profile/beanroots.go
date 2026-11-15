@@ -7,6 +7,7 @@ import (
 	"ariadne/internal/callgraph"
 	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/springxml"
 )
 
 // Spring bean lifecycle roots (Roots.Beans; ROADMAP B4 b4-7).
@@ -45,6 +46,12 @@ const (
 	BeanRootDestroy     BeanRootKind = "destroy annotation"
 	BeanRootInitMethod  BeanRootKind = "@Bean initMethod"
 	BeanRootDestroyMeth BeanRootKind = "@Bean destroyMethod"
+	// Spring XML bean definitions (b4-8).
+	XMLRootConstructor BeanRootKind = "XML constructor"
+	XMLRootSetter      BeanRootKind = "XML property setter"
+	XMLRootInit        BeanRootKind = "XML init-method"
+	XMLRootDestroy     BeanRootKind = "XML destroy-method"
+	XMLRootFactory     BeanRootKind = "XML factory-method"
 )
 
 // BeanRoot is one lifecycle method the container may call: FQCN#Name+Desc
@@ -308,6 +315,184 @@ func BeanLifecycleAppRoots(g *callgraph.Graph, roots []BeanRoot) []uint32 {
 	for _, r := range roots {
 		if id, ok := g.ID(r.FQCN, r.Name, r.Desc); ok {
 			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// XMLBeanLifecycleRoots is the same rule for Spring XML bean definitions
+// (ROADMAP B4 b4-8): the container instantiates a <bean> through
+// Constructor#newInstance, sets each <property> through its setter
+// (BeanWrapper → Method#invoke) and runs init-method/destroy-method the
+// same way — a real-JVM oracle (testdata/xmlbeans) measured all of them
+// unreachable. beans are every named definition of every bean-definitions
+// file read, inner are the anonymous ones nested in them.
+//
+// For each definition that is not abstract, after merging its parent
+// chain (class, properties, constructor arguments, init/destroy methods
+// come from the parent when the child does not set them), and whose class
+// is in the input — an application class or a library one (JPetStore
+// declares MyBatis's SqlSessionFactoryBean): every constructor taking as
+// many parameters as the definition has constructor arguments; the
+// one-parameter setter of each property, in the class or a superclass
+// (a nested path "a.b" is skipped); the init-method, else the enclosing
+// default-init-method, and the destroy-method ("(inferred)": close, else
+// shutdown), else the default-destroy-method, each a no-argument method of
+// that name. A definition made by a factory-method roots that method (all
+// overloads of the name: static on the class, or on the factory-bean's
+// class) and nothing on the product, whose class the definition does not
+// name. lazy-init and an unevaluated nested <beans profile> still count.
+func XMLBeanLifecycleRoots(h *hierarchy.Hierarchy, beans, inner []springxml.Bean) []BeanRoot {
+	byID := map[string]springxml.Bean{}
+	for _, b := range beans {
+		if b.ID != "" {
+			if _, dup := byID[b.ID]; !dup {
+				byID[b.ID] = b
+			}
+		}
+	}
+	var out []BeanRoot
+	seen := map[string]bool{}
+	add := func(rs ...BeanRoot) {
+		for _, r := range rs {
+			key := r.FQCN + "#" + r.Name + r.Desc
+			if !seen[key] {
+				seen[key] = true
+				out = append(out, r)
+			}
+		}
+	}
+	for _, raw := range append(append([]springxml.Bean{}, beans...), inner...) {
+		if raw.Abstract {
+			continue
+		}
+		b := mergeParents(raw, byID)
+		if b.FactoryMethod != "" {
+			owner, static := b.Class, true
+			if b.FactoryBean != "" {
+				owner, static = mergeParents(byID[b.FactoryBean], byID).Class, false
+			}
+			add(factoryMethods(h, owner, b.FactoryMethod, static)...)
+			continue
+		}
+		ci, ok := h.Lookup(b.Class)
+		if !ok || ci.IsInterface() || ci.AccessFlags&classfile.AccAbstract != 0 {
+			continue
+		}
+		for _, c := range ci.MethodsByName("<init>") {
+			if params, err := classfile.ParamDescriptors(c.Descriptor); err == nil && len(params) == b.ConstructorArgs {
+				add(BeanRoot{Bean: b.Class, FQCN: b.Class, Name: c.Name, Desc: c.Descriptor, Kind: XMLRootConstructor})
+			}
+		}
+		for _, prop := range b.Properties {
+			add(setters(h, b.Class, prop)...)
+		}
+		init := b.InitMethod
+		if init == "" {
+			init = b.DefaultInitMethod
+		}
+		if init != "" {
+			add(noArgMethods(h, b.Class, []string{init}, XMLRootInit)...)
+		}
+		destroy := []string{b.DestroyMethod}
+		switch b.DestroyMethod {
+		case "(inferred)":
+			destroy = inferredDestroy
+		case "":
+			destroy = []string{b.DefaultDestroyMethod}
+		}
+		if destroy[0] != "" {
+			add(noArgMethods(h, b.Class, destroy, XMLRootDestroy)...)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].FQCN != out[j].FQCN {
+			return out[i].FQCN < out[j].FQCN
+		}
+		return out[i].Name+out[i].Desc < out[j].Name+out[j].Desc
+	})
+	return out
+}
+
+// mergeParents fills what b does not set from its parent chain (cycles
+// and unknown parents end the walk).
+func mergeParents(b springxml.Bean, byID map[string]springxml.Bean) springxml.Bean {
+	visited := map[string]bool{b.ID: true}
+	props := map[string]bool{}
+	for _, p := range b.Properties {
+		props[p] = true
+	}
+	for parentID := b.Parent; parentID != "" && !visited[parentID]; {
+		visited[parentID] = true
+		p, ok := byID[parentID]
+		if !ok {
+			break
+		}
+		if b.Class == "" {
+			b.Class = p.Class
+		}
+		if b.ConstructorArgs == 0 {
+			b.ConstructorArgs = p.ConstructorArgs
+		}
+		if b.InitMethod == "" {
+			b.InitMethod = p.InitMethod
+		}
+		if b.DestroyMethod == "" {
+			b.DestroyMethod = p.DestroyMethod
+		}
+		if b.FactoryMethod == "" && b.FactoryBean == "" {
+			b.FactoryMethod, b.FactoryBean = p.FactoryMethod, p.FactoryBean
+		}
+		for _, name := range p.Properties {
+			if !props[name] {
+				props[name] = true
+				b.Properties = append(b.Properties, name)
+			}
+		}
+		parentID = p.Parent
+	}
+	return b
+}
+
+// setters: the one-parameter set<Prop> methods of class or its
+// superclasses (each overload; the nearest declaration of a descriptor).
+func setters(h *hierarchy.Hierarchy, class, prop string) []BeanRoot {
+	if prop == "" || strings.ContainsAny(prop, ".[") {
+		return nil
+	}
+	name := "set" + strings.ToUpper(prop[:1]) + prop[1:]
+	var out []BeanRoot
+	seen := map[string]bool{}
+	for cur := class; cur != ""; {
+		ci, ok := h.Lookup(cur)
+		if !ok {
+			break
+		}
+		for _, m := range ci.MethodsByName(name) {
+			params, err := classfile.ParamDescriptors(m.Descriptor)
+			if err != nil || len(params) != 1 || m.IsStatic() || m.IsAbstract() || seen[m.Descriptor] {
+				continue
+			}
+			seen[m.Descriptor] = true
+			out = append(out, BeanRoot{Bean: class, FQCN: cur, Name: m.Name, Desc: m.Descriptor, Kind: XMLRootSetter})
+		}
+		cur = ci.SuperClass
+	}
+	return out
+}
+
+// factoryMethods: every method of that name declared on owner (static or
+// not, as the definition says) — the overload Spring picks depends on the
+// constructor arguments' types.
+func factoryMethods(h *hierarchy.Hierarchy, owner, name string, static bool) []BeanRoot {
+	ci, ok := h.Lookup(owner)
+	if !ok {
+		return nil
+	}
+	var out []BeanRoot
+	for _, m := range ci.MethodsByName(name) {
+		if m.IsStatic() == static && !m.IsAbstract() {
+			out = append(out, BeanRoot{Bean: owner, FQCN: owner, Name: m.Name, Desc: m.Descriptor, Kind: XMLRootFactory})
 		}
 	}
 	return out

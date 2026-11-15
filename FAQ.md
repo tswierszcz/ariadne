@@ -298,6 +298,14 @@ that one piece.
   `@Conditional` or `@Lazy` bean counts, because only the running container
   knows whether it is created. No verdict changed on petclinic, WebGoat or
   JPetStore.
+- **And beans declared in XML?** The same rule covers
+  `<bean>` definitions (since `b4-8`): the constructor that matches the number
+  of `<constructor-arg>`s, the setter of each `<property>` (also `p:`/`c:`
+  namespaces and `parent` definitions), and `init-method`/`destroy-method`.
+  These count even for library classes, which `-roots all` otherwise never
+  roots. A WAR's `WEB-INF/applicationContext.xml` is read now too, so on
+  JPetStore MyBatis's `SqlSessionFactoryBean` setters became reachable;
+  no verdict changed.
 
 ### How to prepare a project
 

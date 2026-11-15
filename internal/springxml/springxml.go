@@ -13,22 +13,21 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strings"
 )
 
-// Bean is one `<bean>` declaration's own identity and target class —
-// scoped to exactly what FRAMEWORKS F1's own bean-name-conflict check
-// needs; `<property>`/`<constructor-arg>` wiring is not modeled here
-// (nothing in this increment consumes it, and this codebase's own
-// "don't build what nothing uses yet" rule applies).
+// Bean is one `<bean>` declaration. ID/Class/Scope/Primary serve
+// FRAMEWORKS F1's bean-name-conflict check; the rest is what the
+// container does with the bean when it creates it (ROADMAP B4 b4-8: the
+// spring profile's bean lifecycle roots) — which constructor arity it
+// calls, which properties it sets, which init/destroy methods it runs.
 type Bean struct {
 	// ID is the bean's own `id` attribute, or, when absent, its first
 	// `name` attribute value (Spring treats the two as interchangeable
 	// primary identifiers; only the first of a space/comma-separated
 	// `name` list is kept, since this package does not model bean
-	// aliases as a separate concept). "" when neither attribute is
-	// given (an anonymous inner bean, usually nested inside a
-	// `<property>` — never seen here, since this package only looks at
-	// `<beans>`' own direct `<bean>` children).
+	// aliases as a separate concept). "" for an anonymous bean (an inner
+	// bean, see BeansXML.Inner).
 	ID    string
 	Class string
 	Scope string // "" means Spring's own default ("singleton")
@@ -36,11 +35,40 @@ type Bean struct {
 	// own tie-breaker when more than one bean matches an injection
 	// point by type.
 	Primary bool
+
+	// Abstract (`abstract="true"`): a template other definitions name as
+	// `parent`; the container never instantiates it.
+	Abstract bool
+	// LazyInit (`lazy-init="true"`): created on first use only.
+	LazyInit bool
+	// Parent is the `parent` definition's name: the child inherits its
+	// class, properties, constructor arguments and init/destroy methods.
+	Parent string
+	// InitMethod/DestroyMethod are the bean's own attributes ("" when
+	// absent); DefaultInitMethod/DefaultDestroyMethod are the enclosing
+	// <beans>' default-init-method/default-destroy-method, which Spring
+	// applies only when the bean has such a method.
+	InitMethod, DestroyMethod               string
+	DefaultInitMethod, DefaultDestroyMethod string
+	// Properties are the names set through <property name> and p:name /
+	// p:name-ref attributes, in document order, without duplicates.
+	Properties []string
+	// ConstructorArgs counts <constructor-arg> elements and c: attributes.
+	ConstructorArgs int
+	// FactoryMethod/FactoryBean: the bean is made by a factory method
+	// (static on Class, or on the FactoryBean bean), not a constructor.
+	FactoryMethod, FactoryBean string
 }
 
 // BeansXML is a limited, decoded Spring bean-definitions document.
 type BeansXML struct {
+	// Beans are the named definitions: <bean> children of the root
+	// <beans> and of nested <beans> sections (a nested section's profile
+	// attribute is not evaluated — its beans count).
 	Beans []Bean
+	// Inner are the anonymous beans declared inside another bean's
+	// <property>, <constructor-arg> or collection elements.
+	Inner []Bean
 	// Skipped is every top-level <beans> child element name this
 	// package does not model (e.g. `<import>`, `<alias>`, or any
 	// namespaced element like `<context:component-scan>` — its own
@@ -50,23 +78,49 @@ type BeansXML struct {
 	Skipped []string
 }
 
-type rawBean struct {
-	ID      string `xml:"id,attr"`
-	Name    string `xml:"name,attr"`
-	Class   string `xml:"class,attr"`
-	Scope   string `xml:"scope,attr"`
-	Primary string `xml:"primary,attr"`
+const (
+	pNamespace = "http://www.springframework.org/schema/p"
+	cNamespace = "http://www.springframework.org/schema/c"
+)
+
+// node is any element, with its attributes and children, decoded whole.
+type node struct {
+	XMLName  xml.Name
+	Attrs    []xml.Attr `xml:",any,attr"`
+	Children []node     `xml:",any"`
 }
 
-// Parse decodes a Spring bean-definitions document's bytes. Only the
-// top-level children of the outermost <beans> element are inspected.
+func (n node) attr(local string) string {
+	for _, a := range n.Attrs {
+		if a.Name.Local == local && (a.Name.Space == "" || a.Name.Space == n.XMLName.Space) {
+			return a.Value
+		}
+	}
+	return ""
+}
+
+type defaults struct{ init, destroy string }
+
+func (d defaults) within(n node) defaults {
+	if v := n.attr("default-init-method"); v != "" {
+		d.init = v
+	}
+	if v := n.attr("default-destroy-method"); v != "" {
+		d.destroy = v
+	}
+	return d
+}
+
+// Parse decodes a Spring bean-definitions document's bytes: the
+// definitions under the outermost <beans> element and nested <beans>
+// sections, with their inner beans.
 func Parse(r io.Reader) (BeansXML, error) {
 	dec := xml.NewDecoder(r)
 	// dec.Entity is deliberately left nil — see the package doc comment.
 
 	var out BeansXML
 	skippedSeen := map[string]bool{}
-	enteredRoot := false
+	var root *xml.StartElement
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
@@ -79,41 +133,109 @@ func Parse(r io.Reader) (BeansXML, error) {
 		if !ok {
 			continue
 		}
-		if !enteredRoot {
+		if root == nil {
 			// The outermost element itself (<beans>) — see
 			// webxml.Parse's own doc comment for why every subsequent
 			// StartElement is necessarily a direct child.
-			enteredRoot = true
+			s := start.Copy()
+			root = &s
 			continue
 		}
-
-		if start.Name.Local == "bean" {
-			var b rawBean
-			if err := dec.DecodeElement(&b, &start); err != nil {
-				return BeansXML{}, fmt.Errorf("decoding <bean>: %w", err)
-			}
-			id := b.ID
-			if id == "" {
-				id = firstName(b.Name)
-			}
-			out.Beans = append(out.Beans, Bean{
-				ID:      id,
-				Class:   b.Class,
-				Scope:   b.Scope,
-				Primary: b.Primary == "true",
-			})
-			continue
+		var n node
+		if err := dec.DecodeElement(&n, &start); err != nil {
+			return BeansXML{}, fmt.Errorf("decoding <%s>: %w", start.Name.Local, err)
 		}
-
-		if !skippedSeen[start.Name.Local] {
-			skippedSeen[start.Name.Local] = true
-			out.Skipped = append(out.Skipped, start.Name.Local)
-		}
-		if err := dec.Skip(); err != nil {
-			return BeansXML{}, fmt.Errorf("skipping <%s>: %w", start.Name.Local, err)
+		d := defaults{}.within(node{XMLName: root.Name, Attrs: root.Attr})
+		switch n.XMLName.Local {
+		case "bean":
+			out.addBean(n, d)
+		case "beans":
+			out.addSection(n, d)
+		default:
+			if !skippedSeen[n.XMLName.Local] {
+				skippedSeen[n.XMLName.Local] = true
+				out.Skipped = append(out.Skipped, n.XMLName.Local)
+			}
 		}
 	}
 	return out, nil
+}
+
+// addSection adds a nested <beans> section's definitions.
+func (out *BeansXML) addSection(n node, d defaults) {
+	d = d.within(n)
+	for _, c := range n.Children {
+		switch c.XMLName.Local {
+		case "bean":
+			out.addBean(c, d)
+		case "beans":
+			out.addSection(c, d)
+		}
+	}
+}
+
+func (out *BeansXML) addBean(n node, d defaults) {
+	out.Beans = append(out.Beans, out.bean(n, d))
+}
+
+// bean interprets one <bean> element and collects its inner beans.
+func (out *BeansXML) bean(n node, d defaults) Bean {
+	id := n.attr("id")
+	if id == "" {
+		id = firstName(n.attr("name"))
+	}
+	b := Bean{
+		ID:                   id,
+		Class:                n.attr("class"),
+		Scope:                n.attr("scope"),
+		Primary:              n.attr("primary") == "true",
+		Abstract:             n.attr("abstract") == "true",
+		LazyInit:             n.attr("lazy-init") == "true",
+		Parent:               n.attr("parent"),
+		InitMethod:           n.attr("init-method"),
+		DestroyMethod:        n.attr("destroy-method"),
+		DefaultInitMethod:    d.init,
+		DefaultDestroyMethod: d.destroy,
+		FactoryMethod:        n.attr("factory-method"),
+		FactoryBean:          n.attr("factory-bean"),
+	}
+	seen := map[string]bool{}
+	addProp := func(name string) {
+		if name != "" && !seen[name] {
+			seen[name] = true
+			b.Properties = append(b.Properties, name)
+		}
+	}
+	for _, a := range n.Attrs {
+		switch a.Name.Space {
+		case pNamespace:
+			addProp(strings.TrimSuffix(a.Name.Local, "-ref"))
+		case cNamespace:
+			b.ConstructorArgs++
+		}
+	}
+	for _, c := range n.Children {
+		switch c.XMLName.Local {
+		case "property":
+			addProp(c.attr("name"))
+		case "constructor-arg":
+			b.ConstructorArgs++
+		}
+		out.collectInner(c, d)
+	}
+	return b
+}
+
+// collectInner finds the anonymous <bean> elements anywhere under n (a
+// <property>, a <constructor-arg>, a <list> or <map> inside them).
+func (out *BeansXML) collectInner(n node, d defaults) {
+	if n.XMLName.Local == "bean" {
+		out.Inner = append(out.Inner, out.bean(n, d))
+		return
+	}
+	for _, c := range n.Children {
+		out.collectInner(c, d)
+	}
 }
 
 // firstName returns the first of a bean's own (possibly
