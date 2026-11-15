@@ -47,6 +47,13 @@ type ResolvedInvoke struct {
 	// UnresolvedReason explains why OwnerFQCN/MethodName are "" — the
 	// Method receiver wasn't a provable valueflow.KindReflectiveMethod.
 	UnresolvedReason string
+	// ThroughParameter: resolved by REFLECTION R3 from what the calling
+	// method's callers pass as the Method parameter
+	// (ResolveThroughParameters); one entry per resolved identity.
+	ThroughParameter bool
+	// PartlyThroughParameter marks the unresolved entry R3 keeps for a
+	// site whose callers' values resolved only in part.
+	PartlyThroughParameter bool
 }
 
 // ResolveInvokes is REFLECTION R2's own receiver-resolution step: for

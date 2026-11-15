@@ -29,6 +29,7 @@ import (
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
+	"ariadne/internal/dataflow"
 	"ariadne/internal/deserialize"
 	"ariadne/internal/exploit"
 	"ariadne/internal/hierarchy"
@@ -911,6 +912,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	reflectInvokeSites := reflectinvoke.FindInvokeSites(h)
 	resolvedReflectInvokes, reflectResolveWarnings := reflectinvoke.ResolveInvokes(h, reflectInvokeSites)
 	warnings = append(warnings, reflectResolveWarnings...)
+	// REFLECTION R3 (r3-3): a Method receiver that is a parameter of the
+	// calling method, resolved from what its callers pass.
+	r3ParamIndex := dataflow.NewCallerIndex(h)
+	resolvedReflectInvokes, r3Stats, r3ParamWarnings := reflectinvoke.ResolveThroughParameters(h, r3ParamIndex, resolvedReflectInvokes)
+	r3ParamIndex.Close()
+	warnings = append(warnings, r3ParamWarnings...)
+	log("reflection through parameters (REFLECTION R3 %s): %d unresolved Method#invoke sites with a parameter receiver, %d resolved from their callers (%d partially), %d identities",
+		reflectinvoke.ThroughParametersVersion, r3Stats.ParameterSites, r3Stats.ResolvedSites, r3Stats.PartialSites, r3Stats.Targets)
 	reflectEdgeResults := reflectinvoke.FindInvokeEdges(h, resolvedReflectInvokes)
 	reflectEdgeTargets := reflectinvoke.EdgeTargets(reflectEdgeResults)
 	var reflectGraphEdges []callgraph.ReflectInvokeEdge
@@ -1367,6 +1376,18 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
 	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)
+	// REFLECTION R3 slice 3: where the receivers of the reachable
+	// unresolved reflective calls come from (report-only census).
+	r3Start := time.Now()
+	r3Index := dataflow.NewCallerIndex(h)
+	reflectCensus, r3Warnings := reflectinvoke.Provenance(h, r3Index, resolvedReflectInvokes, resolvedReflectNewInstances, engine.MethodReachable)
+	r3Index.Close()
+	warnings = append(warnings, r3Warnings...)
+	reflectCensusSummary := reflectinvoke.SummarizeProvenance(reflectCensus, 15)
+	if reflectCensusSummary != nil {
+		log("reflection census (REFLECTION R3 %s): %d reachable unresolved sites (%s), %d still convertible, in %s", reflectinvoke.ProvenanceVersion,
+			reflectCensusSummary.Sites, report.GapCounts(reflectCensusSummary.ByCategory), reflectCensusSummary.Convertible, time.Since(r3Start).Round(time.Millisecond))
+	}
 	// ROADMAP B0 b0-5: where the unbounded sites are (report-only).
 	unboundedSummary := engine.UnboundedSummary(15)
 	if unboundedSummary != nil {
@@ -1554,6 +1575,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Gaps:               runGapList,
 		GapProbe:           gapProbe,
 		UnboundedSites:     unboundedSummary,
+		ReflectionCensus:   reflectCensusSummary,
 		GapProbeRows:       reach.ProbeRows(results),
 		App:                cfg.app,
 		GeneratedAt:        time.Now(),
@@ -1639,6 +1661,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	doc.Coverage.Gaps = runGapList
 	doc.Coverage.GapProbe = gapProbe
 	doc.Coverage.UnboundedSites = unboundedSummary
+	doc.Coverage.ReflectionCensus = reflectCensusSummary
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}

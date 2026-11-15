@@ -1694,6 +1694,7 @@ itself) uses the scripts in `scripts/`:
 ./scripts/runtime-trace-jpetstore.sh  [OUT_DIR] [PORT]                  # the same for JPetStore's WAR in Jetty (jetty-runner fetched by Maven)
 ./scripts/spidispatch-oracle.sh       /path/to/jdk17-or-later/JAVA_HOME # real-JVM oracle for service-provider dispatch (testdata/spidispatch)
 ./scripts/reflection-oracle.sh        [JAVA_HOME]                       # real-JVM oracle for reflection R0–R2: method bodies that ran (testdata/reflection)
+./scripts/reflectparam-oracle.sh      [JAVA_HOME]                       # real-JVM oracle for reflection R3: Methods passed as parameters (testdata/reflectparam)
 ./scripts/servletdispatch-oracle.sh   /path/to/jdk17-or-later/JAVA_HOME [servlet-api.jar] # real-JVM servlet container dispatch oracle (testdata/servletdispatch; API jar defaults to the prepared WebGoat's)
 ./scripts/graph-benchmark.sh          [--repeat N]                      # CHA vs RTA on prepared petclinic/WebGoat: time, memory, edges, gaps, verdict changes (testdata/graphbench)
 ./scripts/serviceloader-oracle.sh                                      # real-JVM oracle for the ServiceLoader fixtures (java 11+ on PATH)
@@ -2038,11 +2039,30 @@ report:
   is never inherited, so the resolved parameter types pick exactly one
   `<init>` on the resolved class, with a related class-initialization
   edge alongside it if that class has a `<clinit>` (the same pairing
-  a `new` instruction itself already gets). `getDeclared*`'s own
-  access-check bypass/`setAccessible` (R3), a Method/Constructor
-  receiver that arrives as a method parameter rather than a field or a
-  helper-method return value, and any runtime-computed class/method
-  name remain unmodeled, so the rest of this limitation still stands.
+  a `new` instruction itself already gets). A fifth slice, REFLECTION R3 (`r3-3`, 2026-11-15): a `Method#invoke`
+  whose Method receiver is a parameter of the calling method is resolved
+  from what its callers in the input pass (`dataflow.CallerIndex`) — a
+  resolved `getMethod`/`getDeclaredMethod` fact directly, or one read from
+  a field or returned by a static helper one step away. Each resolved
+  value is an edge; when every value resolves the site stops being a
+  model gap, otherwise it stays one (partial). Measured first: on
+  petclinic and WebGoat exactly 2 sites have this shape — Thymeleaf's
+  `BinaryOperationExpression#doComposeBinaryOperationExpression`, whose
+  `isLeftAllowed`/`isRightAllowed` Methods six subclasses keep in static
+  fields (12 edges; reflection gaps 510 → 508 and 536 → 534; no verdict
+  changed); JPetStore has one partial site and no new edge. Real-JVM
+  oracle `testdata/reflectparam` (`scripts/reflectparam-oracle.sh`,
+  `TestReflectParamOracle`): 4 → 9 of 10 bodies the JVM ran; the tenth is
+  looked up by a run-time name. Every run also reports where the remaining
+  unresolved receivers come from — log "reflection census", report
+  "Unresolved reflection by receiver provenance", v2
+  `coverage.reflection_census`: mostly values the analysis does not track
+  (results of virtual calls, array elements) and fields holding them; on
+  the three apps no further site is convertible. `getDeclared*`'s own
+  access-check bypass/`setAccessible`, `Constructor#newInstance` through
+  parameters (no such site measured), and any runtime-computed
+  class/method name remain unmodeled, so the rest of this limitation still
+  stands.
 - **Seven profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus`, `stripes` and `generic`** — every framework PLAN.md section 4
   originally named for Phase 7, the `spring`/`generic` pair from the base

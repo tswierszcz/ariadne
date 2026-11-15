@@ -833,6 +833,17 @@ func (e *Engine) ReachableGaps() (reachable, unbounded int) {
 	return len(e.gaps), unbounded
 }
 
+// MethodReachable reports whether the roots reach fqcn#name+desc (the
+// FRAMEWORK pass, the one the model-gap rule uses).
+func (e *Engine) MethodReachable(fqcn, name, desc string) bool {
+	id, ok := e.g.ID(fqcn, name, desc)
+	if !ok {
+		return false
+	}
+	_, visited := e.full.path(id)
+	return visited
+}
+
 // UnboundedGapSites returns the reachable sites with no bounded candidate
 // set, in recording order (ROADMAP B0 b0-5: where they are).
 func (e *Engine) UnboundedGapSites() []GapSite {

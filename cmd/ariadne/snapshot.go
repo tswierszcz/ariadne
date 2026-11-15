@@ -31,6 +31,7 @@ import (
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/proxycatalog"
 	"ariadne/internal/reach"
+	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/resultsv2"
 	"ariadne/internal/runtimeevents"
 	"ariadne/internal/servletdispatch"
@@ -79,6 +80,8 @@ func algorithmVersions(mode string) map[string]string {
 		"spi.dispatch":     spidispatch.Version,
 		// JDBC objects: creator-gated edges in every mode.
 		"jdbc.objects": jdbcdispatch.Version,
+		// REFLECTION R3: Method receivers resolved through parameters.
+		"reflection.parameters": reflectinvoke.ThroughParametersVersion,
 		// JPA objects: creator-gated edges in every mode.
 		"jpa.objects": jpadispatch.Version,
 		// Framework proxies: creator-gated edges in every mode.
