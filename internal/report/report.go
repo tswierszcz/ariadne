@@ -37,6 +37,9 @@ type Header struct {
 	GapProbeRows []reach.ProbeRow
 	// UnboundedSites (ROADMAP B0 b0-5): where the unbounded gap sites are.
 	UnboundedSites *reach.UnboundedSummary
+	// ReflectionCensus (REFLECTION R3 r3-3): receivers of the unresolved
+	// reflective calls by provenance.
+	ReflectionCensus *reflectinvoke.ProvenanceSummary
 	App            string
 	GeneratedAt    time.Time
 	AriadneVersion string

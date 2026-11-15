@@ -27,6 +27,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/mavenversion"
 	"ariadne/internal/reach"
+	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/relocate"
 	"ariadne/internal/runtimeevents"
 	"ariadne/internal/snapshot"
@@ -354,6 +355,9 @@ type Coverage struct {
 	// with no bounded candidate set are — by component and calling method.
 	// Measurement only.
 	UnboundedSites *reach.UnboundedSummary `json:"unbounded_sites,omitempty"`
+	// ReflectionCensus (REFLECTION R3 r3-3): where the receivers of the
+	// reachable unresolved reflective calls come from. Measurement only.
+	ReflectionCensus *reflectinvoke.ProvenanceSummary `json:"reflection_census,omitempty"`
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`

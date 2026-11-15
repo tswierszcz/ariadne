@@ -1056,6 +1056,14 @@ A measurement (ROADMAP B0 {{.Version}}): where the reachable gap sites with no b
 |---|---|---|
 {{range .TopCallers}}| `{{.Method}}` | {{.Kind}} | {{.Sites}} |
 {{end}}
+{{end}}{{with .ReflectionCensus}}## Unresolved reflection by receiver provenance (report-only)
+
+A measurement (REFLECTION R3 {{.Version}}): where the `Method`/`Constructor` receiver of each reachable unresolved `Method#invoke`/`Constructor#newInstance` comes from, read in the calling method. Interprocedural propagation helps only a parameter whose callers pass a resolved member; {{.Convertible}} such sites remain (the ones found are already resolved through their callers). {{.Sites}} sites: {{gapCounts .ByCategory}}.
+
+| Provenance | Detail | Sites |
+|---|---|---|
+{{range .Details}}| {{.Category}} | {{.Detail}} | {{.Sites}} |
+{{end}}
 {{end}}## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),

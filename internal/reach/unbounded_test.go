@@ -23,7 +23,7 @@ func TestUnboundedSummary(t *testing.T) {
 		site("methodhandle", "reachfixture.AppEntry", "callsVulnerableDirectly"),
 		site("deserialization", "reachfixture.FrameworkThing", "doWork"),
 		site("reflection", "reachfixture.AppEntry", "callsFrameworkWhichCallsVulnerable", "reachfixture.VulnerableLib"), // bounded
-		site("reflection", "reachfixture.VulnerableLib", "unreachable"),                                               // not reachable
+		site("reflection", "reachfixture.VulnerableLib", "unreachable"),                                                 // not reachable
 	})
 	got := e.UnboundedSummary(2)
 	app := "reachfixture.AppEntry#callsVulnerableDirectly()V"
