@@ -30,6 +30,53 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS:F3 — proxy transakcyjne Springa (`framework:proxies` `x3`, `spring-tx:transactional`) — DONE for this scope (2026-11-15)
+
+- **Zakres (zatwierdzony 2026-11-15):** wyrocznia JVM, potem model
+  wywołań metod transakcyjnych → `TransactionInterceptor#invoke` z bramką
+  twórców; pomiar na aplikacjach referencyjnych, każda zmiana werdyktu
+  wyjaśniona.
+- **Wyrocznia:** `testdata/tx` — prawdziwe jary Spring 5.3.6 (`jcl`,
+  `core`, `beans`, `aop`, `context`, `expression`, `tx`),
+  `@EnableTransactionManagement`, własny `PlatformTransactionManager`;
+  `@Transactional` na klasie (CGLIB), na jednej metodzie, za interfejsem
+  (JDK), wyjątek (`rollback`), serwis bez adnotacji.
+  `scripts/tx-oracle.sh`, `TestTxOracle`. Przed modelem graf nie osiągał
+  **9** ciał (`TransactionInterceptor#invoke`, `$1#proceedWithInvocation`,
+  `TransactionAspectSupport` ×4, `getTransaction`/`commit`/`rollback`).
+- **Zrealizowane:** wpis `spring-tx:transactional` w
+  `internal/proxycatalog` (wersja `x2` → `x3`): metoda transakcyjna, gdy
+  `@Transactional` (Spring, `javax`/`jakarta.transaction`) jest na niej,
+  na jej klasie albo na nadtypie, który ją deklaruje (lub na nim samym);
+  tylko publiczne, niestatyczne, niefinalne; miejsce wywołania, gdy metoda
+  na właścicielu lub dowolnym konkretnym podtypie jest transakcyjna; bez
+  wywołań z tej samej klasy. Bramka: `new TransactionInterceptor` albo
+  klasa nazywająca ją literałem.
+- **Wynik:** wyrocznia — wszystkie ciała osiągalne. Kandydaci: petclinic
+  20 (repozytoria Spring Data z `@Transactional`), WebGoat 10, JPetStore 4.
+  v1: WebGoat bajtowo identyczne; petclinic — 4 ścieżki `REACHABLE`
+  (CVE-2021-46877, CVE-2022-45868, CVE-2023-6378, CVE-2026-41850) zaczynają
+  się teraz w kontrolerze i idą przez menedżera transakcji, werdykty bez
+  zmian; JPetStore `-roots profile` bez zmian, `-roots all` —
+  **CVE-2026-41850 `FRAMEWORK` → `REACHABLE`**: pierwszy krok
+  (`AccountActionBean#newAccount` → `TransactionInterceptor#invoke`)
+  prawdziwy, dalej CHA z `TransactionSynchronization#beforeCommit` do
+  adaptera `@TransactionalEventListener`, którego JPetStore nie rejestruje
+  — nadmiarowe przybliżenie CHA w spring-tx (zostaje też przy RTA, bo
+  adapter tworzy osiągalna fabryka); ścieżki 10 ustaleń `FRAMEWORK` i
+  liczniki `model_gaps` (reflection 147 → 172) się zmieniły. RTA
+  (`-roots all`): dodatkowo CVE-2022-41853 `FRAMEWORK` → `REACHABLE` przez
+  `doBegin` → `JDBCConnection#setAutoCommit` (prawdziwe) i wnętrze HSQLDB
+  (CHA).
+- **Weryfikacja:** `TestTransactionalEdges` (klasa, metoda JTA,
+  interfejs, implementacja; `final`/`static`, wywołanie wewnątrz klasy,
+  bean bez adnotacji, brak twórcy), `TestTxOracle`; `go test ./...`,
+  `go vet ./...`. Dokumentacja: README, SUPPORT.MD.
+- **Następny krok (wymaga zgody):** `org.springframework:spring-tx` (i
+  ewentualnie `spring-context`) w `framework_packages` profilu `spring`,
+  tak jak spring-beans/core/aop — ścieżka przez wnętrze spring-tx byłaby
+  wtedy `FRAMEWORK` do ręcznego przeglądu zamiast `REACHABLE`.
+
 ### FRAMEWORKS:F2 — skanowanie z XML Springa (`<mybatis:scan>`, `<context:component-scan>`): pomiar i naprawa ograniczenia — DONE for this scope (2026-11-15)
 
 - **Zakres (zatwierdzony 2026-11-15):** zmierzyć na JPetStore, co dodaje
