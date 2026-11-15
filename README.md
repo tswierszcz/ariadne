@@ -2030,11 +2030,34 @@ report:
   originally named for Phase 7, the `spring`/`generic` pair from the base
   plan, and `stripes` (2026-11-14: Stripes action beans' event handlers,
   through the convention rule `roots.handlers`, found missing by a recorded
-  JPetStore run).
+  JPetStore run). Since 2026-11-15 the `spring` profile also sets
+  `roots.beans`: the methods the Spring container calls on its beans by
+  reflection are roots in both scenarios — the constructor it picks (the
+  only one, else the `@Autowired`/`@Inject` one, else the no-argument one),
+  `@Autowired`/`@Inject`/`@Resource`/`@Value` methods, `@PostConstruct`/
+  `@PreDestroy` (also in application superclasses), and a `@Bean`'s
+  `initMethod`/`destroyMethod`, including the inferred `close()`/
+  `shutdown()` on the class the factory method returns or creates. A bean
+  is a concrete application class with a stereotype, `@Configuration` or
+  `@ControllerAdvice`; one whose `@Profile` `-active-profiles` shows
+  inactive is left out, while a `@Conditional` or `@Lazy` bean counts (the
+  container decides at run time; the rule never guesses false). Found by a
+  real-JVM oracle (`testdata/di`, `scripts/di-oracle.sh`, `TestDIOracle`,
+  Spring 5.3.6): before, the graph missed every such body — constructors,
+  an `@Autowired` setter, `@PostConstruct`, `@PreDestroy`, `@Bean`
+  init/destroy — while the callback interfaces (`InitializingBean`, the
+  `Aware` interfaces, `FactoryBean`, post-processors, `ApplicationListener`)
+  were already reached through CHA. The log line `spring bean lifecycle
+  roots: N methods (…), N new roots` counts them. Reference apps: v1
+  verdicts unchanged (petclinic 8, WebGoat 165, JPetStore 3 such methods);
+  under `-roots profile` two WebGoat paths now start at a lifecycle method
+  (`WebSecurityConfig#configureGlobal`, `@Autowired`;
+  `HSQLDBDatabaseConfig#shutdown`, `@PreDestroy`). Spring XML beans
+  (`init-method`, constructor arguments) are not covered.
   The profile system itself (auto-detection and merging, `-roots profile`,
   synthetic edges, the conditional jackson-databind rule,
   `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`/
-  `roots.handlers`,
+  `roots.handlers`/`roots.beans`,
   including CDI's `@Observes`) is implemented (see step 7 above); there is
   no `--max-dep-depth`. See [PLAN.md](PLAN.md)'s Phase 7 for what's left.
 - **An EAR's own top-level modules are never read as app code**, only as
