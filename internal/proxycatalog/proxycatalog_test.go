@@ -93,7 +93,7 @@ func TestFindMappers(t *testing.T) {
 		"applicationContext.xml": `<beans xmlns:mybatis="http://mybatis.org/schema/mybatis-spring"><mybatis:scan base-package="demo.scanned"/></beans>`,
 		"other.xml":              `<mapper namespace="demo.service.CatalogService"/>`, // a class, not an interface
 	})
-	r, err := Find(fixture(true), []appref.Jar{app})
+	r, err := Find(fixture(true), []appref.Jar{app}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestFindMappers(t *testing.T) {
 	}
 
 	// No class creating MapperProxy: no candidates, reported.
-	r, _ = Find(fixture(false), []appref.Jar{app})
+	r, _ = Find(fixture(false), []appref.Jar{app}, nil)
 	if len(r.Edges) != 0 || !reflect.DeepEqual(r.NoCreator, []string{"mybatis:mapper"}) {
 		t.Errorf("without a creator: edges %d, no-creator %v", len(r.Edges), r.NoCreator)
 	}
@@ -167,7 +167,7 @@ func TestFixedInterfacesAndCallerClass(t *testing.T) {
 		cls(template, false, meth("<init>", "()V", nil, intercep), meth("selectOne", objDesc, []classfile.Call{call(session, "selectOne", 3)})),
 		cls("demo.Dao", true, meth("load", "()V", []classfile.Call{call(em, "find", 1), call(session, "selectOne", 4), call(ownerRep, "findAll", 7)})),
 	})
-	r, err := Find(h, nil)
+	r, err := Find(h, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,6 +181,38 @@ func TestFixedInterfacesAndCallerClass(t *testing.T) {
 	for _, e := range r.Edges {
 		if e.TargetFQCN == intercep && e.CallerFQCN != template {
 			t.Errorf("SqlSession edge from %s", e.CallerFQCN)
+		}
+	}
+}
+
+// TestFindMappersInWebInfXML: a <mybatis:scan> declared in a WAR's
+// WEB-INF/applicationContext.xml — outside the class path, where JPetStore
+// keeps it — finds the mappers of the scanned package; the same file in no
+// source finds nothing, and a package outside the scan stays out.
+func TestFindMappersInWebInfXML(t *testing.T) {
+	app := writeJar(t, "app.jar", map[string]string{"demo/Empty.xml": `<beans/>`})
+	webInf := map[string][]byte{
+		"WEB-INF/applicationContext.xml": []byte(`<beans xmlns:mybatis="http://mybatis.org/schema/mybatis-spring"><mybatis:scan base-package="demo.scanned"/></beans>`),
+	}
+	r, err := Find(fixture(true), []appref.Jar{app}, webInf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, m := range r.Mappers {
+		got[m.Interface] = m.Why
+	}
+	want := map[string]string{
+		scannedMap:   "scanned by WEB-INF/applicationContext.xml",
+		annotatedMap: "@Mapper",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mappers %v, want %v (categoryMap has no XML and is outside the scan)", got, want)
+	}
+	r, _ = Find(fixture(true), []appref.Jar{app}, nil)
+	for _, m := range r.Mappers {
+		if m.Interface == scannedMap {
+			t.Error("the scanned mapper is found without the WEB-INF file")
 		}
 	}
 }

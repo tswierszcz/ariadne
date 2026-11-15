@@ -30,6 +30,38 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS:F2 — skanowanie z XML Springa (`<mybatis:scan>`, `<context:component-scan>`): pomiar i naprawa ograniczenia — DONE for this scope (2026-11-15)
+
+- **Zakres (zatwierdzony 2026-11-15):** zmierzyć na JPetStore, co dodaje
+  `WEB-INF/*.xml` (mappery z `<mybatis:scan>`, pakiety
+  `<context:component-scan>`, beany elementów przestrzeni nazw);
+  przekazać `WEB-INF/*.xml` do katalogu proxy niezależnie od wyniku;
+  zawężenie `roots.beans` przez `component-scan` i katalog beanów
+  przestrzeni nazw — tylko przy zmierzonym efekcie.
+- **Pomiar (JPetStore 6.0.2):** 7 interfejsów mapperów, każdy z XML
+  mappera — wszystkie 7 już wykrywane po `namespace`; `<mybatis:scan
+  base-package="org.mybatis.jpetstore.mapper">` nie dodaje żadnego.
+  Klasy ze stereotypem: 3 (`AccountService`, `CatalogService`,
+  `OrderService`), wszystkie w skanowanym `org.mybatis.jpetstore.service`
+  — zawężenie przez `component-scan` nie zmieniłoby niczego (nie
+  zbudowane). `<jdbc:embedded-database>`: `EmbeddedDatabaseFactoryBean#
+  afterPropertiesSet`, `EmbeddedDatabaseFactory#initDatabase`,
+  `ResourceDatabasePopulator#populate`, konfigurator HSQLDB — już
+  osiągalne (CHA). `<tx:annotation-driven>`: `TransactionInterceptor#invoke`
+  **nieosiągalny** (proxy transakcyjne wokół serwisów `@Transactional`) —
+  model proxy AOP poza tym zakresem, do osobnej propozycji.
+- **Zrealizowane:** `proxycatalog.Find(h, jars, extraXML)` czyta też
+  `PreparedApp.WebInfBeansXMLs` (skan mapperów, przestrzenie nazw
+  mapperów) — usunięte udokumentowane ograniczenie README.
+- **Wynik:** petclinic, WebGoat, JPetStore (`-roots profile` i `all`): v1
+  **bajtowo identyczne**; linia katalogu proxy JPetStore bez zmian.
+- **Weryfikacja:** `TestFindMappersInWebInfXML` (skan tylko w `WEB-INF`,
+  pakiet poza skanem, brak pliku), `TestFindMappers`; `go test ./...`,
+  `go vet ./...`. Dokumentacja: README, SUPPORT.MD.
+- **Następny krok (wymaga zgody):** model proxy transakcyjnego Springa
+  (`TransactionInterceptor` wokół beanów `@Transactional`, wyzwalany przez
+  `<tx:annotation-driven>`/`@EnableTransactionManagement`) albo inny obszar.
+
 ### GRAPH_PRECISION:P3 — wycinek 1 (`p3-1`): zawężanie odbiorników według alokacji — DONE for this scope (2026-11-15); tryb eksperymentalny
 
 - **Zakres (zatwierdzony 2026-11-15):** ograniczone points-to we wspólnej

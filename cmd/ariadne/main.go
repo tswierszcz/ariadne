@@ -1259,7 +1259,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// interfaces reach the InvocationHandler the framework's proxy runs,
 	// once a method creating that handler is reachable.
 	proxyStart := time.Now()
-	proxies, err := proxycatalog.Find(h, classPathJars)
+	proxies, err := proxycatalog.Find(h, classPathJars, prepared.WebInfBeansXMLs)
 	if err != nil {
 		warnings = append(warnings, "framework proxies: "+err.Error())
 	}
