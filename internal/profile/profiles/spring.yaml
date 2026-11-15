@@ -36,6 +36,11 @@ framework_packages:
   - org.springframework:spring-core
   - org.springframework:spring-expression
   - org.springframework:spring-aop
+  # spring-tx: since framework:proxies x3 a transactional call enters
+  # TransactionInterceptor, and CHA inside spring-tx (synchronizations,
+  # transaction managers) reaches far more than an application runs — the
+  # same "framework-mediated, review by hand" treatment as beans/core/aop.
+  - org.springframework:spring-tx
   - org.hibernate:*
   - ch.qos.logback:*
   - org.apache.logging.log4j:*

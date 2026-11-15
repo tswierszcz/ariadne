@@ -642,15 +642,17 @@ interceptor, `TransactionAspectSupport` and the transaction manager's
 `getTransaction`/`commit`/`rollback` (9 bodies), now reaches all of them.
 Reference apps: petclinic 20 call sites (its `@Transactional` Spring Data
 repositories), WebGoat 10, JPetStore 4 (`AccountService`, `OrderService`);
-four petclinic `REACHABLE` paths now start at a controller and go through
-the transaction manager. JPetStore `-roots all`: CVE-2026-41850
-`FRAMEWORK` → `REACHABLE` — the new first step is real, but the path then
-follows CHA from `TransactionSynchronization#beforeCommit` into the
-`@TransactionalEventListener` adapter, which JPetStore never registers: a
-CHA over-approximation inside spring-tx, not a measured execution. With
-`-callgraph-mode rta` also CVE-2022-41853 (HSQLDB) `FRAMEWORK` →
-`REACHABLE` through `DataSourceTransactionManager#doBegin` →
-`JDBCConnection#setAutoCommit` (real) and HSQLDB internals (CHA).
+the edges make spring-tx's internals reachable from application code, and
+CHA inside them reaches far more than an application runs (JPetStore:
+`TransactionSynchronization#beforeCommit` → the `@TransactionalEventListener`
+adapter it never registers → SpEL). So the `spring` profile also lists
+`org.springframework:spring-tx` as a framework package (like spring-beans,
+core, expression and aop): a path through it is `FRAMEWORK`, to review by
+hand. With both, every verdict on petclinic, WebGoat and JPetStore is what
+it was before `x3`; only JPetStore's `-roots all` `FRAMEWORK` paths and
+model-gap counts change (they now go through the real interceptor). Without
+spring-tx in the list, CVE-2026-41850 (JPetStore `-roots all`) and, with
+RTA, CVE-2022-41853 became `REACHABLE` through those internals.
 Each edge (basis `model`) waits for the same creator gate as the JDBC
 objects: a method creating the handler must be reachable from the roots.
 Checked in the bytecode of mybatis 3.4.1–3.5.16, mybatis-spring

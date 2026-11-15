@@ -30,6 +30,27 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS — profil `spring`: `spring-tx` jako pakiet frameworka (po `x3`) — DONE (2026-11-15)
+
+- **Zakres (zatwierdzony 2026-11-15):** dopisać
+  `org.springframework:spring-tx` do `framework_packages` profilu `spring`
+  (tylko spring-tx, bez spring-context) i zmierzyć wobec `x3`.
+- **Powód:** `x3` (prawdziwa krawędź do `TransactionInterceptor#invoke`)
+  wpuścił kod aplikacji we wnętrze spring-tx, gdzie CHA sięga daleko poza
+  wykonanie: JPetStore `-roots all` CVE-2026-41850 `FRAMEWORK` →
+  `REACHABLE` przez `TransactionSynchronization#beforeCommit` → adapter
+  `@TransactionalEventListener` (nierejestrowany), przy RTA także
+  CVE-2022-41853.
+- **Wynik:** petclinic, WebGoat (obie konfiguracje korzeni) i JPetStore
+  `-roots profile` — v1 bajtowo identyczne ze stanem sprzed `x3`;
+  JPetStore `-roots all` — statusy jak przed `x3` (CVE-2026-41850
+  `FRAMEWORK`), zmienione tylko ścieżki `FRAMEWORK` (przez prawdziwy
+  interceptor) i liczniki `model_gaps`; RTA — CVE-2022-41853 i
+  CVE-2026-41850 znów `FRAMEWORK`. Krawędzie `x3` zostają w grafie.
+- **Weryfikacja:** `TestSpringProfileFrameworksSpringTx`; `go test ./...`,
+  `go vet ./...`. Dokumentacja: README, SUPPORT.MD.
+- **Następny krok (wymaga zgody):** inny obszar.
+
 ### FRAMEWORKS:F3 — proxy transakcyjne Springa (`framework:proxies` `x3`, `spring-tx:transactional`) — DONE for this scope (2026-11-15)
 
 - **Zakres (zatwierdzony 2026-11-15):** wyrocznia JVM, potem model
