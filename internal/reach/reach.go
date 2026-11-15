@@ -833,6 +833,18 @@ func (e *Engine) ReachableGaps() (reachable, unbounded int) {
 	return len(e.gaps), unbounded
 }
 
+// UnboundedGapSites returns the reachable sites with no bounded candidate
+// set, in recording order (ROADMAP B0 b0-5: where they are).
+func (e *Engine) UnboundedGapSites() []GapSite {
+	var out []GapSite
+	for _, g := range e.gaps {
+		if g.unbounded {
+			out = append(out, g.site)
+		}
+	}
+	return out
+}
+
 // ReachableGapsByKind counts the reachable unresolved sites by kind.
 func (e *Engine) ReachableGapsByKind() map[string]int {
 	out := map[string]int{}

@@ -1367,6 +1367,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
 	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)
+	// ROADMAP B0 b0-5: where the unbounded sites are (report-only).
+	unboundedSummary := engine.UnboundedSummary(15)
+	if unboundedSummary != nil {
+		log("unbounded gap sites (ROADMAP B0 %s): %d sites in %d distinct methods; the %d busiest hold %d; %d components (most: %s %d)",
+			unboundedSummary.Version, unboundedSummary.Sites, unboundedSummary.Callers, unboundedSummary.TopN, unboundedSummary.TopCallerSites,
+			len(unboundedSummary.ByComponent), unboundedSummary.ByComponent[0].Component, unboundedSummary.ByComponent[0].Sites)
+	}
 	webAssets := map[string]bool{}
 	for _, dj := range depJars {
 		if dj.WebAssetsOnly && dj.GAV != nil {
@@ -1546,6 +1553,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	header := report.Header{
 		Gaps:               runGapList,
 		GapProbe:           gapProbe,
+		UnboundedSites:     unboundedSummary,
 		GapProbeRows:       reach.ProbeRows(results),
 		App:                cfg.app,
 		GeneratedAt:        time.Now(),
@@ -1630,6 +1638,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
 	doc.Coverage.Gaps = runGapList
 	doc.Coverage.GapProbe = gapProbe
+	doc.Coverage.UnboundedSites = unboundedSummary
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}

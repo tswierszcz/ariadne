@@ -133,6 +133,19 @@ its own axis.
   unbounded sites — 611 / 681 / 161 reachable — already mark everything), and the skipped
   receivers land in **every** instance (hundreds to thousands of calls each, also without
   `Object` methods): as a rule term they carry no information. The rule stays as it is.
+- **Where the unbounded sites are (ROADMAP B0 b0-5, 2026-11-15, report-only).** v2
+  `coverage.unbounded_sites` (`sites`, `callers`, `by_kind`, `by_component`, `top_callers`
+  with `top_n`/`top_caller_sites`; report "Unbounded gap sites") groups the reachable sites
+  with no bounded candidate set by the calling class's component and calling method. A
+  site can only be bounded by a model of what its caller dispatches to; measured on the
+  default runs they are a long tail — petclinic 611 sites in 477 distinct methods (40
+  components), WebGoat 681 in 549 (55), JPetStore 161 in 129 (14); the 15 busiest methods
+  hold 82 / 83 / 44. The reflective dispatchers ariadne already models elsewhere (Spring
+  bean creation/lifecycle, `RepositoryMethodInvoker`, Spring ORM handlers,
+  `InvocableHandlerMethod`, Stripes) hold 25 / 25 / 19: bounding them would leave every
+  `NOT_REACHABLE` finding marked, so they stay unbounded and the rule stays report-only.
+  Making it selective needs a general bound on unresolved reflection (REFLECTION R3/R4,
+  GRAPH_PRECISION P3), not a catalog.
 
 ## 5. JSON compatibility
 

@@ -1406,6 +1406,24 @@ reach every instance — so the rule is unchanged ([contract
 §4](docs/RESULTS_CONTRACT.MD)). No verdict or reason code depends on it; v1
 is byte-identical.
 
+**Unbounded gap sites (ROADMAP B0 b0-5).** The sites that make the rule
+mark everything are the reachable ones with no bounded candidate set —
+unresolved `Method#invoke`/`Constructor#newInstance`, `MethodHandle`
+calls, deserialization entries. Every run reports where they are: the log
+line "unbounded gap sites", the report's "Unbounded gap sites" section (by
+the calling class's component and by calling method) and v2
+`coverage.unbounded_sites`. A site could only be bounded by a model of
+what its calling method dispatches to, so the measurement asks whether a
+few dispatchers hold most of them. They do not: petclinic 611 sites in 477
+distinct methods across 40 components (Tomcat 98, Byte Buddy 88, Hibernate
+79, …; the 15 busiest methods hold 82), WebGoat 681 in 549 across 55,
+JPetStore 161 in 129 across 14. The framework dispatchers ariadne already
+models (Spring bean creation and lifecycle, Spring Data's
+`RepositoryMethodInvoker`, Spring ORM's handlers, Spring MVC's handler
+invocation, Stripes) hold 25, 25 and 19 of them — bounding all of those
+would leave every `NOT_REACHABLE` finding marked, so no such catalog was
+built. Report-only; v1 is byte-identical.
+
 **Outputs are written together (CVE:F9a).** The report, the results
 file and a `-snapshot-out` manifest are rendered first and written only
 at the end of a successful run, all or nothing — a run that fails

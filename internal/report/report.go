@@ -33,8 +33,10 @@ type Header struct {
 	Gaps []gaps.Gap
 	// GapProbe and GapProbeRows (ROADMAP B0 b0-4): the report-only
 	// measurement of model-gap rule variants over NOT_REACHABLE findings.
-	GapProbe       *reach.ProbeSummary
-	GapProbeRows   []reach.ProbeRow
+	GapProbe     *reach.ProbeSummary
+	GapProbeRows []reach.ProbeRow
+	// UnboundedSites (ROADMAP B0 b0-5): where the unbounded gap sites are.
+	UnboundedSites *reach.UnboundedSummary
 	App            string
 	GeneratedAt    time.Time
 	AriadneVersion string
