@@ -20,8 +20,8 @@ const (
 	ModeCHA = "cha"
 )
 
-// Modes lists the implemented modes (ModeRTA: rta.go).
-var Modes = []string{ModeCHA, ModeRTA}
+// Modes lists the implemented modes (ModeRTA: rta.go; ModePTA: prune.go and internal/pta).
+var Modes = []string{ModeCHA, ModeRTA, ModePTA}
 
 // Unknown-allocation policies (GRAPH_PRECISION P0 contract). A strategy
 // that narrows dispatch by the types it knows can be created (RTA) must
@@ -204,6 +204,8 @@ func StrategyFor(mode string) (Strategy, error) {
 		return CHA{}, nil
 	case ModeRTA:
 		return RTA{}, nil
+	case ModePTA:
+		return PTA{}, nil
 	}
 	return nil, fmt.Errorf("unknown call-graph mode %q (implemented: %s)", mode, strings.Join(Modes, ", "))
 }

@@ -43,6 +43,7 @@ import (
 	"ariadne/internal/models"
 	"ariadne/internal/profile"
 	"ariadne/internal/proxycatalog"
+	"ariadne/internal/pta"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/report"
@@ -151,7 +152,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.snapshotIn, "snapshot-in", "", "replay a data snapshot: every lookup is answered from it (no cache, no network); inputs, analyzer and algorithm versions must match it")
 	fs.StringVar(&cfg.snapshotCompare, "snapshot-compare", "", "compare this run with an earlier snapshot: list the advisories whose derived results were invalidated, and why")
 	fs.BoolVar(&cfg.refresh, "refresh", false, "revalidate every cached OSV/advisory response now, whatever its age (CVE:F2); never re-asks an LLM; not with -offline")
-	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback)`)
+	fs.StringVar(&cfg.callgraphMode, "callgraph-mode", callgraph.ModeCHA, `call-graph strategy for virtual/interface dispatch (GRAPH_PRECISION P0/P2): "cha" (class hierarchy analysis, the default) or "rta" (opt-in: CHA narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback) or "pta" (opt-in, GRAPH_PRECISION P3: RTA, then each CHA call site whose receiver's allocated types are proven is narrowed to the targets those types select)`)
 	fs.StringVar(&cfg.graphOut, "graph-out", "", "write the final call graph (every edge with a stable identity, its call-site PCs, the graph's settings and the findings' paths) as sorted text to this file, for -graph-compare")
 	fs.StringVar(&cfg.jdkHome, "jdk-home", "", "the target runtime's installation directory (CVE:F8a): its release file identifies vendor, version, OS and architecture; nothing is run, and the scanner's own JDK is never assumed. Exclusive with -runtime-file")
 	fs.StringVar(&cfg.openjdkCatalog, "openjdk-catalog", "", "use this curated OpenJDK advisory catalog (YAML, from cmd/openjdk-catalog) instead of the embedded one (CVE:F8b) — e.g. to check a draft before committing it")
@@ -817,6 +818,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		case callgraph.RTA:
 			s.Exclude, s.ExcludeRule = exclude, rule
 			strategy = s
+		case callgraph.PTA:
+			s.Exclude, s.ExcludeRule = exclude, rule
+			strategy = s
 		}
 	}
 	log("building call graph (mode %s)", strategy.Mode())
@@ -1341,7 +1345,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// edges to the classes created by reachable code, after every model
 	// edge is in and before reachability is analyzed.
 	var rtaResult *callgraph.RTAResult
-	if strategy.Mode() == callgraph.ModeRTA {
+	if m := strategy.Mode(); m == callgraph.ModeRTA || m == callgraph.ModePTA {
 		rtaStart := time.Now()
 		providers := []string{}
 		for _, r := range svcRegs {
@@ -1353,6 +1357,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		log("RTA (GRAPH_PRECISION P2, %s): %d reachable methods, %d live classes (%d only by the unknown-allocation fallback); %d of %d CHA edges removed, %d kept only by the fallback; active unknown-allocation gaps: %s; in %s",
 			res.Version, res.ReachableMethods, res.LiveClasses, res.FallbackClasses, res.CHAEdgesRemoved, res.CHAEdgesBefore, res.CHAEdgesFallback,
 			report.GapCounts(res.ActiveGaps), time.Since(rtaStart).Round(time.Millisecond))
+	}
+	// GRAPH_PRECISION P3 (opt-in -callgraph-mode pta): narrow each CHA
+	// call site whose receiver's allocated types are proven.
+	var ptaResult *pta.Result
+	if strategy.Mode() == callgraph.ModePTA {
+		res, ptaWarnings := pta.Narrow(g, h, roots)
+		warnings = append(warnings, ptaWarnings...)
+		ptaResult = &res
+		log("receiver narrowing (GRAPH_PRECISION P3, %s): %d reachable methods with CHA call sites, %d sites, %d with a proven receiver (%s), %d narrowed; %d of %d CHA edges removed (%d sites); in %s",
+			res.Version, res.CallerMethods, res.Sites, res.Proven, report.GapCounts(res.ProofBy), res.Narrowed, res.CHAEdgesRemoved, res.CHAEdgesBefore, res.CHASitesRemoved, res.Duration)
 	}
 
 	var engine *reach.Engine
@@ -1654,7 +1668,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
 		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
-		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult},
+		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult, PTA: ptaResult},
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
 	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)

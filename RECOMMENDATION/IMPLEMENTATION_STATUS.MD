@@ -22,13 +22,55 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation site; SAM-call materialization 2026-11-09; PR #30, [L1 zarchiwizowane](../archive/2026-11-09/dynamic_linkage/DYNAMIC_LINKAGE_L1.md)), L2 (same-method + static-field case): DONE; L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | L1: lambda/method reference uruchamiana przez interfejs funkcyjny w innej metodzie niż tworząca dostaje krawędź `sam` (`internal/samcall`, builder `4`); na śladzie petclinic luki `sam-call` 50 → 22 (12 z nich to nie lambdy). L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat (pola instancyjne / wynik innego wywołania). |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
-| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: UNASSESSED (nieuzasadnione wynikami P4); trzecia aplikacja pomiarowa JPetStore (WAR, 2026-11-09): żaden model nie zmienia werdyktu, 3 fałszywe negatywy domyślnego `-roots all` (korzenie web.xml, naprawione); 2026-11-10: ręczne mapowania HSQLDB/log4j 1.2 (7 sinków) — 3 artefakty CHA przez appendery log4j, RTA poprawne, `j1` bez wpływu; WebGoat: CVE-2022-41853 `REACHABLE` (lekcja SQLi wykonuje SQL z żądania) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
+| GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: wycinek 1 (`p3-1`, 2026-11-15) DONE for this scope — eksperymentalny tryb `-callgraph-mode pta`, 1–3,4 % krawędzi CHA ponad RTA, 0 zmian werdyktów, 2,7–3,7× czasu RTA; trzecia aplikacja pomiarowa JPetStore (WAR, 2026-11-09): żaden model nie zmienia werdyktu, 3 fałszywe negatywy domyślnego `-roots all` (korzenie web.xml, naprawione); 2026-11-10: ręczne mapowania HSQLDB/log4j 1.2 (7 sinków) — 3 artefakty CHA przez appendery log4j, RTA poprawne, `j1` bez wpływu; WebGoat: CVE-2022-41853 `REACHABLE` (lekcja SQLi wykonuje SQL z żądania) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
 | RUNTIME_NATIVE | [N0–N5](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) | N0, N1: DONE (2026-11-08; PR #24, [zarchiwizowane](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)); N2–N5: UNASSESSED | Przyczyny luk grafu względem śladu (`g1`, PR #28, addendum w archiwum N0–N1): na petclinic wskazały defekt CHA (naprawiony, PR #29) i wywołania SAM (L1, PR #30). `-runtime-filter-out`: ustawienia JFR śledzące wszystkie podatne metody ustaleń — petclinic: 505 metod / 91 advisories, 26 wykonanych (3/3 REACHABLE, 23/74 FRAMEWORK, CVE-2025-35036 NOT_REACHABLE), 65 śledzonych bez wejścia. Kontrakt śladu `ariadne-runtime-trace-1` i importer `-runtime-trace` (dopasowanie po hashach klas, definicje per loader, wywołania vs graf statyczny, podatne metody zaobserwowane per ustalenie); rejestrator z JFR bez agenta. petclinic: CVE-2024-38809 śledzone ~1 400 razy, CVE-2025-35036 wykonane mimo NOT_REACHABLE (luka `javax.validation` SPI). Graf i werdykty bez zmian. Szczegóły we wpisie RUNTIME_NATIVE:N0–N1. |
 | ECOSYSTEMS | [E0–E4](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) | UNASSESSED | Osobny pilot; nie jest warunkiem ulepszania JVM. |
 
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### GRAPH_PRECISION:P3 — wycinek 1 (`p3-1`): zawężanie odbiorników według alokacji — DONE for this scope (2026-11-15); tryb eksperymentalny
+
+- **Zakres (zatwierdzony 2026-11-15):** ograniczone points-to we wspólnej
+  domenie wartości D2/D3, opt-in `-callgraph-mode pta` nad RTA, wyrocznia
+  JVM z przypadkami z kryteriów „Gotowe”, pomiar z regułą stopu i decyzją
+  o trybie.
+- **Zrealizowane:** `internal/pta` (wersja `p3-1`, `callgraph.pta` w
+  snapshotach, v2 `callgraph.pta`, log „receiver narrowing”); strategia
+  `callgraph.PTA` (RTA z własną nazwą trybu), `Graph.PruneCHASites`.
+  Dowód typu odbiornika w miejscu CHA osiągalnej metody: `new` w tej samej
+  metodzie (klucz alokacji = miejsce `new`), złączenie takich wartości
+  (≤ 8 klas), wynik statycznej fabryki, wartość pola `final` (zapisują je
+  tylko `<clinit>`/konstruktory), parametr metody statycznej/prywatnej/
+  konstruktora, jeśli wszyscy wywołujący są w wejściu (nie korzeń, brak
+  krawędzi refleksji/modelu do niej); głębokość ≤ 3; bez kontekstu
+  wywołań. Brak dowodu (element tablicy, wynik wywołania wirtualnego,
+  pole niefinalne, pole zapisane z parametru konstruktora, klasa, dla
+  której wybór metody JVM jest nieznany — tablica lub spoza wejścia) →
+  miejsce zachowuje cele RTA. Dowód nie zależy od krawędzi grafu, więc
+  jeden przebieg jest punktem stałym.
+- **Wyrocznia:** `testdata/pta` (`scripts/pta-oracle.sh`, `TestPTAOracle`):
+  dla każdego z 9 miejsc wywołania `Shape#area` RTA daje wszystkie trzy
+  cele; PTA zawęża dwa odbiorniki, pole `final`, fabrykę, parametr i
+  fabrykę z dwiema alokacjami, zostawia trzy cele dla tablicy, pola
+  niefinalnego i pola z parametru konstruktora; każde z 10 wywołań JVM
+  pozostaje krawędzią.
+- **Pomiar** (`testdata/graphbench/RESULTS.MD`): ponad RTA petclinic
+  7 062 / 7 991 krawędzi CHA (3,4 %), WebGoat 9 555 / 12 302 (2,6–2,9 %),
+  JPetStore 292 / 299 (1,0 %) przy `-roots profile` / `all`; **0 zmian
+  werdyktów**; 2 ścieżki WebGoat (`-roots all`) przeszły na inną prawdziwą
+  trasę — usunięte krawędzie `ClearSiteDataHeaderWriter` →
+  `MvcRequestMatcher`/`ELRequestMatcher` są artefaktami CHA (pole
+  `private final` = `new SecureRequestMatcher()`); koszt 2,7–3,7× czasu
+  RTA, +30–45 % pamięci. Dowody: najczęściej pola `final` (~60 %).
+- **Decyzja:** tryb zostaje eksperymentalny (opt-in), domyślny CHA bez
+  zmian; większa czułość nieuzasadniona.
+- **Weryfikacja:** `TestPTAOracle`, `TestPruneCHASites`,
+  `TestStrategyForPTA`; `go test ./...`, `go vet ./...`. Dokumentacja:
+  README, SUPPORT.MD, plan P3, RESULTS.MD.
+- **Następny krok (wymaga zgody):** `<mybatis:scan>`/
+  `<context:component-scan>` z XML albo inny obszar.
 
 ### REFLECTION:R3 — wycinek 3 (`r3-3`): spis pochodzenia odbiorców i `Method` przez parametry — DONE for this scope (2026-11-15)
 

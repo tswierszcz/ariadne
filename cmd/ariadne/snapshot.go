@@ -30,6 +30,7 @@ import (
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/proxycatalog"
+	"ariadne/internal/pta"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/resultsv2"
@@ -106,9 +107,12 @@ func algorithmVersions(mode string) map[string]string {
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the
 	// derivation (CHA: report-only, left out so CHA snapshots don't churn).
-	if mode == callgraph.ModeRTA {
+	if mode == callgraph.ModeRTA || mode == callgraph.ModePTA {
 		v["alloc.catalog"] = alloc.CatalogVersion
 		v["callgraph.rta"] = callgraph.RTAVersion
+	}
+	if mode == callgraph.ModePTA {
+		v["callgraph.pta"] = pta.Version
 	}
 	return v
 }

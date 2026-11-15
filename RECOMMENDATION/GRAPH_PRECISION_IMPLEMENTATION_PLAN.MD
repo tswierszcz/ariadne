@@ -27,6 +27,8 @@ po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## P3. Ograniczona analiza points-to
 
+**Stan (2026-11-15):** wycinek 1 (`p3-1`) DONE for this scope — zawężanie odbiorników według alokacji jako eksperymentalny tryb `-callgraph-mode pta` (`internal/pta`); wyrocznia `testdata/pta`; pomiar w `testdata/graphbench/RESULTS.MD`. Większa czułość (kontekst wywołań, pola niefinalne, zawartość tablic) nieuzasadniona pomiarem.
+
 Zależności: DATA_FLOW D3; P2 jest przydatnym baseline, nie koniecznym fundamentem każdej implementacji points-to.
 
 - Rozszerzyć wspólną domenę obiektów, nie budować drugiego interpreter stosu. Klucz alokacji i przyjęta czułość kontekstu muszą być jawne.
