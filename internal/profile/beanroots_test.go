@@ -221,3 +221,21 @@ func TestXMLBeanLifecycleRoots(t *testing.T) {
 		t.Errorf("roots:\n got %q\nwant %q", got, want)
 	}
 }
+
+// TestSpringProfileFrameworksSpringTx: spring-tx is a framework package of
+// the spring profile — a path through TransactionInterceptor's internals
+// (framework:proxies x3) is FRAMEWORK, to review by hand, like one through
+// spring-beans/core/aop.
+func TestSpringProfileFrameworksSpringTx(t *testing.T) {
+	c, err := LoadDefaultCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _ := c.Get("spring")
+	for _, fp := range p.FrameworkPackages {
+		if fp.Pattern == "org.springframework:spring-tx" && len(fp.WhenAnnotation) == 0 {
+			return
+		}
+	}
+	t.Error("spring profile: org.springframework:spring-tx is not an unconditional framework package")
+}
