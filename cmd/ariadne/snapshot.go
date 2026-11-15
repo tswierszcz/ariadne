@@ -26,6 +26,7 @@ import (
 	"ariadne/internal/exploit"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/jdbcdispatch"
+	"ariadne/internal/jpadispatch"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/proxycatalog"
@@ -78,6 +79,8 @@ func algorithmVersions(mode string) map[string]string {
 		"spi.dispatch":     spidispatch.Version,
 		// JDBC objects: creator-gated edges in every mode.
 		"jdbc.objects": jdbcdispatch.Version,
+		// JPA objects: creator-gated edges in every mode.
+		"jpa.objects": jpadispatch.Version,
 		// Framework proxies: creator-gated edges in every mode.
 		"framework.proxies": proxycatalog.Version,
 		// ROADMAP B3: how models and the creator gates reach their joint

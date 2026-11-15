@@ -555,7 +555,7 @@ The IDs are `jdk:service-loader-classpath-provider`,
 `jdk:service-loader-consumption`, `jdk:service-loader-provider-dispatch`,
 `servlet-container:dispatch`, `service-provider:dispatch` (models) and
 `dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
-`framework:proxies` (gates). An ID the analyzer does not know stops the run
+`jpa:objects`, `framework:proxies` (gates). An ID the analyzer does not know stops the run
 with the list of known ones; profiles merged by auto-detection disable the
 union of their lists; the embedded profiles disable nothing. A disabled
 model is removed from the registry and a disabled gate adds no edge. The
@@ -585,7 +585,10 @@ scans) → `MapperProxy#invoke`; `SqlSessionTemplate`'s calls on its
 **Spring Data repository** interface → `JdkDynamicAopProxy#invoke`;
 `EntityManager` → Spring ORM's shared and extended EntityManager handlers,
 `Query`/`TypedQuery`/`StoredProcedureQuery` → its deferred-query handler,
-`EntityManagerFactory` → the managed factory handler (javax and jakarta).
+`EntityManagerFactory` → the managed factory handler (javax and jakarta;
+all four handlers reached exactly as Spring ORM 5.3.6 runs them on a real
+JVM, `testdata/jpa`; the provider behind them is reached by `jpa:objects`
+below).
 Since `x2` a Spring Data repository call also reaches the **base
 repository** body (`spring-data:base-repository`): Spring Data's proxy
 runs it through `RepositoryMethodInvoker` → `Method#invoke`, which no
@@ -652,6 +655,29 @@ candidates, N edges added, …` counts them; snapshots record
 `java.sql`/`javax.sql` relations the graph missed is an edge now, and the
 `java.sql.Driver#connect` relation behind them follows
 ([TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)).
+
+**JPA objects (`jpa:objects`, `internal/jpadispatch`, version `e1`).** The
+same gate for `javax.persistence` `EntityManager`, `EntityManagerFactory`,
+`Query`, `TypedQuery`, `StoredProcedureQuery` and `EntityTransaction`: a
+virtual/interface call on one of them gets a `model` edge to the body every
+concrete implementation in the input runs for it, once a method creating
+that implementation is reachable — the provider's entity manager once its
+factory's `createEntityManager` runs, a query once `createQuery` runs.
+Behind Spring ORM's proxies (the `framework:proxies` `spring-orm:*`
+entries) the handler reaches the provider's object through `Method#invoke`
+on its target, which no literal resolves: the real-JVM oracle
+`testdata/jpa` (`scripts/jpa-oracle.sh`, `TestJPAOracle`; Spring ORM
+5.3.6 over a minimal provider instead of Hibernate) ran all four handlers
+and four provider bodies, and the graph reached the handlers only. The
+service-provider model already covers a provider registered in
+`META-INF/services/javax.persistence.spi.PersistenceProvider`, but only in
+its own jars and only for calls it reaches; this model is not tied to the
+registration. `jakarta.persistence` is not listed: it is not under the
+skip rule, so CHA already expands it. On petclinic and WebGoat (Hibernate
+5.4) it adds 139/138 edges (Hibernate's queries, `SessionImpl#find`/
+`remove`/`flush`, …); verdicts are byte-identical in v1, also under RTA.
+The log line is `JPA objects (jpa:objects e1): …`; snapshots record
+`jpa.objects`.
 
 CHA's own targets follow the same rule (builder version `3`): for a
 virtual/interface call on `T`, every subtype of `T` declaring the method,
