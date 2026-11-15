@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"ariadne/internal/callgraph"
+	"ariadne/internal/classfile"
+	"ariadne/internal/hierarchy"
 )
 
 // TestPathEvidence (ROADMAP B0/B1): a positive result's path is rebuilt
@@ -68,5 +70,37 @@ func TestBasisCharacterAndLines(t *testing.T) {
 	}
 	if s := r.PathSummary(); s != "2 steps: jvm_rule 1, heuristic 1" {
 		t.Errorf("summary = %q", s)
+	}
+}
+
+// TestPathEvidenceCondition (ASYNC_CALLBACKS A3): a callback edge's
+// condition (an exceptionally branch) is kept in the step's evidence and
+// shown on the report's arrow.
+func TestPathEvidenceCondition(t *testing.T) {
+	var methods []hierarchy.Method
+	for _, n := range []string{"m", "recover", "then"} {
+		methods = append(methods, hierarchy.Method{Method: classfile.Method{Name: n, Descriptor: "()V"}})
+	}
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{{FQCN: "a.A", SuperClass: "java.lang.Object", Methods: methods, IsApp: true}})
+	g := callgraph.Build(h, nil)
+	callgraph.ApplyCallbackEdges(g, []callgraph.CallbackEdge{
+		{CallerFQCN: "a.A", CallerName: "m", CallerDesc: "()V", PC: 7, TargetFQCN: "a.A", TargetMethod: "recover", TargetMethodDesc: "()V", Condition: "exceptional"},
+		{CallerFQCN: "a.A", CallerName: "m", CallerDesc: "()V", PC: 3, TargetFQCN: "a.A", TargetMethod: "then", TargetMethodDesc: "()V"},
+	})
+	steps, _ := pathEvidence(g, []string{"a.A#m()V", "a.A#recover()V"})
+	if len(steps) != 1 || len(steps[0].Evidence) != 1 || steps[0].Evidence[0].Condition != "exceptional" || steps[0].Evidence[0].PCs[0] != 7 {
+		t.Fatalf("evidence = %+v", steps)
+	}
+	r := Result{Path: []string{"a.A#m()V", "a.A#recover()V"}, PathEdges: steps}
+	if l := r.PathLines()[1]; l != " →[library_model: callback, if exceptional] a.A#recover()V" {
+		t.Errorf("line = %q", l)
+	}
+	steps, _ = pathEvidence(g, []string{"a.A#m()V", "a.A#then()V"})
+	if steps[0].Evidence[0].Condition != "" {
+		t.Errorf("unconditional edge has condition %q", steps[0].Evidence[0].Condition)
+	}
+	b, _ := json.Marshal(steps[0].Evidence[0])
+	if strings.Contains(string(b), "condition") {
+		t.Errorf("unconditional evidence JSON carries condition: %s", b)
 	}
 }

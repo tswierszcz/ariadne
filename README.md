@@ -1467,8 +1467,8 @@ all; `model`: a reachable call site connected to a modeled target
 (the B3 registry models — ServiceLoader, servlet container dispatch,
 service-provider dispatch — and the creator-gated models: servlet and JDBC
 objects, framework proxies);
-`callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged` registration connected to the
-callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
+`callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged`/`CompletionStage` registration connected to the
+callback's own method, ASYNC_CALLBACKS A2/A3; `methodhandle`:
 a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,
 DYNAMIC_LINKAGE L2; `deserialization`: a Java serialization entry
 connected to a serialization callback, DESERIALIZATION Z1) and, when there
@@ -1900,11 +1900,47 @@ report:
   straight to its own implementation method (DYNAMIC_LINKAGE L0/L1)
   (ASYNC_CALLBACKS A1 — "Callback identities resolved" section), and a
   real call-graph edge connects the registration site to that method
-  (ASYNC_CALLBACKS A2 — "Callback call-graph edges" section). Nothing
-  beyond the registration→callback edge itself is modeled
-  (`CompletionStage`, listeners, reactive operators), and a lambda whose
-  own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
-  left unresolved rather than guessed at.
+  (ASYNC_CALLBACKS A2 — "Callback call-graph edges" section). Since
+  ASYNC_CALLBACKS A3 slice 1 the catalog also holds every
+  callback-taking method of `CompletionStage`, on the interface and as
+  `CompletableFuture` overrides it (`thenApply`/`thenAccept`/`thenRun`,
+  `thenCombine`/`thenAcceptBoth`/`runAfterBoth` and the `*Either` forms —
+  the callback is then the second argument — `thenCompose`, `handle`,
+  `whenComplete`, `exceptionally`, each with its `*Async` and
+  `*Async(…, Executor)` forms), `CompletableFuture`'s
+  `exceptionallyAsync`/`exceptionallyCompose*` (Java 12+) and
+  `supplyAsync`/`runAsync`. A plain continuation is `immediate-or-async`
+  (it runs on the registering thread when the stage is already complete),
+  an `*Async` one and a source `async-maybe`. `exceptionally*` callbacks
+  run only when the previous stage fails: their edges carry the condition
+  `exceptional`, kept in the v2 path evidence (`"condition"`) and shown on
+  the report's arrow (`→[library_model: callback, if exceptional]`);
+  `handle`/`whenComplete` run on both outcomes and carry none. The real-JVM
+  oracle `testdata/continuations` (`scripts/continuations-oracle.sh`,
+  `TestContinuationsOracle`) measured that a lambda or method reference
+  handed to a continuation was already reached — the edge from the
+  `invokedynamic` creating it — so for those the model adds the
+  registration edge and its condition, i.e. the explanation; what it adds
+  to reachability is an object of a class handed to a continuation
+  (`runAsync(new Task(), executor)`, `thenApply(new Render())`), whose
+  method nothing reached before. Whether a stage ever completes, and how,
+  is not decided: a continuation of a future nothing completes, the
+  normal branch of a stage that always fails and the exceptional branch
+  of one that always succeeds keep their "may run" edge (the oracle has
+  one of each). Edges are per registration site, so a long pipeline needs
+  no budget. Control app `scripts/prepare-continuations-demo.sh`
+  (commons-text 1.9, `thenApply(new Render())`): CVE-2022-42889 under
+  `-profile generic -roots profile` was `NOT_REACHABLE` and is now
+  `REACHABLE` (`main` → `Render#apply(Object)` bridge → `apply(String)` →
+  `StringSubstitutor#replace`), as on the JVM; the variant creating the
+  `Render` without registering it stays `NOT_REACHABLE`, as on the JVM.
+  Reference apps (petclinic, WebGoat, JPetStore; `-roots all`/`profile`,
+  CHA/RTA): +9/+9/+2 registration sites and `callback` edges, all in
+  libraries; v1 results byte-identical.
+  Not modeled: listeners, reactive operators, Spring's `ListenableFuture`,
+  a callback passed through a parameter or field (a reported gap, as
+  before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.
+  `StringConcatFactory`), left unresolved rather than guessed at.
 - **Lambdas run in another method than the one creating them** get a `sam`
   edge only where DATA_FLOW follows the value (DYNAMIC_LINKAGE L1, above):
   not through the result of an instance call, an array element, a

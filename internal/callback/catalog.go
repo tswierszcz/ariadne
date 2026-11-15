@@ -59,7 +59,17 @@ type RegistrationModel struct {
 	// CallbackInterface actually gets invoked (e.g. "run", "()V").
 	CallbackMethod, CallbackMethodDesc string
 	Execution                          ExecutionKind
+	// Condition is when the callback runs at all, beyond being
+	// registered: "" for every completion (or not modeled),
+	// ConditionExceptional for a CompletionStage branch that runs only
+	// when the previous stage fails (exceptionally/exceptionallyCompose).
+	// It is carried into the edge's path evidence.
+	Condition string
 }
+
+// ConditionExceptional: the callback runs only when the stage it is
+// registered on completes exceptionally (ASYNC_CALLBACKS A3).
+const ConditionExceptional = "exceptional"
 
 const (
 	fqcnThread          = "java.lang.Thread"
@@ -70,14 +80,17 @@ const (
 	fqcnAccessCtl       = "java.security.AccessController"
 	fqcnPrivAction      = "java.security.PrivilegedAction"
 	fqcnPrivExcAction   = "java.security.PrivilegedExceptionAction"
+	// ASYNC_CALLBACKS A3.
+	fqcnCompletableFuture = "java.util.concurrent.CompletableFuture"
+	fqcnCompletionStage   = "java.util.concurrent.CompletionStage"
 )
 
 // DefaultCatalog is ASYNC_CALLBACKS A0's own initial JDK catalog: the
 // Thread constructors that accept a Runnable, and Executor/
 // ExecutorService's execute/submit — deliberately not exhaustive (no
-// ScheduledExecutorService, no CompletableFuture chaining — ASYNC_CALLBACKS
-// A3's own scope).
-var DefaultCatalog = []RegistrationModel{
+// ScheduledExecutorService). ASYNC_CALLBACKS A3 adds completionCatalog
+// (CompletionStage continuations).
+var DefaultCatalog = append([]RegistrationModel{
 	{Owner: fqcnThread, Name: "<init>", Desc: "(Ljava/lang/Runnable;)V",
 		CallbackArgIndex: 0, CallbackInterface: fqcnRunnable, CallbackMethod: "run", CallbackMethodDesc: "()V",
 		Execution: ExecutionAsyncMaybe},
@@ -122,7 +135,95 @@ var DefaultCatalog = []RegistrationModel{
 	{Owner: fqcnAccessCtl, Name: "doPrivileged", Desc: "(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;[Ljava/security/Permission;)Ljava/lang/Object;",
 		CallbackArgIndex: 0, CallbackInterface: fqcnPrivExcAction, CallbackMethod: "run", CallbackMethodDesc: "()Ljava/lang/Object;",
 		Execution: ExecutionSynchronous},
-}
+}, completionCatalog...)
+
+// ASYNC_CALLBACKS A3 slice 1: CompletionStage continuations and
+// CompletableFuture's async sources. Every method of CompletionStage that
+// takes a callback, as declared on the interface and as overridden by
+// CompletableFuture (the call's owner is whichever the bytecode names),
+// plus CompletableFuture's exceptionally*Async/exceptionallyCompose* (Java
+// 12+) and supplyAsync/runAsync. A plain continuation may run on the
+// registering thread (the stage already complete) or on the completing
+// one; an *Async one, and a source, on an executor.
+var completionCatalog = func() []RegistrationModel {
+	type cb struct{ iface, method, desc string }
+	var (
+		function   = cb{"java.util.function.Function", "apply", "(Ljava/lang/Object;)Ljava/lang/Object;"}
+		consumer   = cb{"java.util.function.Consumer", "accept", "(Ljava/lang/Object;)V"}
+		runnable   = cb{fqcnRunnable, "run", "()V"}
+		biFunction = cb{"java.util.function.BiFunction", "apply", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"}
+		biConsumer = cb{"java.util.function.BiConsumer", "accept", "(Ljava/lang/Object;Ljava/lang/Object;)V"}
+		supplier   = cb{"java.util.function.Supplier", "get", "()Ljava/lang/Object;"}
+	)
+	const stage = "Ljava/util/concurrent/CompletionStage;"
+	const executor = "Ljava/util/concurrent/Executor;"
+	type op struct {
+		name       string
+		other      bool // a CompletionStage argument before the callback
+		cb         cb
+		async      bool // also has *Async(cb) and *Async(cb, Executor)
+		condition  string
+		futureOnly bool // declared on CompletableFuture only
+	}
+	ops := []op{
+		{name: "thenApply", cb: function, async: true},
+		{name: "thenAccept", cb: consumer, async: true},
+		{name: "thenRun", cb: runnable, async: true},
+		{name: "thenCombine", other: true, cb: biFunction, async: true},
+		{name: "thenAcceptBoth", other: true, cb: biConsumer, async: true},
+		{name: "runAfterBoth", other: true, cb: runnable, async: true},
+		{name: "applyToEither", other: true, cb: function, async: true},
+		{name: "acceptEither", other: true, cb: consumer, async: true},
+		{name: "runAfterEither", other: true, cb: runnable, async: true},
+		{name: "thenCompose", cb: function, async: true},
+		{name: "handle", cb: biFunction, async: true},
+		{name: "whenComplete", cb: biConsumer, async: true},
+		{name: "exceptionally", cb: function, condition: ConditionExceptional},
+		{name: "exceptionallyAsync", cb: function, condition: ConditionExceptional, futureOnly: true},
+		{name: "exceptionallyCompose", cb: function, async: true, condition: ConditionExceptional, futureOnly: true},
+	}
+	var out []RegistrationModel
+	add := func(owner, ret, name string, params []string, idx int, c cb, exec ExecutionKind, cond string) {
+		out = append(out, RegistrationModel{
+			Owner: owner, Name: name, Desc: "(" + strings.Join(params, "") + ")" + ret,
+			CallbackArgIndex: idx, CallbackInterface: c.iface, CallbackMethod: c.method, CallbackMethodDesc: c.desc,
+			Execution: exec, Condition: cond,
+		})
+	}
+	for _, o := range ops {
+		cbDesc := "L" + strings.ReplaceAll(o.cb.iface, ".", "/") + ";"
+		params := []string{cbDesc}
+		idx := 0
+		if o.other {
+			params = []string{stage, cbDesc}
+			idx = 1
+		}
+		owners := [][2]string{{fqcnCompletableFuture, "Ljava/util/concurrent/CompletableFuture;"}}
+		if !o.futureOnly {
+			owners = append(owners, [2]string{fqcnCompletionStage, stage})
+		}
+		for _, ow := range owners {
+			if o.name == "exceptionallyAsync" {
+				add(ow[0], ow[1], o.name, params, idx, o.cb, ExecutionAsyncMaybe, o.condition)
+				add(ow[0], ow[1], o.name, append(append([]string{}, params...), executor), idx, o.cb, ExecutionAsyncMaybe, o.condition)
+				continue
+			}
+			add(ow[0], ow[1], o.name, params, idx, o.cb, ExecutionImmediateOrAsync, o.condition)
+			if o.async {
+				add(ow[0], ow[1], o.name+"Async", params, idx, o.cb, ExecutionAsyncMaybe, o.condition)
+				add(ow[0], ow[1], o.name+"Async", append(append([]string{}, params...), executor), idx, o.cb, ExecutionAsyncMaybe, o.condition)
+			}
+		}
+	}
+	const cf = "Ljava/util/concurrent/CompletableFuture;"
+	sup := "Ljava/util/function/Supplier;"
+	run := "Ljava/lang/Runnable;"
+	add(fqcnCompletableFuture, cf, "supplyAsync", []string{sup}, 0, supplier, ExecutionAsyncMaybe, "")
+	add(fqcnCompletableFuture, cf, "supplyAsync", []string{sup, executor}, 0, supplier, ExecutionAsyncMaybe, "")
+	add(fqcnCompletableFuture, cf, "runAsync", []string{run}, 0, runnable, ExecutionAsyncMaybe, "")
+	add(fqcnCompletableFuture, cf, "runAsync", []string{run, executor}, 0, runnable, ExecutionAsyncMaybe, "")
+	return out
+}()
 
 var byKey = func() map[[3]string]RegistrationModel {
 	m := make(map[[3]string]RegistrationModel, len(DefaultCatalog))

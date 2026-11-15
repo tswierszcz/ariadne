@@ -126,6 +126,10 @@ const (
 // the CHA expansion to this edge's actual target).
 type CallSite struct {
 	PC int
+	// Condition is when a modeled callback runs at all ("" always, or
+	// not modeled; "exceptional": only when the stage it is registered
+	// on fails — ASYNC_CALLBACKS A3). Path evidence reports it.
+	Condition string
 }
 
 // ModelEdge is a model-derived call relationship. The caller and target

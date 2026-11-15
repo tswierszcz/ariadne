@@ -64,6 +64,8 @@ type CallbackEdge struct {
 	CallerFQCN, CallerName, CallerDesc         string
 	PC                                         int
 	TargetFQCN, TargetMethod, TargetMethodDesc string
+	// Condition is the registration model's (RegistrationModel.Condition).
+	Condition string
 }
 
 // EdgeTargets returns every CallbackEdgeResult with a resolved
@@ -79,6 +81,7 @@ func EdgeTargets(results []CallbackEdgeResult) []CallbackEdge {
 		out = append(out, CallbackEdge{
 			CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc, PC: s.PC,
 			TargetFQCN: r.DeclaringFQCN, TargetMethod: r.DeclaringMethod, TargetMethodDesc: r.DeclaringDesc,
+			Condition: s.Model.Condition,
 		})
 	}
 	return out

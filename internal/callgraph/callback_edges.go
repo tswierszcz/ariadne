@@ -12,6 +12,8 @@ type CallbackEdge struct {
 	CallerFQCN, CallerName, CallerDesc         string
 	PC                                         int
 	TargetFQCN, TargetMethod, TargetMethodDesc string
+	// Condition is the registration model's condition (CallSite).
+	Condition string
 }
 
 // ApplyCallbackEdges adds, for every edge, a synthetic edge from its
@@ -35,7 +37,7 @@ func ApplyCallbackEdges(g *Graph, edges []CallbackEdge) int {
 		if hasEdge(g, fromID, toID, classfile.CallSynthetic, BasisCallback) {
 			continue
 		}
-		g.addEdge(fromID, toID, classfile.CallSynthetic, BasisCallback, &CallSite{PC: e.PC})
+		g.addEdge(fromID, toID, classfile.CallSynthetic, BasisCallback, &CallSite{PC: e.PC, Condition: e.Condition})
 		added++
 	}
 	return added

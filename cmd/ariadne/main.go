@@ -857,6 +857,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		callbackGraphEdges = append(callbackGraphEdges, callgraph.CallbackEdge{
 			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
 			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetMethod: e.TargetMethod, TargetMethodDesc: e.TargetMethodDesc,
+			Condition: e.Condition,
 		})
 	}
 	callbackEdgesAdded := callgraph.ApplyCallbackEdges(g, callbackGraphEdges)
