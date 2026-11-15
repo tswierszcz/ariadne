@@ -26,6 +26,13 @@ type PreparedApp struct {
 	// input shape (a plain jar, a directory, a Spring Boot fat jar —
 	// none of those have a WEB-INF/web.xml to begin with).
 	WebXMLs map[string][]byte
+	// WebInfBeansXMLs is every Spring bean-definitions file directly under
+	// a WAR's WEB-INF/ (applicationContext.xml, <servlet>-servlet.xml —
+	// the places web.xml's contextConfigLocation usually points), keyed
+	// "WEB-INF/x.xml" for a standalone WAR or "module.war!/WEB-INF/x.xml"
+	// for an EAR's module. WEB-INF/classes is the app classes jar, which
+	// FindBeansXML already scans (ROADMAP B4 b4-8).
+	WebInfBeansXMLs map[string][]byte
 	// LibEntries maps each jar extracted into ExtractedLibs (by its base
 	// file name, the name it has there) to the entry it came from inside
 	// the app archive — "BOOT-INF/lib/x.jar", "WEB-INF/lib/x.jar", or
@@ -214,8 +221,42 @@ func prepareFromFatArchive(files []*zip.File, classesPrefix, libPrefix string) (
 		if ok {
 			prepared.WebXMLs = map[string][]byte{"": data}
 		}
+		beans, err := webInfBeansXMLs(files, "")
+		if err != nil {
+			prepared.Cleanup()
+			return PreparedApp{}, err
+		}
+		if len(beans) > 0 {
+			prepared.WebInfBeansXMLs = beans
+		}
 	}
 	return prepared, nil
+}
+
+// webInfBeansXMLs reads every WEB-INF/*.xml (not in a subdirectory, not
+// web.xml) whose root element is <beans>, keyed by prefix + entry name.
+func webInfBeansXMLs(files []*zip.File, prefix string) (map[string][]byte, error) {
+	out := map[string][]byte{}
+	for _, f := range files {
+		name := f.Name
+		if f.FileInfo().IsDir() || name == webXMLEntryName || !strings.HasPrefix(name, "WEB-INF/") ||
+			!strings.HasSuffix(name, ".xml") || strings.Contains(strings.TrimPrefix(name, "WEB-INF/"), "/") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return nil, fmt.Errorf("opening %s%s: %w", prefix, name, err)
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading %s%s: %w", prefix, name, err)
+		}
+		if isSpringBeansRoot(data) {
+			out[prefix+name] = data
+		}
+	}
+	return out, nil
 }
 
 // prepareFromEar merges every nested WAR module's WEB-INF/classes +
@@ -234,6 +275,7 @@ func prepareFromEar(files []*zip.File) (PreparedApp, error) {
 	// — unlike a standalone WAR (always key ""), an EAR can genuinely
 	// have more than one.
 	webXMLs := map[string][]byte{}
+	beansXMLs := map[string][]byte{}
 	earEntries := map[string]string{}
 	prepared, err := buildPreparedApp("ariadne-ear-*", func(zw *zip.Writer, written map[string]bool, libDir string) error {
 		for _, f := range files {
@@ -250,6 +292,13 @@ func prepareFromEar(files []*zip.File) (PreparedApp, error) {
 					return fmt.Errorf("reading %s's own %s: %w", f.Name, webXMLEntryName, err)
 				} else if ok {
 					webXMLs[f.Name] = data
+				}
+				beans, err := webInfBeansXMLs(nested, f.Name+"!/")
+				if err != nil {
+					return err
+				}
+				for k, v := range beans {
+					beansXMLs[k] = v
 				}
 
 			case !f.FileInfo().IsDir() && strings.HasSuffix(f.Name, ".jar"):
@@ -270,6 +319,9 @@ func prepareFromEar(files []*zip.File) (PreparedApp, error) {
 	}
 	if len(webXMLs) > 0 {
 		prepared.WebXMLs = webXMLs
+	}
+	if len(beansXMLs) > 0 {
+		prepared.WebInfBeansXMLs = beansXMLs
 	}
 	prepared.LibEntries = earEntries
 	return prepared, nil

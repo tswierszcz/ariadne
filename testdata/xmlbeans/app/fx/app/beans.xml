@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:c="http://www.springframework.org/schema/c"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd"
+       default-init-method="setup">
+
+    <bean id="repo" class="fx.app.Repo"/>
+
+    <bean id="service" class="fx.app.Service" init-method="start" destroy-method="stop">
+        <constructor-arg ref="repo"/>
+        <property name="name" value="hello"/>
+        <property name="helper">
+            <bean class="fx.app.Helper"/>
+        </property>
+    </bean>
+
+    <bean id="pbean" class="fx.app.PBean" p:label="y" p:repo-ref="repo"/>
+
+    <bean id="cbean" class="fx.app.CBean" c:_0="z"/>
+
+    <bean id="base" class="fx.app.Base" abstract="true">
+        <property name="tag" value="t"/>
+    </bean>
+    <bean id="child" class="fx.app.Child" parent="base"/>
+
+    <bean id="ghost" class="fx.app.Ghost" abstract="true">
+        <property name="tag" value="g"/>
+    </bean>
+
+    <bean id="sleepy" class="fx.app.Sleepy" lazy-init="true"/>
+
+    <bean id="lib" class="fx.lib.LibService" init-method="open" destroy-method="close">
+        <property name="endpoint" value="e"/>
+    </bean>
+</beans>

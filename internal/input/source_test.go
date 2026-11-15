@@ -385,3 +385,40 @@ func jarEntryNames(t *testing.T, path string) []string {
 	}
 	return names
 }
+
+// TestPrepareAppInput_capturesWebInfBeansXML (ROADMAP B4 b4-8): Spring
+// bean-definitions files directly under WEB-INF/ (JPetStore's
+// applicationContext.xml) are kept, keyed by entry name — per module in an
+// EAR — while web.xml, a non-<beans> XML file and anything in a WEB-INF
+// subdirectory are not.
+func TestPrepareAppInput_capturesWebInfBeansXML(t *testing.T) {
+	ctx := []byte(`<?xml version="1.0"?><beans xmlns="http://www.springframework.org/schema/beans"><bean id="a" class="x.A"/></beans>`)
+	module := map[string][]byte{
+		"WEB-INF/classes/com/example/App.class": []byte("fake app class bytes"),
+		"WEB-INF/web.xml":                       []byte("<web-app/>"),
+		"WEB-INF/applicationContext.xml":        ctx,
+		"WEB-INF/faces-config.xml":              []byte("<faces-config/>"),
+		"WEB-INF/spring/nested.xml":             ctx,
+	}
+	war := filepath.Join(t.TempDir(), "app.war")
+	writeZip(t, war, module)
+	p, err := PrepareAppInput(war)
+	if err != nil {
+		t.Fatalf("PrepareAppInput: %v", err)
+	}
+	defer p.Cleanup()
+	if len(p.WebInfBeansXMLs) != 1 || string(p.WebInfBeansXMLs["WEB-INF/applicationContext.xml"]) != string(ctx) {
+		t.Errorf("WAR: WebInfBeansXMLs = %v, want only WEB-INF/applicationContext.xml", p.WebInfBeansXMLs)
+	}
+
+	ear := filepath.Join(t.TempDir(), "app.ear")
+	writeZip(t, ear, map[string][]byte{"one.war": zipBytes(t, module)})
+	pe, err := PrepareAppInput(ear)
+	if err != nil {
+		t.Fatalf("PrepareAppInput(ear): %v", err)
+	}
+	defer pe.Cleanup()
+	if len(pe.WebInfBeansXMLs) != 1 || pe.WebInfBeansXMLs["one.war!/WEB-INF/applicationContext.xml"] == nil {
+		t.Errorf("EAR: WebInfBeansXMLs = %v, want one.war!/WEB-INF/applicationContext.xml", pe.WebInfBeansXMLs)
+	}
+}

@@ -691,7 +691,9 @@ above) are not. `internal/profile` implements section 4 as described:
   `-roots profile`; see FAQ.md; the `spring` profile's `roots.beans`, 2026-11-15 — the
   container's reflective calls into its beans: the chosen constructor, injection methods,
   `@PostConstruct`/`@PreDestroy`, `@Bean` init/destroy — after the real-JVM oracle
-  `testdata/di` measured all of them unreachable), embedded via
+  `testdata/di` measured all of them unreachable; since `b4-8` also Spring XML `<bean>`
+  definitions from the class path and a WAR's `WEB-INF/*.xml` — constructors by argument
+  count, property setters, init/destroy methods, `testdata/xmlbeans`), embedded via
   `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
   one profile and replaces any existing one of the same name — not a partial per-field
   merge, matching how `-vuln-methods` already overrides a whole table rather than patching

@@ -2052,8 +2052,25 @@ report:
   verdicts unchanged (petclinic 8, WebGoat 165, JPetStore 3 such methods);
   under `-roots profile` two WebGoat paths now start at a lifecycle method
   (`WebSecurityConfig#configureGlobal`, `@Autowired`;
-  `HSQLDBDatabaseConfig#shutdown`, `@PreDestroy`). Spring XML beans
-  (`init-method`, constructor arguments) are not covered.
+  `HSQLDBDatabaseConfig#shutdown`, `@PreDestroy`). Since `b4-8` the same
+  rule covers **Spring XML bean definitions**, read from the application's
+  class path and — new — from a WAR's `WEB-INF/*.xml` (also per EAR
+  module): for every non-abstract `<bean>` (after merging its `parent`
+  chain; inner beans too) whose class is in the input, application or
+  library, the constructors taking as many parameters as it has
+  `<constructor-arg>`/`c:` arguments, the setter of each `<property>`/`p:`
+  property (in superclasses too), the `init-method` or
+  `default-init-method` and the `destroy-method` (`(inferred)`: `close`/
+  `shutdown`) or `default-destroy-method`; a `factory-method` definition
+  roots the factory method. Real-JVM oracle `testdata/xmlbeans`
+  (`scripts/xmlbeans-oracle.sh`, `TestXMLBeansOracle`): before, 1 of 18
+  bodies the JVM ran was reached, now all 18. On JPetStore,
+  `WEB-INF/applicationContext.xml` is read for the first time: `SqlSessionFactoryBean`
+  and `DataSourceTransactionManager` constructors and setters become roots
+  (unreachable before); no verdict changed. Namespace elements
+  (`<jdbc:…>`, `<tx:…>`, `<mybatis:scan>`, `<context:component-scan>`),
+  `<import>`ed files outside those places, and XML outside `WEB-INF/` and
+  the class path are not read.
   The profile system itself (auto-detection and merging, `-roots profile`,
   synthetic edges, the conditional jackson-databind rule,
   `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`/
