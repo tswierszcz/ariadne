@@ -2,9 +2,11 @@ package proxycatalog
 
 import (
 	"archive/zip"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"ariadne/internal/appref"
@@ -214,5 +216,93 @@ func TestFindMappersInWebInfXML(t *testing.T) {
 		if m.Interface == scannedMap {
 			t.Error("the scanned mapper is found without the WEB-INF file")
 		}
+	}
+}
+
+// TestTransactionalEdges (x3, spring-tx:transactional): a call reaches
+// TransactionInterceptor#invoke when Spring would run the named method in
+// a transaction — annotated class (its public methods, not a final or
+// static one), annotated method, annotated interface (Spring Data), an
+// interface whose implementation is annotated — and not for a plain bean,
+// a self-call inside the annotated class, or without a reachable creator
+// of the interceptor (reported as NoCreator).
+func TestTransactionalEdges(t *testing.T) {
+	const (
+		txAnn   = "org.springframework.transaction.annotation.Transactional"
+		jtaAnn  = "jakarta.transaction.Transactional"
+		voidD   = "()V"
+		caller  = "demo.web.Controller"
+		accSvc  = "demo.svc.AccountService"
+		ordSvc  = "demo.svc.OrderService"
+		repo    = "demo.repo.OwnerRepository"
+		catIf   = "demo.svc.Catalog"
+		catImpl = "demo.svc.CatalogImpl"
+		plain   = "demo.svc.Plain"
+		config  = "org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration"
+	)
+	m := func(name string, flags uint16, anns ...string) hierarchy.Method {
+		return hierarchy.Method{Method: classfile.Method{Name: name, Descriptor: voidD, AccessFlags: flags | classfile.AccPublic, Annotations: anns}}
+	}
+	vcall := func(owner, name string, pc int) classfile.Call {
+		return classfile.Call{Kind: classfile.CallVirtual, Owner: owner, Name: name, Desc: voidD, PC: pc}
+	}
+	icall := func(owner, name string, pc int) classfile.Call {
+		return classfile.Call{Kind: classfile.CallInterface, Owner: owner, Name: name, Desc: voidD, PC: pc}
+	}
+	build := func(withCreator bool) *hierarchy.Hierarchy {
+		acc := cls(accSvc, true, m("find", 0), m("locked", 0x0010), m("util", classfile.AccStatic),
+			hierarchy.Method{Method: classfile.Method{Name: "selfCall", Descriptor: voidD, AccessFlags: classfile.AccPublic}, Calls: []classfile.Call{vcall(accSvc, "find", 1)}})
+		acc.Annotations = []string{txAnn}
+		ord := cls(ordSvc, true, m("place", 0, jtaAnn), m("count", 0))
+		rp := iface(repo, true)
+		rp.Methods = []hierarchy.Method{{Method: classfile.Method{Name: "save", Descriptor: voidD, AccessFlags: classfile.AccAbstract | classfile.AccPublic}}}
+		rp.Annotations = []string{txAnn}
+		ci := iface(catIf, true)
+		ci.Methods = []hierarchy.Method{{Method: classfile.Method{Name: "title", Descriptor: voidD, AccessFlags: classfile.AccAbstract | classfile.AccPublic}}}
+		impl := cls(catImpl, true, m("title", 0))
+		impl.Interfaces = []string{catIf}
+		impl.Annotations = []string{txAnn}
+		classes := []*hierarchy.ClassInfo{
+			acc, ord, rp, ci, impl,
+			cls(plain, true, m("hello", 0)),
+			cls(transactionInterceptor, false, meth("invoke", interceptorInvokeDesc, nil)),
+			cls(caller, true, hierarchy.Method{Method: classfile.Method{Name: "handle", Descriptor: voidD}, Calls: []classfile.Call{
+				vcall(accSvc, "find", 1), vcall(accSvc, "locked", 2), vcall(ordSvc, "place", 3), vcall(ordSvc, "count", 4),
+				icall(repo, "save", 5), icall(catIf, "title", 6), vcall(plain, "hello", 7),
+			}}),
+		}
+		if withCreator {
+			classes = append(classes, cls(config, false, meth("transactionInterceptor", "()V", nil, transactionInterceptor)))
+		}
+		return hierarchy.NewForTesting(classes)
+	}
+
+	r, err := Find(build(true), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, e := range r.Edges {
+		if e.TargetFQCN != transactionInterceptor {
+			continue
+		}
+		got[fmt.Sprintf("%s#%s@%d", e.CallerFQCN, e.CallerName, e.PC)] = true
+		if len(e.Creators) != 1 || e.Creators[0].FQCN != config {
+			t.Errorf("edge creators %v, want the configuration that news the interceptor", e.Creators)
+		}
+	}
+	want := map[string]bool{
+		caller + "#handle@1": true, // AccountService#find: annotated class
+		caller + "#handle@3": true, // OrderService#place: annotated method (JTA)
+		caller + "#handle@5": true, // OwnerRepository#save: annotated interface
+		caller + "#handle@6": true, // Catalog#title: annotated implementation
+	}
+	if !reflect.DeepEqual(got, want) || r.ByProxy[TransactionalEntry] != 4 {
+		t.Errorf("transactional call sites %v (%d), want %v", got, r.ByProxy[TransactionalEntry], want)
+	}
+
+	r, _ = Find(build(false), nil, nil)
+	if r.ByProxy[TransactionalEntry] != 0 || !slices.Contains(r.NoCreator, TransactionalEntry) {
+		t.Errorf("without a creator: %d edges, no-creator %v", r.ByProxy[TransactionalEntry], r.NoCreator)
 	}
 }

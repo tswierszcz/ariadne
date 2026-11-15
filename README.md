@@ -595,7 +595,7 @@ servlet participants on petclinic removes 5 918 edges and turns 13
 `FRAMEWORK` into `NOT_REACHABLE` — a way to see what a model contributes,
 not a recommended setting.
 
-**Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x2`).**
+**Framework proxies (`framework:proxies`, `internal/proxycatalog`, version `x3`).**
 Some framework objects exist only as JDK dynamic proxies: a MyBatis mapper
 interface (`CategoryMapper`) has no implementation in the input — MyBatis
 hands out a proxy whose `MapperProxy#invoke` runs the SQL — and neither has a
@@ -627,11 +627,35 @@ method is matched as Spring Data does — exact descriptor, else name and
 assignable parameters (`void save(Owner)` → `save(Object)`); query methods
 (an annotation `*.Query`, or no base-class method of that name) and default
 methods get no such edge.
+Since `x3` a call on a method Spring runs in a transaction reaches
+`TransactionInterceptor#invoke` (`spring-tx:transactional`): `@Transactional`
+(Spring's, or JTA's javax/jakarta one) on the method, its class, or a
+supertype declaring it or that supertype itself; public, non-static,
+non-final methods; the named method on the call's owner or on any concrete
+subtype; not a call from inside the same class (self-invocation bypasses
+the proxy). Gate: a reachable method that `new`s the interceptor
+(`@EnableTransactionManagement`'s configuration) or names the class (the
+`<tx:annotation-driven>` parser). Real-JVM oracle `testdata/tx`
+(`scripts/tx-oracle.sh`, `TestTxOracle`): class-level, method-level and
+interface-proxied services and a rollback — the graph missed the
+interceptor, `TransactionAspectSupport` and the transaction manager's
+`getTransaction`/`commit`/`rollback` (9 bodies), now reaches all of them.
+Reference apps: petclinic 20 call sites (its `@Transactional` Spring Data
+repositories), WebGoat 10, JPetStore 4 (`AccountService`, `OrderService`);
+four petclinic `REACHABLE` paths now start at a controller and go through
+the transaction manager. JPetStore `-roots all`: CVE-2026-41850
+`FRAMEWORK` → `REACHABLE` — the new first step is real, but the path then
+follows CHA from `TransactionSynchronization#beforeCommit` into the
+`@TransactionalEventListener` adapter, which JPetStore never registers: a
+CHA over-approximation inside spring-tx, not a measured execution. With
+`-callgraph-mode rta` also CVE-2022-41853 (HSQLDB) `FRAMEWORK` →
+`REACHABLE` through `DataSourceTransactionManager#doBegin` →
+`JDBCConnection#setAutoCommit` (real) and HSQLDB internals (CHA).
 Each edge (basis `model`) waits for the same creator gate as the JDBC
 objects: a method creating the handler must be reachable from the roots.
 Checked in the bytecode of mybatis 3.4.1–3.5.16, mybatis-spring
 1.3.0–3.0.3, spring-aop/spring-orm 4.3.4–6.1.14. Log line `framework
-proxies (framework:proxies x2): N MyBatis mappers, N Spring Data
+proxies (framework:proxies x3): N MyBatis mappers, N Spring Data
 repositories; N candidates (…), N edges added, …`; snapshots record
 `framework.proxies`. Measured on runtime traces: petclinic's 13 `proxy`
 relations and 6 of JPetStore's 8 are graph edges now; JPetStore's

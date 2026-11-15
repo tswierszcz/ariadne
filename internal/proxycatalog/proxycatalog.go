@@ -59,7 +59,8 @@ const ModelID = "framework:proxies"
 
 // Version versions the catalog and the mapper rules. Snapshots record it.
 // x2: Spring Data base repositories (BaseRepositoryEntry).
-const Version = "x2"
+// x3: Spring's transactional proxies (TransactionalEntry).
+const Version = "x3"
 
 // BaseRepositoryEntry names the x2 rule: a call on a Spring Data
 // repository interface also reaches the body a base repository class runs
@@ -74,6 +75,41 @@ const Version = "x2"
 // Query methods declared on the repository itself have no base-class body
 // and get no edge.
 const BaseRepositoryEntry = "spring-data:base-repository"
+
+// TransactionalEntry names the x3 rule: a call on a method Spring runs in
+// a transaction reaches TransactionInterceptor#invoke. Spring hands out
+// a proxy (CGLIB for a class, JDK for an interface) for every bean with a
+// transactional method; the proxy runs the interceptor chain, and
+// TransactionInterceptor → TransactionAspectSupport#invokeWithinTransaction
+// begins, commits or rolls back through the PlatformTransactionManager
+// around the call (measured on a real JVM: testdata/tx). The graph used to
+// go from the call straight to the method's body.
+//
+// A method is transactional when @Transactional (Spring's, or JTA's javax/
+// jakarta one) is on it, on its class, or on a supertype declaring it or
+// on that supertype itself — the places Spring's annotation source looks;
+// only public, non-static, non-final methods (Spring's default
+// publicMethodsOnly; a final method cannot be proxied). A call site gets
+// the edge when the method it names, on the call's owner or on any
+// concrete subtype that may receive it, is transactional — except a call
+// from inside that same class (self-invocation does not go through the
+// proxy). Gate: a reachable method creating the interceptor — `new
+// TransactionInterceptor` (@EnableTransactionManagement's configuration)
+// or naming the class (the <tx:annotation-driven> parser registers it by
+// class) — so an application that never enables transaction management
+// gets nothing.
+const TransactionalEntry = "spring-tx:transactional"
+
+const (
+	transactionInterceptor = "org.springframework.transaction.interceptor.TransactionInterceptor"
+	interceptorInvokeDesc  = "(Lorg/aopalliance/intercept/MethodInvocation;)Ljava/lang/Object;"
+)
+
+var transactionalAnnotations = []string{
+	"org.springframework.transaction.annotation.Transactional",
+	"javax.transaction.Transactional",
+	"jakarta.transaction.Transactional",
+}
 
 const invokeDesc = "(Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;"
 
@@ -196,6 +232,7 @@ func Find(h *hierarchy.Hierarchy, jars []appref.Jar, extraXML map[string][]byte)
 		}
 	}
 	r.Edges = append(r.Edges, baseRepositoryEdges(h, r.Repositories, creators, &r)...)
+	r.Edges = append(r.Edges, transactionalEdges(h, creators, &r)...)
 	if len(byIface) == 0 {
 		return r, nil
 	}
@@ -221,6 +258,179 @@ func Find(h *hierarchy.Hierarchy, jars []appref.Jar, extraXML map[string][]byte)
 		}
 	}
 	return r, nil
+}
+
+// transactionalEdges builds the x3 candidates (TransactionalEntry).
+func transactionalEdges(h *hierarchy.Hierarchy, creators map[string][]callgraph.MethodRef, r *Result) []callgraph.SAMEdge {
+	if _, ok := h.Lookup(transactionInterceptor); !ok {
+		return nil
+	}
+	gate := append([]callgraph.MethodRef(nil), creators[transactionInterceptor]...)
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		if fqcn == transactionInterceptor {
+			continue
+		}
+		for _, named := range ci.NamedClasses {
+			if named != transactionInterceptor {
+				continue
+			}
+			for _, m := range ci.Methods {
+				gate = append(gate, callgraph.MethodRef{FQCN: fqcn, Name: m.Name, Desc: m.Descriptor})
+			}
+		}
+	}
+	gate = dedupe(gate)
+	if len(gate) == 0 {
+		r.NoCreator = append(r.NoCreator, TransactionalEntry)
+		return nil
+	}
+
+	annotated := func(anns []string) bool { return hasAnyAnnotation(anns, transactionalAnnotations) }
+	// typeTx: types carrying the annotation themselves; methodTx: methods
+	// carrying it, by "type#name+desc".
+	typeTx := map[string]bool{}
+	methodTx := map[string]bool{}
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		if annotated(ci.Annotations) {
+			typeTx[fqcn] = true
+		}
+		for _, m := range ci.Methods {
+			if annotated(m.Annotations) {
+				methodTx[fqcn+"#"+m.Name+m.Descriptor] = true
+			}
+		}
+	}
+	if len(typeTx) == 0 && len(methodTx) == 0 {
+		return nil
+	}
+	// declares: the type or one of its supertypes that declares the
+	// method and is annotated (on the method or on itself).
+	var declares func(fqcn, name, desc string, seen map[string]bool) bool
+	declares = func(fqcn, name, desc string, seen map[string]bool) bool {
+		if fqcn == "" || seen[fqcn] {
+			return false
+		}
+		seen[fqcn] = true
+		ci, ok := h.Lookup(fqcn)
+		if !ok {
+			return false
+		}
+		if m, ok := ci.MethodByNameAndDesc(name, desc); ok {
+			if methodTx[fqcn+"#"+name+desc] || typeTx[fqcn] {
+				return m.AccessFlags&classfile.AccStatic == 0
+			}
+		}
+		if declares(ci.SuperClass, name, desc, seen) {
+			return true
+		}
+		for _, i := range ci.Interfaces {
+			if declares(i, name, desc, seen) {
+				return true
+			}
+		}
+		return false
+	}
+	// transactional: Spring would run fqcn's method name+desc (fqcn the
+	// bean's class, or an interface Spring proxies) in a transaction.
+	memo := map[string]bool{}
+	transactional := func(fqcn, name, desc string) bool {
+		key := fqcn + "#" + name + desc
+		if v, ok := memo[key]; ok {
+			return v
+		}
+		v := false
+		ci, ok := h.Lookup(fqcn)
+		if ok {
+			impl := fqcn
+			if !ci.IsInterface() {
+				if d, found := h.ResolveExact(fqcn, name, desc); found {
+					impl = d
+				}
+			}
+			if ic, ok := h.Lookup(impl); ok {
+				if m, ok := ic.MethodByNameAndDesc(name, desc); ok {
+					final := m.AccessFlags&0x0010 != 0
+					public := m.AccessFlags&classfile.AccPublic != 0
+					v = public && !final && declares(fqcn, name, desc, map[string]bool{})
+				}
+			}
+		}
+		memo[key] = v
+		return v
+	}
+	// Owners worth looking at: the annotated types, their subtypes and
+	// supertypes.
+	relevant := map[string]bool{}
+	var up func(string)
+	up = func(fqcn string) {
+		if fqcn == "" || relevant[fqcn] {
+			return
+		}
+		relevant[fqcn] = true
+		if ci, ok := h.Lookup(fqcn); ok {
+			up(ci.SuperClass)
+			for _, i := range ci.Interfaces {
+				up(i)
+			}
+		}
+	}
+	seeds := map[string]bool{}
+	for t := range typeTx {
+		seeds[t] = true
+	}
+	for k := range methodTx {
+		seeds[k[:strings.IndexByte(k, '#')]] = true
+	}
+	for t := range seeds {
+		up(t)
+		for _, sub := range h.Subtypes(t) {
+			up(sub)
+		}
+	}
+
+	var out []callgraph.SAMEdge
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		for _, m := range ci.Methods {
+			for _, c := range m.Calls {
+				if (c.Kind != classfile.CallInterface && c.Kind != classfile.CallVirtual) || !relevant[c.Owner] || c.Owner == fqcn {
+					continue
+				}
+				tx := transactional(c.Owner, c.Name, c.Desc)
+				for _, sub := range h.Subtypes(c.Owner) {
+					if tx {
+						break
+					}
+					if sc, ok := h.Lookup(sub); ok && sub != fqcn && sc.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) == 0 {
+						tx = transactional(sub, c.Name, c.Desc)
+					}
+				}
+				if !tx {
+					continue
+				}
+				out = append(out, callgraph.SAMEdge{
+					CallerFQCN: fqcn, CallerName: m.Name, CallerDesc: m.Descriptor, PC: c.PC, Kind: c.Kind,
+					TargetFQCN: transactionInterceptor, TargetName: "invoke", TargetDesc: interceptorInvokeDesc,
+					Creators: gate,
+				})
+				r.ByProxy[TransactionalEntry]++
+			}
+		}
+	}
+	return out
+}
+
+func hasAnyAnnotation(anns, want []string) bool {
+	for _, a := range anns {
+		for _, w := range want {
+			if a == w {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // baseRepositoryEdges builds the x2 candidates (BaseRepositoryEntry).
