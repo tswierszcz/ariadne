@@ -35,6 +35,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
 	"ariadne/internal/jdbcdispatch"
+	"ariadne/internal/jpadispatch"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/methodhandle"
@@ -1211,6 +1212,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	jdbcEdges := jdbcdispatch.ObjectEdges(h)
 	jdbcGate := callgraph.NewCreatorGate(g, h, jdbcEdges, callgraph.BasisModel)
 	jdbcTime := time.Since(jdbcStart)
+	// JPA objects (jpa:objects e1): calls on entity managers, their
+	// factories and queries reach the persistence provider's bodies the
+	// same way (behind Spring ORM's proxies the last hop is Method#invoke).
+	jpaStart := time.Now()
+	jpaEdges := jpadispatch.ObjectEdges(h)
+	jpaGate := callgraph.NewCreatorGate(g, h, jpaEdges, callgraph.BasisModel)
+	jpaTime := time.Since(jpaStart)
 	// Framework proxies (FRAMEWORKS F3 slice 3, framework:proxies): calls
 	// on MyBatis mappers, Spring Data repositories and Spring ORM's JPA
 	// interfaces reach the InvocationHandler the framework's proxy runs,
@@ -1238,7 +1246,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {proxycatalog.ModelID, proxyGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1267,10 +1275,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return gate.Apply(g, roots)
 	}
 	samApplied, objApplied, jdbcApplied, proxyApplied := applyGate(samGateID, samGate), applyGate(servletGateID, objGate), applyGate(jdbcdispatch.ModelID, jdbcGate), applyGate(proxycatalog.ModelID, proxyGate)
+	jpaApplied := applyGate(jpadispatch.ModelID, jpaGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		jdbcdispatch.ModelID, jdbcdispatch.Version, len(jdbcEdges), jdbcApplied.Added, jdbcApplied.Covered, jdbcApplied.Gated, jdbcTime.Round(time.Millisecond))
+	log("JPA objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
+		jpadispatch.ModelID, jpadispatch.Version, len(jpaEdges), jpaApplied.Added, jpaApplied.Covered, jpaApplied.Gated, jpaTime.Round(time.Millisecond))
 	log("framework proxies (%s %s): %d MyBatis mappers, %d Spring Data repositories; %d candidates (%s), %d edges added, %d already in the graph, %d left out (no method creating the handler is reachable from the roots)%s, in %s",
 		proxycatalog.ModelID, proxycatalog.Version, len(proxies.Mappers), len(proxies.Repositories), len(proxies.Edges), proxySummary(proxies.ByProxy),
 		proxyApplied.Added, proxyApplied.Covered, proxyApplied.Gated, noCreatorSummary(proxies.NoCreator), proxyTime.Round(time.Millisecond))

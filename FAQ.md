@@ -650,6 +650,19 @@ application's mapper calls to MyBatis and on to the database: HSQLDB's
 CVE-2022-41853 became `REACHABLE`. It does not look inside the handler's
 `Method#invoke`.
 
+**Then how does `em.find(…)` reach Hibernate?** Spring's entity manager
+handler ends in exactly such a `Method#invoke` on the provider's real entity
+manager. A real-JVM oracle (`testdata/jpa`, Spring ORM 5.3.6 over a minimal
+provider) showed the graph stopping at the handlers. JPA is shaped like
+JDBC — `javax.persistence` is under the skip rule, and a provider implements
+the interfaces — so since `jpa:objects` `e1` a call on an `EntityManager`,
+its factory, a query or a transaction reaches the bodies of the
+implementations reachable code creates with `new`: the provider's entity
+manager once its factory's `createEntityManager` runs, its queries once
+`createQuery` runs. That is the call the handler makes reflectively, taken
+straight from the application's call site. `jakarta.persistence` is not under
+the skip rule, so plain CHA covers it already.
+
 **Why could `-roots all` see less than `-roots profile`?** `-roots all` meant
 "every application method", and in a WAR the methods the container calls
 first are often not application methods: `web.xml` registers library
