@@ -161,3 +161,47 @@ func TestFindRegistrationSites_threadSubclassSuperCallIsNotFlagged(t *testing.T)
 		t.Errorf("sites = %+v, want none (super(String), no Runnable involved)", sites)
 	}
 }
+
+// TestCompletionCatalog (ASYNC_CALLBACKS A3): the CompletionStage
+// continuations are cataloged on both owners a call may name, with the
+// callback's index, interface method, execution and condition.
+func TestCompletionCatalog(t *testing.T) {
+	for _, c := range []struct {
+		owner, name, desc string
+		idx               int
+		method, mdesc     string
+		exec              ExecutionKind
+		cond              string
+	}{
+		{"java.util.concurrent.CompletableFuture", "thenApply", "(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;", 0, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;", ExecutionImmediateOrAsync, ""},
+		{"java.util.concurrent.CompletionStage", "thenAcceptAsync", "(Ljava/util/function/Consumer;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletionStage;", 0, "accept", "(Ljava/lang/Object;)V", ExecutionAsyncMaybe, ""},
+		{"java.util.concurrent.CompletableFuture", "thenCombine", "(Ljava/util/concurrent/CompletionStage;Ljava/util/function/BiFunction;)Ljava/util/concurrent/CompletableFuture;", 1, "apply", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", ExecutionImmediateOrAsync, ""},
+		{"java.util.concurrent.CompletionStage", "exceptionally", "(Ljava/util/function/Function;)Ljava/util/concurrent/CompletionStage;", 0, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;", ExecutionImmediateOrAsync, ConditionExceptional},
+		{"java.util.concurrent.CompletableFuture", "exceptionallyAsync", "(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;", 0, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;", ExecutionAsyncMaybe, ConditionExceptional},
+		{"java.util.concurrent.CompletableFuture", "whenComplete", "(Ljava/util/function/BiConsumer;)Ljava/util/concurrent/CompletableFuture;", 0, "accept", "(Ljava/lang/Object;Ljava/lang/Object;)V", ExecutionImmediateOrAsync, ""},
+		{"java.util.concurrent.CompletableFuture", "supplyAsync", "(Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;", 0, "get", "()Ljava/lang/Object;", ExecutionAsyncMaybe, ""},
+		{"java.util.concurrent.CompletableFuture", "runAsync", "(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;", 0, "run", "()V", ExecutionAsyncMaybe, ""},
+	} {
+		m, ok := Lookup(c.owner, c.name, c.desc)
+		if !ok {
+			t.Errorf("%s#%s%s not cataloged", c.owner, c.name, c.desc)
+			continue
+		}
+		if m.CallbackArgIndex != c.idx || m.CallbackMethod != c.method || m.CallbackMethodDesc != c.mdesc || m.Execution != c.exec || m.Condition != c.cond {
+			t.Errorf("%s#%s%s = %+v", c.owner, c.name, c.desc, m)
+		}
+	}
+	// exceptionallyAsync is CompletableFuture's own (Java 12+), not the interface's.
+	if _, ok := Lookup("java.util.concurrent.CompletionStage", "exceptionallyAsync", "(Ljava/util/function/Function;)Ljava/util/concurrent/CompletionStage;"); ok {
+		t.Error("CompletionStage#exceptionallyAsync cataloged")
+	}
+	n := 0
+	for _, m := range DefaultCatalog {
+		if m.Owner == "java.util.concurrent.CompletableFuture" || m.Owner == "java.util.concurrent.CompletionStage" {
+			n++
+		}
+	}
+	if n != len(completionCatalog) || n != 2*(12*3+1)+2+3+4 {
+		t.Errorf("%d completion entries in DefaultCatalog, catalog has %d", n, len(completionCatalog))
+	}
+}

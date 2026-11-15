@@ -19,6 +19,9 @@ roots:
     - org.springframework.web.bind.annotation.DeleteMapping
     - org.springframework.web.bind.annotation.PatchMapping
     - org.springframework.scheduling.annotation.Scheduled
+    # A method with two @Scheduled holds only their @Repeatable container
+    # in the class file (testdata/events, spring:events oracle).
+    - org.springframework.scheduling.annotation.Schedules
     - org.springframework.context.event.EventListener
     - org.springframework.context.annotation.Bean
   overrides: []

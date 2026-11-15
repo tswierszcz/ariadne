@@ -38,6 +38,7 @@ import (
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/spidispatch"
+	"ariadne/internal/springevents"
 	"ariadne/internal/taint"
 	"ariadne/internal/vulnmap"
 )
@@ -87,6 +88,8 @@ func algorithmVersions(mode string) map[string]string {
 		"jpa.objects": jpadispatch.Version,
 		// Framework proxies: creator-gated edges in every mode.
 		"framework.proxies": proxycatalog.Version,
+		// Spring application events: creator-gated edges in every mode.
+		"spring.events": springevents.Version,
 		// ROADMAP B3: how models and the creator gates reach their joint
 		// fixed point.
 		"analysis.coordinator": analysis.CoordinatorVersion,

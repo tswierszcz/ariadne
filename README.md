@@ -676,6 +676,72 @@ CHA expands Spring AOP's interceptor chain and target sources, so some paths
 through repositories are CHA over-approximations (petclinic/WebGoat: paths
 changed, no verdict).
 
+**Spring application events (`spring:events`, `internal/springevents`,
+version `ev1`; FRAMEWORKS F4 slice 1).** `publishEvent` goes through the
+context's multicaster to every listener whose event type matches. A class
+implementing `ApplicationListener` is called through that interface, and
+CHA already reaches it; an annotated listener method is not — Spring wraps
+it in an `ApplicationListenerMethodAdapter` whose `doInvoke` calls it
+through `Method#invoke`. The model adds an edge (basis `model`) from a
+publishing call site to every annotated listener method that may receive
+the event:
+- a publishing site is a call of `publishEvent(Object)` or
+  `publishEvent(ApplicationEvent)` on `ApplicationEventPublisher` or a
+  subtype, anywhere in the input (the context itself publishes
+  `ContextRefreshedEvent`/`ContextClosedEvent`); a publisher forwarding its
+  own parameter (a child context to its parent) is left out, and the
+  adapter's own re-publishing of a listener's return value publishes the
+  registered listeners' return types (arrays: the element type;
+  collections and futures: unknown);
+- the published type is the argument's local value: `new T(…)` is exactly
+  `T`, a parameter is followed to its callers, anything else is its static
+  type — or the `publishEvent` parameter's type (`Object`: every listener)
+  when nothing narrower is known (counted as an *unbounded* site);
+- a listener method is a method of an application class annotated
+  `@EventListener` or with an annotation meta-annotated with it
+  (`@TransactionalEventListener`); its event types are the annotation's
+  `classes`/`value`, else its one parameter's type;
+- it matches when Spring could deliver the event: the listener type is a
+  supertype of the published type (a payload that is not an
+  `ApplicationEvent` arrives wrapped in a `PayloadApplicationEvent`, so a
+  listener on that type receives it too), or, for a static bound, also a
+  subtype of it;
+- the listener's class must be related (equal, subtype, supertype) to a
+  bean type the spring profile found — a stereotype class, a `@Bean`
+  product, an XML bean; a listener on a class that is no bean gets nothing;
+- gate: a reachable method creating an `ApplicationListenerMethodAdapter`
+  (the `EventListenerFactory` implementations).
+
+The edge says the listener *may* run: a SpEL `condition`, a
+`@TransactionalEventListener`'s phase (it runs only for an event published
+in a transaction, after commit by default), an `@Async` executor and the
+event's generic type arguments are not evaluated. Listener methods of
+library classes and Spring Boot's early events (sent through the
+multicaster directly, before the context exists) are out of scope.
+The profile's annotation roots are unchanged: under `-roots profile` every
+`@EventListener` method is still a root by itself, so the model adds
+mostly paths (publisher → listener) there; a `@TransactionalEventListener`
+is no annotation root and is reached only through this edge. Since the same
+slice the `spring` profile also lists `@Schedules` as a root annotation:
+a method with two `@Scheduled` holds only their `@Repeatable` container in
+the class file, and was no root. Real-JVM oracle `testdata/events`
+(`scripts/events-oracle.sh`, `TestEventsOracle`, Spring 5.3.6): before the
+model the graph missed 5 of the 7 listener bodies the JVM ran (all but the
+`ApplicationListener` and nothing on the `@EventListener` adapter's last
+hop) and the repeated `@Scheduled` method was no root; now every one is
+reached, and the two listeners the JVM never runs (an event type nothing
+publishes; a class that is no bean) get no edge. Log line `Spring events
+(spring:events ev1): N listener methods (N on beans), N publishing sites
+(N unbounded, N forwarding left out); N candidates, N edges added, …`;
+snapshots record `spring.events`. Control app `scripts/prepare-events-demo.sh`
+(Spring Boot 2.4.3, a `@TransactionalEventListener` calling commons-text
+1.9 `StringSubstitutor#replace`): under `-roots profile` CVE-2022-42889 was
+`NOT_REACHABLE` and is now `REACHABLE` through `main` → `OrderService#place`
+→ the listener when the event is published (the JVM runs the listener), and
+stays `NOT_REACHABLE` in the variant publishing another type (the JVM does
+not run it). petclinic, WebGoat and JPetStore have no annotated listener:
+their v1 results are byte-identical (`-roots all`/`profile`, CHA/RTA).
+
 **JDBC objects (`jdbc:objects`, `internal/jdbcdispatch`, version `j2`).**
 The service-provider model reaches a driver's classes, but a real
 application rarely talks to the driver directly: Hibernate or Spring's
@@ -1401,8 +1467,8 @@ all; `model`: a reachable call site connected to a modeled target
 (the B3 registry models — ServiceLoader, servlet container dispatch,
 service-provider dispatch — and the creator-gated models: servlet and JDBC
 objects, framework proxies);
-`callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged` registration connected to the
-callback's own `run`/`call` method, ASYNC_CALLBACKS A2; `methodhandle`:
+`callback`: a resolved `Thread`/`Executor`/`AccessController.doPrivileged`/`CompletionStage` registration connected to the
+callback's own method, ASYNC_CALLBACKS A2/A3; `methodhandle`:
 a resolved `MethodHandle#invoke`/`invokeExact` connected to its target,
 DYNAMIC_LINKAGE L2; `deserialization`: a Java serialization entry
 connected to a serialization callback, DESERIALIZATION Z1) and, when there
@@ -1834,11 +1900,47 @@ report:
   straight to its own implementation method (DYNAMIC_LINKAGE L0/L1)
   (ASYNC_CALLBACKS A1 — "Callback identities resolved" section), and a
   real call-graph edge connects the registration site to that method
-  (ASYNC_CALLBACKS A2 — "Callback call-graph edges" section). Nothing
-  beyond the registration→callback edge itself is modeled
-  (`CompletionStage`, listeners, reactive operators), and a lambda whose
-  own bootstrap isn't LambdaMetafactory (e.g. `StringConcatFactory`) is
-  left unresolved rather than guessed at.
+  (ASYNC_CALLBACKS A2 — "Callback call-graph edges" section). Since
+  ASYNC_CALLBACKS A3 slice 1 the catalog also holds every
+  callback-taking method of `CompletionStage`, on the interface and as
+  `CompletableFuture` overrides it (`thenApply`/`thenAccept`/`thenRun`,
+  `thenCombine`/`thenAcceptBoth`/`runAfterBoth` and the `*Either` forms —
+  the callback is then the second argument — `thenCompose`, `handle`,
+  `whenComplete`, `exceptionally`, each with its `*Async` and
+  `*Async(…, Executor)` forms), `CompletableFuture`'s
+  `exceptionallyAsync`/`exceptionallyCompose*` (Java 12+) and
+  `supplyAsync`/`runAsync`. A plain continuation is `immediate-or-async`
+  (it runs on the registering thread when the stage is already complete),
+  an `*Async` one and a source `async-maybe`. `exceptionally*` callbacks
+  run only when the previous stage fails: their edges carry the condition
+  `exceptional`, kept in the v2 path evidence (`"condition"`) and shown on
+  the report's arrow (`→[library_model: callback, if exceptional]`);
+  `handle`/`whenComplete` run on both outcomes and carry none. The real-JVM
+  oracle `testdata/continuations` (`scripts/continuations-oracle.sh`,
+  `TestContinuationsOracle`) measured that a lambda or method reference
+  handed to a continuation was already reached — the edge from the
+  `invokedynamic` creating it — so for those the model adds the
+  registration edge and its condition, i.e. the explanation; what it adds
+  to reachability is an object of a class handed to a continuation
+  (`runAsync(new Task(), executor)`, `thenApply(new Render())`), whose
+  method nothing reached before. Whether a stage ever completes, and how,
+  is not decided: a continuation of a future nothing completes, the
+  normal branch of a stage that always fails and the exceptional branch
+  of one that always succeeds keep their "may run" edge (the oracle has
+  one of each). Edges are per registration site, so a long pipeline needs
+  no budget. Control app `scripts/prepare-continuations-demo.sh`
+  (commons-text 1.9, `thenApply(new Render())`): CVE-2022-42889 under
+  `-profile generic -roots profile` was `NOT_REACHABLE` and is now
+  `REACHABLE` (`main` → `Render#apply(Object)` bridge → `apply(String)` →
+  `StringSubstitutor#replace`), as on the JVM; the variant creating the
+  `Render` without registering it stays `NOT_REACHABLE`, as on the JVM.
+  Reference apps (petclinic, WebGoat, JPetStore; `-roots all`/`profile`,
+  CHA/RTA): +9/+9/+2 registration sites and `callback` edges, all in
+  libraries; v1 results byte-identical.
+  Not modeled: listeners, reactive operators, Spring's `ListenableFuture`,
+  a callback passed through a parameter or field (a reported gap, as
+  before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.
+  `StringConcatFactory`), left unresolved rather than guessed at.
 - **Lambdas run in another method than the one creating them** get a `sam`
   edge only where DATA_FLOW follows the value (DYNAMIC_LINKAGE L1, above):
   not through the result of an instance call, an array element, a

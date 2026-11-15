@@ -18,8 +18,8 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 | DATA_FLOW | [D0–D5, zarchiwizowane](../archive/2026-11-07/data_flow/COMPLETION.md) | D0–D5: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (D5 — PR #13) | IR/CFG/wartości lokalne (D0–D2), pięć wycinków międzyproceduralnych wartości i streszczenia zależności `internal/flowsum` (D3), pilotaż taint `-taint` opt-in (D4), kwalifikacja: wyrocznia JVM, kształty, pomiar (D5, `docs/TAINT_QUALIFICATION.MD`). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | SERVICE_LOADING | [S0–S4, zarchiwizowane](../archive/2026-11-05/service_loading/COMPLETION.md) | S0–S4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-05; po zamknięciu: dispatch SPI na pomijanych odbiorcach (`service-provider:dispatch`, 2026-11-08) | Load sites, lazy materialization, dispatch, JPMS (`-jpms-scenario`), rozpoznane loadery, D3 parametry/pola, `doPrivileged`; S4: wyrocznia prawdziwego JVM (62 pary, 0 nadmiarowych krawędzi, 1 zadeklarowana luka), pomiar historyczny (`results.json` bajtowo stały na 11 buildach). Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | REFLECTION | [R0–R4](REFLECTION_IMPLEMENTATION_PLAN.MD) | R0+R1+R2: DONE dla całego zadeklarowanego zakresu ("R0–R2 stanowią pierwsze wydanie"); R3: zmierzone dwukrotnie (2026-11-05, 2026-11-09) z zerowym zyskiem; wycinek 3 (`r3-3`, 2026-11-15) DONE for this scope — spis pochodzenia znalazł 2 miejsca (Thymeleaf, `Method` w parametrze z pola statycznego), rozwiązywane przez wywołujących; reszta R3 (konfiguracja, `setAccessible`, `Constructor` przez parametr) NOT STARTED; R4: UNASSESSED | `Class.forName("literał")` rozwiązuje się do `KindConst`/`java.lang.Class` (reużycie, nie nowy typ). `getMethod`/`getDeclaredMethod` z literalną nazwą i literalną tablicą `Class[]` rozwiązuje się do nowego `KindReflectiveMethod` — wymagało nowej maszynerii: `KindArray` (wskaźnikowy, mutowalny przez `aastore`, prawdziwa semantyka referencji JVM) i minimalnego śledzenia literałów `int` (wcześniej całkowicie poza zakresem D2). Zmierzony efekt R0+R1 na petclinic/WebGoat: **zero** (żadna z aplikacji nie używa tych API), uczciwie odnotowane; brak crasha na pełnej hierarchii (29k/40k klas), bajt-identyczny `results.json`. R2's pierwsza połowa: `internal/reflectinvoke` łączy każde miejsce `Method#invoke`, którego receiver rozwiązuje się do powyższego faktu, realną krawędzią grafu (`BasisReflection`) do realnego celu dyspozycji (typ alokacji, nie tylko `Class` z lookupu), z uczciwym `Gap` przy niezgodności liczby argumentów/nierozpoznanym typie parametru/braku deklaracji — **efekt niezerowy**, inaczej niż R0/R1: petclinic 3/59/29/51/6→3/62/26/51/6 (5 krawędzi), WebGoat 40/43/21/56/0→42/44/18/56/0 (3 krawędzie). R2's druga połowa (nowa): analogiczna maszyneria dla `getConstructor`/`getDeclaredConstructor` (`KindReflectiveConstructor`, reużywa R1's `KindArray`, bez nowego modelu tablicy) i `Constructor#newInstance` → realna krawędź do **dokładnie jednego** `<init>` (konstruktor nigdy nie jest dziedziczony — JVMS 5.4.3.3, więc żadnego overload-insensitive doboru jak przy `Method#invoke`), plus powiązana krawędź `<clinit>` tą samą parą Kind/Basis, jaką `ApplyServiceLoaderEdges` już stosuje dla SERVICE_LOADING S2. Zmierzone: realne krawędzie istnieją (petclinic 264 miejsc/6 rozwiązań/7 krawędzi, WebGoat 264/5/5), ale **zero dodatkowego efektu na reachability** poza tym, co dała już pierwsza połowa — liczby REACHABLE/FRAMEWORK/NOT_REACHABLE/UNKNOWN identyczne przed/po na obu aplikacjach, uczciwie odnotowane (nowo-konstruowalne klasy nie leżą akurat na ścieżkach podatnych metod w tych dwóch aplikacjach). Dwa przebiegi offline na każdej dają bajt-identyczny `results.json`. |
-| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F2 (siódmy wycinek, 2026-11-08): dispatch kontenera servletów — model B3 `servlet-container:dispatch` do zarejestrowanych servletów/filtrów; F2 (`s2`, 2026-11-09): wywołania na obiektach żądania/odpowiedzi/łańcucha do implementacji tworzonych przez osiągalny kod (WebGoat: 15 Undertow `FRAMEWORK` → `REACHABLE`, 4 wiarygodne, 11 artefaktów CHA); F2 (`l2`/`l2-2`, 2026-11-10): appendery i komponenty Joran logback spoza konfiguracji (też domyślnej Spring Boot) + builder `6` — petclinic/WebGoat: CVE-2024-12798 `FRAMEWORK` → `NOT_REACHABLE`, CVE-2021-42550 zostaje (selektor JNDI z właściwości JVM); F2 (`l1`, 2026-11-10): appendery log4j 1.2 spoza pakowanej konfiguracji nie są celami CHA/RTA (JPetStore: 3 fałszywe `REACHABLE` usunięte, aplikacja kontrolna zgodna z JVM); F2 (`j1`, 2026-11-09): wywołania na obiektach JDBC (`java.sql`/`javax.sql.DataSource`) do implementacji tworzonych przez osiągalny kod (ślad petclinic: wszystkie 22 relacje JDBC w grafie, bez zmian werdyktów); F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony; wycinek 3 (2026-11-10, `framework:proxies` `x1`): katalog proxy MyBatis/Spring Data/Spring ORM — ślady: petclinic `proxy` 13 → 0, JPetStore 8 → 2, JPetStore CVE-2022-41853 `REACHABLE`; wycinek 2 (dispatch przez proxy JDK) zmierzony 2026-11-09 i NOT STARTED — 0 z 12 relacji `proxy` ma ograniczony zbiór interfejsów; reszta UNASSESSED; F4–F5: UNASSESSED | Dispatch kontenera (2026-11-08): `Servlet#service`/`Filter#doFilter`/szablon `HttpServlet` → servlety/filtry z web.xml, `@WebServlet`/`@WebFilter`, beanów i katalogu autokonfiguracji Boot; petclinic: `DispatcherServlet` osiągalny, fałszywie negatywne CVE-2024-38809 przy RTA usunięte; WebGoat bez rejestracji (launcher poza wejściem). F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
-| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3–A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
+| FRAMEWORKS | [F0–F5, F1 zarchiwizowane](../archive/2026-10-23/frameworks/FRAMEWORKS_F1.md) | F0, F1: DONE (F1 dla swojego faktycznego zakresu); F2: sześć wycinków (DI, oznaczone korzenie web.xml, `@Bean` factory methods, katalog zewnętrznych punktów wejścia, Spring Data repository beans, `@Value`-owe właściwości) + korekta false positives zrobione; F2 (siódmy wycinek, 2026-11-08): dispatch kontenera servletów — model B3 `servlet-container:dispatch` do zarejestrowanych servletów/filtrów; F2 (`s2`, 2026-11-09): wywołania na obiektach żądania/odpowiedzi/łańcucha do implementacji tworzonych przez osiągalny kod (WebGoat: 15 Undertow `FRAMEWORK` → `REACHABLE`, 4 wiarygodne, 11 artefaktów CHA); F2 (`l2`/`l2-2`, 2026-11-10): appendery i komponenty Joran logback spoza konfiguracji (też domyślnej Spring Boot) + builder `6` — petclinic/WebGoat: CVE-2024-12798 `FRAMEWORK` → `NOT_REACHABLE`, CVE-2021-42550 zostaje (selektor JNDI z właściwości JVM); F2 (`l1`, 2026-11-10): appendery log4j 1.2 spoza pakowanej konfiguracji nie są celami CHA/RTA (JPetStore: 3 fałszywe `REACHABLE` usunięte, aplikacja kontrolna zgodna z JVM); F2 (`j1`, 2026-11-09): wywołania na obiektach JDBC (`java.sql`/`javax.sql.DataSource`) do implementacji tworzonych przez osiągalny kod (ślad petclinic: wszystkie 22 relacje JDBC w grafie, bez zmian werdyktów); F3: pierwszy wycinek (tożsamość proxy/target/interceptor, `internal/aop`) zrobiony; wycinek 3 (2026-11-10, `framework:proxies` `x1`): katalog proxy MyBatis/Spring Data/Spring ORM — ślady: petclinic `proxy` 13 → 0, JPetStore 8 → 2, JPetStore CVE-2022-41853 `REACHABLE`; wycinek 2 (dispatch przez proxy JDK) zmierzony 2026-11-09 i NOT STARTED — 0 z 12 relacji `proxy` ma ograniczony zbiór interfejsów; reszta UNASSESSED; F4: wycinek 1 (`spring:events` `ev1`, 2026-11-15) DONE for this scope — `publishEvent` → listenery `@EventListener`/`@TransactionalEventListener` beanów, `@Schedules` jako korzeń; F5: UNASSESSED | Dispatch kontenera (2026-11-08): `Servlet#service`/`Filter#doFilter`/szablon `HttpServlet` → servlety/filtry z web.xml, `@WebServlet`/`@WebFilter`, beanów i katalogu autokonfiguracji Boot; petclinic: `DispatcherServlet` osiągalny, fałszywie negatywne CVE-2024-38809 przy RTA usunięte; WebGoat bez rejestracji (launcher poza wejściem). F0 oddziela wykrycie frameworka od aktywnego profilu. F1 dostarcza realne wartości adnotacji (Spring MVC routes/bean names/`@Profile`), ograniczony `web.xml`/XML bean definitions odczyt, i wykrywanie konfliktów nazw beanów. F2's pierwszy wycinek: `@Autowired` injection points rozwiązane po typie/qualifier/primary wobec F1's `BeanNames` — zmierzone pozytywnie na WebGoat (7/74), poprawnie 0/8 na petclinic (Spring Data repository, inny mechanizm). F2's drugi wycinek: `web.xml`-owe servlety/filtry/listenery dostają realne korzenie pod `-roots profile` — zweryfikowane tylko na testach jednostkowych (petclinic/WebGoat nie mają `web.xml`). F2's trzeci wycinek: `@Bean` factory methods na `@Configuration` klasach dodane do tego samego katalogu beanów — WebGoat skacze z 7/74 do 40/74 rozwiązanych (21 `@Bean` metod znalezionych), petclinic bez zmiany (0/8, niezależne typy). F2's czwarty wycinek: `ExternalEntries` scala `Routes`+`WebXMLRoots` w jeden katalog z `Basis`/`Active` (F0's `ExternalEntry` kontrakt, teraz realny) — czysto raportowy, zero nowych korzeni/krawędzi; petclinic 17, WebGoat 19 wpisów. F2's piąty wycinek: `RepositoryBeans` (interfejsy aplikacji — podtypy `Repository`, ten sam sprawdzian co `synthetic_edges`) — petclinic skacze z 0/8 do **8/8**. **Korekta (nie wycinek):** liczby WebGoat (74/7/40/50) były zawyżone fałszywymi trafieniami niejawnej reguły "jedyny konstruktor" Springa 4.3 (Lombok, enumy, ręczne `new`) — po poprawce w `InjectionPoints` prawdziwe liczby to **43 punkty, 37 rozwiązanych, 6 w pełni wyjaśnionych** (1 `@Value`, 4 `List<Bean>`, 1 framework-provided bean). F2's szósty wycinek: `@Value`-owe punkty wstrzyknięcia (pole lub parametr konstruktora z `@Value(...)`) rozpoznane jako **własna, odrębna kategoria** — nigdy nie przechodzą przez wyszukiwanie beanów (Spring rozwiązuje je przez property sources, nie katalog beanów), więc `Reason` mówi teraz "a @Value config value (...), not a bean lookup", nie mylące "no known bean". Ujawniło też, że pole-samo-`@Value` (bez `@Autowired`) **nigdy wcześniej nie było skanowane** — WebGoat skacze z 43 do **45** punktów (2 nowo znalezione pola `LessonMenuService#excludeCategories`/`excludeLessons`), z czego **8** nierozwiązanych teraz w pełni wyjaśnionych: **3** realne `@Value` (było 1 — pozostałe 2 to właśnie te nowo znalezione pola, które poprzednia sesja błędnie zaliczyła do "4 `List<Bean>`"), **4** realne `List<Bean>` (parametry konstruktora, odrębne od pól), **1** framework-provided bean. petclinic bez zmian (8/8, brak `@Value` w kodzie). Zero wpływu na reachability na obu aplikacjach (`@Value` to fakt konfiguracyjny, nigdy krawędź grafu). Rejestr B3 — nietknięty. |
+| ASYNC_CALLBACKS | [A0–A4](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) | A0–A2 (MVP): DONE; A3: wycinek 1 (2026-11-15) DONE for this scope — katalog kontynuacji `CompletionStage`, warunek `exceptional` w dowodzie; reszta A3 (ukończenie, listenery, reactive) i A4: UNASSESSED | A2 dodaje realną krawędź "może wykonać" do `run`/`call` albo (po DYNAMIC_LINKAGE L0/L1) prosto do implementacji lambdy — 67/44 z 69/46 z 135/134 rozwiązanych na petclinic/WebGoat, z 2 szczerymi lukami dla klas JDK poza analizowanym uniwersum. A0–A2 domykają zadeklarowane MVP tego obszaru; continuations/listenery/reactive (A3) nietknięte. |
 | DYNAMIC_LINKAGE | [L0–L4](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) | L0, L1 (creation site; SAM-call materialization 2026-11-09; PR #30, [L1 zarchiwizowane](../archive/2026-11-09/dynamic_linkage/DYNAMIC_LINKAGE_L1.md)), L2 (same-method + static-field case): DONE; L2 (instance-field/return-value tracking), L3–L4: UNASSESSED | L1: lambda/method reference uruchamiana przez interfejs funkcyjny w innej metodzie niż tworząca dostaje krawędź `sam` (`internal/samcall`, builder `4`); na śladzie petclinic luki `sam-call` 50 → 22 (12 z nich to nie lambdy). L2 wciąż daje **0 z 10/46** realnych krawędzi na petclinic/WebGoat (pola instancyjne / wynik innego wywołania). |
 | DESERIALIZATION | [Z0–Z4, zarchiwizowane](../archive/2026-11-07/deserialization/COMPLETION.md) | Z0–Z4: DONE (dla zadeklarowanych zakresów); obszar zamknięty 2026-11-07 (Z3 — PR #11, `e818150`) | Modele wejść (Java serialization, XStream), krawędzie „może wykonać” do callbacków, polityki literalne (Z2), katalog 5 łańcuchów `z3-1` per wejście i per kopia klas, dopływ danych żądania per wejście × łańcuch (`-taint`), v2 i powiązania przy ustaleniach, wyrocznia JVM i zestaw CVE. Ograniczenia: zob. COMPLETION.md i SUPPORT.MD (wiersz Partial). |
 | GRAPH_PRECISION | [P0–P4](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) | P0: DONE (2026-11-07; PR #15, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)); P1: DONE (2026-11-08; PR #17, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)); P2: DONE (2026-11-08; PR #19, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)); P4: DONE (2026-11-08; PR #21, [zarchiwizowane](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)); P3: wycinek 1 (`p3-1`, 2026-11-15) DONE for this scope — eksperymentalny tryb `-callgraph-mode pta`, 1–3,4 % krawędzi CHA ponad RTA, 0 zmian werdyktów, 2,7–3,7× czasu RTA; trzecia aplikacja pomiarowa JPetStore (WAR, 2026-11-09): żaden model nie zmienia werdyktu, 3 fałszywe negatywy domyślnego `-roots all` (korzenie web.xml, naprawione); 2026-11-10: ręczne mapowania HSQLDB/log4j 1.2 (7 sinków) — 3 artefakty CHA przez appendery log4j, RTA poprawne, `j1` bez wpływu; WebGoat: CVE-2022-41853 `REACHABLE` (lekcja SQLi wykonuje SQL z żądania) | Ponowny benchmark po modelu dispatchu servletów (2026-11-08): petclinic — CVE-2024-38809 i CVE-2024-22259 FRAMEWORK przez ścieżkę żądania, zostają 4 poprawne zmiany RTA; WebGoat bez zmian (launcher Boot poza wejściem); domyślnie nadal CHA. P4: benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `testdata/graphbench`) — RTA <1 s, `-roots all` bez zmian werdyktów, przy `-roots profile` 5 z 8 zmian poprawnych, 1 nierozstrzygnięta, 2 fałszywie negatywne przez niemodelowany dispatch kontener → servlet (`javax.*` skip); domyślny tryb pozostaje CHA. P2: opt-in `-callgraph-mode rta` — punkt stały na katalogu P1 zawęża krawędzie CHA do klas tworzonych przez osiągalny kod, fallback nieznanych alokacji z jawnymi lukami, wyrocznia JVM `testdata/rta`; petclinic/WebGoat `-roots profile`: −17% krawędzi CHA, 6/2 FRAMEWORK → NOT_REACHABLE (wszystkie z `MODEL_INCOMPLETE`), żaden REACHABLE nie stracony; domyślny tryb bez zmian. Następny: P3 (ograniczone points-to) albo P4 (benchmark). Szczegóły we wpisie GRAPH_PRECISION:P2. |
@@ -29,6 +29,136 @@ Stany faz: `UNASSESSED`, `READY`, `IN_PROGRESS`, `NEEDS_VERIFICATION`, `DONE`, `
 Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogólne `UNASSESSED` w tabeli obszarów zastąp krótkim podsumowaniem rzeczywistego postępu; nie oznaczaj całego obszaru DONE po jednej fazie.
 
 ## Rejestr faz
+
+### ASYNC_CALLBACKS:A3 — kontynuacje `CompletionStage`, wycinek 1 — DONE for this scope (2026-11-15)
+
+- **Zakres (zatwierdzony 2026-11-15):** katalog operacji
+  `CompletionStage`/`CompletableFuture` (kontynuacje normalne,
+  `exceptionally`, `handle`/`whenComplete`, `*Async`, źródła
+  `supplyAsync`/`runAsync`) z krawędzią „może wykonać” przez istniejący
+  mechanizm A1/A2; także w kodzie bibliotek (decyzja 1); gałąź wyjątku jako
+  adnotacja w dowodzie, bez nowego rodzaju krawędzi (decyzja 2); budżet.
+  Poza zakresem: listenery, reactive, taint D4, `ListenableFuture`.
+- **Wyrocznia:** `testdata/continuations` (`scripts/continuations-oracle.sh`,
+  `TestContinuationsOracle`, tylko JDK): dwie kontynuacje po
+  `supplyAsync`, `thenCompose`, `thenCombine`, nieudany etap
+  (`thenApply` pominięte, `exceptionally`/`handle`/`whenComplete`
+  wykonane), udany etap (`exceptionally` niewykonane), `runAsync`
+  z klasą `Runnable` i `thenRunAsync` na executorze, wywołanie przez
+  `CompletionStage`, future nigdy nieukończony, callback przez parametr.
+  **Pomiar przed modelem:** lambdy i referencje metod były już osiągane
+  (krawędź z `invokedynamic` tworzącego lambdę, DYNAMIC_LINKAGE L0) —
+  także przekazana przez parametr; nieosiągalny był tylko `Task#run`
+  (obiekt klasy przekazany do `runAsync`). Realny zysk osiągalności
+  dotyczy więc obiektów klas przekazanych do kontynuacji; dla lambd model
+  dodaje krawędź rejestracji i warunek (wyjaśnienie ścieżki).
+- **Zrealizowane:** `internal/callback` — `completionCatalog` (83 wpisy:
+  każda metoda `CompletionStage` z callbackiem na obu właścicielach,
+  formy `*Async`, indeks 1 dla `thenCombine`/`thenAcceptBoth`/
+  `runAfterBoth`/`*Either`, `exceptionallyAsync`/`exceptionallyCompose*`
+  tylko na `CompletableFuture`, `supplyAsync`/`runAsync`), pole
+  `RegistrationModel.Condition` (`exceptional` dla `exceptionally*`);
+  warunek przechodzi przez `CallbackEdge` → `callgraph.CallSite.Condition`
+  → `reach.EdgeEvidence.Condition` (`"condition"` w v2, pominięte gdy
+  puste; v1 bez zmian) i strzałkę raportu (`→[library_model: callback,
+  if exceptional]`).
+- **Budżet:** nie wprowadzony — krawędzie są per miejsce rejestracji,
+  bez rozwijania łańcucha, więc liczba krawędzi jest liniowa względem
+  liczby miejsc; nie ma czego obcinać. Zapisane jako decyzja, nie luka.
+- **Wynik:** wyrocznia — 12 z 12 ciał wykonanych przez JVM osiągalne,
+  16 krawędzi `callback` dokładnie zgodnych z oczekiwanymi; jedyna luka
+  rejestracji to `attach` (callback w parametrze); trzy kontynuacje
+  niewykonane przez JVM (normalna gałąź na nieudanym etapie,
+  `exceptionally` na udanym, future nigdy nieukończony) zachowują krawędź
+  „może” — model nie rozstrzyga ukończenia. Aplikacja kontrolna
+  `scripts/prepare-continuations-demo.sh` (commons-text 1.9,
+  `thenApply(new Render())`, `-profile generic -roots profile`):
+  CVE-2022-42889 `NOT_REACHABLE` (przed) → `REACHABLE` (`main` →
+  `Render#apply(Object)` → `apply(String)` → `replace`), JVM uruchamia
+  `Render`; wariant bez rejestracji — `NOT_REACHABLE`, zgodnie z JVM.
+  Aplikacje referencyjne (petclinic, WebGoat, JPetStore; `-roots all`/
+  `profile` × CHA/RTA, porównanie z `28f1ebb` na tym samym cache offline):
+  miejsca rejestracji 435/453/98 → 444/462/100, krawędzie `callback`
+  288/287/74 → 297/296/76 (wszystkie nowe w bibliotekach); v1 bajtowo
+  identyczne we wszystkich 12 konfiguracjach.
+- **Weryfikacja:** `TestContinuationsOracle`, `TestAsyncOracle` (bez
+  zmian), `TestCompletionCatalog`, `TestPathEvidenceCondition`;
+  `go test ./...`, `go vet ./...`. Dokumentacja: README, SUPPORT.MD.
+- **Ograniczenia:** brak analizy ukończenia etapu (kryterium „nieaktywny
+  pipeline” z A3 nierozstrzygnięte — krawędź zostaje „może”); listenery,
+  reactive, `ListenableFuture`, przekazanie argumentów do taint D4 —
+  nietknięte; callback przez parametr/pole — raportowana luka jak w A1;
+  przy dwóch rejestracjach tej samej pary metod z różnym warunkiem dowód
+  niesie warunek pierwszej.
+- **Następny krok (wymaga zgody):** A3 — analiza ukończenia (future bez
+  `complete*`), listenery albo wybrana biblioteka reactive; albo inny
+  obszar.
+
+### FRAMEWORKS:F4 — zdarzenia aplikacyjne Springa (`spring:events` `ev1`), wycinek 1 — DONE for this scope (2026-11-15)
+
+- **Zakres (zatwierdzony 2026-11-15):** krawędź z `publishEvent` do
+  metod listenerów (`@EventListener`, meta-adnotacje, w tym
+  `@TransactionalEventListener`) zarejestrowanych beanów, z bramką twórców
+  i dopasowaniem po typie zdarzenia (z dziedziczeniem); `@Scheduled` pod
+  `-roots profile`; wyrocznia JVM, aplikacja kontrolna, pomiar na
+  aplikacjach referencyjnych.
+- **Korekta zakresu po przeglądzie kodu:** `@EventListener` i `@Scheduled`
+  już były korzeniami adnotacji profilu `spring` (bez sprawdzania
+  rejestracji). Reguła korzeni pozostała bez zmian (żadnego nowego
+  wyniku negatywnego); model dodaje ścieżki publikujący → listener i
+  domyka to, czego korzenie nie obejmowały: `@TransactionalEventListener`
+  (meta-adnotacja, nie korzeń) i `@Schedules` (dwa `@Scheduled` na jednej
+  metodzie — w pliku klasy jest tylko kontener `@Repeatable`).
+- **Wyrocznia:** `testdata/events` (`scripts/events-oracle.sh`,
+  `TestEventsOracle`; jary Spring 5.3.6 z `testdata/tx/deps`, bez kopii):
+  listenery na dokładnym typie, nadtypie, `classes=` bez parametru
+  (`ContextRefreshedEvent` publikowany przez kontener), na klasie z
+  `@Bean`, `@TransactionalEventListener` po commicie, `ApplicationListener`;
+  przypadki ujemne: zdarzenie nigdy nie publikowane, klasa niebędąca beanem.
+  Przed modelem (bez korzeni adnotacji) graf nie osiągał **5 z 7** ciał
+  listenerów (CHA dociera tylko do `ApplicationListener`), a `Ticker#twice`
+  (`@Schedules`) nie był korzeniem.
+- **Zrealizowane:** `internal/springevents` — katalog listenerów (klasy
+  aplikacji; adnotacja `@EventListener` lub meta-adnotacja do głębokości 3;
+  typy z `classes`/`value` albo z jedynego parametru), miejsca publikacji
+  (`publishEvent(Object|ApplicationEvent)` na podtypach
+  `ApplicationEventPublisher` w całym wejściu), typ publikowany z wartości
+  lokalnej D2 (`new` dokładny, parametr przez `CallerIndex`, inaczej typ
+  statyczny, inaczej typ parametru `publishEvent` — miejsce
+  „unbounded”), pominięcie przekazywania własnego parametru przez
+  implementację wydawcy, re-publikacja wyniku listenera
+  (`ApplicationListenerMethodAdapter`) = typy zwracane listenerów;
+  dopasowanie jak w Springu (nadtypy, opakowanie `PayloadApplicationEvent`);
+  rejestracja = relacja typu z typem beana (stereotypy, produkty `@Bean`,
+  beany XML); bramka: osiągalny twórca `ApplicationListenerMethodAdapter`.
+  Podłączenie w `cmd/ariadne` jako bramka punktu stałego B3 (uczestnik
+  `spring:events`, klucz snapshotu `spring.events`, linia logu). Profil
+  `spring`: `@Schedules` w `roots.annotations`.
+- **Wynik:** wyrocznia — wszystkie 7 ciał i oba `@Scheduled` osiągnięte;
+  brak krawędzi do listenera nieopublikowanego typu i do klasy niebędącej
+  beanem. Jedyna dodatkowa krawędź na fixture: `EventPublicationInterceptor`
+  (publikuje `ApplicationEvent` tworzony refleksyjnie → ograniczenie
+  statyczne) → listener `ContextRefreshedEvent` — dopuszczalne „może”.
+  Aplikacja kontrolna `scripts/prepare-events-demo.sh` (Boot 2.4.3,
+  `@TransactionalEventListener` → commons-text 1.9
+  `StringSubstitutor#replace`): `-roots profile` CVE-2022-42889
+  `NOT_REACHABLE` (przed) → `REACHABLE` (ścieżka `main` →
+  `OrderService#place` → listener → `replace`), JVM uruchamia listener;
+  wariant publikujący inny typ: `NOT_REACHABLE`, JVM listenera nie
+  uruchamia; `-roots all` — `REACHABLE` w obu (każda metoda aplikacji jest
+  korzeniem). Aplikacje referencyjne (petclinic, WebGoat, JPetStore; `-roots all`/`profile` × CHA/RTA, porównanie z `main` na tym samym cache offline): żadna nie ma listenera adnotowanego — v1 bajtowo identyczne we wszystkich 12 konfiguracjach; efekt mierzalny tylko na wyroczni i aplikacji kontrolnej.
+- **Weryfikacja:** `TestEventsOracle`, `TestFindOnFixture`,
+  `TestFindWithoutAdapterCreator`, `TestMatches`, `TestParamTypes`;
+  `go test ./...`, `go vet ./...`. Dokumentacja: README, SUPPORT.MD.
+- **Ograniczenia:** krawędź „może wykonać”: bez SpEL `condition`, fazy
+  transakcji (`@TransactionalEventListener` działa tylko dla zdarzeń
+  publikowanych w transakcji), `@Async`, argumentów generycznych zdarzenia;
+  bez listenerów klas bibliotecznych, wczesnych zdarzeń Boot (tylko przez
+  multicaster) i `addApplicationListener`; rejestracja to relacja typów, nie
+  rozwiązana definicja beana (`@Conditional`/`@Profile` nie stosowane).
+- **Następny krok (wymaga zgody):** F4 — kolejne wejścia (listenery
+  wiadomości: `@JmsListener`/`@KafkaListener`/`@RabbitListener`) albo
+  ASYNC_CALLBACKS:A3 (kontynuacje `CompletionStage`).
 
 ### FRAMEWORKS — profil `spring`: `spring-tx` jako pakiet frameworka (po `x3`) — DONE (2026-11-15)
 

@@ -53,6 +53,10 @@ type EdgeEvidence struct {
 	// PCs are the bytecode offsets of the call sites (none for an edge
 	// without a call site, e.g. a declared one).
 	PCs []int `json:"pcs,omitempty"`
+	// Condition is when a modeled callback runs at all: "exceptional"
+	// for a CompletionStage branch run only when the previous stage
+	// fails (ASYNC_CALLBACKS A3); omitted when unconditional.
+	Condition string `json:"condition,omitempty"`
 }
 
 // PathEdge is one step of a reported path with every edge between its
@@ -87,6 +91,9 @@ func pathEvidence(g *callgraph.Graph, path []string) ([]PathEdge, []string) {
 				ev := EdgeEvidence{Kind: string(e.Kind), Basis: string(e.Basis), Character: basisCharacter(e.Basis)}
 				for _, s := range e.Sites {
 					ev.PCs = append(ev.PCs, s.PC)
+					if s.Condition != "" {
+						ev.Condition = s.Condition
+					}
 				}
 				sort.Ints(ev.PCs)
 				step.Evidence = append(step.Evidence, ev)
@@ -120,13 +127,19 @@ func (r Result) PathLines() []string {
 		arrow := " → "
 		if i-1 < len(r.PathEdges) {
 			if s := r.PathEdges[i-1]; s.Character != CharJVMRule {
-				var bases []string
+				var bases, conds []string
 				for _, ev := range s.Evidence {
 					bases = append(bases, ev.Basis)
+					if ev.Condition != "" {
+						conds = append(conds, ev.Condition)
+					}
 				}
 				arrow = " →[" + s.Character
 				if len(bases) > 0 {
 					arrow += ": " + joinUnique(bases)
+				}
+				if len(conds) > 0 {
+					arrow += ", if " + joinUnique(conds)
 				}
 				arrow += "] "
 			}
