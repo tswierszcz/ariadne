@@ -350,6 +350,10 @@ type Coverage struct {
 	// GapProbe (ROADMAP B0 b0-4): how many NOT_REACHABLE findings each
 	// variant of the model-gap rule would mark. Measurement only.
 	GapProbe *reach.ProbeSummary `json:"gap_probe,omitempty"`
+	// UnboundedSites (ROADMAP B0 b0-5): where the reachable gap sites
+	// with no bounded candidate set are — by component and calling method.
+	// Measurement only.
+	UnboundedSites *reach.UnboundedSummary `json:"unbounded_sites,omitempty"`
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`

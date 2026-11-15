@@ -1044,6 +1044,18 @@ A measurement (ROADMAP B0 {{.Version}}), not a rule: for each NOT_REACHABLE find
 |---|---|---|---|---|---|---|
 {{range .GapProbeRows}}| {{.CVE}} | `{{.GAV}}` | {{.Probe.Unbounded}} | {{.Probe.Bounded}}{{with .Probe.BoundedByKind}} ({{gapCounts .}}){{end}} | {{.Probe.Lambda}} | {{.Probe.SkippedReceiver}} ({{.Probe.SkippedReceiverObject}}) | {{join .Probe.Marks ", "}} |
 {{end}}
+{{end}}{{with .UnboundedSites}}## Unbounded gap sites (report-only)
+
+A measurement (ROADMAP B0 {{.Version}}): where the reachable gap sites with no bounded candidate set are — the sites that make the model-gap rule mark every NOT_REACHABLE finding. A site could be bounded only by a model of what its calling method dispatches to. {{.Sites}} sites ({{gapCounts .ByKind}}) in {{.Callers}} distinct methods; the {{.TopN}} methods with the most sites hold {{.TopCallerSites}}.
+
+| Component of the calling class | Sites | Methods |
+|---|---|---|
+{{range .ByComponent}}| `{{.Component}}` | {{.Sites}} | {{.Callers}} |
+{{end}}
+| Calling method | Kind | Sites |
+|---|---|---|
+{{range .TopCallers}}| `{{.Method}}` | {{.Kind}} | {{.Sites}} |
+{{end}}
 {{end}}## Limitations
 
 - **Reflection, dynamic proxies (AOP/CGLIB, Spring Data repositories, JDK `Proxy`),
