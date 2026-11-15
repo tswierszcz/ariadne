@@ -138,10 +138,13 @@ type Result struct {
 
 // Find detects mappers and repositories and builds the candidate edges.
 // jars are the analyzed class path's jars (mapper XML and Spring XML are
-// read from them).
-func Find(h *hierarchy.Hierarchy, jars []appref.Jar) (Result, error) {
+// read from them); extraXML are Spring XML files outside the class path,
+// keyed by where they are — a WAR's WEB-INF/applicationContext.xml
+// (input.PreparedApp.WebInfBeansXMLs), where a <mybatis:scan> or a
+// MapperScannerConfigurer is usually declared.
+func Find(h *hierarchy.Hierarchy, jars []appref.Jar, extraXML map[string][]byte) (Result, error) {
 	r := Result{ByProxy: map[string]int{}}
-	mappers, err := findMappers(h, jars)
+	mappers, err := findMappers(h, jars, extraXML)
 	if err != nil {
 		return r, err
 	}
@@ -430,7 +433,7 @@ func dedupe(in []callgraph.MethodRef) []callgraph.MethodRef {
 }
 
 // findMappers applies the mapper rules of the package comment.
-func findMappers(h *hierarchy.Hierarchy, jars []appref.Jar) ([]Mapper, error) {
+func findMappers(h *hierarchy.Hierarchy, jars []appref.Jar, extraXML map[string][]byte) ([]Mapper, error) {
 	found := map[string]string{}
 	add := func(iface, why string) {
 		ci, ok := h.Lookup(iface)
@@ -442,6 +445,18 @@ func findMappers(h *hierarchy.Hierarchy, jars []appref.Jar) ([]Mapper, error) {
 		}
 	}
 	var packages []struct{ pkg, why string }
+	readXML := func(where string, data []byte) {
+		if bytes.Contains(data, []byte("<mapper")) && bytes.Contains(data, []byte("namespace")) {
+			if ns := mapperNamespace(data); ns != "" {
+				add(ns, "namespace of "+where)
+			}
+		}
+		if bytes.Contains(data, []byte("base-package")) || bytes.Contains(data, []byte(scannerConfigurer)) {
+			for _, p := range scannedPackages(data) {
+				packages = append(packages, struct{ pkg, why string }{p, "scanned by " + where})
+			}
+		}
+	}
 	for _, j := range jars {
 		r, err := zip.OpenReader(j.Path)
 		if err != nil {
@@ -458,19 +473,17 @@ func findMappers(h *hierarchy.Hierarchy, jars []appref.Jar) ([]Mapper, error) {
 			}
 			data, _ := io.ReadAll(rc)
 			rc.Close()
-			where := j.Name + "!/" + f.Name
-			if bytes.Contains(data, []byte("<mapper")) && bytes.Contains(data, []byte("namespace")) {
-				if ns := mapperNamespace(data); ns != "" {
-					add(ns, "namespace of "+where)
-				}
-			}
-			if bytes.Contains(data, []byte("base-package")) || bytes.Contains(data, []byte(scannerConfigurer)) {
-				for _, p := range scannedPackages(data) {
-					packages = append(packages, struct{ pkg, why string }{p, "scanned by " + where})
-				}
-			}
+			readXML(j.Name+"!/"+f.Name, data)
 		}
 		r.Close()
+	}
+	extra := make([]string, 0, len(extraXML))
+	for where := range extraXML {
+		extra = append(extra, where)
+	}
+	sort.Strings(extra)
+	for _, where := range extra {
+		readXML(where, extraXML[where])
 	}
 	for _, fqcn := range h.SortedFQCNs() {
 		ci, _ := h.Lookup(fqcn)

@@ -639,8 +639,11 @@ CVE-2022-41853 (HSQLDB) is `REACHABLE` under `-roots all` through the
 application's own mapper calls (it was `FRAMEWORK`, through Spring's
 database shutdown only). Limits: the edge stops at the handler —
 what it then calls through `Method#invoke` is reflection; a mapper
-registered only in code (`Configuration#addMapper`) or scanned by an XML
-outside the input (a WAR's `WEB-INF/applicationContext.xml`) is not found;
+registered only in code (`Configuration#addMapper`) is not found (since
+2026-11-15 a `<mybatis:scan>`/`MapperScannerConfigurer` in a WAR's
+`WEB-INF/*.xml` is read too — `input.PreparedApp.WebInfBeansXMLs`; on
+JPetStore it finds no mapper the mapper XML namespaces did not already
+find, so nothing changed there);
 `SqlSessionTemplate`'s interceptor is gated out when Spring creates the
 template only reflectively (JPetStore); behind `JdkDynamicAopProxy#invoke`
 CHA expands Spring AOP's interceptor chain and target sources, so some paths
