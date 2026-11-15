@@ -40,9 +40,9 @@ type Header struct {
 	// ReflectionCensus (REFLECTION R3 r3-3): receivers of the unresolved
 	// reflective calls by provenance.
 	ReflectionCensus *reflectinvoke.ProvenanceSummary
-	App            string
-	GeneratedAt    time.Time
-	AriadneVersion string
+	App              string
+	GeneratedAt      time.Time
+	AriadneVersion   string
 	// AnalysisID and the results file it was written with (CVE:F9.9):
 	// the v2 document's analysis_id and the -json file's name, format and
 	// SHA-256 — a report and a results file belong together only when

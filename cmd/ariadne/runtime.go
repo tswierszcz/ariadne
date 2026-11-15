@@ -430,7 +430,7 @@ func gapClassifier(h *hierarchy.Hierarchy, mode string) func(caller, callee stri
 		}
 		if site.Name == eName && site.Desc == eDesc && isSubtype(eOwner, site.Owner) {
 			if site.Kind == classfile.CallVirtual || site.Kind == classfile.CallInterface {
-				if mode == callgraph.ModeRTA {
+				if mode == callgraph.ModeRTA || mode == callgraph.ModePTA {
 					return runtimeevents.GapRTAPruned, site.Owner
 				}
 				return runtimeevents.GapDispatchMissing, site.Owner

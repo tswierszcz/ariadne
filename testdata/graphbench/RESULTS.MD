@@ -810,6 +810,31 @@ after the servlet dispatch model:
 Points-to (GRAPH_PRECISION P3) is still not justified by these numbers: on both apps the
 fallback, not the dispatch precision, decides most of what RTA keeps.
 
+## Receiver narrowing (GRAPH_PRECISION P3 `p3-1`, `-callgraph-mode pta`, 2026-11-15)
+
+Measured with `-profile spring`, offline, one run each (time: wall clock of the whole run;
+memory: peak RSS):
+
+| App | Roots | CHA edges after RTA (reachable callers) | Removed by PTA | Sites proven / narrowed | Time RTA → PTA | RSS RTA → PTA | Verdict changes |
+|---|---|---|---|---|---|---|---|
+| petclinic | profile | 207 525 | 7 062 (3.4 %) | 2 993 / 2 150 of 68 314 | 22.5 s → 61.2 s | 1.52 → 1.93 GB | 0 |
+| petclinic | all | 238 663 | 7 991 (3.3 %) | 3 634 / 2 479 of 74 551 | 15.7 s → 63.4 s | 1.54 → 2.05 GB | 0 |
+| WebGoat | profile | 360 915 | 9 555 (2.6 %) | 4 187 / 3 069 of 84 466 | 25.2 s → 86.5 s | 1.85 → 2.57 GB | 0 |
+| WebGoat | all | 429 858 | 12 302 (2.9 %) | 5 091 / 3 532 of 95 191 | 24.7 s → 91.9 s | 1.87 → 2.72 GB | 0 (2 paths) |
+| JPetStore | profile | 27 988 | 292 (1.0 %) | 489 / 328 of 12 044 | 4.2 s → 8.4 s | 0.34 → 0.44 GB | 0 |
+| JPetStore | all | 28 111 | 299 (1.1 %) | 489 / 328 of 12 095 | 4.4 s → 9.8 s | 0.32 → 0.44 GB | 0 |
+
+Proofs by kind (petclinic, profile): final field 1 867, parameter 380, factory 352,
+allocation 350, join of allocations 44. The two WebGoat path changes (CVE-2023-20860,
+CVE-2026-41850, `-roots all`) are right: `ClearSiteDataHeaderWriter`'s `requestMatcher` is
+a `private final` field its constructor sets to `new SecureRequestMatcher()`, so the edges
+to `MvcRequestMatcher`/`ELRequestMatcher` there were CHA artifacts; both findings stay
+`REACHABLE` through `DelegatingRequestMatcherHeaderWriter`. **Decision:** P3 stays an
+experimental opt-in mode — it removes real over-approximation, confirmed by the
+`testdata/pta` oracle, but changes no verdict on these applications and costs 2.7–3.7× RTA's
+time. Deeper sensitivity (call-site context, non-final fields, array contents) is not
+justified by these numbers.
+
 ## Using RTA (migration)
 
 - Opt in with `-callgraph-mode rta`; nothing changes for a run without it. Use it as a

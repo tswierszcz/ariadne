@@ -26,6 +26,7 @@ import (
 	"ariadne/internal/findings"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/mavenversion"
+	"ariadne/internal/pta"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
 	"ariadne/internal/relocate"
@@ -94,6 +95,9 @@ type CallGraph struct {
 	// RTA (GRAPH_PRECISION P2, -callgraph-mode rta): the fixed point's
 	// counts and the CHA edges it removed or kept by the fallback.
 	RTA *callgraph.RTAResult `json:"rta,omitempty"`
+	// PTA (GRAPH_PRECISION P3, -callgraph-mode pta): what receiver
+	// narrowing proved and removed after RTA.
+	PTA *pta.Result `json:"pta,omitempty"`
 }
 
 // Tool identifies the analyzer build.

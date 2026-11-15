@@ -225,8 +225,9 @@ implementations a virtual/interface call may run is chosen by a strategy
 (`internal/callgraph/strategy.go`); everything else below — interning,
 direct edges, class initialization, evidence — is the same for every
 strategy. CHA is the default (`-callgraph-mode cha`); RTA is an opt-in
-second mode (`-callgraph-mode rta`, P2, below), never a silent change of
-the default. The graph's settings — mode, builder version, skip rule,
+second mode (`-callgraph-mode rta`, P2, below) and receiver narrowing an
+experimental third (`-callgraph-mode pta`, P3, below), never a silent
+change of the default. The graph's settings — mode, builder version, skip rule,
 unknown-allocation policy, roots, target Java — are printed in the report
 header and recorded in v2 (`callgraph`), and two graphs are compared edge
 by edge with `-graph-out` / `-graph-compare`: by identity, not by size,
@@ -277,6 +278,32 @@ registers nothing — check the `servlet dispatch` log line. Use RTA as a second
 against the real JVM on `testdata/rta` (`scripts/rta-oracle.sh`). Checked against the real JVM on
 `testdata/callgraph` (`scripts/callgraph-oracle.sh`: overloads, a default
 method, generic and covariant bridges, an inherited body, a super call).
+
+**Receiver narrowing (GRAPH_PRECISION P3 `p3-1`, experimental opt-in
+`-callgraph-mode pta`, `internal/pta`):** RTA first, then for every CHA
+call site in a reachable method the analysis tries to prove which classes
+the receiver can be, over the shared value domain (DATA_FLOW D2/D3) — a
+`new` in the same method (the allocation key is the `new` site), a small
+join of such values, a static factory's result, a `final` field's value
+(only `<clinit>` or the constructors write it), a parameter of a static or
+private method or a constructor whose every caller is in the input (not a
+root, no reflection/model edge into it). No call-site context; an array
+element, a virtual call's result, a non-final field, a field written from
+a constructor parameter, an unresolvable class or more than 8 candidate
+classes are no proof, and the site keeps every target RTA kept. With a
+proof, a CHA edge keeps the site only if a proven class selects its
+target (JVM method selection); direct edges are untouched. Real-JVM
+oracle `testdata/pta` (`scripts/pta-oracle.sh`, `TestPTAOracle`): two
+receivers, a final field, a factory, a parameter and a two-allocation
+factory are narrowed, the array, non-final field and constructor-parameter
+field are not, and every call the JVM made stays an edge. Measured
+(`-roots profile` / `all`): petclinic 7 062 / 7 991 more CHA edges removed
+than RTA (3.4 % of the reachable ones), WebGoat 9 555 / 12 302, JPetStore
+292 / 299; **no verdict changed** (two WebGoat paths moved to another real
+route); cost 2.7–3.7× RTA's time (petclinic 22 s → 61 s) and +30–45 %
+memory. The log line "receiver narrowing" and v2 `callgraph.pta` give the
+counts. It stays experimental: it removes real over-approximation but has
+not yet changed a result, at a large cost.
 
 Every method is interned into a dense `uint32` id. Building the graph is
 two passes:
@@ -1491,7 +1518,7 @@ Flags:
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |
 | `-active-profiles` | no | Comma-separated Spring profile names to treat as active when evaluating `@Profile` conditions (FRAMEWORKS F1 — see "8. The report"). Unset: every `@Profile` condition is reported `unknown`, never a guessed `false`. |
-| `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0/P2): `cha` (the default) or `rta` (opt-in: CHA edges narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback; see section 4). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
+| `-callgraph-mode` | no | Dispatch strategy for virtual/interface calls (GRAPH_PRECISION P0/P2/P3): `cha` (the default), `rta` (opt-in: CHA edges narrowed to the classes created by code reachable from the roots, with the unknown-allocation fallback; see section 4) or `pta` (experimental: RTA, then every CHA call site whose receiver's allocated classes are proven keeps only the targets they select). Recorded with the graph's other settings in the report header and v2 `callgraph`. |
 | `-graph-out` | no | Write the final call graph — every edge with a stable identity (source/target method, call kind, basis) and its call-site PCs, the graph's settings, the findings' paths and the created-type catalog (GRAPH_PRECISION P1) — as sorted text (`ariadne-callgraph-2`; large: ≈ 370 MB for WebGoat). |
 | `-jdk-home` | no | The target runtime's installation directory (CVE:F8a): its `release` file gives vendor, version, OS and architecture; nothing is run, and the scanner's own JDK is never assumed. Report header "Target runtime", v2 `target_runtime`. For a Temurin runtime the OpenJDK Vulnerability Group advisories of the curated catalog are matched (CVE:F8b): report section "Target runtime advisories", v2 `target_runtime.advisories` — applicability only, reachability `not_assessed`, never part of the v1 verdicts; any other distribution is `not_performed` with the reason. The embedded catalog is empty until advisories are curated. Exclusive with `-runtime-file`. See [docs/RUNTIME_SOURCES.MD](docs/RUNTIME_SOURCES.MD). |
 | `-openjdk-catalog` | no | Use this curated OpenJDK advisory catalog (YAML from `go run ./cmd/openjdk-catalog`) instead of the embedded one — to check a draft before committing it. ariadne never fetches openjdk.org (its terms of use do not allow automated access); see [docs/RUNTIME_SOURCES.MD](docs/RUNTIME_SOURCES.MD). |
