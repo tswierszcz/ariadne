@@ -218,6 +218,65 @@ adds the version span; it does **not** change their role or coverage (`sink`/`en
   version's results on petclinic and WebGoat with hashes of every input and of every
   network response used. A baseline is a reference for change, **not ground truth**.
 
+## 8. Library mode (LIBRARY_MODE LB0, 2026-11-16 — contract; implemented by LB1)
+
+A library jar answers a different question than an application: whether anyone using its
+public API can reach mapped vulnerable code in its dependencies, and through which API
+methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
+section fixes the contract before the implementation; nothing below is emitted yet.
+
+**Selection.** Library mode is a root set, `-roots api`, next to `all` and `profile` (not a
+separate `-mode` flag: the graph, the models and every other output stay as they are; only
+the roots and one additive field change). The library jar is the `-app` input, its
+dependencies are `-deps`/`-deps-list` as for an application. `callgraph.roots` is `api`.
+
+**The public API** — the roots — is every method a user of the library can call or
+override from outside its packages:
+
+- the methods and constructors with `public` or `protected` access of every *accessible*
+  class: a `public` top-level class, or a `public`/`protected` member class whose
+  enclosing classes are all accessible (`InnerClasses` flags, not only the class's own);
+  `protected` counts only in a class that is not `final` (a subclass can call it);
+- the public `default` and `static` methods of public interfaces; abstract methods (no
+  body) are roots that reach nothing;
+- the class initializer (`<clinit>`) of every accessible class;
+- the providers the library registers in its own `META-INF/services` (their public
+  no-argument constructor and the service methods they implement) — a consumer's
+  `ServiceLoader` creates them;
+- not roots: `private` and package-private methods, members of inaccessible classes,
+  synthetic and bridge methods (their targets are roots in their own right), lambda bodies.
+
+Two scopes narrow it, both reported: with `-jpms-scenario module-path` and a library
+`module-info`, only the packages the module `exports` (unqualified) are API; `-api-exclude
+p1,p2` removes package prefixes the user calls internal (`…internal…` is public to the
+JVM, so it is API by default). Kotlin `internal`, Java access through reflection
+(`setAccessible`) and `Unsafe` are not access rules here.
+
+**Verdicts.** `reachability` keeps its meaning with the API as the roots: `REACHABLE`
+means "reachable from the public API without passing through framework code", not "run
+by an application". `NOT_REACHABLE` means no API method reaches the mapped code in the
+model. All reason codes keep their meaning.
+
+**New fields (additive, v2 only).**
+
+| Field | Content |
+|---|---|
+| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method). `path`/`path_edges` of the finding stay the overall shortest path. |
+| `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
+
+v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
+
+**Client code (reserved for LB2).** A call the library makes on a type the client can
+implement or override — an interface or abstract method with no implementation in the
+input, an overridable method on a client-supplied object — runs code the analysis does
+not have. LB2 adds the gap mechanism `client_code` to the gap vocabulary below; until
+then such sites are ordinary CHA call sites (a library class implementing the type is a
+CHA target; a client's is not in the input).
+
+**Control library:** [testdata/library/](../testdata/library/EXPECTED.MD) — cases (a)–(f)
+with the expected roots, `exposed_api` and verdicts written before LB1, checked against
+the real JVM (`scripts/library-oracle.sh`).
+
 ## Gap vocabulary
 
 (ROADMAP B0 b0-3, 2026-11-13, `internal/gaps` version `b0-3`.) Every analyzer that reports a model gap keeps its own codes — they are part of its output and are never renamed — and each code maps to exactly one **mechanism**, so the same gap reads the same way wherever it is reported. Sources: `site` — the unresolved dynamic sites of the model-gap rule (§4, `model_gaps` keys); `allocation` — the created-type catalog's unknown allocations (GRAPH_PRECISION P1/P2); `lambda` — SAM-call resolution gaps (DYNAMIC_LINKAGE L1); `runtime` — causes of measured calls missing from the graph (RUNTIME_NATIVE N1); `coordinator` — incomplete model facts of the B3 coordinator. The mapping is a reading aid: it changes no verdict and no reason code; only `site` gaps take part in the model-gap rule. v2: `coverage.gaps[]` (`mechanism`, `source`, `detail` — the source's own code —, `count`, and for `site` `reachable`) and `findings[].gaps[]` (the finding's `model_gaps` in this form). `TestVocabularyDocumented` keeps this table and the code identical.
