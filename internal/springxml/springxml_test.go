@@ -117,3 +117,47 @@ func TestParse_lifecycle(t *testing.T) {
 		t.Errorf("Skipped = %v, want none (nested <beans> is modeled)", got.Skipped)
 	}
 }
+
+func TestParse_aopConfig(t *testing.T) {
+	const doc = `<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:aop="http://www.springframework.org/schema/aop">
+  <bean id="audit" class="demo.Audit"/>
+  <aop:config>
+    <aop:pointcut id="svc" expression="execution(* demo..*Service.*(..))"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="svc"/>
+    <aop:aspect id="a" ref="audit">
+      <aop:pointcut id="own" expression="within(demo.Repo)"/>
+      <aop:before method="before" pointcut-ref="svc"/>
+      <aop:after-returning method="done" pointcut="bean(x)" returning="r" arg-names="r"/>
+      <aop:after-throwing method="failed" pointcut-ref="own" throwing="e"/>
+    </aop:aspect>
+  </aop:config>
+  <beans><aop:config><aop:aspect ref="audit"/></aop:config></beans>
+  <config/>
+</beans>`
+	got, err := Parse(strings.NewReader(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.AOP) != 2 {
+		t.Fatalf("AOP sections %d, want 2 (top level and nested <beans>)", len(got.AOP))
+	}
+	want := AOPConfig{
+		Pointcuts: map[string]string{"svc": "execution(* demo..*Service.*(..))"},
+		Advisors:  1,
+		Aspects: []AOPAspect{{
+			ID: "a", Ref: "audit", Pointcuts: map[string]string{"own": "within(demo.Repo)"},
+			Advice: []AOPAdvice{
+				{Kind: "before", Method: "before", PointcutRef: "svc"},
+				{Kind: "after-returning", Method: "done", Pointcut: "bean(x)", Returning: "r", ArgNames: "r"},
+				{Kind: "after-throwing", Method: "failed", PointcutRef: "own", Throwing: "e"},
+			},
+		}},
+	}
+	if !reflect.DeepEqual(got.AOP[0], want) {
+		t.Errorf("got %+v\nwant %+v", got.AOP[0], want)
+	}
+	if !reflect.DeepEqual(got.Skipped, []string{"config"}) {
+		t.Errorf("skipped %v: a <config> outside the aop namespace stays skipped", got.Skipped)
+	}
+}

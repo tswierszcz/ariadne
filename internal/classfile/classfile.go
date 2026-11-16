@@ -1,6 +1,7 @@
 package classfile
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 )
@@ -69,6 +70,11 @@ type Method struct {
 	// LineNumbers is the optional LineNumberTable attribute, nil if
 	// absent (no debug info) — DATA_FLOW D1 presentation data only.
 	LineNumbers []LineNumberEntry
+	// ParameterNames are the parameters' source names, from the
+	// MethodParameters attribute (javac -parameters) or else the
+	// LocalVariableTable (javac -g) — what Spring's parameter name
+	// discovery reads. nil when neither gives every parameter a name.
+	ParameterNames []string
 }
 
 func (m Method) IsStatic() bool   { return m.AccessFlags&AccStatic != 0 }
@@ -344,6 +350,7 @@ func readMethod(rd *reader, p pool) (Method, error) {
 	var paramAnnotations [][]Annotation
 	var defaultValue *ElementValue
 	var code CodeAttr
+	var paramNames []string
 	for i := uint16(0); i < attrCount && rd.err == nil; i++ {
 		name, data, err := readAttribute(rd, p)
 		if err != nil {
@@ -373,6 +380,8 @@ func readMethod(rd *reader, p pool) (Method, error) {
 			if err != nil {
 				return Method{}, fmt.Errorf("Code: %w", err)
 			}
+		case "MethodParameters":
+			paramNames = parseMethodParameters(data, p)
 		}
 	}
 	if rd.err != nil {
@@ -408,7 +417,60 @@ func readMethod(rd *reader, p pool) (Method, error) {
 		MaxLocals:                  code.MaxLocals,
 		ExceptionTable:             code.ExceptionTable,
 		LineNumbers:                code.LineNumbers,
+		ParameterNames:             parameterNames(desc, accessFlags&AccStatic != 0, paramNames, code.LocalNames),
 	}, nil
+}
+
+// parseMethodParameters reads a MethodParameters attribute (JVM spec
+// 4.7.24); an unnamed entry is "".
+func parseMethodParameters(data []byte, p pool) []string {
+	rd := newReader(bytes.NewReader(data))
+	n := rd.u1()
+	var out []string
+	for i := 0; i < int(n) && rd.err == nil; i++ {
+		idx := rd.u2()
+		rd.u2() // access flags
+		name := ""
+		if idx != 0 {
+			name, _ = p.utf8(idx)
+		}
+		out = append(out, name)
+	}
+	if rd.err != nil {
+		return nil
+	}
+	return out
+}
+
+// parameterNames prefers MethodParameters, else the LocalVariableTable
+// names at the parameters' slots; nil unless every parameter is named.
+func parameterNames(desc string, static bool, fromAttr []string, locals map[int]string) []string {
+	args, err := ArgumentSlots(desc, static)
+	if err != nil || len(args) == 0 {
+		return nil
+	}
+	complete := func(names []string) bool {
+		for _, n := range names {
+			if n == "" {
+				return false
+			}
+		}
+		return len(names) == len(args)
+	}
+	if complete(fromAttr) {
+		return fromAttr
+	}
+	if locals == nil {
+		return nil
+	}
+	out := make([]string, len(args))
+	for i, a := range args {
+		out[i] = locals[a.Slot]
+	}
+	if complete(out) {
+		return out
+	}
+	return nil
 }
 
 // readAttribute reads one attribute_info's name and raw bytes without

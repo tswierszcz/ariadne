@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"ariadne/internal/alloc"
 	"ariadne/internal/analysis"
@@ -426,6 +427,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// directly under a WAR's WEB-INF/ (applicationContext.xml).
 	var springXMLBeans []report.XMLBeanRow
 	var xmlBeanDefs, xmlInnerBeans []springxml.Bean
+	var xmlAOP []springxml.AOPConfig
 	beansXMLResources, beansXMLWarnings, err := input.FindBeansXML(prepared.AppClassesJar)
 	if err != nil {
 		return fmt.Errorf("scanning %s for Spring XML bean definitions: %w", prepared.AppClassesJar, err)
@@ -452,6 +454,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			}
 			xmlBeanDefs = append(xmlBeanDefs, parsed.Beans...)
 			xmlInnerBeans = append(xmlInnerBeans, parsed.Inner...)
+			xmlAOP = append(xmlAOP, parsed.AOP...)
 		}
 		log("Spring XML bean definitions: %d resource(s), %d beans found (%d inner)", len(resources), len(springXMLBeans), len(xmlInnerBeans))
 	}
@@ -1280,7 +1283,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// an advised bean method reaches the @AspectJ advice the proxy runs,
 	// once a method creating Spring's AspectJ advice objects is reachable.
 	aopStart := time.Now()
-	aopRes := springaop.Find(h, springBeanTypes(springBeanNames, springBeanMethods, xmlBeanDefs, xmlInnerBeans))
+	aopRes := springaop.Find(h, springaop.Input{
+		Beans: springBeanTypes(springBeanNames, springBeanMethods, xmlBeanDefs, xmlInnerBeans),
+		Names: springBeanNamesByType(springBeanNames, springBeanMethods, xmlBeanDefs),
+		XML:   xmlAOP,
+	})
 	aopGate := callgraph.NewCreatorGate(g, h, aopRes.Edges, callgraph.BasisModel)
 	aopTime := time.Since(aopStart)
 	// ROADMAP B3: the creator gates are steps of the coordinator's fixed
@@ -1343,8 +1350,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("Spring events (%s %s): %d listener methods (%d on beans), %d publishing sites (%d unbounded, %d forwarding left out); %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the listener adapter is reachable from the roots)%s, in %s",
 		springevents.ModelID, springevents.Version, len(events.Listeners), events.RegisteredCount(), len(events.Sites), events.UnboundedCount(), events.Forwarding,
 		len(events.Edges), eventsApplied.Added, eventsApplied.Covered, eventsApplied.Gated, eventsNoCreator(events), eventsTime.Round(time.Millisecond))
-	log("Spring AOP (%s %s): %d aspects (%d beans), %d advice methods, %d advised bean methods, %d advice × method pairs undecided (pointcut parts not evaluated), %d self-invocations left out; %d candidates%s, %d edges added, %d already in the graph, %d left out (no method creating Spring's advice objects is reachable from the roots)%s, in %s",
-		springaop.ModelID, springaop.Version, len(aopRes.Aspects), aopRes.RegisteredAspects(), len(aopRes.Advice), len(aopRes.JoinPoints), aopRes.UndecidedCount(), aopRes.SelfCalls,
+	log("Spring AOP (%s %s): %d aspects (%d beans), %d advice methods (%d from <aop:config>, %d unresolved), %d advised bean methods, %d advice × method pairs undecided (pointcut parts not evaluated), %d self-invocations left out; %d candidates%s, %d edges added, %d already in the graph, %d left out (no method creating Spring's advice objects is reachable from the roots)%s, in %s",
+		springaop.ModelID, springaop.Version, len(aopRes.Aspects), aopRes.RegisteredAspects(), len(aopRes.Advice), aopRes.XMLCount(), len(aopRes.Unresolved), len(aopRes.JoinPoints), aopRes.UndecidedCount(), aopRes.SelfCalls,
 		len(aopRes.Edges), aopTruncated(aopRes), aopApplied.Added, aopApplied.Covered, aopApplied.Gated, aopNoCreator(aopRes), aopTime.Round(time.Millisecond))
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
@@ -2002,6 +2009,54 @@ func springBeanTypes(names, methods []profile.BeanName, xml, inner []springxml.B
 		add(b.Class)
 	}
 	return out
+}
+
+// springBeanNamesByType are the bean names by type spring:aop's bean()
+// designator and <aop:aspect ref> use: a stereotype's explicit name or
+// Spring's default (the decapitalized simple class name), a @Bean
+// method's name, an XML bean's id.
+func springBeanNamesByType(names, methods []profile.BeanName, xml []springxml.Bean) map[string][]string {
+	out := map[string][]string{}
+	add := func(t, n string) {
+		if t == "" || n == "" {
+			return
+		}
+		for _, x := range out[t] {
+			if x == n {
+				return
+			}
+		}
+		out[t] = append(out[t], n)
+	}
+	for _, b := range names {
+		n := b.Name
+		if n == "" {
+			n = defaultBeanName(b.FQCN)
+		}
+		add(b.FQCN, n)
+	}
+	for _, b := range methods {
+		add(b.FQCN, b.Name)
+	}
+	for _, b := range xml {
+		add(b.Class, b.ID)
+	}
+	return out
+}
+
+// defaultBeanName is AnnotationBeanNameGenerator's default:
+// Introspector.decapitalize of the short class name (Outer.Inner for a
+// nested class) — unchanged when its first two letters are upper case.
+func defaultBeanName(fqcn string) string {
+	short := fqcn[strings.LastIndexByte(fqcn, '.')+1:]
+	short = strings.ReplaceAll(short, "$", ".")
+	if len(short) > 1 && unicode.IsUpper(rune(short[0])) && unicode.IsUpper(rune(short[1])) {
+		return short
+	}
+	if short == "" {
+		return ""
+	}
+	return strings.ToLower(short[:1]) + short[1:]
 }
 
 func aopNoCreator(r springaop.Result) string {

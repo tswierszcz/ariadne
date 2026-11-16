@@ -676,32 +676,52 @@ CHA expands Spring AOP's interceptor chain and target sources, so some paths
 through repositories are CHA over-approximations (petclinic/WebGoat: paths
 changed, no verdict).
 
-**Spring AOP advice (`spring:aop`, `internal/springaop`, version `a1`;
-FRAMEWORKS F3).** A bean advised by an `@Aspect` is replaced in the
-container by a proxy (JDK or CGLIB); a call through the bean reference
-reaches the proxy, which runs the matching advice through
+**Spring AOP advice (`spring:aop`, `internal/springaop`, version `a2`;
+FRAMEWORKS F3).** A bean advised by an aspect is replaced in the container
+by a proxy (JDK or CGLIB); a call through the bean reference reaches the
+proxy, which runs the matching advice through
 `AbstractAspectJAdvice#invokeAdviceMethodWithGivenArgs` → `Method#invoke` —
 nothing a reflection model resolves, so no path reached an advice method.
 The model adds an edge (basis `model`) from each call site that may invoke
 an advised bean method to the advice method:
 - an aspect is an application class annotated `@Aspect` that is a bean
   (related to a bean type the spring profile found — a stereotype, a
-  `@Bean` product, an XML bean); an `@Aspect` that is no bean advises
-  nothing;
+  `@Bean` product, an XML bean), or the bean an `<aop:aspect ref>` of an
+  `<aop:config>` in the input's bean XML names; an `@Aspect` that is no bean
+  advises nothing;
 - advice is a method annotated `@Before`, `@After`, `@AfterReturning`,
-  `@AfterThrowing` or `@Around`; its pointcut is the annotation's
-  `pointcut` (or `value`) element;
-- the pointcut language evaluated: `execution(…)` (modifier, return,
-  declaring-type, name and parameter patterns with `*`, `..`, `+`; the
-  declaring type matches any type of the bean's hierarchy declaring the
-  method), `within(…)`, `@annotation(Type)`, `@within(Type)` — also in the
-  binding form (`@annotation(audited)`) when the advice has exactly one
-  annotation-typed parameter — references to `@Pointcut` methods (in the
-  aspect, its supertypes or a named class), `&&`, `||`, `!`. Anything else
-  (`args`, `this`, `target`, `bean`, annotation patterns inside
-  `execution`, …) is *unknown*, evaluated three-valued: an advice whose
-  match depends on it gets no edge for that method and is counted as
-  *undecided* — never a guessed match;
+  `@AfterThrowing` or `@Around` (its pointcut is the annotation's `pointcut`
+  or `value` element), or the method an `<aop:before|after|after-returning|
+  after-throwing|around>` names (an inline `pointcut` or a `pointcut-ref`;
+  `and`/`or`/`not` allowed; the overload with the fewest parameters, as
+  Spring resolves it);
+- the advice's variables are bound as Spring's parameter name discovery
+  does: `argNames`/`arg-names`; else the names in the class file
+  (`MethodParameters` from `-parameters`, which Spring Boot's parent sets,
+  or the `LocalVariableTable` from `-g`); else inference from the
+  expression (`AspectJAdviceParameterNameDiscoverer`): a leading
+  `JoinPoint` binds nothing, the `throwing` variable takes the one
+  `Throwable` parameter, the `returning` variable the one remaining
+  parameter, an annotation variable the one annotation-typed parameter,
+  one `this`/`target`/`args` variable the one remaining parameter;
+  anything ambiguous stays unbound;
+- the pointcut language evaluated, three-valued: `execution(…)` (method
+  annotation patterns `@a.B`, modifier, return, declaring-type, name and
+  parameter patterns with `*`, `..`, `+`; the declaring type matches any
+  type of the bean's hierarchy declaring the method), `within`,
+  `@annotation`, `@within`, `@target`, `this`, `target`, `args` (types or
+  bound variables; an argument whose declared type may hold an instance of
+  the type matches — Spring tests the value at run time — primitives
+  boxed), `bean(name*)` (the stereotype's explicit or default name, the
+  `@Bean` method's name, the XML id), references to `@Pointcut` methods
+  (parameterized ones bound by their own parameters), `&&`, `||`, `!`.
+  Anything else (`@args`, `cflow`, annotation patterns on parameters, an
+  unbound variable, …) is *unknown*: an advice whose match depends on it
+  gets no edge for that method and is counted as *undecided* — never a
+  guessed match;
+- `@AfterReturning` with a `returning` variable runs only when the
+  method's return type is compatible with the variable's type (`Object`
+  takes every method, `void` included);
 - a join point is a method a proxy can intercept on a bean class: an
   application class or bean type related to a bean type (not an aspect),
   its own and inherited methods except `java.lang.Object`'s, neither
@@ -710,38 +730,48 @@ an advised bean method to the advice method:
   and descriptor whose owner the bean class is assignable to; a call on
   `this` from the bean's own code (self-invocation, DATA_FLOW D2's receiver
   fact) bypasses the proxy and gets no edge;
-- gate: a reachable method creating one of Spring's AspectJ advice objects
-  (`AbstractAspectJAdvice` subtypes, made by
-  `ReflectiveAspectJAdvisorFactory#getAdvice`).
+- gate: for `@Aspect` advice a reachable method creating one of Spring's
+  AspectJ advice objects (`AbstractAspectJAdvice` subtypes, made by
+  `ReflectiveAspectJAdvisorFactory#getAdvice`); for `<aop:config>` advice,
+  whose advice objects the container creates reflectively, a reachable
+  `ConfigBeanDefinitionParser#parse`.
 
 `@AfterReturning` edges carry the condition `returned`, `@AfterThrowing`
 edges `exceptional` (v2 path evidence `"condition"`, the report's arrow
 `→[library_model: model, if returned]`). For `@Around` the target runs only
 if the advice calls `proceed()`; the existing edge to the target is kept (an
-over-approximation). Advice order (`@Order`), the `returning`/`throwing`
-type restrictions, XML `<aop:config>`, the AspectJ compiler or load-time
-weaving, and the JDK-proxy case of a final method reached through an
-interface are not modeled. Real-JVM oracle `testdata/aop`
-(`scripts/aop-oracle.sh`, `TestAOPOracle`, Spring 5.3.6 with aspectjweaver
-1.9.6): a CGLIB-proxied service (with a self-invocation, a final method and
-an `@Audited` method), a repository behind a JDK proxy (a normal return and
-a thrown exception), a `@Monitored` class; before the model no advice body
-was reached, now all five the JVM ran through decided pointcuts are, with
-the conditions; the advice matching no method and the `@Aspect` that is no
-bean get no edge, the self-invocation gets none (the JVM ran no advice for
-it nor for the final method). The one declared gap: an advice using
-`args(id)` runs on the JVM and stays unreached (undecided). Log line
-`Spring AOP (spring:aop a1): N aspects (N beans), N advice methods, N
-advised bean methods, N advice × method pairs undecided …, N
-self-invocations left out; N candidates, N edges added, …`; snapshots record
-`spring.aop`. Control app `scripts/prepare-aop-demo.sh` (Spring Boot 2.4.3,
-`spring-boot-starter-aop`, a `@Before` advice calling commons-text 1.9
-`StringSubstitutor#replace`): under `-roots profile` CVE-2022-42889 was
-`NOT_REACHABLE` and is now `REACHABLE` through `main` → the advice when its
-pointcut names the called `OrderService#place` (the JVM runs the advice),
-and stays `NOT_REACHABLE` when it names `refund`, which nothing calls (the
-JVM does not run it); under `-roots all` it is `REACHABLE` in both (every
-application method is a root). petclinic, WebGoat and JPetStore have no `@Aspect` class: their v1 results are byte-identical (`-roots all`/`profile`, CHA/RTA).
+over-approximation). Advice order (`@Order`), the `throwing` type
+restriction, `<aop:advisor>` (advice beans such as `<tx:advice>`), the
+AspectJ compiler or load-time weaving, `this()` on a JDK proxy (tested
+against the bean class, as with Spring Boot's default CGLIB proxies) and the
+JDK-proxy case of a final method reached through an interface are not
+modeled. Real-JVM oracle `testdata/aop` (`scripts/aop-oracle.sh`,
+`TestAOPOracle`, Spring 5.3.6 with aspectjweaver 1.9.6, compiled without
+debug info so variables are bound by inference): a CGLIB-proxied service
+(with a self-invocation, a final method and an `@Audited` method), a
+repository behind a JDK proxy (a normal return, a thrown exception, a
+`String` return), a `@Monitored` class, 17 annotated advice methods
+covering every designator above and an `<aop:config>` aspect
+(`fx/aop/aop.xml`, `and not`); every one of the 15 advice bodies the JVM
+ran is reached (a1 reached 6, without the model none), and the four that
+never run — patterns matching no method, `bean()` naming no bean, an
+`@Aspect` that is no bean — get no edge; the self-invocation gets none
+(the JVM ran no advice for it nor for the final method). Log line `Spring
+AOP (spring:aop a2): N aspects (N beans), N advice methods (N from
+<aop:config>, N unresolved), N advised bean methods, N advice × method
+pairs undecided …, N self-invocations left out; N candidates, N edges
+added, …`; snapshots record `spring.aop`. Control app
+`scripts/prepare-aop-demo.sh` (Spring Boot 2.4.3, `spring-boot-starter-aop`,
+a `@Before` advice with `args(text)` calling commons-text 1.9
+`StringSubstitutor#replace`): under `-roots profile` CVE-2022-42889 is
+`REACHABLE` through `main` → the advice when its pointcut names the called
+`OrderService#place` (the JVM runs the advice; a1 left the `args(text)`
+advice undecided and reported `NOT_REACHABLE`, without the model it was
+`NOT_REACHABLE` too), stays `NOT_REACHABLE` when it names `refund`, which
+nothing calls (the JVM does not run it), and is `REACHABLE` in the variant
+declaring the same advice in `<aop:config>` (the JVM runs it; a1:
+`NOT_REACHABLE`); under `-roots all` it is `REACHABLE` in every variant
+(every application method is a root). petclinic, WebGoat and JPetStore have no `@Aspect` class and no `<aop:config>`: their v1 results are byte-identical to a1 (`-roots all`/`profile`, CHA/RTA).
 
 **Spring application events (`spring:events`, `internal/springevents`,
 version `ev1`; FRAMEWORKS F4 slice 1).** `publishEvent` goes through the

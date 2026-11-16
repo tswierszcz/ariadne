@@ -4,7 +4,8 @@ import java.util.*;
 import java.util.spi.ToolProvider;
 
 /**
- * Compiles every .java file under a source directory and jars the classes,
+ * Compiles every .java file under a source directory and jars the classes
+ * with the directory's other files (resources),
  * using the JDK's own compiler and jar tool through the java.compiler /
  * ToolProvider APIs — for environments with a Java runtime that has the
  * jdk.compiler module but no javac/jar binaries.
@@ -24,6 +25,14 @@ public class JavaBuild {
         args.addAll(files);
         int rc = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err, args.toArray(String[]::new));
         if (rc != 0) System.exit(rc);
+        // Resources (anything but .java) are copied next to the classes.
+        try (var s = Files.walk(src)) {
+            for (Path p : (Iterable<Path>) s.filter(Files::isRegularFile).filter(p -> !p.toString().endsWith(".java")).sorted()::iterator) {
+                Path to = classes.resolve(src.relativize(p).toString());
+                Files.createDirectories(to.getParent());
+                Files.copy(p, to);
+            }
+        }
         Files.deleteIfExists(out);
         rc = ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err, "--create", "--file", out.toString(), "--date", "2026-01-01T00:00:00Z", "-C", classes.toString(), ".");
         System.exit(rc);

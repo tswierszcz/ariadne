@@ -14,4 +14,10 @@ public class JdbcRepo implements Repo {
         Ran.stack();
         throw new IllegalStateException("no row " + id);
     }
+
+    @Override
+    public String name() {
+        Ran.stack();
+        return "jdbc";
+    }
 }
