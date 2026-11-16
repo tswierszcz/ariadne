@@ -51,6 +51,10 @@ type MappingMeta struct {
 	Role     string `yaml:"role"`
 	Coverage string `yaml:"coverage"`
 	Review   string `yaml:"review"`
+	// NotCode, when set, declares that the advisory concerns no JVM code
+	// of the artifact (an installer, a deployment setting) and says why;
+	// such an entry has no methods (reason NOT_CODE_MAPPABLE, CVE:F10).
+	NotCode string `yaml:"not_code"`
 	// Variants are the versioned method lists of a schema-v2 entry
 	// (CVE:F4); nil for an unversioned entry.
 	Variants []Variant `yaml:"-"`
@@ -106,7 +110,7 @@ func (e *manualEntry) UnmarshalYAML(n *yaml.Node) error {
 	if node.Kind == yaml.SequenceNode {
 		return n.Decode(&e.Methods)
 	}
-	if err := checkKeys(node, "mapping", "methods", "role", "coverage", "review", "variants"); err != nil {
+	if err := checkKeys(node, "mapping", "methods", "role", "coverage", "review", "variants", "not_code"); err != nil {
 		return err
 	}
 	var obj struct {
@@ -139,6 +143,12 @@ var packageName = regexp.MustCompile(`^[^:\s]+:[^:\s]+$`)
 func (e *manualEntry) validate(id string) error {
 	if !advisoryID.MatchString(id) {
 		return fmt.Errorf("%q is not an advisory identifier", id)
+	}
+	if e.NotCode != "" {
+		if len(e.Methods) > 0 || len(e.Variants) > 0 || e.Role != "" || e.Coverage != "" {
+			return fmt.Errorf("%s: not_code excludes methods, variants, role and coverage", id)
+		}
+		return nil
 	}
 	switch {
 	case len(e.Variants) > 0 && len(e.Methods) > 0:

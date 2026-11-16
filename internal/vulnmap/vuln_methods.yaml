@@ -1019,3 +1019,167 @@ CVE-2020-14340: # XNIO: selectors of exited threads leak file descriptors
       versions: "[3.6.0,3.7.9.Final),[3.8.0.Final,3.8.2.Final)"
       methods:
         - org.xnio.nio.NioXnio#getSelector
+
+# UNKNOWN reduction, databases, drivers and the rest (2026-11-16). Same
+# method as the two sections above. CVE-2022-21363 (MySQL Connector/J,
+# fixed 8.0.28) stays unmapped: Oracle's advisory names no component
+# beyond Connector/J, and the 8.0.27 -> 8.0.28 diff (62 methods: TLS
+# protocols, multi-factor authentication, result-set navigation) has no
+# change attributable to it.
+
+CVE-2021-42392: # H2 Console loads a JNDI driver from a URL the user types
+  # 2.0.204 -> 2.0.206: JdbcUtils#getConnection refuses JNDI names that
+  # are not java: (linked tables, TableLink#readMetaData, need ADMIN and
+  # are left out). The Console's login and test-connection actions are
+  # the entry point. checked: 1.2.147, 1.3.176, 1.4.200, 2.0.204.
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: com.h2database:h2
+      versions: "[1.1.100,2.0.206)"
+      methods: &h2-console-connect
+        - org.h2.server.web.WebApp#login
+        - org.h2.server.web.WebApp#test
+
+CVE-2022-23221: # H2 Console: a jdbc:h2:mem URL with INIT=RUNSCRIPT runs code
+  # 2.0.206 -> 2.1.210: the Console checks the host and the URL in
+  # WebApp#login/#test and WebServer#getConnection. Same entry point as
+  # CVE-2021-42392. checked: 1.2.147, 1.3.176, 1.4.200, 2.0.206.
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: com.h2database:h2
+      versions: "(,2.1.210)"
+      methods: *h2-console-connect
+
+CVE-2021-2471: # MySQL Connector/J: XXE in SQLXML#getSource
+  # 8.0.26 -> 8.0.27: MysqlSQLXML#getSource disables external entities
+  # (new setFeature). checked: 8.0.11, 8.0.23, 8.0.26.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: mysql:mysql-connector-java
+      versions: "[8.0.0,8.0.27)"
+      methods:
+        - com.mysql.cj.jdbc.MysqlSQLXML#getSource
+
+CVE-2023-22102: # MySQL Connector/J: a malicious server's result deserialized
+  # 8.1.0 -> 8.2.0 removes the autoDeserialize property; with it set, a
+  # BLOB holding a serialized object is deserialized in ResultSetImpl#
+  # getObject (the "human interaction" is a JDBC URL pointing at the
+  # attacker's server). A path means the application reads results with
+  # getObject; the attack needs autoDeserialize=true. checked: 5.1.49;
+  # 8.0.11, 8.0.23, 8.0.26; 8.1.0.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: mysql:mysql-connector-java
+      versions: "(,6.0.0)"
+      methods:
+        - com.mysql.jdbc.ResultSetImpl#getObject
+    - package: mysql:mysql-connector-java
+      versions: "[6.0.0,8.0.33]"
+      methods: &mysql-getobject
+        - com.mysql.cj.jdbc.result.ResultSetImpl#getObject
+    - package: com.mysql:mysql-connector-j
+      versions: "(,8.2.0)"
+      methods: *mysql-getobject
+
+CVE-2022-26520: # pgjdbc: loggerFile/loggerLevel write any file
+  # 42.3.2 -> 42.3.3: Driver#setupLoggerFromProperties stops honoring
+  # loggerFile. It runs on every Driver#connect; the attack needs control
+  # of the connection properties. checked: 42.2.0, 42.2.18, 42.3.2.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.postgresql:postgresql
+      versions: "[42.1.0,42.3.3)"
+      methods:
+        - org.postgresql.Driver#setupLoggerFromProperties
+
+CVE-2026-42198: # pgjdbc: unbounded SCRAM iteration count from the server
+  # 42.7.10 -> 42.7.11: ScramAuthenticator#handleAuthenticationSASLContinue
+  # caps the iterations the server-first message asks for. Before 42.7.4
+  # the same step is processServerFirstMessage in the sasl package
+  # (jre8 up to 42.2.6, jre7 from 42.2.7). checked: 42.2.0, 42.2.6;
+  # 42.2.7, 42.2.18, 42.7.0, 42.7.3; 42.7.4, 42.7.10.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.postgresql:postgresql
+      versions: "[42.2.0,42.2.7)"
+      methods:
+        - org.postgresql.jre8.sasl.ScramAuthenticator#processServerFirstMessage
+    - package: org.postgresql:postgresql
+      versions: "[42.2.7,42.7.4)"
+      methods:
+        - org.postgresql.jre7.sasl.ScramAuthenticator#processServerFirstMessage
+    - package: org.postgresql:postgresql
+      versions: "[42.7.4,42.7.11)"
+      methods:
+        - org.postgresql.core.v3.ScramAuthenticator#handleAuthenticationSASLContinue
+
+CVE-2022-36033: # jsoup Cleaner: javascript: URLs with control characters kept
+  # 1.15.2 -> 1.15.3: Cleaner#createSafeElement. It runs for every element
+  # cleaned; the bypass needs Safelist#preserveRelativeLinks(true).
+  # checked: 1.10.1, 1.14.2, 1.15.2.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.jsoup:jsoup
+      versions: "(,1.15.3)"
+      methods:
+        - org.jsoup.safety.Cleaner#createSafeElement
+
+CVE-2023-1932: # @SafeHtml lets a tag without its closing '>' through
+  # Named by the advisory; 6.2.0 removed @SafeHtml. checked: 5.2.4, 5.4.3
+  # (org.hibernate); 6.0.0, 6.1.7 (org.hibernate.validator).
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.hibernate.validator:hibernate-validator
+      versions: "(,6.2.0.Final)"
+      methods: &hv-safehtml
+        - org.hibernate.validator.internal.constraintvalidators.hv.SafeHtmlValidator#isValid
+    - package: org.hibernate:hibernate-validator
+      versions: "(,6.2.0.Final)"
+      methods: *hv-safehtml
+
+CVE-2026-22733: # Actuator: app endpoints under the CloudFoundry path skip security
+  # 3.5.11 -> 3.5.12: the CloudFoundry security filter chain matches the
+  # actuator endpoints only, not the whole /cloudfoundryapplication/**.
+  # Before 3.5 the same exclusion is a WebSecurityCustomizer (from 2.4)
+  # or the IgnoredPathsWebSecurityConfigurer (2.0-2.3). Configuration that
+  # runs only on Cloud Foundry; 4.x moved it out of this module and is
+  # left uncovered. checked: 2.0.0, 2.2.0, 2.3.12; 2.4.0, 2.4.5, 2.7.18,
+  # 3.3.13, 3.4.13; 3.5.11 (spring-boot-actuator-autoconfigure).
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.boot:spring-boot-starter-actuator
+      versions: "(,2.4.0)"
+      methods:
+        - org.springframework.boot.actuate.autoconfigure.cloudfoundry.servlet.CloudFoundryActuatorAutoConfiguration$IgnoredPathsWebSecurityConfigurer#configure
+    - package: org.springframework.boot:spring-boot-starter-actuator
+      versions: "[2.4.0,3.5.0)"
+      methods:
+        - org.springframework.boot.actuate.autoconfigure.cloudfoundry.servlet.CloudFoundryActuatorAutoConfiguration$IgnoredCloudFoundryPathsWebSecurityCustomizer#customize
+    - package: org.springframework.boot:spring-boot-starter-actuator
+      versions: "[3.5.0,3.5.12)"
+      methods:
+        - org.springframework.boot.actuate.autoconfigure.cloudfoundry.servlet.CloudFoundryActuatorAutoConfiguration$IgnoredCloudFoundryPathsWebSecurityConfiguration#cloudFoundrySecurityFilterChain
+
+CVE-2025-49124: # Tomcat's Windows installer runs icacls.exe from the search path
+  # Group C of the UNKNOWN review: the advisory is about the installer, not
+  # code in any Tomcat jar (OSV lists tomcat-embed-core anyway).
+  not_code: "Windows installer (icacls.exe resolved through the search path); no class in the jar is involved"
+  review: reviewed

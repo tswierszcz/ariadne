@@ -255,8 +255,10 @@ func mustCache(t *testing.T) *httpcache.Cache {
 // CVE:F0 audit's role and coverage (38 entry points, 1 sink, none
 // complete) plus the 7 HSQLDB/log4j 1.2 sinks added for JPetStore and the
 // 22 release-diff entries of 2026-11-13 (6 entry points, 16 vulnerable),
-// the 15 Spring entries and the 14 server/Jackson/logback entries of the
-// UNKNOWN reduction (2026-11-16), the list API still returns the same methods, and the legacy list form
+// the 15 Spring entries, the 14 server/Jackson/logback entries and the 9
+// database/driver entries of the UNKNOWN reduction (2026-11-16, 2
+// entry points, 7 vulnerable) plus one not_code entry (no methods,
+// no role), the list API still returns the same methods, and the legacy list form
 // keeps its defaults.
 func TestLoadManualMeta_embeddedTable(t *testing.T) {
 	meta, err := LoadManualMeta("")
@@ -267,8 +269,8 @@ func TestLoadManualMeta_embeddedTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(meta) != 97 || len(methods) != 97 {
-		t.Fatalf("entries meta=%d methods=%d, want 97", len(meta), len(methods))
+	if len(meta) != 107 || len(methods) != 107 {
+		t.Fatalf("entries meta=%d methods=%d, want 107", len(meta), len(methods))
 	}
 	roles := map[string]int{}
 	for id, m := range meta {
@@ -276,12 +278,12 @@ func TestLoadManualMeta_embeddedTable(t *testing.T) {
 		if m.Coverage != CoveragePartial || m.Review != ReviewReviewed {
 			t.Errorf("%s: %+v, want partial/reviewed", id, m)
 		}
-		if len(methods[id]) == 0 {
-			t.Errorf("%s: no methods", id)
+		if (len(methods[id]) == 0) != (m.NotCode != "") {
+			t.Errorf("%s: %d methods, not_code %q: want methods exactly when not_code is empty", id, len(methods[id]), m.NotCode)
 		}
 	}
-	if roles[RoleEntrypoint] != 53 || roles[RoleSink] != 8 || roles[RoleVulnerable] != 36 {
-		t.Errorf("roles = %v, want 53 entrypoint + 8 sink + 36 vulnerable", roles)
+	if roles[RoleEntrypoint] != 55 || roles[RoleSink] != 8 || roles[RoleVulnerable] != 43 || roles[""] != 1 {
+		t.Errorf("roles = %v, want 55 entrypoint + 8 sink + 43 vulnerable + 1 not_code", roles)
 	}
 	if got := methods["CVE-2021-39144"]; len(got) != 2 || got[0] != "com.thoughtworks.xstream.XStream#fromXML" {
 		t.Errorf("XStream alias methods = %v", got)

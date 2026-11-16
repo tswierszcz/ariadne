@@ -31,7 +31,7 @@ has the v1 meaning first and the F1 refinement, if any, after it.
 | `FRAMEWORK` | Reachable only through framework/dependency code (no app→dependency edge on the shortest path that ends in app code) | petclinic: a Spring internal reaching a vulnerable Jackson method |
 | `NOT_REACHABLE` | Mapped methods exist in the analyzed graph and none is reachable in the declared model. **(F1)** Not allowed when a *relevant* model gap exists (see §4) or when the mapping is `entrypoint`-only and the entry point is absent for an unrelated reason | petclinic: a vulnerable method of a dependency no root calls |
 | `UNKNOWN` | No verdict: no method mapping, or an LLM advisory-only mapping that is not reachable (would otherwise read as "safe"). **(F1)** also: relevant model gap, `METHOD_NOT_FOUND`, `VERSION_UNKNOWN` | a CVE with no fix diff and no manual entry |
-| `NOT_APPLICABLE` | Every affected dependency is a WebJar (client-side assets, no bytecode); the call graph cannot answer. Unchanged in F1 — in particular it does **not** mean "version not affected" (that is `applicability: not_affected`) | WebGoat: a jQuery advisory on a WebJar |
+| `NOT_APPLICABLE` | Every affected dependency is a WebJar (client-side assets, no bytecode), or (2026-11-16) the manual table declares the advisory concerns no JVM code (reason `NOT_CODE_MAPPABLE`); the call graph cannot answer. Unchanged in F1 — in particular it does **not** mean "version not affected" (that is `applicability: not_affected`) | WebGoat: a jQuery advisory on a WebJar |
 | `not_assessed` (v2 only) | Reachability was not evaluated for this finding: the version is not affected or undetermined, or there is no reachability model for it (e.g. a JIT/VM flaw in the runtime). Never exported to v1 as `NOT_REACHABLE` | a JDK CVE before CVE:F8 |
 
 ### "Method not found" vs "no path" (F0 requirement)
@@ -56,7 +56,7 @@ output contract: never renamed, never reused for another meaning; a superseded c
 deprecated. CVE:F0 defines them. Since CVE:F1b, `METHOD_NOT_FOUND`, `CLASSPATH_CONFLICT`,
 `MAPPING_PARTIAL`, `MAPPING_ENTRYPOINT_ONLY` and `MODEL_INCOMPLETE` are emitted (v1 `reasons`);
 CVE:F4 adds `VERSION_UNKNOWN`, `MAPPING_VERSION_UNCOVERED`, `MAPPING_CONFLICT`; CVE:F5 adds
-`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`;
+`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings);
 `RUNTIME_UNSUPPORTED` is not set yet.
 `MAPPING_NEW_SIDE_ONLY`, like `MAPPING_PARTIAL`, qualifies the advisory row and stays off
 instance findings (v2 carries it as `mapping.new_side_only`).
@@ -77,6 +77,7 @@ its own axis.
 | `MAPPING_NEW_SIDE_ONLY` | mapping | (CVE:F5) A fix-diff mapping was read on the post-fix side only — commit metadata unavailable, a merge or root commit, or the pre-fix file unreadable — so methods the fix removed are missing and helpers it added may be included | a fix commit with two parents |
 | `SOURCE_UNAVAILABLE` | mapping | The evidence needed for a mapping (fix commit, diff, advisory detail) could not be obtained. (CVE:F5) Emitted when the advisory has fix-commit references and none could be read (finding `UNKNOWN`); an advisory with no fix reference at all is a plain unmapped `UNKNOWN` | every fix-commit diff answers HTTP 500 |
 | `MAPPING_MISSING` | mapping | (ROADMAP B0, 2026-11-13) No source produced any mapping for the advisory — manual table, fix diff, `release-diff`, LLM — so no verdict is possible; the `UNKNOWN` row says why instead of carrying no reason (before this code 20 of petclinic's 27 `UNKNOWN` rows had none) | an advisory with no fix commit and no class name |
+| `NOT_CODE_MAPPABLE` | mapping | (CVE:F10, 2026-11-16) The manual table declares (`not_code`, with the reason) that the advisory concerns no JVM code of the artifact — an installer, a deployment setting — so no method can be mapped; the finding is `NOT_APPLICABLE`, like a WebJar, and the note carries the reason. Not a verdict that the app is safe | Tomcat's Windows installer (CVE-2025-49124) filed against `tomcat-embed-core` |
 | `MODEL_INCOMPLETE` | model | An explicit gap in the call-graph model (unresolved reflection, ServiceLoader, callback, …) is relevant to this finding | an unresolved `Method#invoke` in the affected package |
 | `RUNTIME_UNSUPPORTED` | runtime | The finding depends on runtime behavior ariadne does not model (JDK/JRE vulnerabilities, custom class loaders) | a CVE in the JDK itself |
 

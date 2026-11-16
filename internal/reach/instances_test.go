@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"ariadne/internal/callgraph"
@@ -204,6 +205,14 @@ func TestFindingsForUnmatchedVerdicts(t *testing.T) {
 	}
 	if s, _ := Aggregate(r.Findings); s != r.Status {
 		t.Errorf("aggregate %s != row %s", s, r.Status)
+	}
+
+	// A not_code entry (NOT_CODE_MAPPABLE): no JVM code to search.
+	e.SetWebAssetPackages(nil)
+	r = analyzeAffected(t, e, vulnmap.Entry{Source: vulnmap.SourceManual, NotCode: "an installer"}, "1.0")
+	if r.Status != StatusNotApplicable || len(r.Reasons) != 1 || r.Reasons[0] != findings.NotCodeMappable ||
+		!strings.Contains(r.Note, "an installer") || len(r.Findings) != 1 || r.Findings[0].Status != StatusNotApplicable {
+		t.Errorf("not_code: %s %v %q %+v", r.Status, r.Reasons, r.Note, r.Findings)
 	}
 }
 

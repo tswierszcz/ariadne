@@ -8,7 +8,7 @@ import (
 )
 
 // TestServerManualMappings pins the version split of the 2026-11-16
-// server/Jackson/logback entries: where the fix-commit diff named a class
+// server/Jackson/logback entries (and of the database/driver ones): where the fix-commit diff named a class
 // that only a newer line has, the older line (the one the control apps
 // ship: tomcat-embed-core 9.0.45, Jackson 2.11.4, logback 1.2.3, Undertow
 // 2.2.4, XNIO 3.8.0) selects the method that holds the same code there,
@@ -73,6 +73,21 @@ func TestServerManualMappings(t *testing.T) {
 		{"CVE-2026-3260", ut, "2.2.4.Final", []string{"io.undertow.server.handlers.form.MultiPartParserDefinition$MultiPartUploadHandler#parseBlocking"}},
 		{"CVE-2020-14340", "org.jboss.xnio:xnio-nio", "3.8.0.Final", []string{"org.xnio.nio.NioXnio#getSelector"}},
 		{"CVE-2020-14340", "org.jboss.xnio:xnio-nio", "3.8.2.Final", nil},
+		// Part 3 (databases, drivers, the rest).
+		{"CVE-2021-42392", "com.h2database:h2", "1.4.200", []string{"org.h2.server.web.WebApp#login", "org.h2.server.web.WebApp#test"}},
+		{"CVE-2021-42392", "com.h2database:h2", "2.0.206", nil},
+		{"CVE-2023-22102", "mysql:mysql-connector-java", "5.1.49", []string{"com.mysql.jdbc.ResultSetImpl#getObject"}},
+		{"CVE-2023-22102", "mysql:mysql-connector-java", "8.0.23", []string{"com.mysql.cj.jdbc.result.ResultSetImpl#getObject"}},
+		{"CVE-2023-22102", "com.mysql:mysql-connector-j", "8.2.0", nil},
+		{"CVE-2026-42198", "org.postgresql:postgresql", "42.2.6", []string{"org.postgresql.jre8.sasl.ScramAuthenticator#processServerFirstMessage"}},
+		{"CVE-2026-42198", "org.postgresql:postgresql", "42.2.18", []string{"org.postgresql.jre7.sasl.ScramAuthenticator#processServerFirstMessage"}},
+		{"CVE-2026-42198", "org.postgresql:postgresql", "42.7.10", []string{"org.postgresql.core.v3.ScramAuthenticator#handleAuthenticationSASLContinue"}},
+		{"CVE-2026-42198", "org.postgresql:postgresql", "42.7.11", nil},
+		{"CVE-2026-22733", "org.springframework.boot:spring-boot-starter-actuator", "2.4.5",
+			[]string{"org.springframework.boot.actuate.autoconfigure.cloudfoundry.servlet.CloudFoundryActuatorAutoConfiguration$IgnoredCloudFoundryPathsWebSecurityCustomizer#customize"}},
+		{"CVE-2026-22733", "org.springframework.boot:spring-boot-starter-actuator", "2.3.12.RELEASE",
+			[]string{"org.springframework.boot.actuate.autoconfigure.cloudfoundry.servlet.CloudFoundryActuatorAutoConfiguration$IgnoredPathsWebSecurityConfigurer#configure"}},
+		{"CVE-2026-22733", "org.springframework.boot:spring-boot-starter-actuator", "3.5.12", nil},
 	} {
 		if got := pick(c.id, c.pkg, c.v); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s %s %s = %v, want %v", c.id, c.pkg, c.v, got, c.want)

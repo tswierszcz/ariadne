@@ -33,6 +33,10 @@ const (
 	MappingConflict         ReasonCode = "MAPPING_CONFLICT"
 	// CVE:F5: a fix-diff mapping read on the post-fix side only.
 	MappingNewSideOnly ReasonCode = "MAPPING_NEW_SIDE_ONLY"
+	// CVE:F10 (2026-11-16): the manual table declares that the advisory
+	// concerns no JVM code of the artifact (an installer, a deployment
+	// setting), so no method can be mapped (status NOT_APPLICABLE).
+	NotCodeMappable ReasonCode = "NOT_CODE_MAPPABLE"
 
 	// Reachability-model axis.
 	ModelIncomplete ReasonCode = "MODEL_INCOMPLETE"
@@ -45,7 +49,7 @@ const (
 var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict, VersionCandidates,
 	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable, MappingMissing,
-	MappingVersionUncovered, MappingConflict, MappingNewSideOnly,
+	MappingVersionUncovered, MappingConflict, MappingNewSideOnly, NotCodeMappable,
 	ModelIncomplete,
 	RuntimeUnsupported,
 }

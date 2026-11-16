@@ -61,6 +61,9 @@ type Entry struct {
 	// ReleaseDiffs is a release-diff mapping's evidence (CVE:F10): per
 	// component, the two releases compared and the named classes.
 	ReleaseDiffs []ReleaseDiff `json:"release_diffs,omitempty"`
+	// NotCode is set, with no Methods, when the manual table declares
+	// that the advisory concerns no JVM code (reason NOT_CODE_MAPPABLE).
+	NotCode string `json:"not_code,omitempty"`
 }
 
 // Mapped reports whether the entry names at least one method.
@@ -70,7 +73,7 @@ func (e Entry) Mapped() bool { return len(e.Methods) > 0 }
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "6" // 6: CVE:F10 pull requests, field initializers, release diff; 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
+const ResolverVersion = "7" // 7: manual not_code entries (NOT_CODE_MAPPABLE); 6: CVE:F10 pull requests, field initializers, release diff; 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -203,6 +206,9 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 		if methods, ok := r.Manual[id]; ok && len(methods) > 0 {
 			meta := r.ManualMeta[id]
 			return Entry{Methods: methods, Source: SourceManual, Role: meta.Role, Coverage: meta.Coverage, Review: meta.Review, Variants: meta.Variants}.WithDefaults(), true, nil
+		}
+		if meta, ok := r.ManualMeta[id]; ok && meta.NotCode != "" {
+			return Entry{Source: SourceManual, Review: meta.Review, NotCode: meta.NotCode}.WithDefaults(), true, nil
 		}
 	}
 

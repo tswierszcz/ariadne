@@ -28,8 +28,10 @@ const (
 	StatusNotReachable Status = "NOT_REACHABLE"
 	StatusUnknown      Status = "UNKNOWN"
 	// StatusNotApplicable: every affected dependency is a WebJar (client-
-	// side JavaScript/CSS, no JVM bytecode), so a call graph cannot answer
-	// the question at all. It is not a verdict that the app is safe.
+	// side JavaScript/CSS, no JVM bytecode), or the manual table declares
+	// that the advisory concerns no JVM code (NOT_CODE_MAPPABLE), so a
+	// call graph cannot answer the question at all. It is not a verdict
+	// that the app is safe.
 	StatusNotApplicable Status = "NOT_APPLICABLE"
 )
 
@@ -303,6 +305,16 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	}
 	if !ok {
 		return Result{CVE: cve.ID, Status: StatusUnknown, Reasons: []findings.ReasonCode{findings.MappingMissing}}
+	}
+	if entry.NotCode != "" {
+		// The manual table says the advisory concerns no JVM code (an
+		// installer, a deployment setting): nothing for a call graph to
+		// answer, like a WebJar — not a verdict that the app is safe.
+		return Result{
+			CVE: cve.ID, Status: StatusNotApplicable, Source: entry.Source,
+			Reasons: []findings.ReasonCode{findings.NotCodeMappable},
+			Note:    "the advisory concerns no JVM code: " + entry.NotCode,
+		}
 	}
 	if !entry.Mapped() {
 		// Fix-commit references existed but none could be read (CVE:F5).
