@@ -105,6 +105,19 @@ None.
 {{end}}{{end}}
 {{end}}
 
+{{if .Exposed}}
+## Exposed API (library mode)
+
+With `-roots api` the roots are the library's public API (docs/RESULTS_CONTRACT.MD §8): every API
+method below reaches the advisory's mapped code in the model. `app_only` reaches it without passing
+through framework code, `full` only through it; `heuristic` in the character means the example path
+depends on a CHA expansion.
+
+| CVE | Component | API method | Pass | Example path character | Reaches |
+|---|---|---|---|---|---|
+{{range .Exposed}}| {{.CVE}} | `{{.GAV}}` | `{{.Method}}` | {{.Pass}} | {{.Character}} | `{{.Via}}` |
+{{end}}
+{{end}}
 {{if .SnapshotComparedWith}}
 ## Changes since snapshot {{.SnapshotComparedWith}}
 

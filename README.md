@@ -875,6 +875,39 @@ candidates, N edges added, …` counts them; snapshots record
 `java.sql.Driver#connect` relation behind them follows
 ([TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)).
 
+**Library mode (`-roots api`, `internal/libapi`, LIBRARY_MODE LB1,
+2026-11-16).** A library asks a different question than an application:
+can anyone using its public API reach vulnerable code in its
+dependencies, and through which methods? Pass the library jar as `-app`
+and its dependencies as `-deps`; with `-roots api` the roots are its
+public API ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §8):
+the `public` methods and constructors of accessible classes (a member
+class only when every enclosing class is accessible; `protected` too,
+unless the class is `final`), public interface methods, every accessible
+class's `<clinit>`, and the providers the library registers in its own
+`META-INF/services` — never `private`/package-private code, synthetic or
+bridge methods. `-api-exclude` drops package prefixes the user calls
+internal; with `-jpms-scenario module-path` and a `module-info`, only the
+unqualified `exports` count (and its `provides` replace
+`META-INF/services`). Each positive finding then lists, in v2
+`findings[].exposed_api[]` and the report's "Exposed API" section, every
+API method from which its mapped code is reached — with the pass
+(`app_only`/`full`), an example path from that method and the path's
+character (`heuristic` = depends on a CHA expansion); `coverage.api`
+counts the API. Under RTA a class counts as created when it is an
+accessible class (a client can construct it); objects of the client's own
+classes are not in the input (LB2 will report those call sites as a
+`client_code` gap). Log lines `library API (lb1-1): …` and `roots: api
+(…)`. Verified on `testdata/library` (cases in
+[EXPECTED.MD](testdata/library/EXPECTED.MD), written before the
+implementation; real-JVM oracle `scripts/library-oracle.sh`,
+`TestLibraryMode`, `internal/libapi` `TestRoots`): `-roots all` lists nine
+library methods reaching CVE-2022-42889's `StringSubstitutor#replace`,
+three of which no client can call; `-roots api` exposes exactly the 5 (CHA)
+/ 4 (RTA) / 3 (`-api-exclude lib.internal`) API methods expected, and under
+RTA only methods the JVM ran. `-roots all` and `profile` results are
+unchanged.
+
 **JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
 2026-11-16).** `DriverManager#getConnection(url)` offers the URL to every
 registered driver, and the service-provider model links `Driver#connect`
@@ -1799,7 +1832,8 @@ Flags:
 | `-sbom` | no | CycloneDX JSON SBOM (spec 1.4–1.6; CVE:F6b; example: `testdata/sbom/webgoat-jruby.cdx.json`). A component whose SHA-256 is an analyzed dependency jar's is tied to it; Maven components nested in it become embedded candidates of that jar, verified by their classes. Untied components and the dependency graph are not used; a disagreeing identity is reported, never applied. |
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, `stripes`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
-| `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners) or `profile` (the active profile's own entry points, plus the same `web.xml` methods). |
+| `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners), `profile` (the active profile's own entry points, plus the same `web.xml` methods) or `api` (library mode, below: the `-app` jar is a library and its public API is the roots). |
+| `-api-exclude` | no | With `-roots api`: comma-separated package prefixes left out of the API (`com.example.internal`). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |
 | `-jpms-module-path` | with `mixed` | Comma-separated jar file-name patterns (`path.Match` syntax, e.g. `app,commons-text-*.jar`) selecting the module-path jars for `-jpms-scenario mixed`; `app` names the analyzed application. Rejected with any other scenario; a pattern matching no jar is a warning. |

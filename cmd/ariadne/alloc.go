@@ -19,7 +19,7 @@ func allocInputs(h *hierarchy.Hierarchy, g *callgraph.Graph, cfg config, roots [
 	deserJava, deserXStream map[string][]deserialize.Target, deserSites []deserialize.Site,
 	loadSites []serviceload.ServiceLoadSite, newInstanceSites []reflectinvoke.NewInstanceSite,
 	newInstanceTargets []reflectinvoke.NewInstanceEdge) alloc.Inputs {
-	in := alloc.Inputs{H: h, G: g, EntryRoots: cfg.roots == "profile", ExternalInputs: cfg.roots == "all",
+	in := alloc.Inputs{H: h, G: g, EntryRoots: cfg.roots == "profile" || cfg.roots == "api", ExternalInputs: cfg.roots == "all",
 		DeserCandidates: map[string][]string{}, DeserSites: map[string][]alloc.Site{}}
 	for _, b := range beans {
 		in.Container = append(in.Container, alloc.ContainerBean{Class: b.FQCN, Detail: "stereotype"})

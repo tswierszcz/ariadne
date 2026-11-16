@@ -1,0 +1,10 @@
+{
+  "key": "a4f109d7edf2cb8e65884fa29f7bec71ac96aa0d80a487a07b5aa863071dfdca",
+  "kind": "osv",
+  "method": "GET",
+  "url": "https://api.osv.dev/v1/vulns/GHSA-j288-q9x7-2f5v",
+  "fetched_at": "2026-11-15T20:09:51.039672352Z",
+  "validated_at": "2026-11-15T20:09:51.039672352Z",
+  "sha256": "5a256a31466ff55d35028234c13e3e6385fd342e071a2e81c37b82ba9f1bc36f",
+  "bytes": 2844
+}

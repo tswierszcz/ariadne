@@ -7,6 +7,7 @@ lib.api.Formatter#format(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Pipeline#<init>()V
 lib.api.Pipeline#run(Llib/api/Listener;Ljava/lang/String;)V
 lib.api.Templates#<init>()V
+lib.api.Templates#prepare(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Templates#render(Ljava/lang/String;)Ljava/lang/String;
 lib.internal.ExpandCodec#<init>()V
 lib.internal.ExpandCodec#decode(Ljava/lang/String;)Ljava/lang/String;

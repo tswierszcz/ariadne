@@ -1,0 +1,12 @@
+{
+  "key": "887bb920050a6fc599415afd3837e49fc90e5fcb355cf4cd1478dc42dede4be8",
+  "kind": "mutable",
+  "method": "GET",
+  "url": "https://api.github.com/repos/apache/commons-lang/git/matching-refs/tags/commons-lang-3.11",
+  "fetched_at": "2026-11-15T20:09:55.235963051Z",
+  "validated_at": "2026-11-15T20:09:55.235963051Z",
+  "sha256": "82934fd8bac358d20a6bf870693be12faf7b2f4f2c85af955b06c427c6c7d930",
+  "bytes": 777,
+  "etag": "W/\"3a5a7f4f917aecec75a7d71be97921ae5f70ef066a6ac933e4e3d9a28a916b3f\"",
+  "last_modified": "Sat, 14 Nov 2026 11:20:46 GMT"
+}

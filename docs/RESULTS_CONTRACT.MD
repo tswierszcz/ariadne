@@ -218,12 +218,15 @@ adds the version span; it does **not** change their role or coverage (`sink`/`en
   version's results on petclinic and WebGoat with hashes of every input and of every
   network response used. A baseline is a reference for change, **not ground truth**.
 
-## 8. Library mode (LIBRARY_MODE LB0, 2026-11-16 — contract; implemented by LB1)
+## 8. Library mode (LIBRARY_MODE LB0 contract, implemented by LB1 — 2026-11-16)
 
 A library jar answers a different question than an application: whether anyone using its
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
-section fixes the contract before the implementation; nothing below is emitted yet.
+section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`), except the `client_code` gap (LB2).
+Member-class accessibility follows the class's own access flag and its enclosing classes
+(a `protected` member class is compiled `public` and counts as accessible).
 
 **Selection.** Library mode is a root set, `-roots api`, next to `all` and `profile` (not a
 separate `-mode` flag: the graph, the models and every other output stay as they are; only

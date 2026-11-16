@@ -114,6 +114,11 @@ type Header struct {
 }
 
 // Row is one line of the CVE table.
+// ExposedRow is one API method reaching one finding's mapped code.
+type ExposedRow struct {
+	CVE, GAV, Method, Pass, Character, Via string
+}
+
 type Row struct {
 	CVE      string
 	Package  string
@@ -139,6 +144,9 @@ type Data struct {
 	// PerInstance are results whose advisory affects several component
 	// instances or whose instance findings carry reasons/notes (CVE:F1b).
 	PerInstance []reach.Result
+	// Exposed (LIBRARY_MODE LB1, -roots api): per advisory × instance,
+	// the API methods reaching the mapped code.
+	Exposed []ExposedRow
 	// Withdrawn are advisories whose every OSV record is withdrawn: listed,
 	// not analyzed (CVE:F2).
 	Withdrawn []cves.CVE
@@ -494,6 +502,15 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 		}
 		if showPerInstance(r) {
 			data.PerInstance = append(data.PerInstance, r)
+		}
+		for _, f := range r.Findings {
+			for _, x := range f.ExposedAPI {
+				via := ""
+				if len(x.Path) > 1 {
+					via = x.Path[len(x.Path)-1]
+				}
+				data.Exposed = append(data.Exposed, ExposedRow{CVE: r.CVE, GAV: f.GAV, Method: x.Method, Pass: x.Pass, Character: strings.Join(x.Character, ", "), Via: via})
+			}
 		}
 
 		if r.Note != "" {

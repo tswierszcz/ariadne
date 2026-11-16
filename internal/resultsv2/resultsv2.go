@@ -25,6 +25,7 @@ import (
 	"ariadne/internal/deserialize"
 	"ariadne/internal/findings"
 	"ariadne/internal/httpcache"
+	"ariadne/internal/libapi"
 	"ariadne/internal/mavenversion"
 	"ariadne/internal/pta"
 	"ariadne/internal/reach"
@@ -342,6 +343,19 @@ type Finding struct {
 	// entry in runtime_observed it means "traced, not entered in this
 	// run" — still not evidence of unreachability.
 	RuntimeTraced bool `json:"runtime_traced,omitempty"`
+	// ExposedAPI (LIBRARY_MODE LB1, -roots api): every API method from
+	// which the finding's mapped code is reached.
+	ExposedAPI []ExposedMethod `json:"exposed_api,omitempty"`
+}
+
+// ExposedMethod is one API method reaching a finding's mapped code
+// (docs/RESULTS_CONTRACT.MD §8).
+type ExposedMethod struct {
+	Method    string           `json:"method"`
+	Pass      string           `json:"pass"`
+	Character []string         `json:"character,omitempty"`
+	Path      []string         `json:"path"`
+	PathEdges []reach.PathEdge `json:"path_edges,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -362,6 +376,8 @@ type Coverage struct {
 	// ReflectionCensus (REFLECTION R3 r3-3): where the receivers of the
 	// reachable unresolved reflective calls come from. Measurement only.
 	ReflectionCensus *reflectinvoke.ProvenanceSummary `json:"reflection_census,omitempty"`
+	// API (LIBRARY_MODE LB1, -roots api): what the API selection counted.
+	API *libapi.Coverage `json:"api,omitempty"`
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`
@@ -616,6 +632,7 @@ func Build(in Inputs) Document {
 				DeserializationChains: chainRefs(in.DeserChains, cve, f.Instance),
 				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
 				RuntimeTraced:         in.RuntimeTraced[cve.ID][f.Instance],
+				ExposedAPI:            exposedMethods(f.ExposedAPI),
 			})
 			counts.Findings++
 			counts.FindingsByReachability[string(f.Status)]++
@@ -778,4 +795,12 @@ func Write(path string, doc Document) error {
 		return err
 	}
 	return atomicfile.WriteFile(path, b)
+}
+
+func exposedMethods(xs []reach.ExposedMethod) []ExposedMethod {
+	var out []ExposedMethod
+	for _, x := range xs {
+		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges})
+	}
+	return out
 }
