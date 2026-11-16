@@ -1,10 +1,16 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: plan (2026-11-16), żadna faza nierozpoczęta; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
-## LB0. Kontrakt trybu
+## LB0. Kontrakt trybu — DONE (2026-11-16)
+
+Decyzje: tryb to zestaw korzeni `-roots api` (nie osobna flaga `-mode`), zawężenia
+`-api-exclude` i scenariusz JPMS `exports`; pola `findings[].exposed_api[]` i `coverage.api`;
+mechanizm luki `client_code` zarezerwowany dla LB2. Oczekiwania i pomiar „przed”:
+`testdata/library/EXPECTED.MD`.
+
 
 Zależności: CVE F0–F1 (wynik v2), ROADMAP B0.
 
