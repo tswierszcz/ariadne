@@ -255,7 +255,8 @@ func mustCache(t *testing.T) *httpcache.Cache {
 // CVE:F0 audit's role and coverage (38 entry points, 1 sink, none
 // complete) plus the 7 HSQLDB/log4j 1.2 sinks added for JPetStore and the
 // 22 release-diff entries of 2026-11-13 (6 entry points, 16 vulnerable),
-// the list API still returns the same methods, and the legacy list form
+// the 15 Spring entries and the 14 server/Jackson/logback entries of the
+// UNKNOWN reduction (2026-11-16), the list API still returns the same methods, and the legacy list form
 // keeps its defaults.
 func TestLoadManualMeta_embeddedTable(t *testing.T) {
 	meta, err := LoadManualMeta("")
@@ -266,8 +267,8 @@ func TestLoadManualMeta_embeddedTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(meta) != 83 || len(methods) != 83 {
-		t.Fatalf("entries meta=%d methods=%d, want 83", len(meta), len(methods))
+	if len(meta) != 97 || len(methods) != 97 {
+		t.Fatalf("entries meta=%d methods=%d, want 97", len(meta), len(methods))
 	}
 	roles := map[string]int{}
 	for id, m := range meta {
@@ -279,8 +280,8 @@ func TestLoadManualMeta_embeddedTable(t *testing.T) {
 			t.Errorf("%s: no methods", id)
 		}
 	}
-	if roles[RoleEntrypoint] != 49 || roles[RoleSink] != 8 || roles[RoleVulnerable] != 26 {
-		t.Errorf("roles = %v, want 49 entrypoint + 8 sink + 26 vulnerable", roles)
+	if roles[RoleEntrypoint] != 53 || roles[RoleSink] != 8 || roles[RoleVulnerable] != 36 {
+		t.Errorf("roles = %v, want 53 entrypoint + 8 sink + 36 vulnerable", roles)
 	}
 	if got := methods["CVE-2021-39144"]; len(got) != 2 || got[0] != "com.thoughtworks.xstream.XStream#fromXML" {
 		t.Errorf("XStream alias methods = %v", got)
