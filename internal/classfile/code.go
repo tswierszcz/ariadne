@@ -46,6 +46,10 @@ type CodeAttr struct {
 	// (javac -g:none, or any compiler that omits it) — absence is not an
 	// error.
 	LineNumbers []LineNumberEntry
+	// LocalNames are the LocalVariableTable's names of the variables live
+	// from offset 0, by slot — the method's parameters when compiled with
+	// -g (nil without debug info).
+	LocalNames map[int]string
 }
 
 // parseCodeAttribute parses a Code attribute's bytes (JVM spec 4.7.3):
@@ -85,6 +89,7 @@ func parseCodeAttribute(data []byte, p pool) (CodeAttr, error) {
 	}
 
 	var lineNumbers []LineNumberEntry
+	var localNames map[int]string
 	attrCount := rd.u2()
 	for i := uint16(0); i < attrCount && rd.err == nil; i++ {
 		nameIdx := rd.u2()
@@ -103,6 +108,12 @@ func parseCodeAttribute(data []byte, p pool) (CodeAttr, error) {
 				return CodeAttr{}, fmt.Errorf("LineNumberTable: %w", err)
 			}
 		}
+		if name == "LocalVariableTable" {
+			localNames, err = parseLocalVariableNames(attrData, p, localNames)
+			if err != nil {
+				return CodeAttr{}, fmt.Errorf("LocalVariableTable: %w", err)
+			}
+		}
 	}
 	if rd.err != nil {
 		return CodeAttr{}, rd.err
@@ -113,7 +124,34 @@ func parseCodeAttribute(data []byte, p pool) (CodeAttr, error) {
 		Code:           code,
 		ExceptionTable: handlers,
 		LineNumbers:    lineNumbers,
+		LocalNames:     localNames,
 	}, nil
+}
+
+// parseLocalVariableNames reads a LocalVariableTable (JVM spec 4.7.13):
+// the names of the entries starting at offset 0, by slot.
+func parseLocalVariableNames(data []byte, p pool, into map[int]string) (map[int]string, error) {
+	rd := newReader(bytes.NewReader(data))
+	n := rd.u2()
+	for i := uint16(0); i < n && rd.err == nil; i++ {
+		startPC := rd.u2()
+		rd.u2() // length
+		nameIdx := rd.u2()
+		rd.u2() // descriptor
+		index := rd.u2()
+		if rd.err != nil || startPC != 0 {
+			continue
+		}
+		name, err := p.utf8(nameIdx)
+		if err != nil {
+			return nil, fmt.Errorf("entry %d name: %w", i, err)
+		}
+		if into == nil {
+			into = map[int]string{}
+		}
+		into[int(index)] = name
+	}
+	return into, rd.err
 }
 
 func parseLineNumberTable(data []byte) ([]LineNumberEntry, error) {

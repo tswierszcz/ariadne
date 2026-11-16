@@ -6,11 +6,14 @@
 # it, the analysis reads the annotations by name):
 #   fx.app.Main calls advised beans: OrderService (CGLIB: a self-invocation,
 #   a final method, an @Audited method), JdbcRepo behind a JDK proxy (save
-#   returns, find throws) and the @Monitored ReportService. TracingAspect
-#   has @Before on a named pointcut, @AfterReturning, @AfterThrowing,
-#   @Around with a bound annotation, @Before on @within, one advice that
-#   matches nothing and one with args(...). Unregistered is an @Aspect that
-#   is no bean.
+#   returns, find throws, name returns a String) and the @Monitored
+#   ReportService. TracingAspect covers execution (with a method annotation
+#   pattern), within, @annotation (bound), @within, @target, this (bound),
+#   target, args (bound and by type), bean, a parameterized @Pointcut with
+#   argNames, returning and throwing, plus advice matching nothing and a
+#   bean() of no bean. XmlAudit is an <aop:config> aspect (fx/aop/aop.xml,
+#   imported by AopConfig). Unregistered is an @Aspect that is no bean.
+#   Compiled without debug info: Spring binds variables by inference.
 # and runs Main on the real JVM. Writes testdata/aop/observed.txt.
 # The jar and the file are committed; TestAOPOracle needs no JDK.
 #

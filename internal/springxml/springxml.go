@@ -76,6 +76,66 @@ type BeansXML struct {
 	// first-seen, deduplicated order — never silently dropped without
 	// a trace, same discipline as internal/webxml's own Skipped.
 	Skipped []string
+	// AOP are the <aop:config> sections (FRAMEWORKS F3, spring:aop).
+	AOP []AOPConfig
+}
+
+// AOPConfig is one <aop:config> section: its named pointcuts and aspects.
+// <aop:advisor> elements (advice beans such as <tx:advice>) are counted,
+// not modeled here.
+type AOPConfig struct {
+	// Pointcuts are the section's <aop:pointcut id expression>.
+	Pointcuts map[string]string
+	Aspects   []AOPAspect
+	Advisors  int
+}
+
+// AOPAspect is an <aop:aspect ref>: advice methods of the referenced bean.
+type AOPAspect struct {
+	ID, Ref string
+	// Pointcuts are the aspect's own <aop:pointcut id expression>.
+	Pointcuts map[string]string
+	Advice    []AOPAdvice
+}
+
+// AOPAdvice is one <aop:before|after|after-returning|after-throwing|around>.
+type AOPAdvice struct {
+	// Kind is the element name (before, after-returning, …).
+	Kind, Method string
+	// Pointcut is the inline expression; PointcutRef names a pointcut.
+	Pointcut, PointcutRef string
+	Returning, Throwing   string
+	ArgNames              string
+}
+
+const aopNamespace = "http://www.springframework.org/schema/aop"
+
+func aopConfig(n node) AOPConfig {
+	cfg := AOPConfig{Pointcuts: map[string]string{}}
+	for _, c := range n.Children {
+		switch c.XMLName.Local {
+		case "pointcut":
+			cfg.Pointcuts[c.attr("id")] = c.attr("expression")
+		case "advisor":
+			cfg.Advisors++
+		case "aspect":
+			a := AOPAspect{ID: c.attr("id"), Ref: c.attr("ref"), Pointcuts: map[string]string{}}
+			for _, d := range c.Children {
+				switch d.XMLName.Local {
+				case "pointcut":
+					a.Pointcuts[d.attr("id")] = d.attr("expression")
+				case "before", "after", "after-returning", "after-throwing", "around":
+					a.Advice = append(a.Advice, AOPAdvice{
+						Kind: d.XMLName.Local, Method: d.attr("method"),
+						Pointcut: d.attr("pointcut"), PointcutRef: d.attr("pointcut-ref"),
+						Returning: d.attr("returning"), Throwing: d.attr("throwing"), ArgNames: d.attr("arg-names"),
+					})
+				}
+			}
+			cfg.Aspects = append(cfg.Aspects, a)
+		}
+	}
+	return cfg
 }
 
 const (
@@ -151,6 +211,12 @@ func Parse(r io.Reader) (BeansXML, error) {
 			out.addBean(n, d)
 		case "beans":
 			out.addSection(n, d)
+		case "config":
+			if n.XMLName.Space == aopNamespace {
+				out.AOP = append(out.AOP, aopConfig(n))
+				continue
+			}
+			fallthrough
 		default:
 			if !skippedSeen[n.XMLName.Local] {
 				skippedSeen[n.XMLName.Local] = true
@@ -170,6 +236,10 @@ func (out *BeansXML) addSection(n node, d defaults) {
 			out.addBean(c, d)
 		case "beans":
 			out.addSection(c, d)
+		case "config":
+			if c.XMLName.Space == aopNamespace {
+				out.AOP = append(out.AOP, aopConfig(c))
+			}
 		}
 	}
 }

@@ -23,6 +23,7 @@ public final class Main {
         orders.fixed();
         Repo repo = ctx.getBean(Repo.class);
         repo.save("order");
+        repo.name();
         try {
             repo.find(7L);
         } catch (IllegalStateException expected) {

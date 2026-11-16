@@ -55,6 +55,8 @@ type joinPoint struct {
 	h    *hierarchy.Hierarchy
 	C, D string
 	m    hierarchy.Method
+	// names are the bean names of C ("" unknown).
+	names []string
 }
 
 // node is a parsed pointcut expression.
@@ -97,23 +99,40 @@ func (n withinNode) eval(jp *joinPoint, _ *resolver) tri {
 	return typeMatches(jp.h, n.pat, jp.D)
 }
 
-// annNode: @annotation(Type) on the executed method, @within(Type) on its
-// declaring type.
+// Annotation designators: @annotation on the executed method, @within on
+// its declaring type, @target on the target (bean) class.
+const (
+	onMethod    = "@annotation"
+	onDeclaring = "@within"
+	onTarget    = "@target"
+)
+
+// annNode is an annotation designator; raw is its argument as written (a
+// type, or a variable bound to an advice parameter).
 type annNode struct {
-	ann    string
-	onType bool
+	designator, raw string
+	// ann is the annotation type once known.
+	ann string
 }
 
 func (n annNode) eval(jp *joinPoint, _ *resolver) tri {
+	if n.ann == "" {
+		return unknown
+	}
 	var anns []string
-	if n.onType {
-		ci, ok := jp.h.Lookup(jp.D)
+	switch n.designator {
+	case onMethod:
+		anns = jp.m.Annotations
+	case onDeclaring, onTarget:
+		c := jp.D
+		if n.designator == onTarget {
+			c = jp.C
+		}
+		ci, ok := jp.h.Lookup(c)
 		if !ok {
 			return unknown
 		}
 		anns = ci.Annotations
-	} else {
-		anns = jp.m.Annotations
 	}
 	for _, a := range anns {
 		if a == n.ann {
@@ -123,7 +142,118 @@ func (n annNode) eval(jp *joinPoint, _ *resolver) tri {
 	return no
 }
 
-// refNode is a reference to a named @Pointcut method.
+// objNode: this(Type)/target(Type) — the proxy or target is an instance of
+// the type (or of the bound advice parameter's type). Spring Boot's
+// default CGLIB proxy is a subclass of the target, so both test the bean
+// class.
+type objNode struct {
+	designator, raw string
+	typ             string
+}
+
+func (n objNode) eval(jp *joinPoint, _ *resolver) tri {
+	if n.typ == "" {
+		return unknown
+	}
+	if assignable(jp.h, jp.C, boxed(n.typ)) {
+		return yes
+	}
+	return no
+}
+
+// argsNode: args(...) — the call's arguments are instances of the listed
+// types (or of the bound advice parameters' types); .. any number, * one
+// of any type.
+type argsNode struct {
+	raw   []string
+	types []string // "" = unknown
+}
+
+func (n argsNode) eval(jp *joinPoint, _ *resolver) tri {
+	params, _ := descParts(jp.m.Descriptor)
+	return argsMatch(jp.h, n.types, params)
+}
+
+func argsMatch(h *hierarchy.Hierarchy, pats, types []string) tri {
+	if len(pats) == 0 {
+		if len(types) == 0 {
+			return yes
+		}
+		return no
+	}
+	if pats[0] == ".." {
+		res := no
+		for k := 0; k <= len(types); k++ {
+			res = or3(res, argsMatch(h, pats[1:], types[k:]))
+			if res == yes {
+				return yes
+			}
+		}
+		return res
+	}
+	if len(types) == 0 {
+		return no
+	}
+	first := yes
+	switch p := pats[0]; {
+	case p == "":
+		first = unknown
+	case p != "*":
+		first = instanceMayMatch(h, types[0], p)
+	}
+	if first == no {
+		return no
+	}
+	return and3(first, argsMatch(h, pats[1:], types[1:]))
+}
+
+// instanceMayMatch: a value of declared type decl may be an instance of
+// t (decl is t or a subtype, or t a subtype of decl — a runtime test
+// Spring makes), primitives compared boxed.
+func instanceMayMatch(h *hierarchy.Hierarchy, decl, t string) tri {
+	if primitives[decl] && primitives[t] {
+		if decl == t {
+			return yes
+		}
+		return no
+	}
+	d, b := boxed(decl), boxed(t)
+	if assignable(h, d, b) || assignable(h, b, d) {
+		return yes
+	}
+	return no
+}
+
+var wrappers = map[string]string{
+	"boolean": "java.lang.Boolean", "byte": "java.lang.Byte", "char": "java.lang.Character", "short": "java.lang.Short",
+	"int": "java.lang.Integer", "long": "java.lang.Long", "float": "java.lang.Float", "double": "java.lang.Double", "void": "java.lang.Void",
+}
+
+func boxed(t string) string {
+	if w, ok := wrappers[t]; ok {
+		return w
+	}
+	return t
+}
+
+// beanNode: bean(namePattern) — the bean's name matches (* any run).
+type beanNode struct{ pat string }
+
+func (n beanNode) eval(jp *joinPoint, _ *resolver) tri {
+	if len(jp.names) == 0 {
+		return unknown
+	}
+	re := beanGlob(n.pat)
+	for _, name := range jp.names {
+		if re.MatchString(name) {
+			return yes
+		}
+	}
+	return no
+}
+
+// refNode is a reference to a named @Pointcut method (its arguments, if
+// any, are bound by the pointcut method's own parameters).
 type refNode struct{ qualifier, name string }
 
 func (n refNode) eval(jp *joinPoint, r *resolver) tri {
@@ -134,8 +264,9 @@ func (n refNode) eval(jp *joinPoint, r *resolver) tri {
 	return x.eval(jp, r)
 }
 
-// execNode: execution(modifiers? ret declaring.name(params) throws?).
+// execNode: execution(@Ann* modifiers? ret declaring.name(params) throws?).
 type execNode struct {
+	anns   []string
 	mods   []string
 	ret    string
 	decl   string // "" = any declaring type
@@ -148,7 +279,11 @@ func (n execNode) eval(jp *joinPoint, _ *resolver) tri {
 	if !nameMatches(n.name, m.Name) {
 		return no
 	}
-	res := yes
+	for _, a := range n.anns {
+		if !hasAnn(m.Annotations, a) {
+			return no
+		}
+	}
 	for _, mod := range n.mods {
 		neg := strings.HasPrefix(mod, "!")
 		flag, ok := modifierFlags[strings.TrimPrefix(mod, "!")]
@@ -161,7 +296,7 @@ func (n execNode) eval(jp *joinPoint, _ *resolver) tri {
 		}
 	}
 	params, ret := descParts(m.Descriptor)
-	res = and3(res, typeMatches(jp.h, n.ret, ret))
+	res := typeMatches(jp.h, n.ret, ret)
 	if res == no {
 		return no
 	}
@@ -230,6 +365,26 @@ func parse(expr string) node {
 		return unknownNode{"unparsed: " + p.s[p.i:]}
 	}
 	return n
+}
+
+var xmlWords = regexp.MustCompile(`\b(and|or|not)\b`)
+
+// parseXML parses an <aop:config> expression, where and/or/not (as words
+// between blanks or parentheses) stand for &&/||/!.
+func parseXML(expr string) node {
+	var b strings.Builder
+	last := 0
+	sep := func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '(' || c == ')' }
+	for _, m := range xmlWords.FindAllStringIndex(expr, -1) {
+		if m[0] > 0 && !sep(expr[m[0]-1]) || m[1] < len(expr) && !sep(expr[m[1]]) {
+			continue
+		}
+		b.WriteString(expr[last:m[0]])
+		b.WriteString(map[string]string{"and": "&&", "or": "||", "not": "!"}[expr[m[0]:m[1]]])
+		last = m[1]
+	}
+	b.WriteString(expr[last:])
+	return parse(b.String())
 }
 
 type parser struct {
@@ -326,20 +481,36 @@ func (p *parser) primary() node {
 			return unknownNode{"within(" + args + ")"}
 		}
 		return withinNode{args}
-	case "@annotation", "@within":
-		if !isQualifiedName(args) {
-			// A binding form (@annotation(name)): the advice method
-			// resolves it (bindAnnotations); left unknown here.
-			return bindingNode{designator: head, name: args}
+	case onMethod, onDeclaring, onTarget:
+		if !isIdentOrName(args) {
+			return unknownNode{head + "(" + args + ")"}
 		}
-		return annNode{ann: args, onType: head == "@within"}
-	case "args", "this", "target", "@args", "@target", "bean", "call", "get", "set",
-		"initialization", "preinitialization", "staticinitialization", "handler",
+		return annNode{designator: head, raw: args}
+	case "this", "target":
+		if !isIdentOrName(args) {
+			return unknownNode{head + "(" + args + ")"}
+		}
+		return objNode{designator: head, raw: args}
+	case "args":
+		var raw []string
+		if args != "" {
+			for _, x := range strings.Split(args, ",") {
+				x = strings.TrimSpace(x)
+				if x != ".." && x != "*" && !isIdentOrName(x) && !isTypePattern(x) {
+					return unknownNode{"args(" + args + ")"}
+				}
+				raw = append(raw, x)
+			}
+		}
+		return argsNode{raw: raw}
+	case "bean":
+		if !beanPatternRe.MatchString(args) {
+			return unknownNode{"bean(" + args + ")"}
+		}
+		return beanNode{args}
+	case "@args", "call", "get", "set", "initialization", "preinitialization", "staticinitialization", "handler",
 		"adviceexecution", "withincode", "@withincode", "cflow", "cflowbelow", "if":
 		return unknownNode{head + "(" + args + ")"}
-	}
-	if args != "" {
-		return unknownNode{"named pointcut with arguments: " + head + "(" + args + ")"}
 	}
 	q, name := "", head
 	if i := strings.LastIndexByte(head, '.'); i >= 0 {
@@ -348,15 +519,19 @@ func (p *parser) primary() node {
 	return refNode{qualifier: q, name: name}
 }
 
-// bindingNode is @annotation(param)/@within(param): the annotation type is
-// the advice parameter's type. Advice.bind replaces it with an annNode
-// when the type is known.
-type bindingNode struct{ designator, name string }
-
-func (n bindingNode) eval(*joinPoint, *resolver) tri { return unknown }
-
 func parseExecution(args string) node {
 	s := strings.TrimSpace(args)
+	// Leading method annotation patterns (@a.b.Ann); any other @ (on a
+	// parameter or the declaring type) is not evaluated.
+	var anns []string
+	for strings.HasPrefix(s, "@") {
+		end := strings.IndexAny(s, " \t")
+		if end < 0 || !isQualifiedName(s[1:end]) {
+			return unknownNode{"annotation pattern in execution(" + args + ")"}
+		}
+		anns = append(anns, s[1:end])
+		s = strings.TrimSpace(s[end:])
+	}
 	if strings.ContainsAny(s, "@") {
 		return unknownNode{"annotation pattern in execution(" + args + ")"}
 	}
@@ -377,7 +552,7 @@ func parseExecution(args string) node {
 	if len(head) < 2 {
 		return unknownNode{"execution(" + args + ") without a return type"}
 	}
-	n := execNode{mods: head[:len(head)-2], ret: head[len(head)-2]}
+	n := execNode{anns: anns, mods: head[:len(head)-2], ret: head[len(head)-2]}
 	dn := head[len(head)-1]
 	if i := strings.LastIndexByte(dn, '.'); i >= 0 {
 		n.decl, n.name = dn[:i], dn[i+1:]
@@ -408,11 +583,14 @@ var (
 	typePatternRe = regexp.MustCompile(`^[A-Za-z0-9_$.*]+\+?(\[\])*$`)
 	namePatternRe = regexp.MustCompile(`^[A-Za-z0-9_$*]+$`)
 	qualifiedRe   = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)+$`)
+	identRe       = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*(\[\])*$`)
+	beanPatternRe = regexp.MustCompile(`^[A-Za-z0-9_$.#*-]+$`)
 )
 
 func isTypePattern(s string) bool   { return typePatternRe.MatchString(s) }
 func isNamePattern(s string) bool   { return namePatternRe.MatchString(s) }
 func isQualifiedName(s string) bool { return qualifiedRe.MatchString(s) }
+func isIdentOrName(s string) bool   { return identRe.MatchString(s) }
 
 func nameMatches(pat, name string) bool {
 	if pat == "*" {
@@ -452,6 +630,23 @@ func globRegexp(pat string) *regexp.Regexp {
 	b.WriteString("$")
 	re := regexp.MustCompile(b.String())
 	reCache[pat] = re
+	return re
+}
+
+// beanGlob compiles a bean name pattern: * is any run of characters.
+func beanGlob(pat string) *regexp.Regexp {
+	key := "bean:" + pat
+	reMu.Lock()
+	defer reMu.Unlock()
+	if re, ok := reCache[key]; ok {
+		return re
+	}
+	parts := strings.Split(pat, "*")
+	for i := range parts {
+		parts[i] = regexp.QuoteMeta(parts[i])
+	}
+	re := regexp.MustCompile("^" + strings.Join(parts, ".*") + "$")
+	reCache[key] = re
 	return re
 }
 
@@ -607,11 +802,106 @@ func sourceType(s string) (string, int) {
 	return base + strings.Repeat("[]", dims), n
 }
 
+// isVariable: an args/this/target/annotation argument that names a
+// variable rather than a type — not qualified and not capitalized (a
+// java.lang type such as String or Long).
+func isVariable(raw string) bool {
+	if raw == "" || raw == "*" || raw == ".." || strings.Contains(raw, ".") || primitives[raw] {
+		return false
+	}
+	c := raw[0]
+	return !(c >= 'A' && c <= 'Z')
+}
+
+// variables lists the variables an expression binds, by designator kind:
+// annotation designators, and this/target/args.
+func variables(n node, ann, obj *[]string) {
+	switch x := n.(type) {
+	case andNode:
+		variables(x.l, ann, obj)
+		variables(x.r, ann, obj)
+	case orNode:
+		variables(x.l, ann, obj)
+		variables(x.r, ann, obj)
+	case notNode:
+		variables(x.x, ann, obj)
+	case annNode:
+		if isVariable(x.raw) {
+			*ann = appendUnique(*ann, x.raw)
+		}
+	case objNode:
+		if isVariable(x.raw) {
+			*obj = appendUnique(*obj, x.raw)
+		}
+	case argsNode:
+		for _, r := range x.raw {
+			if isVariable(r) {
+				*obj = appendUnique(*obj, r)
+			}
+		}
+	}
+}
+
+func appendUnique(s []string, v string) []string {
+	for _, x := range s {
+		if x == v {
+			return s
+		}
+	}
+	return append(s, v)
+}
+
+// scope maps the variables an expression binds to their types.
+type scope map[string]string
+
+// bind resolves an expression's variables against sc: a variable becomes
+// its parameter's type, a type name stays a type; an unbound variable
+// stays unknown.
+func bind(n node, sc scope) node {
+	typeOf := func(raw string) string {
+		if t, ok := sc[raw]; ok {
+			return t
+		}
+		if isVariable(raw) {
+			return ""
+		}
+		if !strings.Contains(raw, ".") && !primitives[raw] && !strings.HasSuffix(raw, "[]") {
+			return "java.lang." + raw
+		}
+		return raw
+	}
+	switch x := n.(type) {
+	case andNode:
+		return andNode{bind(x.l, sc), bind(x.r, sc)}
+	case orNode:
+		return orNode{bind(x.l, sc), bind(x.r, sc)}
+	case notNode:
+		return notNode{bind(x.x, sc)}
+	case annNode:
+		x.ann = typeOf(x.raw)
+		return x
+	case objNode:
+		x.typ = typeOf(x.raw)
+		return x
+	case argsNode:
+		x.types = make([]string, len(x.raw))
+		for i, r := range x.raw {
+			if r == ".." || r == "*" {
+				x.types[i] = r
+			} else {
+				x.types[i] = typeOf(r)
+			}
+		}
+		return x
+	}
+	return n
+}
+
 // resolver resolves named pointcut references from one aspect.
 type resolver struct {
 	h      *hierarchy.Hierarchy
 	aspect string
-	// cache holds parsed @Pointcut methods by class and name; active
+	// cache holds bound @Pointcut methods by class and name; active
 	// guards recursion.
 	cache  map[string]node
 	active map[string]bool
@@ -637,6 +927,9 @@ func (r *resolver) lookup(qualifier, name string) (node, bool) {
 		if n, ok := r.cache[key]; ok {
 			return wrapActive{n, key}, true
 		}
+		if r.h == nil {
+			continue
+		}
 		ci, ok := r.h.Lookup(c)
 		if !ok {
 			continue
@@ -649,11 +942,10 @@ func (r *resolver) lookup(qualifier, name string) (node, bool) {
 				if a.Type != pointcutAnn {
 					continue
 				}
-				if r.active[key] {
-					return nil, false
-				}
 				expr, _ := stringElement(a, "value")
-				n := parse(expr)
+				argNames, _ := stringElement(a, "argNames")
+				parsed := parse(expr)
+				n := bind(parsed, methodScope(r.h, parsed, m.Method, argNames, "", ""))
 				r.cache[key] = n
 				return wrapActive{n, key}, true
 			}
@@ -686,6 +978,113 @@ func stringElement(a classfile.Annotation, name string) (string, bool) {
 	return s, ok
 }
 
+// methodScope names an advice's (or a parameterized pointcut's)
+// parameters as Spring's parameter name discovery does: the argNames
+// element; else the names compiled into the class file (-parameters,
+// -g); else inference from the expression
+// (AspectJAdviceParameterNameDiscoverer): a leading JoinPoint is no
+// binding, the throwing variable takes the one Throwable parameter, the
+// returning variable the one remaining parameter, an annotation variable
+// the one annotation-typed parameter, and a single this/target/args
+// variable the single remaining parameter. What stays ambiguous stays
+// unbound (unknown).
+func methodScope(h *hierarchy.Hierarchy, n node, m classfile.Method, argNames, returning, throwing string) scope {
+	params, _ := descParts(m.Descriptor)
+	sc := scope{}
+	names := splitNames(argNames)
+	if len(names) == len(params)-1 && len(params) > 0 && joinPointTypes[params[0]] {
+		names = append([]string{""}, names...)
+	}
+	if len(names) != len(params) {
+		names = m.ParameterNames
+	}
+	if len(names) == len(params) && len(params) > 0 {
+		for i, nm := range names {
+			if nm != "" {
+				sc[nm] = params[i]
+			}
+		}
+		return sc
+	}
+	unbound := map[int]bool{}
+	for i, p := range params {
+		if i == 0 && joinPointTypes[p] {
+			continue
+		}
+		unbound[i] = true
+	}
+	only := func(pred func(string) bool) (int, bool) {
+		k, found := -1, 0
+		for i := range unbound {
+			if pred(params[i]) {
+				k, found = i, found+1
+			}
+		}
+		return k, found == 1
+	}
+	if throwing != "" {
+		i, ok := only(func(t string) bool { return isThrowable(h, t) })
+		if !ok {
+			return sc
+		}
+		sc[throwing] = params[i]
+		delete(unbound, i)
+	}
+	if returning != "" {
+		i, ok := only(func(string) bool { return true })
+		if !ok {
+			return sc
+		}
+		sc[returning] = params[i]
+		delete(unbound, i)
+	}
+	var annVars, objVars []string
+	variables(n, &annVars, &objVars)
+	if len(annVars) == 1 {
+		if i, ok := only(func(t string) bool { return isAnnotationType(h, t) }); ok {
+			sc[annVars[0]] = params[i]
+			delete(unbound, i)
+		}
+	}
+	if len(objVars) == 1 {
+		if i, ok := only(func(string) bool { return true }); ok {
+			sc[objVars[0]] = params[i]
+			delete(unbound, i)
+		}
+	}
+	return sc
+}
+
+// isThrowable: t is a Throwable subtype; a type outside the input (the
+// JDK's) by its name.
+func isThrowable(h *hierarchy.Hierarchy, t string) bool {
+	if assignable(h, t, "java.lang.Throwable") {
+		return true
+	}
+	for _, s := range supertypes(h, t) {
+		if _, ok := h.Lookup(s); !ok && (strings.HasSuffix(s, "Exception") || strings.HasSuffix(s, "Error") || s == "java.lang.Throwable") {
+			return true
+		}
+	}
+	return false
+}
+
+func splitNames(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	var out []string
+	for _, x := range strings.Split(s, ",") {
+		out = append(out, strings.TrimSpace(x))
+	}
+	return out
+}
+
+func isAnnotationType(h *hierarchy.Hierarchy, t string) bool {
+	ci, ok := h.Lookup(t)
+	return ok && ci.AccessFlags&accAnnotation != 0
+}
+
 // unknownReasons collects why an expression is not fully understood.
 func unknownReasons(n node, r *resolver, out map[string]bool, depth int) {
 	if depth > 8 {
@@ -702,8 +1101,20 @@ func unknownReasons(n node, r *resolver, out map[string]bool, depth int) {
 		unknownReasons(x.x, r, out, depth+1)
 	case unknownNode:
 		out[x.why] = true
-	case bindingNode:
-		out[x.designator+"("+x.name+") bound to an advice parameter of unknown type"] = true
+	case annNode:
+		if x.ann == "" {
+			out[x.designator+"("+x.raw+") bound to no parameter of known type"] = true
+		}
+	case objNode:
+		if x.typ == "" {
+			out[x.designator+"("+x.raw+") bound to no parameter of known type"] = true
+		}
+	case argsNode:
+		for i, t := range x.types {
+			if t == "" {
+				out["args variable "+x.raw[i]+" bound to no parameter of known type"] = true
+			}
+		}
 	case refNode:
 		if y, ok := r.lookup(x.qualifier, x.name); ok {
 			unknownReasons(y, r, out, depth+1)

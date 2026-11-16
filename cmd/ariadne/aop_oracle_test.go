@@ -44,18 +44,21 @@ func aopGraph(t *testing.T, extra ...string) (callgraph.Export, *hierarchy.Hiera
 }
 
 // TestAOPOracle (spring:aop): testdata/aop (scripts/aop-oracle.sh) calls
-// beans advised by TracingAspect on a Spring 5.3.6 context with
-// @EnableAspectJAutoProxy — OrderService through CGLIB, JdbcRepo through a
-// JDK proxy, the @Monitored ReportService. Spring runs the advice methods
-// through AbstractAspectJAdvice#invokeAdviceMethodWithGivenArgs →
-// Method#invoke, so without the model nothing reaches them.
+// beans advised by TracingAspect and by the <aop:config> aspect XmlAudit
+// (fx/aop/aop.xml) on a Spring 5.3.6 context with @EnableAspectJAutoProxy
+// — OrderService through CGLIB, JdbcRepo through a JDK proxy, the
+// @Monitored ReportService. Spring runs the advice methods through
+// AbstractAspectJAdvice#invokeAdviceMethodWithGivenArgs → Method#invoke,
+// so without the model nothing reaches them.
 //
 // Every advice body the JVM ran is reached from main and the bean
-// lifecycle roots, except withArgs: its pointcut uses args(...), which a1
-// does not evaluate (the declared gap). The advice that never ran — a
-// pattern matching no method, an @Aspect that is no bean — gets no edge;
-// the self-invocation place → internal gets none, and the advice record
-// shows the JVM ran no advice for it, nor for the final method.
+// lifecycle roots — args/this/target bound by inference (the fixture has
+// no debug info), a parameterized @Pointcut with argNames, bean(),
+// @target, an annotation pattern in execution, a returning type, XML
+// and/not. The advice that never ran — patterns matching no method, a
+// bean() naming no bean, an @Aspect that is no bean — gets no edge; the
+// self-invocation place → internal gets none, and the advice record shows
+// the JVM ran no advice for it, nor for the final method.
 func TestAOPOracle(t *testing.T) {
 	ex, h := aopGraph(t)
 	starts := []string{"fx.app.Main#main([Ljava/lang/String;)V"}
@@ -68,7 +71,6 @@ func TestAOPOracle(t *testing.T) {
 			reach[b] = true
 		}
 	}
-	const withArgs = "fx.aop.aspect.TracingAspect#withArgs(J)V"
 	all := (benchFixture{observed: aopFixture + "observed.txt", bodyColumn: 0}).observedBodies(t)
 	var missed []string
 	n := 0
@@ -77,19 +79,23 @@ func TestAOPOracle(t *testing.T) {
 			continue // generated at run time
 		}
 		n++
-		if !reach[b] && b != withArgs {
+		if !reach[b] {
 			missed = append(missed, b)
 		}
 	}
-	if n < 12 || !all[withArgs] {
+	if n < 24 || !all["fx.aop.aspect.XmlAudit#audit()V"] {
 		t.Fatalf("observed.txt has %d input bodies; regenerate with scripts/aop-oracle.sh", n)
 	}
 	sort.Strings(missed)
 	for _, b := range missed {
 		t.Errorf("the JVM ran %s, the graph does not reach it", b)
 	}
-	if reach[withArgs] {
-		t.Errorf("%s reached: args(...) is not evaluated, update the declared gap", withArgs)
+	never := []string{"fx.aop.aspect.TracingAspect#ghost()V", "fx.aop.aspect.TracingAspect#noBean()V",
+		"fx.aop.aspect.Unregistered#never()V", "fx.aop.aspect.XmlAudit#ghost()V"}
+	for _, b := range never {
+		if all[b] {
+			t.Fatalf("observed.txt has %s; the fixture changed", b)
+		}
 	}
 
 	// The advice record: no advice for the self-invocation or the final
@@ -114,17 +120,10 @@ func TestAOPOracle(t *testing.T) {
 			model[id.From][id.To] = true
 		}
 	}
-	const (
-		main      = "fx.app.Main#main([Ljava/lang/String;)V"
-		before    = "fx.aop.aspect.TracingAspect#before(Lorg/aspectj/lang/JoinPoint;)V"
-		afterSave = "fx.aop.aspect.TracingAspect#afterSave(Ljava/lang/Object;)V"
-		onError   = "fx.aop.aspect.TracingAspect#onError(Ljava/lang/Exception;)V"
-		audit     = "fx.aop.aspect.TracingAspect#audit(Lorg/aspectj/lang/ProceedingJoinPoint;Lfx/aop/svc/Audited;)Ljava/lang/Object;"
-		monitor   = "fx.aop.aspect.TracingAspect#monitor()V"
-	)
-	for _, to := range []string{before, afterSave, onError, audit, monitor} {
-		if !model[main][to] {
-			t.Errorf("no model edge %s → %s", main, to)
+	const main = "fx.app.Main#main([Ljava/lang/String;)V"
+	for b := range all {
+		if strings.HasPrefix(b, "fx.aop.aspect.") && !model[main][b] {
+			t.Errorf("no model edge %s → %s", main, b)
 		}
 	}
 	for from, tos := range model {
@@ -132,8 +131,10 @@ func TestAOPOracle(t *testing.T) {
 			t.Errorf("model edges from %s → %v: only main calls advised beans through the proxy", from, tos)
 		}
 		for to := range tos {
-			if strings.Contains(to, "#ghost(") || strings.Contains(to, "#withArgs(") || strings.HasPrefix(to, "fx.aop.aspect.Unregistered#") {
-				t.Errorf("model edge %s → %s: the JVM never runs it", from, to)
+			for _, b := range never {
+				if to == b {
+					t.Errorf("model edge %s → %s: the JVM never runs it", from, to)
+				}
 			}
 		}
 	}

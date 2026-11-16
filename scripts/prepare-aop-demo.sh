@@ -4,12 +4,14 @@
 # (spring-boot-starter-aop) whose @Before advice renders the order text
 # with commons-text 1.9's StringSubstitutor#replace (CVE-2022-42889,
 # Text4Shell — a manual-table CVE in internal/vulnmap/vuln_methods.yaml).
-# main calls OrderService#place on the bean, packaged twice with one class
-# differing:
-#   - app-advised.jar: the aspect's pointcut is
-#     execution(* demo.OrderService.place(..)) — the advice runs;
+# main calls OrderService#place on the bean, packaged three times:
+#   - app-advised.jar: the @Aspect's pointcut is
+#     execution(* demo.OrderService.place(..)) && args(text) — the advice
+#     runs (text bound by name: Boot compiles with -parameters);
 #   - app-unadvised.jar: the pointcut names OrderService#refund, which
-#     nothing calls — the advice never runs.
+#     nothing calls — the advice never runs;
+#   - app-xml.jar: the same advice declared by <aop:config> in aop.xml
+#     (and/args in the XML expression) on a plain class — the advice runs.
 # An advice method is not a root of the spring profile, so under -roots
 # profile it is reachable only through the model's edge from the call of
 # the advised method.
@@ -19,7 +21,7 @@
 # OSV through the cache) and prints the model's log line and the verdict
 # of CVE-2022-42889.
 #
-# Produces under work/aop-demo/: app-{advised,unadvised}.jar, lib/*.jar,
+# Produces under work/aop-demo/: app-{advised,unadvised,xml}.jar, lib/*.jar,
 # deps.txt.
 #
 # Usage: scripts/prepare-aop-demo.sh [JAVA_HOME]   (any JDK 8+; default: java on PATH)
@@ -32,7 +34,7 @@ fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$root/work/aop-demo"
 rm -rf "$work"
-mkdir -p "$work/src/main/java/demo" "$work/variants/advised" "$work/variants/unadvised"
+mkdir -p "$work/src/main/java/demo" "$work/variants"
 cd "$work"
 
 # source/target rather than <release>: a JDK without ct.sym rejects --release.
@@ -95,13 +97,13 @@ public class OrderService {
     public void refund(String text) { System.out.println("refunded: " + text); }
 }
 EOF
-for v in advised unadvised; do
-    if [ $v = advised ]; then m=place; else m=refund; fi
-    cat > variants/$v/AuditAspect.java <<EOF
+
+aspect() { # variant method
+    mkdir -p "variants/$1/java"
+    sed "s/@M@/$2/" > "variants/$1/java/AuditAspect.java" <<'EOF'
 package demo;
 
 import org.apache.commons.text.StringSubstitutor;
-import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.springframework.stereotype.Component;
@@ -110,23 +112,67 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 public class AuditAspect {
-    @Before("execution(* demo.OrderService.$m(..))")
-    public void audit(JoinPoint jp) {
-        String text = String.valueOf(jp.getArgs()[0]);
+    @Before("execution(* demo.OrderService.@M@(..)) && args(text)")
+    public void audit(String text) {
         System.out.println("advice ran: " + StringSubstitutor.createInterpolator().replace(text));
     }
 }
 EOF
-done
+}
+aspect advised place
+aspect unadvised refund
+
+# The xml variant: a plain class made an aspect by <aop:config>.
+mkdir -p variants/xml/java variants/xml/resources
+cat > variants/xml/java/AuditAspect.java <<'EOF'
+package demo;
+
+import org.apache.commons.text.StringSubstitutor;
+
+/** Renders an audit line; an aspect through aop.xml. */
+public class AuditAspect {
+    public void audit(String text) {
+        System.out.println("advice ran: " + StringSubstitutor.createInterpolator().replace(text));
+    }
+}
+EOF
+cat > variants/xml/java/XmlConfig.java <<'EOF'
+package demo;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportResource;
+
+@Configuration
+@ImportResource("classpath:aop.xml")
+public class XmlConfig {
+}
+EOF
+cat > variants/xml/resources/aop.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+    <bean id="auditAspect" class="demo.AuditAspect"/>
+    <aop:config>
+        <aop:aspect ref="auditAspect">
+            <aop:before method="audit" pointcut="execution(* demo.OrderService.place(..)) and args(text)"/>
+        </aop:aspect>
+    </aop:config>
+</beans>
+EOF
 
 java -version
 mvn -q -B dependency:copy-dependencies -DoutputDirectory=lib -DincludeScope=runtime
 mvn -q -B dependency:list -DoutputFile=deps.txt -DincludeScope=runtime
-# One jar per variant: the shared classes plus that variant's AuditAspect
-# (zipped with Python, so a JDK without the jar tool is enough; with
-# directory entries, without which component scanning finds nothing).
-for v in advised unadvised; do
-    cp "variants/$v/AuditAspect.java" src/main/java/demo/AuditAspect.java
+# One jar per variant: the shared classes plus that variant's classes and
+# resources (zipped with Python, so a JDK without the jar tool is enough;
+# with directory entries, without which component scanning finds nothing).
+for v in advised unadvised xml; do
+    rm -rf src/main/resources src/main/java/demo/XmlConfig.java
+    cp variants/$v/java/*.java src/main/java/demo/
+    if [ -d variants/$v/resources ]; then cp -r variants/$v/resources src/main/resources; fi
     mvn -q -B clean compile
     python3 -I - target/classes "app-$v.jar" <<'PY'
 import os, sys, zipfile
@@ -141,7 +187,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
 PY
 done
 
-for v in advised unadvised; do
+for v in advised unadvised xml; do
     echo "== real JVM, $v"
     java -cp "app-$v.jar:lib/*" demo.DemoApplication 2>&1 | grep -E "advice ran" || echo "  (advice did not run)"
 done
@@ -149,7 +195,7 @@ done
 echo "== ariadne"
 cd "$root"
 go build -o bin/ariadne ./cmd/ariadne
-for v in advised unadvised; do
+for v in advised unadvised xml; do
     for roots in profile all; do
         out="$work/ariadne-$v-$roots"
         bin/ariadne -cache-dir "$root/.cache" -app "$work/app-$v.jar" -deps "$work/lib" \

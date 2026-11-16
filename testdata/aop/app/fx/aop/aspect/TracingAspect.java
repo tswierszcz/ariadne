@@ -48,7 +48,46 @@ public class TracingAspect {
     @Before("execution(* fx.aop.svc.OrderService.never*(..))")
     public void ghost() { Ran.stack(); }
 
-    /** args(...) is not evaluated by spring:aop a1: runs, undecided (the declared gap). */
+    /** args(id): id is the one parameter (bound by inference, no debug info). */
     @Before("execution(* fx.aop.svc.Repo+.*(..)) && args(id)")
     public void withArgs(long id) { Ran.stack(); }
+
+    @Pointcut(value = "execution(* fx.aop.svc.Repo+.find(..)) && args(id)", argNames = "id")
+    public void byId(long id) {}
+
+    /** A parameterized named pointcut. */
+    @Before("byId(id)")
+    public void beforeFind(long id) { Ran.stack(); }
+
+    /** bean(name): the default name of the @Repository JdbcRepo. */
+    @Before("bean(jdbc*) && execution(* name())")
+    public void byBean() { Ran.stack(); }
+
+    /** bean(name) of no bean: never runs. */
+    @Before("bean(nothing*)")
+    public void noBean() { Ran.stack(); }
+
+    /** target(Type). */
+    @Before("target(fx.aop.svc.ReportService)")
+    public void byTarget() { Ran.stack(); }
+
+    /** this(variable): bound to the ReportService parameter. */
+    @Before("this(svc) && execution(* render(..))")
+    public void byThis(fx.aop.svc.ReportService svc) { Ran.stack(); }
+
+    /** @target(Annotation). */
+    @Before("@target(fx.aop.svc.Monitored)")
+    public void byTargetAnn() { Ran.stack(); }
+
+    /** A method annotation pattern inside execution. */
+    @Before("execution(@fx.aop.svc.Audited * *(..))")
+    public void byExecAnn() { Ran.stack(); }
+
+    /** returning String: Repo#name only (save is void, find throws). */
+    @AfterReturning(pointcut = "execution(* fx.aop.svc.Repo+.*(..))", returning = "s")
+    public void onString(String s) { Ran.stack(); }
+
+    /** args(String): save's Object parameter may hold a String at run time (and does). */
+    @Before("execution(* fx.aop.svc..*(..)) && args(String)")
+    public void stringArg() { Ran.stack(); }
 }
