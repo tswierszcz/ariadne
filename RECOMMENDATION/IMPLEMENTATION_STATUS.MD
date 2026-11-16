@@ -1450,6 +1450,55 @@ obiekty JDBC, proxy MyBatis i Spring Data: zrobione 2026-11-14 (`b4-1`…`b4-5`)
 - **Następny krok (wymaga zgody):** pełne wejście WebGoata (wszystkie
   lekcje) albo ROADMAP B3.
 
+### CVE:F10 (redukcja `UNKNOWN`, część 1: Spring) — DONE for this scope (2026-11-16)
+
+- **Zakres (zatwierdzony 2026-11-16):** przegląd 41 unikalnych `UNKNOWN`
+  na petclinic/WebGoat/JPetStore (27/26/5) — grupy: A brak commita
+  poprawki i nazwy klasy (~27), B mapowanie z commita na metody nieobecne w
+  badanej linii (9), C advisory niedotyczące kodu (~5); ręczne mapowania z
+  diffów wydań w 2–3 PR-ach (Spring; Tomcat/Jackson/logback/Undertow; H2,
+  sterowniki JDBC, reszta + kod powodu dla grupy C). Ta część: Spring.
+- **Metoda:** jak 2026-11-13 (`work/jardiff`: znormalizowany bytecode
+  ostatniego wydania podatnego vs naprawionego z Maven Central, przypisanie
+  zmian po treści advisory, sprawdzenie każdej metody z nazwy w wydaniach
+  wariantu). Gdy poprawka zmienia współdzielone narzędzie wykonywane i tak
+  przy starcie (`StringUtils#cleanPath`, `UrlResource#createRelative`,
+  cache ścieżek właściwości Spring Data), wpis nazywa punkt wejścia z
+  treści advisory (`entrypoint`).
+- **Wynik:** 15 wpisów (68 → 83; role 49 entrypoint / 8 sink / 26
+  vulnerable): CVE-2016-1000027 (eksportery HTTP invoker/RMI, poprawki brak
+  — commity zmieniają tylko Javadoc), CVE-2018-11040/-1257/-1271/-15756
+  (linia 4.3; dla 15756 osobny wariant 4.2 — `HttpRange#toResourceRegions`
+  powstało w 4.3), CVE-2024-38828 (`ByteArrayHttpMessageConverter#
+  readInternal`, 5.3.39 vs 6.0.0 — bufor z `Content-Length`),
+  CVE-2025-41242 (`PathResourceResolver#getResource`; poprawka w
+  `spring-core` `createRelative`), CVE-2025-22235 (`EndpointRequest#to`),
+  CVE-2026-40972 (`HttpHeaderAccessManager#isAllowed`), CVE-2026-41711/
+  -41716/-41721 (resolvery argumentów web Spring Data; jedno wydanie
+  3.5.11→3.5.12 naprawia wszystkie trzy), CVE-2021-22119 (repozytorium
+  żądań autoryzacji OAuth2, warianty dla `spring-security-oauth2-client` i
+  `-core`), CVE-2026-22732 (`OnCommittedResponseWrapper#addHeader`),
+  CVE-2026-47838 (`SubjectDnX509PrincipalExtractor#extractPrincipal`).
+  `UNKNOWN` (v2, ustalenia, `-roots all` CHA offline): petclinic 27 → 19,
+  WebGoat 26 → 17, JPetStore 5 → 3. Zmiany: 11 → `FRAMEWORK` (ścieżki przez
+  wnętrze Springa), 6 → `NOT_REACHABLE` (aplikacje nie wołają
+  `EndpointRequest.to()`, nie używają zdalnych DevTools, HTTP invokera
+  (JPetStore), zakresów zasobów (JPetStore)), 2 → `REACHABLE` w WebGoat:
+  CVE-2026-22732 (ścieżka wiarygodna: nagłówki bezpieczeństwa zapisywane
+  przez `OnCommittedResponseWrapper#addHeader`) i CVE-2026-47838
+  (nadmiarowa ścieżka CHA `ClearSiteDataHeaderWriter` → dowolny
+  `RequestMatcher` → filtr X.509; WebGoat nie używa X.509; także przy RTA,
+  bo konfigurator Spring Security tworzy filtr) — mapowanie poprawne,
+  nieprecyzja grafu.
+- **Pozostaje w tej grupie:** JPetStore CVE-2018-11040/-1257/-1271 —
+  `METHOD_NOT_FOUND`, bo aplikacja nie ma `spring-webmvc` ani
+  `spring-messaging` (kod podatny nieobecny; obecny kontrakt: `UNKNOWN`);
+  CVE-2026-22733 (CloudFoundry, zależne od wdrożenia — grupa C).
+- **Weryfikacja:** `TestLoadManualMeta_embeddedTable` (83 wpisy),
+  `go test ./...`, `go vet ./...`; porównanie ustaleń v2 przed/po na trzech
+  aplikacjach (każda zmiana wyjaśniona wyżej). Dokumentacja: README.
+- **Następny krok:** część 2 (Tomcat, Jackson, logback, Undertow/XNIO).
+
 ### CVE:F10 (kontynuacja) — ręczne mapowania z diffów wydań — DONE for this scope (2026-11-13)
 
 - **Archiwum:** [archive/2026-11-13/cve/CVE_F10.md](../archive/2026-11-13/cve/CVE_F10.md) (zmergowane: PR #48 `4b88699`, PR #49 `8d9ff45`).
