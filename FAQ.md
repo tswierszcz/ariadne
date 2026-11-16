@@ -878,6 +878,12 @@ dropped from 57/60/12 to 49/45/8. The biggest groups left after that (Spring MVC
 Thymeleaf, SnakeYAML: advisories with no commit and no class name) got
 22 hand-reviewed manual entries, each from a release diff read by hand
 and checked over a span of releases: `UNKNOWN` 49/45/8 → 27/23/5.
+On 2026-11-16 the rest went the same way: 39 more entries (Spring,
+Tomcat, Jackson, logback, Undertow, JDBC drivers, …), an advisory that
+concerns no JVM code at all marked as such (`not_code`, e.g. Tomcat's
+Windows installer), and mapped code absent from the whole classpath
+reported as `NOT_REACHABLE` (`MAPPED_CODE_ABSENT`) — `UNKNOWN`
+27/26/5 → 1/0/0.
 
 Source 4 is an LLM reading the advisory + fix diff, opt-in with `-llm`
 (design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
@@ -931,11 +937,15 @@ overridden.
 `NOT_APPLICABLE`: client-side JavaScript/CSS a call graph cannot analyze,
 which is not the same as safe. (A merely empty jar does not count: Maven
 aggregators like `spring-boot-starter-web` are empty too, and Spring4Shell
-is filed against exactly that one.) Then: no entry from step 6 → `UNKNOWN`. Otherwise:
+is filed against exactly that one.) The same `NOT_APPLICABLE` for an
+advisory the manual table marks `not_code` (`NOT_CODE_MAPPABLE`). Then: no
+entry from step 6 → `UNKNOWN`. Otherwise:
 matched nodes visited in search 1 → `REACHABLE` (the shortest such
 path). Visited only in search 2 → `FRAMEWORK`. Neither → `NOT_REACHABLE`
 — unless no mapped method exists in the graph at all, which is `UNKNOWN`
-with `METHOD_NOT_FOUND` (CVE:F1b; "method not found" is not "no path").
+with `METHOD_NOT_FOUND` (CVE:F1b; "method not found" is not "no path"),
+or, when not even one mapped class is on the classpath, `NOT_REACHABLE`
+with `MAPPED_CODE_ABSENT` (the application does not ship that code).
 The advisory is evaluated per affected component instance and aggregated;
 the instance whose own copy of a class lost to another jar's copy gets
 `CLASSPATH_CONFLICT` instead of borrowing that copy's path. Why are model
