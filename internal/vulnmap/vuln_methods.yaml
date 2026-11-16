@@ -542,3 +542,225 @@ CVE-2026-41901: # expressions executed in sandboxed contexts (fixed 3.1.5)
       versions: "[3.1.4.RELEASE,3.1.5.RELEASE)"
       methods:
         - org.thymeleaf.spring5.util.SpringStandardExpressionUtils#containsExternalAccess
+
+# ---------------------------------------------------------------------------
+# UNKNOWN reduction, Spring (2026-11-16). Same method as the 2026-11-13
+# section above: a release diff of the normalized bytecode (work/jardiff)
+# between the last affected and the fixing release, read in full and
+# attributed to the advisory by its text; every method then checked by
+# name in the releases listed as `checked:`. Where the changed method is a
+# shared utility (StringUtils#cleanPath, UrlResource#createRelative, the
+# property-path caches Spring Data fills at startup), the mapping names the
+# entry point the advisory describes instead, so a path means the attack
+# surface is in use — role entrypoint.
+
+CVE-2016-1000027: # Java deserialization in Spring's HTTP invoker / RMI exporters
+  # Not fixed: Spring documented the risk (the referenced commits change
+  # Javadoc only) and removed the exporters in 6.0. The deserializing entry
+  # points of the remoting exporters. checked: 4.3.4, 5.3.6, 5.3.39.
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-web
+      versions: "(,6.0.0)"
+      methods:
+        - org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter#readRemoteInvocation
+        - org.springframework.remoting.rmi.RemoteInvocationSerializingExporter#doReadRemoteInvocation
+
+CVE-2018-11040: # JSONP enabled by default in MappingJackson2JsonView
+  # 4.3.17 -> 4.3.18: the view's constructors stop registering the
+  # jsonp/callback parameters; JSONP is served through these two methods.
+  # checked: 4.3.0, 4.3.4, 4.3.17, 5.0.0, 5.0.6 (spring-webmvc).
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-core
+      versions: "[4.3.0,4.3.18),[5.0.0,5.0.7)"
+      methods:
+        - org.springframework.web.servlet.view.json.MappingJackson2JsonView#getJsonpParameterValue
+        - org.springframework.web.servlet.mvc.method.annotation.AbstractJsonpResponseBodyAdvice#beforeBodyWriteInternal
+
+CVE-2018-1257: # ReDoS in the simple STOMP broker's subscription selector
+  # 4.3.16 -> 4.3.17 (spring-messaging): selector expressions on SUBSCRIBE
+  # become opt-in; they are parsed in addSubscriptionInternal.
+  # checked: 4.3.0, 4.3.4, 4.3.16, 5.0.0, 5.0.5.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-core
+      versions: "(,4.3.17),[5.0.0,5.0.6)"
+      methods:
+        - org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry#addSubscriptionInternal
+
+CVE-2018-1271: # static resources served from a Windows file system: path traversal
+  # 4.3.14 -> 4.3.15 (spring-webmvc): path checks in the resource handler and
+  # the location check of PathResourceResolver (StringUtils#cleanPath also
+  # changed; it is a shared utility, left out). checked: 4.3.0, 4.3.4,
+  # 4.3.14, 5.0.0, 5.0.4.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-core
+      versions: "(,4.3.15),[5.0.0,5.0.5)"
+      methods:
+        - org.springframework.web.servlet.resource.ResourceHttpRequestHandler#getResource
+        - org.springframework.web.servlet.resource.PathResourceResolver#getResource
+        - org.springframework.web.servlet.resource.PathResourceResolver#isResourceUnderLocation
+
+CVE-2018-15756: # range requests with many/overlapping ranges: DoS
+  # 4.3.19 -> 4.3.20 (spring-web): HttpRange bounds the ranges. 4.2 parses
+  # the ranges in the same HttpRange#parseRanges and writes them in the
+  # resource handler. checked: 4.2.0, 4.2.9 (4.2 variant); 4.3.4, 4.3.19,
+  # 5.0.0, 5.0.9, 5.1.0.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-core
+      versions: "[4.2.0.RELEASE,4.3.0.RELEASE)"
+      methods:
+        - org.springframework.http.HttpRange#parseRanges
+        - org.springframework.web.servlet.resource.ResourceHttpRequestHandler#writePartialContent
+    - package: org.springframework:spring-core
+      versions: "[4.3.0.RELEASE,4.3.20.RELEASE),[5.0.0.RELEASE,5.0.10.RELEASE),[5.1.0.RELEASE,5.1.1.RELEASE)"
+      methods:
+        - org.springframework.http.HttpRange#parseRanges
+        - org.springframework.http.HttpRange#toResourceRegions
+
+CVE-2024-38828: # @RequestBody byte[]: DoS
+  # Fixed in 5.3.42 (commercial only); 6.x is not affected. 5.3.39 -> 6.0.0
+  # differs in exactly this method: 5.3 sizes its buffer from the request's
+  # Content-Length. checked: 5.3.0, 5.3.6, 5.3.39 (spring-web).
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.42)"
+      methods:
+        - org.springframework.http.converter.ByteArrayHttpMessageConverter#readInternal
+
+CVE-2025-41242: # static resources on a non-compliant servlet container: path traversal
+  # 6.2.9 -> 6.2.10: the fix is in spring-core's UrlResource/FileUrlResource
+  # #createRelative, which every resource lookup uses (startup too); the
+  # entry point is the static-resource resolution that calls it.
+  # checked: 5.3.0, 5.3.6, 5.3.39, 6.0.0, 6.1.21, 6.2.9.
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework:spring-webmvc
+      versions: "[5.3.0,5.3.43],[6.0.0,6.0.29],[6.1.0,6.1.21],[6.2.0,6.2.10)"
+      methods:
+        - org.springframework.web.servlet.resource.PathResourceResolver#getResource
+
+# Spring Boot.
+CVE-2025-22235: # EndpointRequest.to() matches null/** for a disabled endpoint
+  # 3.4.4 -> 3.4.5 (spring-boot-actuator-autoconfigure): the matchers'
+  # createDelegate. Only an application building its security chain with
+  # EndpointRequest.to() is affected: that call is the entry point.
+  # checked: 2.4.3, 2.7.18, 3.4.4.
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.boot:spring-boot
+      versions: "(,2.7.24.2],[3.1.0,3.1.15.2],[3.2.0,3.2.13.2],[3.3.0,3.3.11),[3.4.0,3.4.5)"
+      methods:
+        - org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest#to
+        - org.springframework.boot.actuate.autoconfigure.security.reactive.EndpointRequest#to
+
+CVE-2026-40972: # DevTools remote secret compared in non-constant time
+  # 3.5.13 -> 3.5.14: HttpHeaderAccessManager#isAllowed. checked: 2.4.5,
+  # 2.7.18, 3.5.13.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.boot:spring-boot-devtools
+      versions: "(,2.7.32],[3.3.0,3.3.18],[3.4.0,3.4.15],[3.5.0,3.5.14),[4.0.0,4.0.6)"
+      methods:
+        - org.springframework.boot.devtools.remote.server.HttpHeaderAccessManager#isAllowed
+
+# Spring Data Commons. One release (3.5.11 -> 3.5.12) fixes all three: it
+# bounds PropertyPath#create's recursion (Sort parsing), the property-path
+# and type caches, and MapDataBinder (projection binding). The caches are
+# filled at startup by every repository, so the mappings name the web entry
+# points the advisories describe. checked: 2.4.5, 2.7.18, 3.5.11.
+CVE-2026-41711: # StackOverflowError parsing Sort parameters
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.data:spring-data-commons
+      versions: "(,2.7.19],[3.0.0,3.3.16],[3.4.0,3.4.14],[3.5.0,3.5.12),[4.0.0,4.0.6)"
+      methods:
+        - org.springframework.data.web.SortHandlerMethodArgumentResolver#resolveArgument
+CVE-2026-41716: # unbounded property-lookup cache keyed by request strings
+  role: entrypoint
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.data:spring-data-commons
+      versions: "(,2.7.19],[3.3.0,3.3.16],[3.4.0,3.4.14],[3.5.0,3.5.12),[4.0.0,4.0.6)"
+      methods:
+        - org.springframework.data.web.SortHandlerMethodArgumentResolver#resolveArgument
+        - org.springframework.data.web.PageableHandlerMethodArgumentResolver#resolveArgument
+        - org.springframework.data.web.ProxyingHandlerMethodArgumentResolver#createAttribute
+        - org.springframework.data.web.querydsl.QuerydslPredicateArgumentResolver#resolveArgument
+CVE-2026-41721: # @ProjectedPayload binding allocates without bound
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.data:spring-data-commons
+      versions: "(,2.7.19],[3.0.0,3.3.16],[3.4.0,3.4.14],[3.5.0,3.5.12),[4.0.0,4.0.6)"
+      methods:
+        - org.springframework.data.web.ProxyingHandlerMethodArgumentResolver#createAttribute
+
+# Spring Security.
+CVE-2021-22119: # OAuth2 client: unbounded authorization requests per session
+  # 5.4.6 -> 5.4.7 (spring-security-oauth2-client): the session-backed
+  # request repository. OSV files it under spring-security-core too.
+  # checked: 5.2.0, 5.4.5, 5.4.6, 5.5.0.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.security:spring-security-oauth2-client
+      versions: "[5.2.0,5.2.11),[5.3.0,5.3.10),[5.4.0,5.4.7),[5.5.0,5.5.1)"
+      methods: &oauth2-request-repository
+        - org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository#saveAuthorizationRequest
+        - org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository#getAuthorizationRequests
+    - package: org.springframework.security:spring-security-core
+      versions: "[5.2.0,5.2.11),[5.3.0,5.3.10),[5.4.0,5.4.7),[5.5.0,5.5.1)"
+      methods: *oauth2-request-repository
+
+CVE-2026-22732: # security headers not written after a Content-Length header
+  # 6.5.8 -> 6.5.9: OnCommittedResponseWrapper tracks the content length set
+  # through every header method; before, only addHeader. checked: 5.4.5,
+  # 5.7.14, 6.3.10, 6.5.8.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.security:spring-security-web
+      versions: "(,5.7.14],[5.8.0,5.8.16],[6.0.0,6.3.10],[6.4.0,6.4.13],[6.5.0,6.5.9),[7.0.0,7.0.4)"
+      methods:
+        - org.springframework.security.web.util.OnCommittedResponseWrapper#addHeader
+
+CVE-2026-47838: # X.509: a crafted subject CN yields another user's name
+  # Named by the advisory; 6.5.11 deprecates it for SubjectX500PrincipalExtractor.
+  # checked: 5.4.5, 5.7.14, 6.3.10, 6.5.10.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.springframework.security:spring-security-web
+      versions: "(,5.7.14],[5.8.0,5.8.16],[6.0.0,6.3.10],[6.4.0,6.4.13],[6.5.0,6.5.11)"
+      methods:
+        - org.springframework.security.web.authentication.preauth.x509.SubjectDnX509PrincipalExtractor#extractPrincipal

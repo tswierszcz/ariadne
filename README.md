@@ -1216,12 +1216,24 @@ For each CVE, in priority order:
    checked against the installed Maven's own `ComparableVersion` on 38809
    pairs and `VersionRange` on 396 cases). The embedded table's
    CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
-   The table has 68 entries (audit:
+   The table has 83 entries (audit:
    `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`); 22 of them (2026-11-13)
    cover advisories with neither a fix commit nor a class name — SnakeYAML
    DoS, Spring MVC static resources/SSE/script templates, SpEL, Spring log
    injection, Thymeleaf — each read by hand from a release diff and
-   versioned over the releases where the methods were checked.
+   versioned over the releases where the methods were checked. 15 more
+   (2026-11-16, the same way) cover the Spring advisories the reference
+   apps left `UNKNOWN`: Spring Framework (the HTTP-invoker deserialization
+   entry points of CVE-2016-1000027, four 4.3-line advisories whose fix
+   commits name methods 4.3 does not have, `@RequestBody byte[]`, static
+   resources on non-compliant containers), Spring Boot (`EndpointRequest.to()`,
+   DevTools' secret check), Spring Data Commons (three DoS through the web
+   argument resolvers) and Spring Security (OAuth2 authorization requests,
+   header writing, X.509 subject parsing). Where the fix changed a shared
+   utility that runs at startup anyway (`StringUtils#cleanPath`,
+   `UrlResource#createRelative`, Spring Data's property-path caches), the
+   entry names the entry point the advisory describes (role `entrypoint`).
+   `UNKNOWN` on petclinic/WebGoat/JPetStore: 27/26/5 → 19/17/3.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only non-test `.java` files
