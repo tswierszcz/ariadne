@@ -96,3 +96,19 @@ func looksLikeClassName(s string) bool {
 	}
 	return seg > 0
 }
+
+// Strings returns the class's string constants (CONSTANT_String), in
+// constant-pool order, unreadable entries skipped.
+func (cf *ClassFile) Strings() []string {
+	var out []string
+	for i := 1; i < len(cf.pool); i++ {
+		e := cf.pool[i]
+		if e.tag != tagString {
+			continue
+		}
+		if s, err := cf.pool.utf8(e.nameIndex); err == nil {
+			out = append(out, s)
+		}
+	}
+	return out
+}

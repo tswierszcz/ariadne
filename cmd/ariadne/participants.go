@@ -3,6 +3,7 @@ package main
 import (
 	"ariadne/internal/analysis"
 	"ariadne/internal/jdbcdispatch"
+	"ariadne/internal/jdbcurl"
 	"ariadne/internal/jpadispatch"
 	"ariadne/internal/proxycatalog"
 	"ariadne/internal/samcall"
@@ -34,6 +35,8 @@ func participantCatalog() []analysis.Participant {
 		{ID: samGateID, Version: samcall.Version, Kind: analysis.KindGate},
 		{ID: servletGateID, Version: servletdispatch.Version, Kind: analysis.KindGate},
 		{ID: jdbcdispatch.ModelID, Version: jdbcdispatch.Version, Kind: analysis.KindGate},
+		// A step before the gates: cuts JDBC drivers no packaged URL reaches.
+		{ID: jdbcurl.ModelID, Version: jdbcurl.Version, Kind: analysis.KindGate},
 		{ID: jpadispatch.ModelID, Version: jpadispatch.Version, Kind: analysis.KindGate},
 		{ID: proxycatalog.ModelID, Version: proxycatalog.Version, Kind: analysis.KindGate},
 		{ID: springevents.ModelID, Version: springevents.Version, Kind: analysis.KindGate},

@@ -159,6 +159,9 @@ func ApplyModelEdges(g *Graph, edges []ModelEdge) int {
 		if kind == "" {
 			kind = classfile.CallSynthetic
 		}
+		if g.siteCut(from, e.PC) {
+			continue
+		}
 		merged := false
 		for i := range g.adjacency[from] {
 			existing := &g.adjacency[from][i]
@@ -242,6 +245,9 @@ type Graph struct {
 	unresolvedOwner int
 	// config is the construction metadata (GRAPH_PRECISION P0).
 	config Config
+	// siteCuts[id] is the bytecode offset past which method id never
+	// runs in this analysis (CutSitesAfter).
+	siteCuts map[uint32]int
 }
 
 // Config returns the graph's construction metadata.
@@ -417,10 +423,16 @@ func (g *Graph) intern(fqcn, name, desc string) uint32 {
 // addEdge always appends a new Edge; callers that want to merge evidence
 // into an existing (to, kind, basis) edge instead (build.go's addOrMerge)
 // must check for that themselves first.
-func (g *Graph) addEdge(from uint32, to uint32, kind classfile.CallKind, basis EdgeBasis, site *CallSite) {
+// addEdge appends an edge and reports whether it did: a call at a site
+// CutSitesAfter cut is refused.
+func (g *Graph) addEdge(from uint32, to uint32, kind classfile.CallKind, basis EdgeBasis, site *CallSite) bool {
+	if site != nil && g.siteCut(from, site.PC) {
+		return false
+	}
 	var sites []CallSite
 	if site != nil {
 		sites = []CallSite{*site}
 	}
 	g.adjacency[from] = append(g.adjacency[from], Edge{To: to, Kind: kind, Basis: basis, Sites: sites})
+	return true
 }

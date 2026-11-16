@@ -37,8 +37,9 @@ func ApplyCallbackEdges(g *Graph, edges []CallbackEdge) int {
 		if hasEdge(g, fromID, toID, classfile.CallSynthetic, BasisCallback) {
 			continue
 		}
-		g.addEdge(fromID, toID, classfile.CallSynthetic, BasisCallback, &CallSite{PC: e.PC, Condition: e.Condition})
-		added++
+		if g.addEdge(fromID, toID, classfile.CallSynthetic, BasisCallback, &CallSite{PC: e.PC, Condition: e.Condition}) {
+			added++
+		}
 	}
 	return added
 }

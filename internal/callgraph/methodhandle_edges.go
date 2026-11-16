@@ -32,8 +32,9 @@ func ApplyMethodHandleEdges(g *Graph, edges []HandleEdge) int {
 			if hasEdge(g, fromID, toID, classfile.CallSynthetic, BasisMethodHandle) {
 				continue
 			}
-			g.addEdge(fromID, toID, classfile.CallSynthetic, BasisMethodHandle, &CallSite{PC: e.PC})
-			added++
+			if g.addEdge(fromID, toID, classfile.CallSynthetic, BasisMethodHandle, &CallSite{PC: e.PC}) {
+				added++
+			}
 		}
 	}
 	return added

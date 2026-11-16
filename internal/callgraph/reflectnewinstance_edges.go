@@ -35,14 +35,16 @@ func ApplyReflectNewInstanceEdges(g *Graph, edges []ReflectNewInstanceEdge) int 
 		}
 		if ctorID, ok := g.ID(e.TargetFQCN, "<init>", e.TargetDesc); ok {
 			if !hasEdge(g, fromID, ctorID, classfile.CallSynthetic, BasisReflection) {
-				g.addEdge(fromID, ctorID, classfile.CallSynthetic, BasisReflection, &CallSite{PC: e.PC})
-				added++
+				if g.addEdge(fromID, ctorID, classfile.CallSynthetic, BasisReflection, &CallSite{PC: e.PC}) {
+					added++
+				}
 			}
 		}
 		if clinitID, ok := g.ID(e.TargetFQCN, "<clinit>", "()V"); ok {
 			if !hasEdge(g, fromID, clinitID, classfile.CallInit, BasisReflection) {
-				g.addEdge(fromID, clinitID, classfile.CallInit, BasisReflection, nil)
-				added++
+				if g.addEdge(fromID, clinitID, classfile.CallInit, BasisReflection, nil) {
+					added++
+				}
 			}
 		}
 	}

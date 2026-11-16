@@ -37,6 +37,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/input"
 	"ariadne/internal/jdbcdispatch"
+	"ariadne/internal/jdbcurl"
 	"ariadne/internal/jpadispatch"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
@@ -841,6 +842,30 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 		added := callgraph.ApplySyntheticEdges(g, h, synthetic)
 		log("applied %d synthetic edges from profile %q (e.g. Spring Data repository proxies)", added, prof.Name)
+	}
+
+	// JDBC drivers (jdbc:drivers u1): a catalog driver no URL of the
+	// application can reach runs only its URL check when DriverManager
+	// offers it a connection — its connect is cut after the check, before
+	// any model or creator gate reads the graph.
+	jdbcURLs, err := jdbcurl.Collect(prepared.AppClassesJar, prepared.WebXMLs, h)
+	if err != nil {
+		warnings = append(warnings, "reading JDBC URLs from the application: "+err.Error())
+	}
+	jdbcDrivers := jdbcurl.Decide(h, jdbcURLs)
+	if partOff[jdbcurl.ModelID] {
+		jdbcDrivers = jdbcurl.Decision{Why: "model disabled"}
+	}
+	if jdbcDrivers.Applies {
+		cutSites := jdbcDrivers.Apply(g)
+		var cut []string
+		for _, c := range jdbcDrivers.Cuts {
+			cut = append(cut, c.Driver)
+		}
+		log("JDBC drivers (%s %s; URL prefixes %s): kept %s; cut after the URL check %s (%d call sites); no URL check found %s",
+			jdbcurl.ModelID, jdbcurl.Version, strings.Join(jdbcURLPrefixes(jdbcURLs), ", "), listOrNone(jdbcDrivers.Kept), listOrNone(cut), cutSites, listOrNone(jdbcDrivers.Unguarded))
+	} else if jdbcDrivers.Why != "no catalog driver in the input" {
+		log("JDBC drivers (%s %s): every driver kept — %s", jdbcurl.ModelID, jdbcurl.Version, jdbcDrivers.Why)
 	}
 
 	// SERVICE_LOADING S2: connect a load site to its registered providers
@@ -2138,4 +2163,21 @@ func appendNewRoots(roots, extra []uint32) ([]uint32, int) {
 		}
 	}
 	return roots, n
+}
+
+// jdbcURLPrefixes lists the URL beginnings jdbc:drivers found, sorted.
+func jdbcURLPrefixes(u jdbcurl.URLs) []string {
+	out := make([]string, 0, len(u.Prefixes))
+	for p := range u.Prefixes {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func listOrNone(xs []string) string {
+	if len(xs) == 0 {
+		return "none"
+	}
+	return strings.Join(xs, ", ")
 }

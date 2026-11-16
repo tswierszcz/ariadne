@@ -875,6 +875,40 @@ candidates, N edges added, …` counts them; snapshots record
 `java.sql.Driver#connect` relation behind them follows
 ([TRACE_GAPS.MD](testdata/graphbench/TRACE_GAPS.MD)).
 
+**JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
+2026-11-16).** `DriverManager#getConnection(url)` offers the URL to every
+registered driver, and the service-provider model links `Driver#connect`
+to every driver in `META-INF/services` — so an application on HSQLDB
+reached pgjdbc's and MySQL's whole connection code just because their jars
+are on the class path. A driver that does not accept the URL checks it
+first thing and returns `null`. For a driver in the model's catalog
+(pgjdbc 42.x, MySQL Connector/J 8.0.23+, H2 1.4/2.x), when no URL the
+application can use starts with one of its prefixes, its `connect` is cut
+after the URL check (`callgraph.Graph.CutSitesAfter`: later call sites are
+removed, and a model adding an edge from one later is refused), before any
+model or creator gate reads the graph. The URLs come from the application
+jar — its classes' `jdbc:` string constants, its configuration files
+(every Spring profile's `.properties`/`.yml`, Spring XML, a `web.xml`) —
+plus H2, HSQLDB and Derby when Spring's embedded-database support is in
+the input (Boot starts one without a URL). **Assumption:** the packaged
+configuration is what runs. A URL set only from outside cannot be seen,
+so a URL placeholder the packaged configuration does not set
+(`${DATABASE_URL}`), a JNDI `DataSource` or a URL with no literal
+`jdbc:<subprotocol>:` beginning turns the model off for the run (every
+driver kept, the log says why); an environment variable overriding a
+packaged URL is not seen. A driver outside the catalog, or a catalog
+version whose `connect` has no URL check (Connector/J 8.0.11), is left as
+it is. Log line `JDBC drivers (jdbc:drivers u1; URL prefixes …): kept …;
+cut after the URL check …`; snapshots record `jdbc.drivers`; it can be
+switched off in a profile (`models.disable: [jdbc:drivers]`). Real-JVM
+oracle: `testdata/jdbcdrivers` (`scripts/jdbcdrivers-oracle.sh`, traced
+through JDI by `scripts/MethodTrace.java`, `TestJDBCDriversOracle`) — the
+JVM enters pgjdbc's and Connector/J's `connect` and URL check for a URL
+neither accepts, and nothing past it; the graph reaches both checks and
+nothing past them. WebGoat (HSQLDB): pgjdbc cut, its CVE-2022-21724,
+CVE-2022-26520 and CVE-2026-42198 `REACHABLE` → `NOT_REACHABLE`; petclinic
+(H2, MySQL profile) and JPetStore (HSQLDB only) unchanged.
+
 **JPA objects (`jpa:objects`, `internal/jpadispatch`, version `e1`).** The
 same gate for `javax.persistence` `EntityManager`, `EntityManagerFactory`,
 `Query`, `TypedQuery`, `StoredProcedureQuery` and `EntityTransaction`: a

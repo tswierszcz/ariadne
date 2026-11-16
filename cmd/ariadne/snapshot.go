@@ -26,6 +26,7 @@ import (
 	"ariadne/internal/exploit"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/jdbcdispatch"
+	"ariadne/internal/jdbcurl"
 	"ariadne/internal/jpadispatch"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
@@ -83,6 +84,8 @@ func algorithmVersions(mode string) map[string]string {
 		"spi.dispatch":     spidispatch.Version,
 		// JDBC objects: creator-gated edges in every mode.
 		"jdbc.objects": jdbcdispatch.Version,
+		// JDBC drivers no packaged URL reaches, cut after their URL check.
+		"jdbc.drivers": jdbcurl.Version,
 		// REFLECTION R3: Method receivers resolved through parameters.
 		"reflection.parameters": reflectinvoke.ThroughParametersVersion,
 		// JPA objects: creator-gated edges in every mode.
