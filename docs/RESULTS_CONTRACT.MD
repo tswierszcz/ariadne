@@ -56,7 +56,7 @@ output contract: never renamed, never reused for another meaning; a superseded c
 deprecated. CVE:F0 defines them. Since CVE:F1b, `METHOD_NOT_FOUND`, `CLASSPATH_CONFLICT`,
 `MAPPING_PARTIAL`, `MAPPING_ENTRYPOINT_ONLY` and `MODEL_INCOMPLETE` are emitted (v1 `reasons`);
 CVE:F4 adds `VERSION_UNKNOWN`, `MAPPING_VERSION_UNCOVERED`, `MAPPING_CONFLICT`; CVE:F5 adds
-`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings);
+`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings); `MAPPED_CODE_ABSENT` (2026-11-16, on `NOT_REACHABLE` findings, and on the v1 row when every finding carries it);
 `RUNTIME_UNSUPPORTED` is not set yet.
 `MAPPING_NEW_SIDE_ONLY`, like `MAPPING_PARTIAL`, qualifies the advisory row and stays off
 instance findings (v2 carries it as `mapping.new_side_only`).
@@ -78,6 +78,7 @@ its own axis.
 | `SOURCE_UNAVAILABLE` | mapping | The evidence needed for a mapping (fix commit, diff, advisory detail) could not be obtained. (CVE:F5) Emitted when the advisory has fix-commit references and none could be read (finding `UNKNOWN`); an advisory with no fix reference at all is a plain unmapped `UNKNOWN` | every fix-commit diff answers HTTP 500 |
 | `MAPPING_MISSING` | mapping | (ROADMAP B0, 2026-11-13) No source produced any mapping for the advisory — manual table, fix diff, `release-diff`, LLM — so no verdict is possible; the `UNKNOWN` row says why instead of carrying no reason (before this code 20 of petclinic's 27 `UNKNOWN` rows had none) | an advisory with no fix commit and no class name |
 | `NOT_CODE_MAPPABLE` | mapping | (CVE:F10, 2026-11-16) The manual table declares (`not_code`, with the reason) that the advisory concerns no JVM code of the artifact — an installer, a deployment setting — so no method can be mapped; the finding is `NOT_APPLICABLE`, like a WebJar, and the note carries the reason. Not a verdict that the app is safe | Tomcat's Windows installer (CVE-2025-49124) filed against `tomcat-embed-core` |
+| `MAPPED_CODE_ABSENT` | mapping | (2026-11-16) No class the selected mapping names is on the analyzed classpath — the instance's version or the application does not ship that code (e.g. a Spring advisory mapped to `spring-webmvc` in an application without it) — so nothing can run it: the finding is `NOT_REACHABLE`, the note names the classes. A class that is present without the mapped method stays `METHOD_NOT_FOUND`. Assumes, like every `NOT_REACHABLE`, that the inputs are the deployed classpath | JPetStore (no `spring-webmvc`) and CVE-2018-1271 |
 | `MODEL_INCOMPLETE` | model | An explicit gap in the call-graph model (unresolved reflection, ServiceLoader, callback, …) is relevant to this finding | an unresolved `Method#invoke` in the affected package |
 | `RUNTIME_UNSUPPORTED` | runtime | The finding depends on runtime behavior ariadne does not model (JDK/JRE vulnerabilities, custom class loaders) | a CVE in the JDK itself |
 
@@ -157,7 +158,8 @@ its own axis.
 - **v1 export from v2 (F1):** one row per advisory. Aggregation: any positive finding
   wins (`REACHABLE` over `FRAMEWORK`); without one, an unresolved instance is never
   hidden under `NOT_REACHABLE` — the row becomes `UNKNOWN`; `NOT_APPLICABLE` only when
-  every instance is a WebJar. Counts of unique advisories and of per-component findings
+  every finding is (a WebJar, or `NOT_CODE_MAPPABLE`); a `NOT_REACHABLE` row carries
+  `MAPPED_CODE_ABSENT` only when every finding does. Counts of unique advisories and of per-component findings
   are reported separately.
 - **Writing (CVE:F9a):** the report, the results file and a snapshot manifest are
   written together at the end of a run, all or nothing; a run that fails writes none of

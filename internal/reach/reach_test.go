@@ -190,9 +190,22 @@ func TestAnalyze_unmatchedMethodIsMethodNotFound(t *testing.T) {
 	// was NOT_REACHABLE; the results contract (docs/RESULTS_CONTRACT.MD §2)
 	// separates "method not found" from "no path": UNKNOWN with
 	// METHOD_NOT_FOUND.
-	r := analyzeOne(t, e, []string{"com.example.NoSuchClass#noSuchMethod"})
+	// The class is on the classpath, the method is not.
+	r := analyzeOne(t, e, []string{"reachfixture.VulnerableLib#noSuchMethod"})
 	if r.Status != StatusUnknown || len(r.Reasons) != 1 || r.Reasons[0] != findings.MethodNotFound {
 		t.Fatalf("Status = %q reasons %v, want UNKNOWN [METHOD_NOT_FOUND]", r.Status, r.Reasons)
+	}
+	// One mapped class present: still METHOD_NOT_FOUND.
+	r = analyzeOne(t, e, []string{"com.example.NoSuchClass#m", "reachfixture.VulnerableLib#noSuchMethod"})
+	if r.Status != StatusUnknown || !hasReason(r.Reasons, findings.MethodNotFound) {
+		t.Fatalf("mixed: Status = %q reasons %v, want UNKNOWN METHOD_NOT_FOUND", r.Status, r.Reasons)
+	}
+	// No mapped class on the classpath (2026-11-16): nothing can run the
+	// mapped code — NOT_REACHABLE with MAPPED_CODE_ABSENT, naming them.
+	r = analyzeOne(t, e, []string{"com.example.NoSuchClass#noSuchMethod", "com.example.Other#m"})
+	if r.Status != StatusNotReachable || !hasReason(r.Reasons, findings.MappedCodeAbsent) ||
+		!strings.Contains(r.Note, "com.example.NoSuchClass, com.example.Other") {
+		t.Fatalf("absent: Status = %q reasons %v note %q, want NOT_REACHABLE MAPPED_CODE_ABSENT", r.Status, r.Reasons, r.Note)
 	}
 }
 

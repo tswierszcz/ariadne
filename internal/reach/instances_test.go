@@ -207,6 +207,16 @@ func TestFindingsForUnmatchedVerdicts(t *testing.T) {
 		t.Errorf("aggregate %s != row %s", s, r.Status)
 	}
 
+	// No mapped class on the classpath: NOT_REACHABLE per instance with
+	// MAPPED_CODE_ABSENT, kept on the row (every finding carries it).
+	e.SetWebAssetPackages(nil)
+	r = analyzeAffected(t, e, vulnmap.Entry{Methods: []string{"org.absent.Gone#m"}, Source: vulnmap.SourceManual}, "1.0")
+	if r.Status != StatusNotReachable || len(r.Findings) != 1 || r.Findings[0].Status != StatusNotReachable ||
+		!hasReason(r.Findings[0].Reasons, findings.MappedCodeAbsent) || !hasReason(r.Reasons, findings.MappedCodeAbsent) ||
+		!strings.Contains(r.Findings[0].Note, "org.absent.Gone") {
+		t.Errorf("absent: %s %v %+v", r.Status, r.Reasons, r.Findings)
+	}
+
 	// A not_code entry (NOT_CODE_MAPPABLE): no JVM code to search.
 	e.SetWebAssetPackages(nil)
 	r = analyzeAffected(t, e, vulnmap.Entry{Source: vulnmap.SourceManual, NotCode: "an installer"}, "1.0")
