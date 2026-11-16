@@ -1450,6 +1450,29 @@ obiekty JDBC, proxy MyBatis i Spring Data: zrobione 2026-11-14 (`b4-1`…`b4-5`)
 - **Następny krok (wymaga zgody):** pełne wejście WebGoata (wszystkie
   lekcje) albo ROADMAP B3.
 
+### CVE:F10 — „kod nieobecny”: `MAPPED_CODE_ABSENT` — DONE (2026-11-16)
+
+- **Decyzja (zatwierdzona 2026-11-16):** gdy żadna klasa wskazana przez
+  wybrany wariant mapowania (także po relokacji instancji) nie istnieje na
+  analizowanym classpath, ustalenie jest `NOT_REACHABLE` z nowym kodem
+  `MAPPED_CODE_ABSENT`, a notatka wymienia klasy. Klasa obecna bez metody
+  zostaje `METHOD_NOT_FOUND` (`UNKNOWN`). Reguła luk B0 nie dotyczy takich
+  ustaleń (klasy nie ma, więc żadne nierozstrzygnięte miejsce jej nie
+  uruchomi). Wiersz v1 niesie kod, gdy niosą go wszystkie ustalenia
+  (agregacja §5). Założenie jak przy każdym `NOT_REACHABLE`: wejście to
+  wdrażany classpath.
+- **Wynik:** `UNKNOWN` (v2, `-roots all` CHA) 3/1/3 → 1/0/0: JPetStore
+  CVE-2018-11040/-1257/-1271 (brak `spring-webmvc`/`spring-messaging`),
+  petclinic CVE-2026-34483/-34487 (`tomcat-embed-core` 9.0.45 bez
+  `JsonAccessLogValve` i `tomcat-tribes`), WebGoat CVE-2021-22119 (brak
+  `spring-security-oauth2-client`). Zostaje petclinic CVE-2022-21363.
+- **Weryfikacja:** `TestAnalyze_unmatchedMethodIsMethodNotFound` (klasa
+  obecna / część obecna / żadna), `TestFindingsForUnmatchedVerdicts`
+  (instancja i wiersz), `TestReasonCodesDocumented`; `go test ./...`,
+  `go vet ./...`; porównanie v1 z `main` w 12 konfiguracjach (petclinic/
+  WebGoat/JPetStore × `-roots all`/`profile` × CHA/RTA): zmieniają się
+  wyłącznie te 6 advisory. Dokumentacja: RESULTS_CONTRACT (§2, §3), README.
+
 ### CVE:F10 (redukcja `UNKNOWN`, część 3: bazy, sterowniki, reszta + `NOT_CODE_MAPPABLE`) — DONE for this scope (2026-11-16)
 
 - **Mapowania (9, metoda jak w częściach 1–2):** H2 CVE-2021-42392 i

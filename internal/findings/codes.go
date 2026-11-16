@@ -37,6 +37,10 @@ const (
 	// concerns no JVM code of the artifact (an installer, a deployment
 	// setting), so no method can be mapped (status NOT_APPLICABLE).
 	NotCodeMappable ReasonCode = "NOT_CODE_MAPPABLE"
+	// 2026-11-16: no class the mapping names is on the analyzed classpath
+	// (the instance's version, or the application, does not ship that
+	// code), so nothing can run it (status NOT_REACHABLE).
+	MappedCodeAbsent ReasonCode = "MAPPED_CODE_ABSENT"
 
 	// Reachability-model axis.
 	ModelIncomplete ReasonCode = "MODEL_INCOMPLETE"
@@ -48,7 +52,7 @@ const (
 // All lists every defined reason code, in documentation order.
 var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict, VersionCandidates,
-	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable, MappingMissing,
+	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable, MappingMissing, MappedCodeAbsent,
 	MappingVersionUncovered, MappingConflict, MappingNewSideOnly, NotCodeMappable,
 	ModelIncomplete,
 	RuntimeUnsupported,

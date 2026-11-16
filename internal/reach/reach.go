@@ -340,11 +340,16 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	if instances := e.affectedInstances(cve); len(instances) > 0 && len(entry.Variants) > 0 {
 		e.analyzeVariants(&result, entry, instances)
 	} else if len(instances) > 0 {
-		e.analyzePerInstance(&result, entry, matched, instances)
+		e.analyzePerInstance(&result, entry.Methods, matched, instances)
 	} else {
 		e.classify(&result, matched)
 		switch {
 		case result.Status == StatusNotReachable && len(matched) == 0:
+			if absent := e.absentClasses(entry.Methods, nil); absent != nil {
+				result.Reasons = append(result.Reasons, findings.MappedCodeAbsent)
+				result.Note = absentNote(absent)
+				break
+			}
 			result.Status = StatusUnknown
 			result.Reasons = append(result.Reasons, findings.MethodNotFound)
 		case result.Status == StatusNotReachable:
@@ -491,7 +496,7 @@ func (e *Engine) nodeInstance(id uint32) string {
 // allowed nodes, exactly as before CVE:F1b; with none allowed it is
 // UNKNOWN with CLASSPATH_CONFLICT (only borrowed nodes) or
 // METHOD_NOT_FOUND (none at all).
-func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched []uint32, instances []component.Instance) {
+func (e *Engine) analyzePerInstance(result *Result, specs []string, matched []uint32, instances []component.Instance) {
 	affected := map[string]bool{}
 	for _, in := range instances {
 		affected[in.ID] = true
@@ -574,13 +579,17 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 			f.Status, f.Reasons = StatusUnknown, []findings.ReasonCode{findings.ClasspathConflict}
 		default:
 			f.Status, f.Reasons = StatusUnknown, []findings.ReasonCode{findings.MethodNotFound}
+			if absent := e.absentClasses(specs, instances); absent != nil {
+				f.Status, f.Reasons = StatusNotReachable, []findings.ReasonCode{findings.MappedCodeAbsent}
+				f.Note = absentNote(absent)
+			}
 		}
 		result.Findings = append(result.Findings, f)
 	}
 
 	for i := range result.Findings {
 		f := &result.Findings[i]
-		if f.Status == StatusNotReachable {
+		if f.Status == StatusNotReachable && !hasReason(f.Reasons, findings.MappedCodeAbsent) {
 			e.annotateGaps(&f.Reasons, &f.ModelGaps, map[string]bool{f.Instance: true})
 		}
 	}
@@ -597,7 +606,9 @@ func (e *Engine) analyzePerInstance(result *Result, entry vulnmap.Entry, matched
 		e.classify(&r, allowed)
 		result.Path, result.Entry = r.Path, r.Entry
 	case StatusNotReachable:
-		e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+		if !hasReason(result.Reasons, findings.MappedCodeAbsent) {
+			e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+		}
 	}
 }
 
@@ -714,7 +725,7 @@ func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances 
 	for _, key := range order {
 		matched := e.matchSpecs(methodsOf[key], groups[key])
 		var r Result
-		e.analyzePerInstance(&r, entry, matched, groups[key])
+		e.analyzePerInstance(&r, methodsOf[key], matched, groups[key])
 		for _, f := range r.Findings {
 			byInstance[f.Instance] = f
 		}
@@ -737,7 +748,9 @@ func (e *Engine) analyzeVariants(result *Result, entry vulnmap.Entry, instances 
 		for _, in := range instances {
 			affected[in.ID] = true
 		}
-		e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+		if !hasReason(result.Reasons, findings.MappedCodeAbsent) {
+			e.annotateGaps(&result.Reasons, &result.ModelGaps, affected)
+		}
 	}
 }
 
@@ -756,7 +769,9 @@ func statusRank(s Status) int {
 // advisory's per-instance findings: the best positive status wins
 // (REACHABLE over FRAMEWORK) with no reasons; otherwise any UNKNOWN
 // finding makes it UNKNOWN with the union of their reasons; NOT_APPLICABLE
-// only when every finding is; else NOT_REACHABLE.
+// only when every finding is; else NOT_REACHABLE, which carries
+// MAPPED_CODE_ABSENT when every finding does (no affected instance ships
+// the mapped code).
 func Aggregate(fs []InstanceFinding) (Status, []findings.ReasonCode) {
 	best := StatusNotReachable
 	var unresolved []findings.ReasonCode
@@ -778,6 +793,13 @@ func Aggregate(fs []InstanceFinding) (Status, []findings.ReasonCode) {
 		return StatusUnknown, orderedReasons(unresolved)
 	case notApplicable:
 		return StatusNotApplicable, nil
+	}
+	absent := len(fs) > 0
+	for _, f := range fs {
+		absent = absent && hasReason(f.Reasons, findings.MappedCodeAbsent)
+	}
+	if absent {
+		return StatusNotReachable, []findings.ReasonCode{findings.MappedCodeAbsent}
 	}
 	return StatusNotReachable, nil
 }
@@ -1029,4 +1051,69 @@ func (e *Engine) entryEdge(path []uint32) *EntryEdge {
 		}
 	}
 	return nil
+}
+
+// absentClasses returns the classes specs name, sorted, when none of them
+// (nor, for a relocated instance, its rewritten name) is on the analyzed
+// classpath; nil when any is present or specs is empty. A class that is
+// present but lacks the mapped method stays METHOD_NOT_FOUND.
+func (e *Engine) absentClasses(specs []string, instances []component.Instance) []string {
+	seen := map[string]bool{}
+	var out []string
+	check := func(spec string) bool {
+		sel, err := vulnmap.ParseSelector(spec)
+		if err != nil {
+			return false
+		}
+		if _, ok := e.h.Lookup(sel.Class); ok {
+			return false
+		}
+		if !seen[sel.Class] {
+			seen[sel.Class] = true
+			out = append(out, sel.Class)
+		}
+		return true
+	}
+	for _, spec := range specs {
+		if !check(spec) {
+			return nil
+		}
+	}
+	for _, in := range instances {
+		if len(in.Relocations) == 0 {
+			continue
+		}
+		rs, err := relocate.New(in.Relocations)
+		if err != nil {
+			continue
+		}
+		for _, spec := range specs {
+			if r := rs.Selector(spec); r != spec {
+				sel, err := vulnmap.ParseSelector(r)
+				if err == nil {
+					if _, ok := e.h.Lookup(sel.Class); ok {
+						return nil
+					}
+				}
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	sort.Strings(out)
+	return out
+}
+
+func absentNote(classes []string) string {
+	return "no mapped class is on the analyzed classpath: " + strings.Join(classes, ", ")
+}
+
+func hasReason(rs []findings.ReasonCode, c findings.ReasonCode) bool {
+	for _, r := range rs {
+		if r == c {
+			return true
+		}
+	}
+	return false
 }

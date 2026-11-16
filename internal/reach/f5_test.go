@@ -40,11 +40,3 @@ func TestFixDiffReasons(t *testing.T) {
 	}
 }
 
-func hasReason(rs []findings.ReasonCode, c findings.ReasonCode) bool {
-	for _, r := range rs {
-		if r == c {
-			return true
-		}
-	}
-	return false
-}
