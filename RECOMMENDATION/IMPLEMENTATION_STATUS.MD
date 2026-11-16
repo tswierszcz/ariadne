@@ -1450,6 +1450,59 @@ obiekty JDBC, proxy MyBatis i Spring Data: zrobione 2026-11-14 (`b4-1`…`b4-5`)
 - **Następny krok (wymaga zgody):** pełne wejście WebGoata (wszystkie
   lekcje) albo ROADMAP B3.
 
+### CVE:F10 (redukcja `UNKNOWN`, część 2: Tomcat, Jackson, logback, Undertow/XNIO) — DONE for this scope (2026-11-16)
+
+- **Metoda:** jak w części 1 (diff znormalizowanego bytecode'u wydań w
+  `work/jardiff`, który dostał `-list` do wypisania metod klasy; każda
+  metoda sprawdzona z nazwy w wydaniach wariantu). Gdy commit poprawki
+  nazywa klasę, której badana linia nie ma (parser async Jacksona od 2.14,
+  procesory modelu logbacka od 1.3), wariant starszej linii wskazuje metodę
+  z tym samym kodem.
+- **Wynik:** 14 wpisów (83 → 97; role 53 entrypoint / 8 sink / 36
+  vulnerable). Tomcat: CVE-2024-56337 (`DefaultServlet#doPut`, zapis przy
+  `readonly=false`; poprawka 9.0.99 w `DirResourceSet`), CVE-2026-34483
+  (`JsonAccessLogValve$JsonWrappedElement#addElement`), CVE-2026-65905
+  (`DigestAuthenticator$NonceInfo#nonceCountValid`). Jackson:
+  CVE-2026-68494 (liczby w parserze async: `NonBlockingJsonParser` < 2.14,
+  `NonBlockingUtf8JsonParserBase` od 2.14 i w 3.x), CVE-2026-50193
+  (`InternalNodeMapper#nodeToString`/`nodeToPrettyString`), CVE-2026-54514
+  (`FromStringDeserializer$Std#_deserialize` — wspólna gałąź typów JDK,
+  nadmiarowe przybliżenie przypadku `InetSocketAddress`; 2.3:
+  `InetSocketAddressDeserializer`), CVE-2026-54515
+  (`BeanDeserializerBase#createContextual`, 2.x i 3.x). logback:
+  CVE-2025-11226 (`IfAction#begin` < 1.3, `IfModelHandler#handle`),
+  CVE-2026-1225 (`NestedComplexPropertyIA#begin` < 1.3,
+  `ImplicitModelHandler#doComplex`), CVE-2026-10532
+  (`HardenedObjectInputStream#<init>`). Undertow: CVE-2021-3597
+  (`AbstractFramedStreamSinkChannel#flushComplete`), CVE-2021-3629
+  (`Http2Channel#updateSettings`), CVE-2026-3260 (`MultiPartParserDefinition$
+  MultiPartUploadHandler#parseBlocking`, brak poprawki). XNIO:
+  CVE-2020-14340 (`NioXnio#getSelector`).
+  `UNKNOWN` (v2, ustalenia, `-roots all` CHA offline): petclinic 19 → 10,
+  WebGoat 17 → 6, JPetStore 3 → 3. Zmiany (20): 12 → `FRAMEWORK` (logback przy
+  konfiguracji, Jackson przez konwertery Spring MVC, DIGEST przez potok
+  wentyli Tomcata), 4 → `NOT_REACHABLE` (petclinic nie zapisuje przez
+  `DefaultServlet`, nie wywołuje `JsonNode#toString`; żadna aplikacja nie
+  uruchamia odbiorników gniazd logbacka), 4 → `REACHABLE` w WebGoat:
+  CVE-2026-3260 i CVE-2020-14340 (wiarygodne: `VerifyAccount` woła
+  `getParameterNames`, co parsuje treść żądania — multipart na dysk,
+  blokujący odczyt przez selektor wątku), CVE-2021-3597 i CVE-2021-3629
+  (ścieżki przez kanały HTTP/2; WebGoat nie włącza HTTP/2, więc to
+  nadmiarowe przybliżenie zależne od konfiguracji — także przy RTA).
+- **Pozostaje (`METHOD_NOT_FOUND`, kod nieobecny w jarze):** petclinic
+  CVE-2026-34483 (`tomcat-embed-core` 9.0.45 nie ma `JsonAccessLogValve` —
+  jest w nim od linii 9.0.6x) i CVE-2026-34487 (członkostwo w chmurze z
+  `tomcat-tribes`, którego jar embed nie zawiera) — ten sam przypadek co
+  JPetStore CVE-2018-11040/-1257/-1271 (decyzja o kontrakcie otwarta).
+- **Weryfikacja:** `TestServerManualMappings` (wybór wariantu wg wersji,
+  wydanie naprawione nic nie wybiera), `TestLoadManualMeta_embeddedTable`
+  (97 wpisów), `go test ./...`, `go vet ./...`; porównanie ustaleń v2
+  przed/po na trzech aplikacjach (zmieniły się tylko omówione wyżej, plus
+  powód CVE-2026-34483 `MAPPING_MISSING` → `METHOD_NOT_FOUND`); WebGoat
+  ponownie przy RTA (te same 4 `REACHABLE`). Dokumentacja: README.
+- **Następny krok:** część 3 (H2, sterowniki JDBC, jsoup,
+  hibernate-validator, kod powodu dla grupy C).
+
 ### CVE:F10 (redukcja `UNKNOWN`, część 1: Spring) — DONE for this scope (2026-11-16)
 
 - **Zakres (zatwierdzony 2026-11-16):** przegląd 41 unikalnych `UNKNOWN`
@@ -1497,7 +1550,7 @@ obiekty JDBC, proxy MyBatis i Spring Data: zrobione 2026-11-14 (`b4-1`…`b4-5`)
 - **Weryfikacja:** `TestLoadManualMeta_embeddedTable` (83 wpisy),
   `go test ./...`, `go vet ./...`; porównanie ustaleń v2 przed/po na trzech
   aplikacjach (każda zmiana wyjaśniona wyżej). Dokumentacja: README.
-- **Następny krok:** część 2 (Tomcat, Jackson, logback, Undertow/XNIO).
+- **Następny krok:** część 2 (Tomcat, Jackson, logback, Undertow/XNIO) — zrobiona, sekcja wyżej.
 
 ### CVE:F10 (kontynuacja) — ręczne mapowania z diffów wydań — DONE for this scope (2026-11-13)
 

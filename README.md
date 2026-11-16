@@ -1216,7 +1216,7 @@ For each CVE, in priority order:
    checked against the installed Maven's own `ComparableVersion` on 38809
    pairs and `VersionRange` on 396 cases). The embedded table's
    CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
-   The table has 83 entries (audit:
+   The table has 97 entries (audit:
    `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`); 22 of them (2026-11-13)
    cover advisories with neither a fix commit nor a class name — SnakeYAML
    DoS, Spring MVC static resources/SSE/script templates, SpEL, Spring log
@@ -1233,7 +1233,16 @@ For each CVE, in priority order:
    utility that runs at startup anyway (`StringUtils#cleanPath`,
    `UrlResource#createRelative`, Spring Data's property-path caches), the
    entry names the entry point the advisory describes (role `entrypoint`).
-   `UNKNOWN` on petclinic/WebGoat/JPetStore: 27/26/5 → 19/17/3.
+   `UNKNOWN` on petclinic/WebGoat/JPetStore: 27/26/5 → 19/17/3. 14 more
+   (2026-11-16) cover Tomcat (default-servlet writes, the JSON access log,
+   DIGEST nonce counts), Jackson (async number parsing, `JsonNode#toString`,
+   `InetSocketAddress`, case-insensitive properties), logback (`<if>` and
+   complex-property instantiation in configuration files, the socket
+   receivers' object stream), Undertow (HTTP/2 framing and flow control,
+   multipart parsing) and XNIO (per-thread selectors). Where the fix-commit
+   diff names a class only a newer line has (Jackson's 2.14+ async parser,
+   logback 1.3+'s model processors), the older line's variant names the
+   method that holds the same code there. `UNKNOWN`: 19/17/3 → 10/6/3.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only non-test `.java` files
