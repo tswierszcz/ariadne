@@ -30,6 +30,38 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS — profil `spring`: listenery wiadomości jako korzenie — DONE (2026-11-16)
+
+- **Zakres (zatwierdzony 2026-11-16):** metody `@JmsListener`,
+  `@KafkaListener`/`@KafkaHandler`, `@RabbitListener`/`@RabbitHandler`
+  (z kontenerami `@Repeatable`) jako korzenie `-roots profile` profilu
+  `spring`; bez osobnego modelu. Ustalenie przed implementacją: plan floty
+  CI używa `-roots all`, gdzie każda metoda aplikacji (więc i listener)
+  już jest korzeniem — zmiana poprawia `-roots profile`, nie wyniki floty;
+  użytkownik zatwierdził wersję małą, następnie redukcję `UNKNOWN`.
+- **Zrealizowane:** `internal/profile/profiles/spring.yaml`
+  `roots.annotations` += 8 adnotacji (spring-jms, spring-kafka,
+  spring-rabbit). Klasa z `@KafkaListener`/`@RabbitListener` — korzenie to
+  jej publiczne metody (istniejąca reguła adnotacji klasy; także publiczny
+  konstruktor).
+- **Weryfikacja:** `TestMessageListenerRoots` (`testdata/listeners`:
+  adnotacje-zaślepki o prawdziwych nazwach, metody i klasy, powtórzone;
+  bez zmiany profilu test nie przechodzi). Aplikacja kontrolna
+  `scripts/prepare-listeners-demo.sh` (Boot 2.4.3, ActiveMQ w pamięci,
+  `@JmsListener` → commons-text 1.9 `StringSubstitutor#replace`):
+  `-roots profile` CVE-2022-42889 `NOT_REACHABLE` (binarka z `main`) →
+  `REACHABLE` (korzeń: `OrderListener#onOrder`), JVM uruchamia listener
+  przez kontener; wariant bez adnotacji — `NOT_REACHABLE`, JVM listenera
+  nie uruchamia; `-roots all` — `REACHABLE` w obu.
+  Aplikacje referencyjne (petclinic, WebGoat, JPetStore; `-roots all`/`profile` × CHA/RTA, porównanie z `main`): żadna nie ma listenera wiadomości — v1 bajtowo identyczne we wszystkich 12 konfiguracjach. `go test ./...`, `go vet ./...`.
+  Dokumentacja: README, SUPPORT.MD.
+- **Ograniczenia:** dopasowanie po nazwie adnotacji, bez sprawdzania
+  konfiguracji kontenera (`@EnableJms`/`@EnableKafka`, autokonfiguracja);
+  bez Spring Cloud Stream (funkcje), `@SqsListener` i programowej
+  rejestracji `MessageListener`.
+- **Następny krok (zatwierdzony kierunek):** redukcja `UNKNOWN` (brak
+  mapowania CVE → metoda) — największy wpływ na wyniki `-roots all` floty.
+
 ### FRAMEWORKS:F3 — advice Spring AOP, domknięcie (`spring:aop` `a2`) — DONE for this scope (2026-11-16)
 
 - **Zakres (zatwierdzony 2026-11-16, „kończ AOP”):** luki a1 — wiązanie

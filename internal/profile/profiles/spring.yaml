@@ -24,6 +24,20 @@ roots:
     - org.springframework.scheduling.annotation.Schedules
     - org.springframework.context.event.EventListener
     - org.springframework.context.annotation.Bean
+    # Message listeners: the broker's listener container calls them
+    # (through MessagingMessageListenerAdapter → InvocableHandlerMethod →
+    # Method#invoke) — entry points like an HTTP mapping. A class-level
+    # @KafkaListener/@RabbitListener makes its public methods roots (its
+    # @KafkaHandler/@RabbitHandler methods among them); the @Repeatable
+    # containers are what a method with two listener annotations holds.
+    - org.springframework.jms.annotation.JmsListener
+    - org.springframework.jms.annotation.JmsListeners
+    - org.springframework.kafka.annotation.KafkaListener
+    - org.springframework.kafka.annotation.KafkaListeners
+    - org.springframework.kafka.annotation.KafkaHandler
+    - org.springframework.amqp.rabbit.annotation.RabbitListener
+    - org.springframework.amqp.rabbit.annotation.RabbitListeners
+    - org.springframework.amqp.rabbit.annotation.RabbitHandler
   overrides: []
   main: true
   # The container's reflective calls into its beans: the constructor it

@@ -1418,6 +1418,8 @@ callee, a much bigger change than this simplification buys back).
 above, plus the `web.xml` lifecycle roots described below) narrows the BFS roots to the active profile's own entry points
 instead: a method carrying one of `roots.annotations`
 (`@RequestMapping`/`@GetMapping`/.../`@Scheduled`/`@EventListener`/`@Bean`
+and the message listeners `@JmsListener`/`@KafkaListener`/`@KafkaHandler`/
+`@RabbitListener`/`@RabbitHandler` with their `@Repeatable` containers
 for `spring`), every public method of a class itself carrying one,
 (when `roots.main` is true) every public static `main(String[])`, and
 every `roots.overrides` entry (`"fqcn#method"`, e.g. `javax.servlet.
@@ -1427,6 +1429,33 @@ one of its transitive subtypes **and declares that method itself**
 of this (`HttpServlet#do*`/`Filter#doFilter`, both the `javax.servlet.*`
 and `jakarta.servlet.*` namespaces) is the first shipped profile to need
 it; `spring.yaml`'s own list is still empty.
+
+**Message listeners (`spring` profile, since 2026-11-16).** A broker's
+listener container calls a listener method through
+`MessagingMessageListenerAdapter` → `InvocableHandlerMethod` →
+`Method#invoke`; nothing in the application calls it, so under `-roots
+profile` it is an entry point like an HTTP mapping. The `spring` profile's
+`roots.annotations` list `@JmsListener`/`@JmsListeners` (spring-jms),
+`@KafkaListener`/`@KafkaListeners`/`@KafkaHandler` (spring-kafka) and
+`@RabbitListener`/`@RabbitListeners`/`@RabbitHandler` (spring-rabbit); a
+class-level `@KafkaListener`/`@RabbitListener` roots its public methods
+(its handlers, and its public constructor, by the class-annotation rule).
+Roots are matched by annotation name: whether the listener container is
+configured (`@EnableJms`/`@EnableKafka`/`@EnableRabbit`, Boot
+autoconfiguration) is not checked, like `@Scheduled` without
+`@EnableScheduling`. Spring Cloud Stream functions, `@SqsListener` and
+programmatic `MessageListener` registrations are not covered (a class
+implementing `MessageListener` is reached by CHA only when a container
+call is reachable). Verified: `TestMessageListenerRoots` (name-only
+stand-ins of the annotations, `testdata/listeners`, method- and
+class-level, repeated); control app `scripts/prepare-listeners-demo.sh`
+(Spring Boot 2.4.3, in-memory ActiveMQ, a `@JmsListener` calling
+commons-text 1.9 `StringSubstitutor#replace`): under `-roots profile`
+CVE-2022-42889 was `NOT_REACHABLE` and is now `REACHABLE` with the
+listener as the root (the JVM's listener container runs it); the variant
+without the annotation stays `NOT_REACHABLE` (nothing runs it); under
+`-roots all` it is `REACHABLE` in both (every application method is a
+root). petclinic, WebGoat and JPetStore have no message listener: their v1 results are byte-identical (`-roots all`/`profile`, CHA/RTA).
 
 `jakarta.yaml` (JAX-RS `@GET`/`@POST`/`@PUT`/`@DELETE`/`@PATCH`/`@HEAD`/
 `@OPTIONS`, EJB `@Schedule`/`@Schedules`, both namespaces) is a second
