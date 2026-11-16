@@ -9,6 +9,7 @@ import (
 	"ariadne/internal/serviceload"
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/spidispatch"
+	"ariadne/internal/springaop"
 	"ariadne/internal/springevents"
 )
 
@@ -36,5 +37,6 @@ func participantCatalog() []analysis.Participant {
 		{ID: jpadispatch.ModelID, Version: jpadispatch.Version, Kind: analysis.KindGate},
 		{ID: proxycatalog.ModelID, Version: proxycatalog.Version, Kind: analysis.KindGate},
 		{ID: springevents.ModelID, Version: springevents.Version, Kind: analysis.KindGate},
+		{ID: springaop.ModelID, Version: springaop.Version, Kind: analysis.KindGate},
 	}
 }

@@ -25,6 +25,10 @@ type SAMEdge struct {
 	// Creators: the methods whose invokedynamic creates the values the
 	// site may receive with this implementation.
 	Creators []MethodRef
+	// Condition is when the target runs at all (CallSite.Condition): ""
+	// always, or a model's condition (spring:aop's "returned" for
+	// @AfterReturning, "exceptional" for @AfterThrowing).
+	Condition string
 }
 
 // SAMStats count what a SAMGate did.
@@ -44,6 +48,7 @@ type samCandidate struct {
 	kind     classfile.CallKind
 	pc       int
 	creators []uint32
+	cond     string
 	done     bool
 }
 
@@ -119,7 +124,7 @@ func NewCreatorGate(g *Graph, h *hierarchy.Hierarchy, edges []SAMEdge, basis Edg
 				s.stats.Missing++
 				continue
 			}
-			s.cands = append(s.cands, samCandidate{from: from, to: to, kind: kind, pc: e.PC, creators: creators})
+			s.cands = append(s.cands, samCandidate{from: from, to: to, kind: kind, pc: e.PC, creators: creators, cond: e.Condition})
 		}
 	}
 	return s
@@ -206,11 +211,11 @@ func (s *SAMGate) add(g *Graph, c *samCandidate) {
 				return
 			}
 		}
-		ex.Sites = append(ex.Sites, CallSite{PC: c.pc})
+		ex.Sites = append(ex.Sites, CallSite{PC: c.pc, Condition: c.cond})
 	case other:
 		s.stats.Covered++
 	default:
-		g.addEdge(c.from, c.to, c.kind, s.basis, &CallSite{PC: c.pc})
+		g.addEdge(c.from, c.to, c.kind, s.basis, &CallSite{PC: c.pc, Condition: c.cond})
 		if s.basis == BasisSAM {
 			g.samEdges++
 		} else {

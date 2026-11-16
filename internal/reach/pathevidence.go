@@ -55,7 +55,9 @@ type EdgeEvidence struct {
 	PCs []int `json:"pcs,omitempty"`
 	// Condition is when a modeled callback runs at all: "exceptional"
 	// for a CompletionStage branch run only when the previous stage
-	// fails (ASYNC_CALLBACKS A3); omitted when unconditional.
+	// fails (ASYNC_CALLBACKS A3) or an @AfterThrowing advice (spring:aop),
+	// "returned" for an @AfterReturning advice; omitted when
+	// unconditional.
 	Condition string `json:"condition,omitempty"`
 }
 

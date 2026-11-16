@@ -54,6 +54,7 @@ import (
 	"ariadne/internal/servletdispatch"
 	"ariadne/internal/snapshot"
 	"ariadne/internal/spidispatch"
+	"ariadne/internal/springaop"
 	"ariadne/internal/springevents"
 	"ariadne/internal/springxml"
 	"ariadne/internal/taint"
@@ -1275,6 +1276,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	events := springevents.Find(h, springBeanTypes(springBeanNames, springBeanMethods, xmlBeanDefs, xmlInnerBeans))
 	eventsGate := callgraph.NewCreatorGate(g, h, events.Edges, callgraph.BasisModel)
 	eventsTime := time.Since(eventsStart)
+	// Spring AOP advice (FRAMEWORKS F3, spring:aop): a call that may reach
+	// an advised bean method reaches the @AspectJ advice the proxy runs,
+	// once a method creating Spring's AspectJ advice objects is reachable.
+	aopStart := time.Now()
+	aopRes := springaop.Find(h, springBeanTypes(springBeanNames, springBeanMethods, xmlBeanDefs, xmlInnerBeans))
+	aopGate := callgraph.NewCreatorGate(g, h, aopRes.Edges, callgraph.BasisModel)
+	aopTime := time.Since(aopStart)
 	// ROADMAP B3: the creator gates are steps of the coordinator's fixed
 	// point, alongside the registered models — a gate edge can expose a
 	// modeled call site and a model edge can make a creator reachable, in
@@ -1291,7 +1299,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1322,6 +1330,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	samApplied, objApplied, jdbcApplied, proxyApplied := applyGate(samGateID, samGate), applyGate(servletGateID, objGate), applyGate(jdbcdispatch.ModelID, jdbcGate), applyGate(proxycatalog.ModelID, proxyGate)
 	jpaApplied := applyGate(jpadispatch.ModelID, jpaGate)
 	eventsApplied := applyGate(springevents.ModelID, eventsGate)
+	aopApplied := applyGate(springaop.ModelID, aopGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1334,6 +1343,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("Spring events (%s %s): %d listener methods (%d on beans), %d publishing sites (%d unbounded, %d forwarding left out); %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the listener adapter is reachable from the roots)%s, in %s",
 		springevents.ModelID, springevents.Version, len(events.Listeners), events.RegisteredCount(), len(events.Sites), events.UnboundedCount(), events.Forwarding,
 		len(events.Edges), eventsApplied.Added, eventsApplied.Covered, eventsApplied.Gated, eventsNoCreator(events), eventsTime.Round(time.Millisecond))
+	log("Spring AOP (%s %s): %d aspects (%d beans), %d advice methods, %d advised bean methods, %d advice × method pairs undecided (pointcut parts not evaluated), %d self-invocations left out; %d candidates%s, %d edges added, %d already in the graph, %d left out (no method creating Spring's advice objects is reachable from the roots)%s, in %s",
+		springaop.ModelID, springaop.Version, len(aopRes.Aspects), aopRes.RegisteredAspects(), len(aopRes.Advice), len(aopRes.JoinPoints), aopRes.UndecidedCount(), aopRes.SelfCalls,
+		len(aopRes.Edges), aopTruncated(aopRes), aopApplied.Added, aopApplied.Covered, aopApplied.Gated, aopNoCreator(aopRes), aopTime.Round(time.Millisecond))
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
 		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)
@@ -1990,6 +2002,20 @@ func springBeanTypes(names, methods []profile.BeanName, xml, inner []springxml.B
 		add(b.Class)
 	}
 	return out
+}
+
+func aopNoCreator(r springaop.Result) string {
+	if r.NoCreator {
+		return "; advice objects never created in the input"
+	}
+	return ""
+}
+
+func aopTruncated(r springaop.Result) string {
+	if r.Truncated {
+		return " (edge budget reached, rest left out)"
+	}
+	return ""
 }
 
 func eventsNoCreator(r springevents.Result) string {
