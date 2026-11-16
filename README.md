@@ -1216,7 +1216,7 @@ For each CVE, in priority order:
    checked against the installed Maven's own `ComparableVersion` on 38809
    pairs and `VersionRange` on 396 cases). The embedded table's
    CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
-   The table has 97 entries (audit:
+   The table has 107 entries (audit:
    `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`); 22 of them (2026-11-13)
    cover advisories with neither a fix commit nor a class name — SnakeYAML
    DoS, Spring MVC static resources/SSE/script templates, SpEL, Spring log
@@ -1243,6 +1243,15 @@ For each CVE, in priority order:
    diff names a class only a newer line has (Jackson's 2.14+ async parser,
    logback 1.3+'s model processors), the older line's variant names the
    method that holds the same code there. `UNKNOWN`: 19/17/3 → 10/6/3.
+   9 more (2026-11-16) cover H2 Console, MySQL Connector/J, pgjdbc, jsoup,
+   hibernate-validator's `@SafeHtml` and Spring Boot's CloudFoundry
+   actuator paths. An advisory that concerns no JVM code at all gets a
+   `not_code: "<why>"` entry instead of methods: the finding is
+   `NOT_APPLICABLE` with reason `NOT_CODE_MAPPABLE` (Tomcat's Windows
+   installer, CVE-2025-49124). `UNKNOWN`: 10/6/3 → 3/1/3; what is left is
+   mapped code the analyzed jar does not ship (`METHOD_NOT_FOUND`) and
+   CVE-2022-21363, which neither Oracle's advisory nor the release diff
+   attributes to any code.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only non-test `.java` files
@@ -1387,7 +1396,7 @@ found:
 | `FRAMEWORK` | Found only in pass 2: the only path runs through framework code the static graph can't follow past. Needs manual review. |
 | `NOT_REACHABLE` | vulnmap has methods for this CVE, at least one of them exists in the analyzed graph, but neither pass ever visits any of them. Since CVE:F1b the row carries `reasons`: `MAPPING_PARTIAL` when the mapping is not known to be complete (every mapping today), and `MODEL_INCOMPLETE` plus `model_gaps` (counts by kind) when reachable unresolved reflection/MethodHandle/callback/ServiceLoader sites or deserialization entries could dispatch into the affected component. That gap rule is **report-only**: on the reference apps it applies to every `NOT_REACHABLE` finding (16 of 16 petclinic, 10 of 10 WebGoat, after DESERIALIZATION Z1), so turning them into `UNKNOWN` would carry no information ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §4). Read the verdict as "no path in the model", not "safe". |
 | `UNKNOWN` | vulnmap has no entry for this CVE at all; or (CVE:F1b, with `reasons`) **none of the mapped methods exists in the analyzed graph** (`METHOD_NOT_FOUND` — e.g. a diff-derived method absent under that name in the analyzed version; 7 petclinic and 6 WebGoat rows that v1 used to report as `NOT_REACHABLE`), or the affected instance's own copy of a mapped class lost to another jar's copy under the classpath order (`CLASSPATH_CONFLICT` — a path through the other copy is not that instance's code). |
-| `NOT_APPLICABLE` | Every affected dependency is a WebJar (no `.class` file, assets under `META-INF/resources/webjars/`): client-side JavaScript/CSS a call graph cannot analyze. Checked before everything else. **Not** a verdict that the app is safe: the code runs in the browser. An empty jar alone does not qualify, since Maven aggregators such as `spring-boot-starter-web` are class-free too and CVEs filed against them (Spring4Shell) concern JVM code in other jars. |
+| `NOT_APPLICABLE` | Every affected dependency is a WebJar (no `.class` file, assets under `META-INF/resources/webjars/`): client-side JavaScript/CSS a call graph cannot analyze. Checked before everything else. **Not** a verdict that the app is safe: the code runs in the browser. Also (2026-11-16) when the manual table declares, with a reason, that the advisory concerns no JVM code at all (`not_code`; reason `NOT_CODE_MAPPABLE`) — Tomcat's Windows installer filed against `tomcat-embed-core` — with that reason as the note. An empty jar alone does not qualify, since Maven aggregators such as `spring-boot-starter-web` are class-free too and CVEs filed against them (Spring4Shell) concern JVM code in other jars. |
 
 Matching a vulnmap method name (`"Class#method"`, no descriptor — matching
 is overload-insensitive everywhere in ariadne) against the graph also

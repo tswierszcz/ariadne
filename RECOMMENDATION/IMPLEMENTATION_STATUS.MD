@@ -1450,6 +1450,57 @@ obiekty JDBC, proxy MyBatis i Spring Data: zrobione 2026-11-14 (`b4-1`…`b4-5`)
 - **Następny krok (wymaga zgody):** pełne wejście WebGoata (wszystkie
   lekcje) albo ROADMAP B3.
 
+### CVE:F10 (redukcja `UNKNOWN`, część 3: bazy, sterowniki, reszta + `NOT_CODE_MAPPABLE`) — DONE for this scope (2026-11-16)
+
+- **Mapowania (9, metoda jak w częściach 1–2):** H2 CVE-2021-42392 i
+  CVE-2022-23221 (Console: `WebApp#login`/`#test`, `entrypoint`),
+  MySQL CVE-2021-2471 (`MysqlSQLXML#getSource`), CVE-2023-22102
+  (`ResultSetImpl#getObject` — 8.2.0 usuwa `autoDeserialize`; warianty
+  5.1 / 8.0 / `mysql-connector-j`), pgjdbc CVE-2022-26520
+  (`Driver#setupLoggerFromProperties`) i CVE-2026-42198 (krok SCRAM z
+  liczbą iteracji: `jre8`/`jre7` `processServerFirstMessage`, od 42.7.4
+  `core.v3` `handleAuthenticationSASLContinue`), jsoup CVE-2022-36033
+  (`Cleaner#createSafeElement`), hibernate-validator CVE-2023-1932
+  (`SafeHtmlValidator#isValid`), Spring Boot CVE-2026-22733 (wykluczenie
+  ścieżek CloudFoundry z bezpieczeństwa: konfigurator 2.0–2.3,
+  `WebSecurityCustomizer` 2.4–3.4, łańcuch filtrów 3.5; 4.x poza modułem —
+  `MAPPING_VERSION_UNCOVERED`). Grupa C okazała się mniejsza: CVE-2026-22733
+  dotyczy kodu (autokonfiguracji), więc dostała mapowanie.
+- **`NOT_CODE_MAPPABLE` (nowy kod, kontrakt):** wpis `not_code: "<powód>"`
+  w tabeli (bez metod, wariantów, roli i pokrycia) → status
+  `NOT_APPLICABLE` (jak WebJar: graf nie może odpowiedzieć; nie werdykt
+  „bezpieczne”), powód w notatce; v1 `reasons`, v2 `reason_codes`, log
+  „no JVM code=N”. `ResolverVersion` 6 → 7. Jedyny wpis: CVE-2025-49124
+  (instalator Tomcata dla Windows). Dokumentacja: RESULTS_CONTRACT §2–3,
+  README.
+- **Bez mapowania:** CVE-2022-21363 (MySQL 8.0.28) — advisory Oracle nie
+  nazywa komponentu, diff 8.0.27→8.0.28 (62 metody: TLS, MFA, nawigacja
+  wyników) nie ma zmiany do przypisania; zostaje `MAPPING_MISSING`.
+- **Wynik:** `UNKNOWN` (v2, `-roots all` CHA offline): petclinic 10 → 3,
+  WebGoat 6 → 1, JPetStore 3 → 3 (łącznie od 27/26/5). Zmiany (12): 5 →
+  `NOT_REACHABLE` (H2 Console ×2, `SQLXML`, CloudFoundry ×2 — petclinic i
+  WebGoat nie działają na Cloud Foundry, ścieżka nieosiągalna), 2 →
+  `FRAMEWORK` (`@SafeHtml` przez walidator), 1 → `NOT_APPLICABLE`
+  (CVE-2025-49124), 4 → `REACHABLE` — wszystkie nadmiarowe lub zależne od
+  konfiguracji, także przy RTA: WebGoat CVE-2022-26520 i CVE-2026-42198
+  (przez `java.sql.Driver#connect` do sterownika PostgreSQL; WebGoat łączy
+  się z HSQLDB), CVE-2022-36033 (`Element#text` → dowolny `NodeVisitor` →
+  `Cleaner`; lekcja tylko parsuje, nie czyści), petclinic CVE-2023-22102
+  (ścieżka przez H2 do `ResultSet#getObject` MySQL; MySQL jest tylko w
+  profilu `mysql`). Mapowania poprawne, nieprecyzja grafu na interfejsach
+  JDBC/jsoup.
+- **Pozostaje `UNKNOWN`:** kod nieobecny w jarze (`METHOD_NOT_FOUND`):
+  JPetStore CVE-2018-11040/-1257/-1271, petclinic CVE-2026-34483/-34487,
+  WebGoat CVE-2021-22119 (`spring-security-core` bez klas OAuth2);
+  petclinic CVE-2022-21363. Decyzja, czy „kod nieobecny” ma dawać inny
+  status, pozostaje otwarta (zmiana kontraktu).
+- **Weryfikacja:** `TestManualNotCode`, `TestFindingsForUnmatchedVerdicts`
+  (`NOT_APPLICABLE` + `NOT_CODE_MAPPABLE`), `TestServerManualMappings`
+  (warianty części 3), `TestLoadManualMeta_embeddedTable` (107 wpisów),
+  `TestReasonCodesDocumented`; `go test ./...`, `go vet ./...`;
+  porównanie v2 przed/po (zmieniło się tylko 12 omówionych), v1/Markdown
+  petclinic dla CVE-2025-49124; RTA dla 4 nowych `REACHABLE`.
+
 ### CVE:F10 (redukcja `UNKNOWN`, część 2: Tomcat, Jackson, logback, Undertow/XNIO) — DONE for this scope (2026-11-16)
 
 - **Metoda:** jak w części 1 (diff znormalizowanego bytecode'u wydań w
@@ -1500,8 +1551,7 @@ obiekty JDBC, proxy MyBatis i Spring Data: zrobione 2026-11-14 (`b4-1`…`b4-5`)
   przed/po na trzech aplikacjach (zmieniły się tylko omówione wyżej, plus
   powód CVE-2026-34483 `MAPPING_MISSING` → `METHOD_NOT_FOUND`); WebGoat
   ponownie przy RTA (te same 4 `REACHABLE`). Dokumentacja: README.
-- **Następny krok:** część 3 (H2, sterowniki JDBC, jsoup,
-  hibernate-validator, kod powodu dla grupy C).
+- **Następny krok:** część 3 — zrobiona, sekcja wyżej.
 
 ### CVE:F10 (redukcja `UNKNOWN`, część 1: Spring) — DONE for this scope (2026-11-16)
 

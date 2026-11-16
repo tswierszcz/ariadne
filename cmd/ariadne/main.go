@@ -1158,6 +1158,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	bySource := map[string]int{}
 	mapped, newSideOnly := 0, 0
 	for _, e := range vm {
+		if e.NotCode != "" {
+			bySource["not_code"]++
+			continue
+		}
 		if !e.Mapped() {
 			bySource["unavailable"]++
 			continue
@@ -1168,8 +1172,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			newSideOnly++
 		}
 	}
-	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d; diff read on the post-fix side only=%d; fix commits unreadable=%d)",
-		mapped, len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM], newSideOnly, bySource["unavailable"])
+	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d; diff read on the post-fix side only=%d; fix commits unreadable=%d; no JVM code=%d)",
+		mapped, len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM], newSideOnly, bySource["unavailable"], bySource["not_code"])
 	log("fix commits vs the analyzed release (CVE:F5c): %s", releaseLineSummary(vm))
 	if llmSrc != nil {
 		st := llmSrc.Stats()
