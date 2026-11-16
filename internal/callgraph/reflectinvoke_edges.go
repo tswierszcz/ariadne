@@ -31,8 +31,9 @@ func ApplyReflectInvokeEdges(g *Graph, edges []ReflectInvokeEdge) int {
 			if hasEdge(g, fromID, toID, classfile.CallSynthetic, BasisReflection) {
 				continue
 			}
-			g.addEdge(fromID, toID, classfile.CallSynthetic, BasisReflection, &CallSite{PC: e.PC})
-			added++
+			if g.addEdge(fromID, toID, classfile.CallSynthetic, BasisReflection, &CallSite{PC: e.PC}) {
+				added++
+			}
 		}
 	}
 	return added

@@ -192,6 +192,9 @@ func (s *SAMGate) Apply(g *Graph, roots []uint32) SAMStats {
 }
 
 func (s *SAMGate) add(g *Graph, c *samCandidate) {
+	if g.siteCut(c.from, c.pc) {
+		return
+	}
 	idx, other := -1, false
 	for i, ex := range g.adjacency[c.from] {
 		if ex.To != c.to {

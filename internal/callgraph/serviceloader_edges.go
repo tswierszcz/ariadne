@@ -35,14 +35,16 @@ func ApplyServiceLoaderEdges(g *Graph, edges []ServiceLoaderEdge) int {
 		}
 		if ctorID, ok := g.ID(e.ProviderFQCN, "<init>", "()V"); ok {
 			if !hasEdge(g, fromID, ctorID, classfile.CallSynthetic, BasisServiceLoader) {
-				g.addEdge(fromID, ctorID, classfile.CallSynthetic, BasisServiceLoader, &CallSite{PC: e.PC})
-				added++
+				if g.addEdge(fromID, ctorID, classfile.CallSynthetic, BasisServiceLoader, &CallSite{PC: e.PC}) {
+					added++
+				}
 			}
 		}
 		if clinitID, ok := g.ID(e.ProviderFQCN, "<clinit>", "()V"); ok {
 			if !hasEdge(g, fromID, clinitID, classfile.CallInit, BasisServiceLoader) {
-				g.addEdge(fromID, clinitID, classfile.CallInit, BasisServiceLoader, nil)
-				added++
+				if g.addEdge(fromID, clinitID, classfile.CallInit, BasisServiceLoader, nil) {
+					added++
+				}
 			}
 		}
 	}

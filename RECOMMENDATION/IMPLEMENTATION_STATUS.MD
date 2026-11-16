@@ -30,6 +30,47 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS — sterowniki JDBC według URL (`jdbc:drivers` `u1`) — DONE (2026-11-16)
+
+- **Problem:** `DriverManager#getConnection(url)` oferuje URL każdemu
+  zarejestrowanemu sterownikowi, a `service-provider:dispatch` łączy
+  `Driver#connect` ze wszystkimi sterownikami z `META-INF/services`. Przez
+  to WebGoat (HSQLDB) „osiągał” cały kod połączenia pgjdbc. Z 8 nowych
+  `REACHABLE` z części 2–3 redukcji `UNKNOWN` 2 brały się stąd.
+- **Model (`internal/jdbcurl`, domyślnie włączony — decyzja 2026-11-16):**
+  sterownik z katalogu (pgjdbc 42.x, Connector/J 8.0.23+, H2 1.4/2.x),
+  którego prefiks nie pasuje do żadnego URL-a aplikacji, ma `connect`
+  ucięte po sprawdzeniu URL-a (`callgraph.Graph.CutSitesAfter`: późniejsze
+  miejsca wywołań usunięte, a krawędzie modeli z nich odrzucane we
+  wszystkich ścieżkach dodawania). Dzieje się to przed modelami i bramkami
+  twórców. Źródła URL-i: stałe `jdbc:` klas aplikacji, pliki konfiguracji
+  (wszystkie profile, Spring XML, `web.xml`), H2/HSQLDB/Derby przy
+  wsparciu baz wbudowanych Springa. **Założenie:** spakowana konfiguracja
+  to wdrażana. Model wyłącza się dla przebiegu, gdy ma nieustawiony
+  placeholder URL-a, JNDI albo URL bez literalnego `jdbc:<sub>:`.
+  Nadpisania zmienną środowiskową nie widać.
+- **Wyrocznia JVM:** `testdata/jdbcdrivers` (`scripts/jdbcdrivers-oracle.sh`;
+  nowe `scripts/MethodTrace.java` śledzi wejścia do metod przez JDI) —
+  `jdbc:fx:` z pgjdbc 42.2.18 i Connector/J 8.0.23 na classpath: JVM
+  wchodzi w `connect` i sprawdzenie URL-a obu, dalej nic. Graf osiąga oba
+  sprawdzenia i nic za nimi; bez modelu z `main` osiągalnych jest 6993
+  metody, z modelem 82, żadna nowa. Nieosiągnięte, a wykonane przez JVM:
+  ładowanie sterowników przez `DriverManager` (`<clinit>`, konstruktory,
+  rejestracja, wątek czyszczący MySQL) — istniejąca luka SPI, ta sama z
+  modelem i bez.
+- **Wynik (v1 vs `main`, 12 konfiguracji):** petclinic i JPetStore bez
+  zmian (petclinic nie ma pgjdbc, MySQL zostaje przez profil `mysql`;
+  JPetStore ma tylko HSQLDB). WebGoat we wszystkich 4: CVE-2022-21724,
+  CVE-2022-26520, CVE-2026-42198 `REACHABLE` → `NOT_REACHABLE`, poza tym
+  tylko liczby `model_gaps` (2 miejsca refleksji w pgjdbc mniej).
+- **Weryfikacja:** `TestJDBCDriversOracle`, `TestCutSitesAfter`,
+  `TestCollect`, `TestDecide`; `go test ./...`, `go vet ./...`.
+  Dokumentacja: README, SUPPORT.MD.
+- **Poza zakresem:** MySQL w petclinic (CVE-2023-22102, ścieżka przez H2 do
+  `ResultSet#getObject`) zostaje, bo profil `mysql` naprawdę go używa; jsoup
+  w WebGoat (`NodeVisitor` → `Cleaner`) i HTTP/2 Undertow to osobne
+  nadmiarowe przybliżenia.
+
 ### FRAMEWORKS — profil `spring`: listenery wiadomości jako korzenie — DONE (2026-11-16)
 
 - **Zakres (zatwierdzony 2026-11-16):** metody `@JmsListener`,

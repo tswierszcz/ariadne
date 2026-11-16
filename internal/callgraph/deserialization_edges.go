@@ -28,8 +28,9 @@ func ApplyDeserializationEdges(g *Graph, edges []DeserializationEdge) int {
 		if hasEdge(g, fromID, toID, classfile.CallSynthetic, BasisDeserialization) {
 			continue
 		}
-		g.addEdge(fromID, toID, classfile.CallSynthetic, BasisDeserialization, &CallSite{PC: e.PC})
-		added++
+		if g.addEdge(fromID, toID, classfile.CallSynthetic, BasisDeserialization, &CallSite{PC: e.PC}) {
+			added++
+		}
 	}
 	return added
 }
