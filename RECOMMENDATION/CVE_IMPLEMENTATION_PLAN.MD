@@ -310,6 +310,9 @@ Pull requesty, inicjalizatory pól, źródło `release-diff` (PR #48) i 22 ręcz
 wydań (PR #49); zobacz
 [archive/2026-11-13/cve/CVE_F10.md](../archive/2026-11-13/cve/CVE_F10.md) po pełny zapis i
 `docs/SUPPORT.MD` po bieżący opis zachowania.
+Kontynuacja 2026-11-16 (redukcja `UNKNOWN`, PR #84–#87: 39 ręcznych mapowań, `NOT_CODE_MAPPABLE`,
+`MAPPED_CODE_ABSENT`; `UNKNOWN` 27/26/5 → 1/0/0):
+[archive/2026-11-16/cve/CVE_F10_UNKNOWN_REDUCTION.md](../archive/2026-11-16/cve/CVE_F10_UNKNOWN_REDUCTION.md).
 
 ## F9. Integracja, migracja i kwalifikacja wydania — DONE dla przyrostów pierwszego i drugiego, F0–F7 (F9a 2026-11-06: zadania 4, 5, 8, 9; F9b 2026-11-06: 3, 6, 7, 8 — rate limit; 1–2 zrealizowane w F1–F7); przy trzecim przyroście (F8) zadania F9 trzeba powtórzyć; zob. IMPLEMENTATION_STATUS
 
