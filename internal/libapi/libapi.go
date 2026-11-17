@@ -17,8 +17,9 @@ import (
 // Version versions the API definition and the client-code sites;
 // snapshots record it. lb2-1: ClientSites (LIBRARY_MODE LB2); lb2-2: a
 // class a client can construct is not a client-dispatch stand-in
-// (Constructible, measured on commons-configuration2).
-const Version = "lb2-2"
+// (Constructible, measured on commons-configuration2); lb2-3: methods an
+// API class inherits from a dependency supertype are roots (Inherited).
+const Version = "lb2-3"
 
 const (
 	accPrivate   = 0x0002
@@ -45,8 +46,11 @@ type Provider struct {
 
 // Coverage is what the API selection counted (v2 coverage.api).
 type Coverage struct {
-	Classes   int      `json:"classes"`
-	Methods   int      `json:"methods"`
+	Classes int `json:"classes"`
+	Methods int `json:"methods"`
+	// Inherited counts the roots that are dependency methods an API class
+	// inherits (lb2-3); they are part of Methods.
+	Inherited int      `json:"inherited_methods"`
 	Providers int      `json:"providers"`
 	Excluded  []string `json:"excluded_packages,omitempty"`
 	JPMS      string   `json:"jpms"` // "exports" or "classpath"
@@ -157,14 +161,18 @@ func (s *selector) accessible(fqcn string) bool {
 // as graph nodes, sorted by key, and what was counted. providers are the
 // library's own META-INF/services registrations; under ModulePath with a
 // module-info its provides are used instead.
-func Roots(g *callgraph.Graph, h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, providers []Provider, opt Options) ([]uint32, Coverage) {
+//
+// inherited maps each root that is a dependency method an accessible API
+// class inherits (public, or protected in a non-final class; an instance
+// method with a body; resolved from that class to the dependency's
+// declaration, so not overridden on the way) to those API classes, sorted.
+func Roots(g *callgraph.Graph, h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, providers []Provider, opt Options) (roots []uint32, cov Coverage, inherited map[uint32][]string) {
 	sel := newSelector(h, mod, providers, opt)
-	cov := sel.cov
+	cov = sel.cov
 	providers = sel.providers
 	inScope, accessible := sel.inScope, sel.accessible
 
 	seen := map[uint32]bool{}
-	var roots []uint32
 	add := func(fqcn, name, desc string) bool {
 		id, ok := g.ID(fqcn, name, desc)
 		if !ok || seen[id] {
@@ -210,9 +218,69 @@ func Roots(g *callgraph.Graph, h *hierarchy.Hierarchy, mod *classfile.ModuleInfo
 			}
 		}
 	}
+	inherited = map[uint32][]string{}
+	for _, fqcn := range h.SortedFQCNs() {
+		if !accessible(fqcn) || !inScope(fqcn) {
+			continue
+		}
+		ci, _ := h.Lookup(fqcn)
+		final := ci.AccessFlags&classfile.AccFinal != 0
+		for _, sup := range dependencySupertypes(h, fqcn) {
+			sci, _ := h.Lookup(sup)
+			for _, m := range sci.Methods {
+				f := m.AccessFlags
+				if m.Name == "<init>" || m.Name == "<clinit>" || f&(accStatic|accSynthetic|accBridge|accPrivate|classfile.AccAbstract) != 0 {
+					continue
+				}
+				if f&classfile.AccPublic == 0 && (f&accProtected == 0 || final) {
+					continue
+				}
+				if decl, ok := h.ResolveExact(fqcn, m.Name, m.Descriptor); !ok || decl != sup {
+					continue // overridden closer to the API class
+				}
+				id, ok := g.ID(sup, m.Name, m.Descriptor)
+				if !ok {
+					continue
+				}
+				if !seen[id] {
+					seen[id] = true
+					roots = append(roots, id)
+					cov.Inherited++
+				}
+				inherited[id] = append(inherited[id], fqcn) // fqcn ascending: sorted
+			}
+		}
+	}
 	sort.Slice(roots, func(i, j int) bool { return g.Key(roots[i]) < g.Key(roots[j]) })
 	cov.Methods = len(roots)
-	return roots, cov
+	return roots, cov, inherited
+}
+
+// dependencySupertypes lists fqcn's transitive supertypes (superclasses
+// and interfaces) that are dependency classes, in breadth-first order.
+func dependencySupertypes(h *hierarchy.Hierarchy, fqcn string) []string {
+	seen := map[string]bool{fqcn: true}
+	queue := []string{fqcn}
+	var out []string
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		ci, ok := h.Lookup(cur)
+		if !ok {
+			continue
+		}
+		if cur != fqcn && !ci.IsApp {
+			out = append(out, cur)
+		}
+		next := append([]string{ci.SuperClass}, ci.Interfaces...)
+		for _, s := range next {
+			if s != "" && !seen[s] {
+				seen[s] = true
+				queue = append(queue, s)
+			}
+		}
+	}
+	return out
 }
 
 // Constructible reports whether a client can get an object of a library

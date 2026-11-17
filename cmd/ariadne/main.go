@@ -1217,6 +1217,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var apiCoverage *libapi.Coverage
 	var clientSites []libapi.ClientSite
 	var clientConstructible func(string) bool
+	var apiInherited map[uint32][]string
 	if cfg.roots == "api" {
 		// LIBRARY_MODE LB1: the library's public API (docs/RESULTS_CONTRACT.MD §8).
 		mod, err := libapi.Module(prepared.AppClassesJar)
@@ -1237,7 +1238,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 		var cov libapi.Coverage
 		apiOpt := libapi.Options{Exclude: exclude, ModulePath: jpmsScenario == serviceload.ScenarioModulePath}
-		roots, cov = libapi.Roots(g, h, mod, providers, apiOpt)
+		roots, cov, apiInherited = libapi.Roots(g, h, mod, providers, apiOpt)
 		apiCoverage = &cov
 		// LIBRARY_MODE LB2: the calls a client can implement or override.
 		clientSites = libapi.ClientSites(h, mod, apiOpt)
@@ -1248,8 +1249,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 				abstract++
 			}
 		}
-		log("library API (%s): %d accessible classes, %d methods, %d registered providers; JPMS %s%s; %d client-code call sites (%d to abstract methods)",
-			libapi.Version, cov.Classes, cov.Methods, cov.Providers, cov.JPMS, apiExcludeNote(exclude), len(clientSites), abstract)
+		log("library API (%s): %d accessible classes, %d methods (%d inherited from dependency supertypes), %d registered providers; JPMS %s%s; %d client-code call sites (%d to abstract methods)",
+			libapi.Version, cov.Classes, cov.Methods, cov.Inherited, cov.Providers, cov.JPMS, apiExcludeNote(exclude), len(clientSites), abstract)
 	} else if cfg.roots == "profile" {
 		roots = prof.AppRoots(g, h)
 		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
@@ -1479,7 +1480,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		for _, c := range clientSites {
 			calls = append(calls, reach.ClientCall{CallerFQCN: c.CallerFQCN, CallerName: c.CallerName, CallerDesc: c.CallerDesc, PC: c.PC, Declared: c.Declared})
 		}
-		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, objectsExist(allocCatalog, clientConstructible)))
+		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, objectsExist(allocCatalog, clientConstructible), apiInherited))
 	case "profile":
 		log("roots: profile %q (%d entry-point methods, %d from web.xml, %d bean lifecycle)", prof.Name, len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)

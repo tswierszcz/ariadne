@@ -360,6 +360,9 @@ type ExposedMethod struct {
 	// code only through a client-code site dispatched to a library body
 	// that stands in for client code.
 	ClientDispatch bool `json:"client_dispatch,omitempty"`
+	// InheritedBy (lb2-3): for a dependency method API classes inherit,
+	// those classes.
+	InheritedBy []string `json:"inherited_by,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -804,7 +807,7 @@ func Write(path string, doc Document) error {
 func exposedMethods(xs []reach.ExposedMethod) []ExposedMethod {
 	var out []ExposedMethod
 	for _, x := range xs {
-		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges, ClientDispatch: x.ClientDispatch})
+		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges, ClientDispatch: x.ClientDispatch, InheritedBy: x.InheritedBy})
 	}
 	return out
 }

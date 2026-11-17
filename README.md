@@ -884,7 +884,11 @@ public API ([docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §8):
 the `public` methods and constructors of accessible classes (a member
 class only when every enclosing class is accessible; `protected` too,
 unless the class is `final`), public interface methods, every accessible
-class's `<clinit>`, and the providers the library registers in its own
+class's `<clinit>`, the public (protected in non-`final` classes)
+instance methods an accessible class inherits from a dependency supertype
+without overriding them (`lb2-3`: `YAMLMapper#readValue` is
+`ObjectMapper#readValue`; v2 `exposed_api[].inherited_by` names the API
+classes, `coverage.api.inherited_methods` counts them), and the providers the library registers in its own
 `META-INF/services` — never `private`/package-private code, synthetic or
 bridge methods. `-api-exclude` drops package prefixes the user calls
 internal; with `-jpms-scenario module-path` and a `module-info`, only the
@@ -911,10 +915,16 @@ exist only as client code (the input never creates it and a client cannot
 construct it — `lb2-2`) — a stand-in for the client's implementation. Calls into
 dependency/JDK types are left to the other mechanisms. Measured on three real libraries (`scripts/library-measure.sh`:
 commons-configuration2 2.7, jackson-dataformat-yaml 2.12.3, jjwt-jackson
-0.11.2): same verdicts as `-roots all`, `exposed_api` from 6 to 778
-methods per finding; API methods inherited from a dependency superclass
-(`YAMLMapper#readValue` from `ObjectMapper`) are not roots yet. Log lines
-`library API (lb2-2): …, N client-code call sites (M to abstract
+0.11.2): same verdicts as `-roots all` before `lb2-3`, `exposed_api` from 6 to
+778 methods per finding. With inherited methods as roots (`lb2-3`)
+jackson-dataformat-yaml goes from 1 to 17 of 26 advisories `REACHABLE`
+(databind deserialization through the inherited `readValue`/`readValueAs`);
+an inherited root is the dependency's own method node, so a call on
+`this` inside it is dispatched as for any receiver — CVE-2025-49128 there
+(`JsonFactory#createJsonParser` reaching the JSON parser, which
+`YAMLFactory` overrides) is such an over-approximation. Log lines
+`library API (lb2-3): …, N methods (M inherited from dependency
+supertypes), …, N client-code call sites (M to abstract
 methods)`, `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
 (…)`. Verified on `testdata/library` (cases in
 [EXPECTED.MD](testdata/library/EXPECTED.MD), written before the

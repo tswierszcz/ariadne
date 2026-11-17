@@ -63,8 +63,9 @@ dla metod sięgających kodu tylko przez wysyłkę do klasy, której wejście ni
 fixture. Zostaje: ścieżki warunkowe po powrocie z kodu klienta, wywołania na typach zależności,
 autokonfiguracja jako korzenie, wyrocznia z przykładowym klientem dla (d) poza `observed.txt`.
 Pomiar 2026-11-17 (3 biblioteki, `scripts/library-measure.sh`): werdykty jak `-roots all`;
-poprawka `lb2-2` (klasy konstruowalne przez klienta nie są zastępstwem); otwarta decyzja:
-metody odziedziczone z nadklas zależności jako API (jackson-yaml: 1 → 17 `REACHABLE`).
+poprawka `lb2-2` (klasy konstruowalne przez klienta nie są zastępstwem); `lb2-3` (decyzja
+użytkownika): metody odziedziczone z nadtypów zależności są API (jackson-yaml: 1 → 17
+`REACHABLE`), bez specjalizacji do odbiorcy.
 
 Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).
 
