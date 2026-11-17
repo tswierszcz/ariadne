@@ -427,6 +427,11 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
   added helpers are evidence only; no parent (no metadata, merge commit) → post-fix side only
   with `MAPPING_NEW_SIDE_ONLY`; an unreadable commit is per-CVE (`SOURCE_UNAVAILABLE`), not a
   run failure. See README step 6 and RECOMMENDATION/IMPLEMENTATION_STATUS.MD (CVE:F5a).
+  **Since 2026-11-17** a diff or release-diff mapping made only of static initializers
+  (`<clinit>`) carries the mapping qualifier `MAPPING_INITIALIZER_ONLY`; one made only of
+  jackson-databind's blocklist initializers (`SubTypeValidator`, `BeanDeserializerFactory`)
+  is mapped to the default-typing API instead (role `entrypoint`,
+  `internal/vulnmap/initializers.go`, `ResolverVersion` 8).
   **Deviation from the plan's own description:** rather than a regex/`javalang` pass over
   the diff's `@@` hunk context, the implementation always fetches the full post-fix file
   and runs the same brace-aware scanner on it, using the diff only for *which lines*

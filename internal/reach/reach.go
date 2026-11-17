@@ -350,6 +350,9 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 	if entry.Source == vulnmap.SourceDiff && entry.NewSideOnly() {
 		reasons = append(reasons, findings.MappingNewSideOnly)
 	}
+	if entry.InitializerOnly() {
+		reasons = append(reasons, findings.MappingInitializerOnly)
+	}
 
 	if instances := e.affectedInstances(cve); len(instances) > 0 && len(entry.Variants) > 0 {
 		e.analyzeVariants(&result, entry, instances)
@@ -393,6 +396,9 @@ func (e *Engine) analyzeOne(cve cves.CVE, vm map[string]vulnmap.Entry) Result {
 		reasons = append(reasons, findings.MappingPartial)
 	}
 	result.Reasons = orderedReasons(reasons)
+	if r := entry.InitializerRedirect; r != nil && result.Note == "" {
+		result.Note = r.Reason + " (fix changed " + strings.Join(r.Initializers, ", ") + ")"
+	}
 	return result
 }
 
