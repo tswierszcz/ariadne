@@ -114,11 +114,13 @@ func clientGapSites(sites []libapi.ClientSite) []reach.GapSite {
 	return out
 }
 
-// createdByInput: the classes the input itself creates (the created-type
-// catalog, every origin but an assumed entry) — a client-code site's
-// dispatch to one of them may run on a library-made object, so it is not
-// a stand-in for client code (LIBRARY_MODE LB2).
-func createdByInput(c alloc.Catalog) func(string) bool {
+// objectsExist: the classes whose objects exist without client code — the
+// ones the input itself creates (the created-type catalog, every origin
+// but an assumed entry) and the ones a client can construct or subclass
+// without overriding (libapi.Constructible). A client-code site's dispatch
+// to one of them runs library code on an ordinary object, so it is not a
+// stand-in for client code (LIBRARY_MODE LB2).
+func objectsExist(c alloc.Catalog, constructible func(string) bool) func(string) bool {
 	made := map[string]bool{}
 	for _, t := range c.Types {
 		for _, o := range t.Origins {
@@ -127,5 +129,5 @@ func createdByInput(c alloc.Catalog) func(string) bool {
 			}
 		}
 	}
-	return func(fqcn string) bool { return made[fqcn] }
+	return func(fqcn string) bool { return made[fqcn] || (constructible != nil && constructible(fqcn)) }
 }

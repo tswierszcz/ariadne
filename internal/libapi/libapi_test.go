@@ -98,3 +98,23 @@ func TestClientSites(t *testing.T) {
 		t.Errorf("with lib.api excluded: %v", got)
 	}
 }
+
+// Constructible (lb2-2): a client can get objects of public classes with a
+// public constructor and of public interfaces, never of a package-private
+// class — so only the latter's bodies stand in for client code.
+func TestConstructible(t *testing.T) {
+	_, h := build(t)
+	c := Constructible(h, nil, Options{})
+	for fqcn, want := range map[string]bool{
+		"lib.api.Templates": true, "lib.api.Listener": true, "lib.api.Pipeline": true,
+		"lib.api.ExpandingListener": false, "lib.api.Hidden": false, "lib.api.Engine": false,
+		"org.apache.commons.text.StringSubstitutor": false, // a dependency's, not the library's
+	} {
+		if got := c(fqcn); got != want {
+			t.Errorf("Constructible(%s) = %v, want %v", fqcn, got, want)
+		}
+	}
+	if Constructible(h, nil, Options{Exclude: []string{"lib.api"}})("lib.api.Templates") {
+		t.Error("an excluded package's class counted as constructible")
+	}
+}

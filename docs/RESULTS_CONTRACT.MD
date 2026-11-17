@@ -224,7 +224,7 @@ A library jar answers a different question than an application: whether anyone u
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
-api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, 2026-11-17) the `client_code` gap.
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap.
 Member-class accessibility follows the class's own access flag and its enclosing classes
 (a `protected` member class is compiled `public` and counts as accessible).
 
@@ -269,7 +269,7 @@ model. All reason codes keep their meaning.
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 
-**Client code (LB2, `lb2-1`, 2026-11-17).** A call the library makes on a method a client
+**Client code (LB2, `lb2-1`/`lb2-2`, 2026-11-17).** A call the library makes on a method a client
 can implement or override runs code the analysis does not have. A *client-code site* is a
 virtual or interface call in a library method whose resolved method is declared in an
 accessible, in-scope library type the client can subtype (an interface, or a class that is
@@ -282,8 +282,11 @@ reaches the library only through its API, which is already the roots — so it n
 a finding `MODEL_INCOMPLETE`. No edge is invented: such sites stay ordinary CHA/RTA call
 sites. A *client dispatch* is a graph edge whose every bytecode site is a client-code site
 and whose target is neither the called method's own body nor a body of a class (or a
-subtype of it) the input creates (created-type catalog, any origin but an assumed entry):
-that body runs there only on an object the client creates and passes. An `exposed_api`
+subtype of it) whose objects exist without client code — one the input creates
+(created-type catalog, any origin but an assumed entry) or one a client can construct or
+subclass without overriding (an accessible, in-scope interface, a class with a public
+constructor, a non-`final` class with a protected one; `lb2-2`): that body stands in for
+the client's own code. An `exposed_api`
 entry is `client_dispatch: true` when every path from it in its pass contains a client
 dispatch; otherwise its example path avoids them. Not yet: vulnerable code reached only
 after a client call returns is not marked conditional.

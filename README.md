@@ -896,7 +896,7 @@ API method from which its mapped code is reached — with the pass
 character (`heuristic` = depends on a CHA expansion); `coverage.api`
 counts the API. Under RTA a class counts as created when it is an
 accessible class (a client can construct it). **Client code (LB2,
-`lb2-1`, 2026-11-17):** a call the library makes on a method a client can
+`lb2-1`/`lb2-2`, 2026-11-17):** a call the library makes on a method a client can
 implement or override — declared, with `public`/`protected` access and not
 `static`/`final`, in an accessible, non-excluded library type the client
 can subtype (an interface, or a non-`final` class with a public/protected
@@ -906,10 +906,15 @@ constructor) — is a `client_code` gap (site code `client`, in
 which is already the roots). No edge is invented for it. An
 `exposed_api` entry is marked `client_dispatch` (report: "client
 dispatch") when every path from that method passes such a site dispatched
-to a body other than the called method's own, in a class the input never
-creates — a stand-in for an object only the client could pass. Calls into
-dependency/JDK types are left to the other mechanisms. Log lines
-`library API (lb2-1): …, N client-code call sites (M to abstract
+to a body other than the called method's own, in a class whose objects
+exist only as client code (the input never creates it and a client cannot
+construct it — `lb2-2`) — a stand-in for the client's implementation. Calls into
+dependency/JDK types are left to the other mechanisms. Measured on three real libraries (`scripts/library-measure.sh`:
+commons-configuration2 2.7, jackson-dataformat-yaml 2.12.3, jjwt-jackson
+0.11.2): same verdicts as `-roots all`, `exposed_api` from 6 to 778
+methods per finding; API methods inherited from a dependency superclass
+(`YAMLMapper#readValue` from `ObjectMapper`) are not roots yet. Log lines
+`library API (lb2-2): …, N client-code call sites (M to abstract
 methods)`, `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
 (…)`. Verified on `testdata/library` (cases in
 [EXPECTED.MD](testdata/library/EXPECTED.MD), written before the
