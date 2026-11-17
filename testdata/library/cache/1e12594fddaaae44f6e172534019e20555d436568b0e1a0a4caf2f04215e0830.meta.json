@@ -1,0 +1,12 @@
+{
+  "key": "1e12594fddaaae44f6e172534019e20555d436568b0e1a0a4caf2f04215e0830",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://api.github.com/repos/apache/commons-lang/commits/b424803abdb2bec818e4fbcb251ce031c22aca53",
+  "fetched_at": "2026-11-06T07:17:33.541575381Z",
+  "validated_at": "2026-11-06T07:17:33.541575381Z",
+  "sha256": "b688f3d4a767d3abdb86d74dc92c9f025aeab8cb6739cba0f7ea436ecf286e1a",
+  "bytes": 9894,
+  "etag": "W/\"23e2289e9b42ddc6068c38dbc93bc62a510ca95406044807c96c4104d120b078\"",
+  "last_modified": "Sat, 21 Sep 2024 21:23:08 GMT"
+}

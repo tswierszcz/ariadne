@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -31,7 +31,11 @@ Zależności: CVE F0–F1 (wynik v2), ROADMAP B0.
 
 Gotowe: kontrakt w `docs/RESULTS_CONTRACT.MD`, fixture z oczekiwaniami, decyzje o nazwach.
 
-## LB1. Korzenie z publicznego API i narażone metody
+## LB1. Korzenie z publicznego API i narażone metody — DONE (2026-11-16)
+
+Zrobione bez pomiaru na prawdziwych bibliotekach — ten punkt przechodzi do LB4 (wybór
+bibliotek razem z flotą).
+
 
 Zależności: LB0.
 

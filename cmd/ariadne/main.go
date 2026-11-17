@@ -38,6 +38,7 @@ import (
 	"ariadne/internal/input"
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/jdbcurl"
+	"ariadne/internal/libapi"
 	"ariadne/internal/jpadispatch"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
@@ -99,6 +100,7 @@ type config struct {
 	targetJava     int
 	activeProfiles string
 	jpmsScenario   string
+	apiExclude     string
 	jpmsModulePath string
 	taint          bool
 	callgraphMode  string
@@ -143,7 +145,8 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.profile, "profile", "auto", "which profile's framework knowledge to use: auto, generic, spring, servlet, jakarta, micronaut, quarkus, stripes, or a name from -profile-file")
 	fs.StringVar(&cfg.sbom, "sbom", "", "CycloneDX JSON SBOM (spec 1.4-1.6): components nested in a component whose SHA-256 is an analyzed dependency jar's become embedded-component candidates of that jar, verified by their classes (CVE:F6b); nothing else from the SBOM is used")
 	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
-	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default) or "profile" (only the active profile's entry points: annotated methods/classes, main)`)
+	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default), "profile" (only the active profile's entry points: annotated methods/classes, main) or "api" (library mode: the -app jar is a library, its public API — what a user can call or override — is the roots, and findings list the exposed API methods)`)
+	fs.StringVar(&cfg.apiExclude, "api-exclude", "", `with -roots api: comma-separated package prefixes left out of the API (e.g. "com.example.internal")`)
 	fs.IntVar(&cfg.targetJava, "target-java", 0, "Java feature version (e.g. 11, 17) to resolve multi-release JAR variants against; unset falls back to every jar's base classes, not the highest bytecode version seen (JVM_GRAPH G4)")
 	fs.StringVar(&cfg.activeProfiles, "active-profiles", "", "comma-separated Spring profile names to treat as active when evaluating @Profile conditions (FRAMEWORKS F1); unset reports every @Profile condition as unknown, never a guessed false")
 	fs.StringVar(&cfg.jpmsScenario, "jpms-scenario", "classpath", `JPMS launch scenario for ServiceLoader providers (SERVICE_LOADING S3): "classpath" (every jar in the unnamed module; module-info ignored) or "module-path" (every jar, the app included, on the module path: explicit modules provide only through "provides", automatic modules through META-INF/services, explicit callers need "uses"), or "mixed" (only the -jpms-module-path jars on the module path, assumed resolved as with --add-modules ALL-MODULE-PATH)`)
@@ -245,8 +248,8 @@ func validate(cfg config) error {
 	if cfg.jsonFormat != "v1" && cfg.jsonFormat != "v2" {
 		return fmt.Errorf("-json-format must be %q or %q, got %q", "v1", "v2", cfg.jsonFormat)
 	}
-	if cfg.roots != "all" && cfg.roots != "profile" {
-		return fmt.Errorf("-roots must be %q or %q, got %q", "all", "profile", cfg.roots)
+	if cfg.roots != "all" && cfg.roots != "profile" && cfg.roots != "api" {
+		return fmt.Errorf("-roots must be %q, %q or %q, got %q", "all", "profile", "api", cfg.roots)
 	}
 	for _, s := range strings.Split(cfg.runtimeStatus, ",") {
 		switch reach.Status(strings.TrimSpace(s)) {
@@ -1211,7 +1214,31 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	framework := reach.NewFrameworkMatcher(prof.ResolvePatterns(h))
 	var roots []uint32
 	webXMLRootCount := 0
-	if cfg.roots == "profile" {
+	var apiCoverage *libapi.Coverage
+	if cfg.roots == "api" {
+		// LIBRARY_MODE LB1: the library's public API (docs/RESULTS_CONTRACT.MD §8).
+		mod, err := libapi.Module(prepared.AppClassesJar)
+		if err != nil {
+			warnings = append(warnings, "reading the library's module-info: "+err.Error())
+		}
+		var providers []libapi.Provider
+		for _, r := range svcRegs {
+			if r.GAV == nil && r.SourceJar == prepared.AppClassesJar {
+				providers = append(providers, libapi.Provider{Service: r.Interface, Class: r.ProviderClass})
+			}
+		}
+		var exclude []string
+		for _, p := range strings.Split(cfg.apiExclude, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				exclude = append(exclude, p)
+			}
+		}
+		var cov libapi.Coverage
+		roots, cov = libapi.Roots(g, h, mod, providers, libapi.Options{Exclude: exclude, ModulePath: jpmsScenario == serviceload.ScenarioModulePath})
+		apiCoverage = &cov
+		log("library API (%s): %d accessible classes, %d methods, %d registered providers; JPMS %s%s",
+			libapi.Version, cov.Classes, cov.Methods, cov.Providers, cov.JPMS, apiExcludeNote(exclude))
+	} else if cfg.roots == "profile" {
 		roots = prof.AppRoots(g, h)
 		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
 		webXMLRootCount = len(webRoots)
@@ -1432,10 +1459,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 
 	var engine *reach.Engine
-	if cfg.roots == "profile" {
+	switch cfg.roots {
+	case "api":
+		log("roots: api (%d methods: the library's public API, %d bean lifecycle)", len(roots), beanRootCount)
+		engine = reach.NewWithRoots(g, h, framework, roots)
+		engine.SetExposure()
+	case "profile":
 		log("roots: profile %q (%d entry-point methods, %d from web.xml, %d bean lifecycle)", prof.Name, len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
-	} else {
+	default:
 		log("roots: all (%d methods: every application method, %d more from web.xml, %d more bean lifecycle)", len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 	}
@@ -1738,6 +1770,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	doc.Coverage.GapProbe = gapProbe
 	doc.Coverage.UnboundedSites = unboundedSummary
 	doc.Coverage.ReflectionCensus = reflectCensusSummary
+	doc.Coverage.API = apiCoverage
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}
@@ -2180,4 +2213,11 @@ func listOrNone(xs []string) string {
 		return "none"
 	}
 	return strings.Join(xs, ", ")
+}
+
+func apiExcludeNote(exclude []string) string {
+	if len(exclude) == 0 {
+		return ""
+	}
+	return "; excluded " + strings.Join(exclude, ", ")
 }

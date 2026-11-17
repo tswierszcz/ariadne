@@ -1,0 +1,11 @@
+{
+  "key": "5a3cbbbb7bbab2fb084543dc2768d7413ba8dcff1c8764225409a38010aa4abe",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://raw.githubusercontent.com/apache/commons-lang/2d9eddb7988d3dc423d055fe03419542adf87be6/src/main/java/org/apache/commons/lang3/ClassUtils.java",
+  "fetched_at": "2026-11-06T07:17:33.936681943Z",
+  "validated_at": "2026-11-06T07:17:33.936681943Z",
+  "sha256": "fb963c6db285d45d2c8c335fe1cf22e8218e3ddfc3c72542c8dbf8d2ac29186f",
+  "bytes": 64821,
+  "etag": "W/\"9829c113b9b9d59ebeb79d68b0d54fb957450f6d048e2e919224eb140ff021b1\""
+}

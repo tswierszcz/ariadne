@@ -1,0 +1,73 @@
+diff --git a/src/changes/changes.xml b/src/changes/changes.xml
+index 5ca2a390ec1..b9952c9669a 100644
+--- a/src/changes/changes.xml
++++ b/src/changes/changes.xml
+@@ -50,7 +50,8 @@ The <action> type attribute can be add,update,fix,remove.
+     <action                   type="fix" dev="ggregory" due-to="Gary Gregory">Fix flaky FileUtilsWaitForTest.testWaitForNegativeDuration().</action>
+     <action                   type="fix" dev="ggregory" due-to="Gary Gregory">Pick up exec-maven-plugin version from parent POM.</action>
+     <action                   type="fix" dev="ggregory" due-to="Gary Gregory">Speed up and sanitize StopWatchTest.</action>
+-    <action                   type="fix" dev="ggregory" due-to="Fabrice Benhamouda">Fix handling of non-ASCII letters and numbers in RandomStringUtils #1273.</action> 
++    <action                   type="fix" dev="ggregory" due-to="Fabrice Benhamouda">Fix handling of non-ASCII letters and numbers in RandomStringUtils #1273.</action>
++    <action                   type="fix" dev="ggregory" due-to="OSS-Fuzz, Gary Gregory">Rewrite ClassUtils.getClass(...) without recursion to avoid StackOverflowError on very long inputs. OSS-Fuzz Issue 42522972: apache-commons-text:StringSubstitutorInterpolatorFuzzer: Security exception in org.apache.commons.lang3.ClassUtils.getClass.</action>
+     <!-- ADD -->
+     <action                   type="add" dev="ggregory" due-to="Gary Gregory">Add Strings and refactor StringUtils.</action>
+     <!-- UPDATE -->
+diff --git a/src/main/java/org/apache/commons/lang3/ClassUtils.java b/src/main/java/org/apache/commons/lang3/ClassUtils.java
+index 46c15f1901e..d41fe15a31e 100644
+--- a/src/main/java/org/apache/commons/lang3/ClassUtils.java
++++ b/src/main/java/org/apache/commons/lang3/ClassUtils.java
+@@ -527,24 +527,21 @@ public static Class<?> getClass(final ClassLoader classLoader, final String clas
+      * @throws ClassNotFoundException if the class is not found
+      */
+     public static Class<?> getClass(final ClassLoader classLoader, final String className, final boolean initialize) throws ClassNotFoundException {
+-        try {
+-            final Class<?> clazz = getPrimitiveClass(className);
+-            return clazz != null ? clazz : Class.forName(toCanonicalName(className), initialize, classLoader);
+-        } catch (final ClassNotFoundException ex) {
+-            // allow path separators (.) as inner class name separators
+-            final int lastDotIndex = className.lastIndexOf(PACKAGE_SEPARATOR_CHAR);
+-
+-            if (lastDotIndex != -1) {
+-                try {
+-                    return getClass(classLoader, className.substring(0, lastDotIndex) + INNER_CLASS_SEPARATOR_CHAR + className.substring(lastDotIndex + 1),
+-                        initialize);
+-                } catch (final ClassNotFoundException ignored) {
+-                    // ignore exception
++        // This method was re-written to avoid recursion and stack overflows found by fuzz testing.
++        String next = className;
++        int lastDotIndex = -1;
++        do {
++            try {
++                final Class<?> clazz = getPrimitiveClass(next);
++                return clazz != null ? clazz : Class.forName(toCanonicalName(next), initialize, classLoader);
++            } catch (final ClassNotFoundException ex) {
++                lastDotIndex = next.lastIndexOf(PACKAGE_SEPARATOR_CHAR);
++                if (lastDotIndex != -1) {
++                    next = next.substring(0, lastDotIndex) + INNER_CLASS_SEPARATOR_CHAR + next.substring(lastDotIndex + 1);
+                 }
+             }
+-
+-            throw ex;
+-        }
++        } while (lastDotIndex != -1);
++        throw new ClassNotFoundException(next);
+     }
+ 
+     /**
+@@ -1504,9 +1501,10 @@ public static Class<?> primitiveToWrapper(final Class<?> cls) {
+     private static String toCanonicalName(final String className) {
+         String canonicalName = StringUtils.deleteWhitespace(className);
+         Objects.requireNonNull(canonicalName, "className");
+-        if (canonicalName.endsWith("[]")) {
++        final String arrayMarker = "[]";
++        if (canonicalName.endsWith(arrayMarker)) {
+             final StringBuilder classNameBuffer = new StringBuilder();
+-            while (canonicalName.endsWith("[]")) {
++            while (canonicalName.endsWith(arrayMarker)) {
+                 canonicalName = canonicalName.substring(0, canonicalName.length() - 2);
+                 classNameBuffer.append("[");
+             }
+diff --git a/src/test/java/org/apache/commons/lang3/ClassUtilsOssFuzzTest.java b/src/test/java/org/apache/commons/lang3/ClassUtilsOssFuzzTest.java
+new file mode 100644
+index 00000000000..3c9d39ea252
+Binary files /dev/null and b/src/test/java/org/apache/commons/lang3/ClassUtilsOssFuzzTest.java differ

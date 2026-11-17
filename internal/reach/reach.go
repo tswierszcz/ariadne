@@ -110,6 +110,8 @@ type Result struct {
 	// exports them per finding.
 	PathEdges []PathEdge `json:"-"`
 	Character []string   `json:"-"`
+	// targets are the matched nodes classify chose the status from.
+	targets []uint32
 }
 
 // InstanceFinding is one advisory's result for one affected component
@@ -133,6 +135,12 @@ type InstanceFinding struct {
 	// GapProbe (ROADMAP B0 b0-4): for a NOT_REACHABLE finding, the gaps a
 	// wider or narrower model-gap rule would count. Measurement only.
 	GapProbe *GapProbe
+	// ExposedAPI (LIBRARY_MODE LB1): with SetExposure, on a positive
+	// finding, every root (an API method under -roots api) from which a
+	// matched node of the finding is reached.
+	ExposedAPI []ExposedMethod
+	// targets are the matched nodes the finding's status came from.
+	targets []uint32
 }
 
 // EngineVersion versions the reachability semantics (statuses, per-instance
@@ -164,6 +172,9 @@ type Engine struct {
 	// it is longer.
 	appOnlyNoCHA bfsResult
 	fullNoCHA    bfsResult
+	// exposure, when set (SetExposure), lists every root reaching a
+	// positive finding's targets (LIBRARY_MODE LB1).
+	exposure *exposure
 
 	// webAssetPkgs holds "group:artifact" of dependencies that are WebJars
 	// (see input.DepJar.WebAssetsOnly); set with SetWebAssetPackages.
@@ -282,6 +293,9 @@ func (e *Engine) Analyze(list []cves.CVE, vm map[string]vulnmap.Entry) []Result 
 		for j := range r.Findings {
 			f := &r.Findings[j]
 			f.PathEdges, f.Character = pathEvidence(e.g, f.Path)
+			if e.exposure != nil && (f.Status == StatusReachable || f.Status == StatusFramework) {
+				f.ExposedAPI = e.exposure.of(f.targets)
+			}
 		}
 	}
 	return results
@@ -421,6 +435,7 @@ func (e *Engine) classify(result *Result, matched []uint32) {
 		result.Status = StatusReachable
 		result.Path = renderPath(e.g, path)
 		result.Entry = e.entryEdge(path)
+		result.targets = matched
 		return
 	}
 	if _, path, ok := shortestOf(e.full, matched); ok {
@@ -430,6 +445,7 @@ func (e *Engine) classify(result *Result, matched []uint32) {
 		result.Status = StatusFramework
 		result.Path = renderPath(e.g, path)
 		result.Entry = e.entryEdge(path)
+		result.targets = matched
 		return
 	}
 	result.Status = StatusNotReachable
@@ -550,14 +566,14 @@ func (e *Engine) analyzePerInstance(result *Result, specs []string, matched []ui
 		switch own := byInstance[in.ID]; {
 		case len(own) > 0:
 			e.classify(&r, own)
-			f.Status, f.Path, f.Entry = r.Status, r.Path, r.Entry
+			f.Status, f.Path, f.Entry, f.targets = r.Status, r.Path, r.Entry, r.targets
 			if r.Status != StatusReachable && len(related) > 0 {
 				// Related-artifact evidence counts for every instance
 				// (as for the advisory row); own code wins a tie.
 				var rr Result
 				e.classify(&rr, related)
 				if statusRank(rr.Status) > statusRank(r.Status) {
-					f.Status, f.Path, f.Entry, f.Note = rr.Status, rr.Path, rr.Entry, relatedNote
+					f.Status, f.Path, f.Entry, f.Note, f.targets = rr.Status, rr.Path, rr.Entry, relatedNote, rr.targets
 				}
 			}
 		case shadowedOwn[in.ID]:
@@ -568,12 +584,12 @@ func (e *Engine) analyzePerInstance(result *Result, specs []string, matched []ui
 			if len(related) > 0 {
 				e.classify(&r, related)
 				if r.Status != StatusNotReachable {
-					f.Status, f.Path, f.Entry, f.Note = r.Status, r.Path, r.Entry, relatedNote
+					f.Status, f.Path, f.Entry, f.Note, f.targets = r.Status, r.Path, r.Entry, relatedNote, r.targets
 				}
 			}
 		case len(allowed) > 0:
 			e.classify(&r, allowed)
-			f.Status, f.Path, f.Entry = r.Status, r.Path, r.Entry
+			f.Status, f.Path, f.Entry, f.targets = r.Status, r.Path, r.Entry, r.targets
 			f.Note = relatedNote
 		case len(borrowed) > 0:
 			f.Status, f.Reasons = StatusUnknown, []findings.ReasonCode{findings.ClasspathConflict}
@@ -948,7 +964,7 @@ func (e *Engine) fillFindings(r *Result, cve cves.CVE) {
 	for _, in := range e.affectedInstances(cve) {
 		r.Findings = append(r.Findings, InstanceFinding{
 			Instance: in.ID, GAV: in.GAV.String(), Status: r.Status, Reasons: reasons,
-			Path: r.Path, Entry: r.Entry, Note: r.Note, ModelGaps: r.ModelGaps,
+			Path: r.Path, Entry: r.Entry, Note: r.Note, ModelGaps: r.ModelGaps, targets: r.targets,
 		})
 	}
 }
