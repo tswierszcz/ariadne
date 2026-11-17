@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  ac.autoconfigure.GreeterAutoConfiguration
+org.springframework.context.ApplicationListener=ac.autoconfigure.StartupListener

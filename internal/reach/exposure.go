@@ -28,6 +28,9 @@ type ExposedMethod struct {
 	// InheritedBy (lb2-3): when Method is a dependency method that API
 	// classes inherit, those classes — the receivers a client calls it on.
 	InheritedBy []string
+	// AnnouncedBy (lb2-5): when Method is an entry of a class the library
+	// announces to a framework, how it was announced.
+	AnnouncedBy []string
 }
 
 // ClientCall is a call site where a client of the library may supply the
@@ -59,6 +62,7 @@ type exposure struct {
 	strict    [][]uint32
 	cache     map[string][]ExposedMethod
 	inherited map[uint32][]string
+	announced map[uint32][]string
 }
 
 // SetExposure makes Analyze list, on every positive finding, the roots
@@ -72,11 +76,13 @@ type exposure struct {
 // edge: the body runs there only on an object the client creates and
 // passes. A root that reaches the code only through one is marked
 // ClientDispatch. inherited names, for roots that are dependency methods
-// API classes inherit, those classes (ExposedMethod.InheritedBy). It
-// returns how many client-dispatch edges there are.
-func (e *Engine) SetExposure(client []ClientCall, made func(fqcn string) bool, inherited map[uint32][]string) int {
+// API classes inherit, those classes (ExposedMethod.InheritedBy);
+// announced, for roots that are framework entries, their provenance
+// (ExposedMethod.AnnouncedBy). It returns how many client-dispatch edges
+// there are.
+func (e *Engine) SetExposure(client []ClientCall, made func(fqcn string) bool, inherited, announced map[uint32][]string) int {
 	n := e.g.NodeCount()
-	x := &exposure{e: e, isRoot: make([]bool, n), reverse: make([][]uint32, n), cache: map[string][]ExposedMethod{}, inherited: inherited}
+	x := &exposure{e: e, isRoot: make([]bool, n), reverse: make([][]uint32, n), cache: map[string][]ExposedMethod{}, inherited: inherited, announced: announced}
 	for _, r := range e.roots {
 		if int(r) < n {
 			x.isRoot[r] = true
@@ -190,7 +196,7 @@ func (x *exposure) of(targets []uint32) []ExposedMethod {
 		}
 		rendered := renderPath(x.e.g, path)
 		edges, char := pathEvidence(x.e.g, rendered)
-		m := ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, InheritedBy: x.inherited[uint32(id)]}
+		m := ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, InheritedBy: x.inherited[uint32(id)], AnnouncedBy: x.announced[uint32(id)]}
 		if i, ok := byMethod[m.Method]; ok {
 			// lb2-4: one root per inheriting API class (receiver-
 			// specialized copies of the same method) — one entry naming

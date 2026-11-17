@@ -369,6 +369,9 @@ type ExposedMethod struct {
 	// InheritedBy (lb2-3): for a dependency method API classes inherit,
 	// those classes.
 	InheritedBy []string `json:"inherited_by,omitempty"`
+	// AnnouncedBy (lb2-5): for an entry of a class the library announces
+	// to a framework, how it was announced.
+	AnnouncedBy []string `json:"announced_by,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -814,7 +817,7 @@ func Write(path string, doc Document) error {
 func exposedMethods(xs []reach.ExposedMethod) []ExposedMethod {
 	var out []ExposedMethod
 	for _, x := range xs {
-		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges, ClientDispatch: x.ClientDispatch, InheritedBy: x.InheritedBy})
+		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges, ClientDispatch: x.ClientDispatch, InheritedBy: x.InheritedBy, AnnouncedBy: x.AnnouncedBy})
 	}
 	return out
 }

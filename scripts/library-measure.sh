@@ -1,12 +1,12 @@
 #!/bin/bash
 # Library mode measurement on real libraries (LIBRARY_MODE LB2/LB4).
 #
-# Fetches three libraries with vulnerable dependencies from Maven Central
+# Fetches four libraries with vulnerable dependencies from Maven Central
 # (mvn dependency:copy-dependencies) into work/libs/<name>/ — lib.jar is the
 # library, deps/ its runtime dependencies — and runs bin/ariadne on each
 # with -roots all and -roots api, under CHA and RTA, printing one summary
 # line per run. Results of 2026-11-17: RECOMMENDATION/IMPLEMENTATION_STATUS.MD
-# (LIBRARY_MODE:LB2 pomiar).
+# (LIBRARY_MODE:LB2 pomiar, lb2-5 for the starter).
 #
 # Usage: scripts/library-measure.sh [OUTDIR] [extra ariadne args, e.g. -offline]
 set -euo pipefail
@@ -20,9 +20,14 @@ libs=(
   "configuration2:org.apache.commons:commons-configuration2:2.7"           # facade/builder; commons-text 1.8, commons-lang3 3.9
   "jackson-yaml:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.12.3" # factory/mapper subclass; snakeyaml 1.27, databind 2.12.3
   "jjwt-jackson:io.jsonwebtoken:jjwt-jackson:0.11.2"                       # SPI (META-INF/services); databind 2.9.10.4
+  # Spring Boot starter (lb2-5): the library is the autoconfigure jar, its
+  # dependencies what the starter brings (mybatis 3.5.4, mybatis-spring
+  # 2.0.4, Spring Boot 2.2.5 jdbc).
+  "mybatis-starter:org.mybatis.spring.boot:mybatis-spring-boot-starter:2.1.2:mybatis-spring-boot-autoconfigure"
 )
 for spec in "${libs[@]}"; do
-  IFS=: read -r name g a v <<<"$spec"
+  IFS=: read -r name g a v libA <<<"$spec"
+  libA="${libA:-$a}"
   d="work/libs/$name"
   if [ ! -f "$d/lib.jar" ]; then
     mkdir -p "$d/deps"
@@ -33,7 +38,7 @@ for spec in "${libs[@]}"; do
 EOF
     (cd "$d" && mvn -q dependency:copy-dependencies -DoutputDirectory=all -DincludeScope=runtime)
     for f in "$d"/all/*.jar; do
-      if [ "$(basename "$f")" = "$a-$v.jar" ]; then cp "$f" "$d/lib.jar"; else cp "$f" "$d/deps/"; fi
+      if [ "$(basename "$f")" = "$libA-$v.jar" ]; then cp "$f" "$d/lib.jar"; else cp "$f" "$d/deps/"; fi
     done
   fi
 done
@@ -53,7 +58,7 @@ done
 python3 -I - "$out" <<'PY'
 import collections, json, sys
 out = sys.argv[1]
-for name in ["configuration2", "jackson-yaml", "jjwt-jackson"]:
+for name in ["configuration2", "jackson-yaml", "jjwt-jackson", "mybatis-starter"]:
     for roots in ["all", "api"]:
         for mode in ["cha", "rta"]:
             j = json.load(open(f"{out}/{name}-{roots}-{mode}.json"))
@@ -62,6 +67,7 @@ for name in ["configuration2", "jackson-yaml", "jjwt-jackson"]:
             cd = sum(1 for f in j["findings"] for x in f.get("exposed_api", []) if x.get("client_dispatch"))
             cc = [(g["count"], g.get("reachable")) for g in j["coverage"].get("gaps", []) if g["mechanism"] == "client_code"]
             api = j["coverage"].get("api", {}).get("methods")
-            print(f"{name:15} {roots:3} {mode}: {st} api_methods={api} exposed_sum={sum(exp)} exposed_max={max(exp) if exp else 0} "
+            ann = j["coverage"].get("api", {}).get("announced_classes")
+            print(f"{name:15} {roots:3} {mode}: {st} api_methods={api} announced_classes={ann} exposed_sum={sum(exp)} exposed_max={max(exp) if exp else 0} "
                   f"client_code(sites,reachable)={cc} client_dispatch={cd}")
 PY

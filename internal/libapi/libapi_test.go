@@ -238,3 +238,66 @@ func TestSpecialize(t *testing.T) {
 		t.Error("observed-strict.txt disagrees with the case; regenerate with scripts/library-oracle.sh")
 	}
 }
+
+// TestParseFactories: java.util.Properties syntax as spring.factories
+// uses it — comments, both separators, continuation lines, spaces.
+func TestParseFactories(t *testing.T) {
+	got := parseFactories("# comment\n! other\na.Key=\\\n  x.A,\\\n  x.B\nb.Key : y.C , y.D\r\n\nc.Key=\n")
+	want := map[string][]string{"a.Key": {"x.A", "x.B"}, "b.Key": {"y.C", "y.D"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("parseFactories = %v, want %v", got, want)
+	}
+}
+
+// TestAnnouncedRoots (lb2-5) on testdata/library-autoconfig: the three
+// announcements, the classes they pull in (member configuration class,
+// @Import), each entry's provenance; never UnusedConfiguration.
+func TestAnnouncedRoots(t *testing.T) {
+	const ac = "../../testdata/library-autoconfig/"
+	anns, err := Announcements(ac + "lib.jar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantAnns := []Announcement{
+		{"META-INF/spring.factories", "org.springframework.boot.autoconfigure.EnableAutoConfiguration", "ac.autoconfigure.GreeterAutoConfiguration"},
+		{"META-INF/spring.factories", "org.springframework.context.ApplicationListener", "ac.autoconfigure.StartupListener"},
+		{"META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", "org.springframework.boot.autoconfigure.AutoConfiguration", "ac.autoconfigure.ModernAutoConfiguration"},
+	}
+	if !reflect.DeepEqual(anns, wantAnns) {
+		t.Fatalf("announcements\n got %v\nwant %v", anns, wantAnns)
+	}
+	h, _, err := hierarchy.Build(ac+"lib.jar", []input.DepJar{{Path: fixture + "deps/commons-text-1.9.jar"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := callgraph.Build(h, callgraph.DefaultSkip)
+	roots, prov, classes := AnnouncedRoots(g, h, anns, Options{})
+	var got []string
+	for _, r := range roots {
+		got = append(got, g.Key(r))
+	}
+	want := []string{
+		"ac.autoconfigure.GreeterAutoConfiguration#<init>()V",
+		"ac.autoconfigure.GreeterAutoConfiguration#banner()Ljava/lang/String;",
+		"ac.autoconfigure.GreeterAutoConfiguration#greeter()Lac/api/Greeter;",
+		"ac.autoconfigure.GreeterAutoConfiguration$NestedConfiguration#<init>()V",
+		"ac.autoconfigure.GreeterAutoConfiguration$NestedConfiguration#nestedBanner()Ljava/lang/StringBuilder;",
+		"ac.autoconfigure.ImportedConfiguration#<init>()V",
+		"ac.autoconfigure.ImportedConfiguration#init()V",
+		"ac.autoconfigure.ModernAutoConfiguration#<init>()V",
+		"ac.autoconfigure.ModernAutoConfiguration#modernBanner()Ljava/lang/String;",
+		"ac.autoconfigure.StartupListener#<init>()V",
+		"ac.autoconfigure.StartupListener#onApplicationEvent(Lorg/springframework/boot/context/event/ApplicationStartedEvent;)V",
+	}
+	if !reflect.DeepEqual(got, want) || classes != 5 {
+		t.Errorf("roots (%d classes)\n got %v\nwant %v", classes, got, want)
+	}
+	id, _ := g.ID("ac.autoconfigure.ImportedConfiguration", "init", "()V")
+	if p := prov[id]; len(p) != 1 || p[0] != "META-INF/spring.factories org.springframework.boot.autoconfigure.EnableAutoConfiguration: ac.autoconfigure.GreeterAutoConfiguration > @Import ac.autoconfigure.ImportedConfiguration" {
+		t.Errorf("ImportedConfiguration#init provenance %v", p)
+	}
+	// An excluded package takes its announced classes out, as providers.
+	if roots, _, classes := AnnouncedRoots(g, h, anns, Options{Exclude: []string{"ac.autoconfigure"}}); len(roots) != 0 || classes != 0 {
+		t.Errorf("excluded: %d roots, %d classes", len(roots), classes)
+	}
+}
