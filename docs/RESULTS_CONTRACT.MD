@@ -56,10 +56,11 @@ output contract: never renamed, never reused for another meaning; a superseded c
 deprecated. CVE:F0 defines them. Since CVE:F1b, `METHOD_NOT_FOUND`, `CLASSPATH_CONFLICT`,
 `MAPPING_PARTIAL`, `MAPPING_ENTRYPOINT_ONLY` and `MODEL_INCOMPLETE` are emitted (v1 `reasons`);
 CVE:F4 adds `VERSION_UNKNOWN`, `MAPPING_VERSION_UNCOVERED`, `MAPPING_CONFLICT`; CVE:F5 adds
-`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings); `MAPPED_CODE_ABSENT` (2026-11-16, on `NOT_REACHABLE` findings, and on the v1 row when every finding carries it);
+`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings); `MAPPED_CODE_ABSENT` (2026-11-16, on `NOT_REACHABLE` findings, and on the v1 row when every finding carries it); `MAPPING_INITIALIZER_ONLY` (2026-11-17, mapping qualifier);
 `RUNTIME_UNSUPPORTED` is not set yet.
 `MAPPING_NEW_SIDE_ONLY`, like `MAPPING_PARTIAL`, qualifies the advisory row and stays off
-instance findings (v2 carries it as `mapping.new_side_only`).
+instance findings (v2 carries it as `mapping.new_side_only`); so does `MAPPING_INITIALIZER_ONLY`
+(v2 `mapping.initializer_only`).
 `MAPPING_PARTIAL` on v1 qualifies `NOT_REACHABLE` without changing it (F1b, "option B"): every
 mapping today is partial, so making it `UNKNOWN` would erase the state; v2 carries coverage as
 its own axis.
@@ -75,6 +76,7 @@ its own axis.
 | `MAPPING_VERSION_UNCOVERED` | mapping | (CVE:F4) The mapping is versioned and none of its variants covers this instance's version: there is no method list for it | a mapping for `[1.0,2.0)` and `[2.0,3.0)`; the input has 3.1 |
 | `MAPPING_CONFLICT` | mapping | (CVE:F4) Several variants of the mapping cover this instance's version with different methods; none is chosen | overlapping `[1.0,2.0]` and `[2.0,3.0)` for 2.0 |
 | `MAPPING_NEW_SIDE_ONLY` | mapping | (CVE:F5) A fix-diff mapping was read on the post-fix side only — commit metadata unavailable, a merge or root commit, or the pre-fix file unreadable — so methods the fix removed are missing and helpers it added may be included | a fix commit with two parents |
+| `MAPPING_INITIALIZER_ONLY` | mapping | (2026-11-17) A fix-diff or release-diff mapping names only static initializers (`<clinit>`) — the fix changed field initializers or static blocks and no method. A static initializer runs the first time the class is used, so reaching it means "the class was used", not that the changed data matters on that path; the verdict is kept. A curated family whose initializer is a data table guarding configuration-gated code (jackson-databind's polymorphic-typing blocklist) is instead mapped to the entry points that enable that code (role `entrypoint`, v2 `mapping.initializer_redirect`, row note) and does not carry this code | jackson-databind CVE-2020-25649: the fix hardened `DOMDeserializer`'s static `DocumentBuilderFactory` setup |
 | `SOURCE_UNAVAILABLE` | mapping | The evidence needed for a mapping (fix commit, diff, advisory detail) could not be obtained. (CVE:F5) Emitted when the advisory has fix-commit references and none could be read (finding `UNKNOWN`); an advisory with no fix reference at all is a plain unmapped `UNKNOWN` | every fix-commit diff answers HTTP 500 |
 | `MAPPING_MISSING` | mapping | (ROADMAP B0, 2026-11-13) No source produced any mapping for the advisory — manual table, fix diff, `release-diff`, LLM — so no verdict is possible; the `UNKNOWN` row says why instead of carrying no reason (before this code 20 of petclinic's 27 `UNKNOWN` rows had none) | an advisory with no fix commit and no class name |
 | `NOT_CODE_MAPPABLE` | mapping | (CVE:F10, 2026-11-16) The manual table declares (`not_code`, with the reason) that the advisory concerns no JVM code of the artifact — an installer, a deployment setting — so no method can be mapped; the finding is `NOT_APPLICABLE`, like a WebJar, and the note carries the reason. Not a verdict that the app is safe | Tomcat's Windows installer (CVE-2025-49124) filed against `tomcat-embed-core` |

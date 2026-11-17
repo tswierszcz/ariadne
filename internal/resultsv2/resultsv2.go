@@ -286,6 +286,12 @@ type Mapping struct {
 	// NewSideOnly: some fix commit or file was read on the post-fix side
 	// only (reason MAPPING_NEW_SIDE_ONLY on the v1 row).
 	NewSideOnly bool `json:"new_side_only,omitempty"`
+	// InitializerOnly: the mapping names only static initializers
+	// (reason MAPPING_INITIALIZER_ONLY on the v1 row). InitializerRedirect:
+	// the source mapped only a curated family's static initializers and
+	// Methods are its entry points instead (2026-11-17).
+	InitializerOnly     bool                         `json:"initializer_only,omitempty"`
+	InitializerRedirect *vulnmap.InitializerRedirect `json:"initializer_redirect,omitempty"`
 }
 
 // MappingVariant is one versioned method list.
@@ -609,6 +615,7 @@ func Build(in Inputs) Document {
 				Methods: methods, MatchPrecision: vulnmap.MappingPrecision(methods), Source: e.Source,
 				Role: e.Role, Coverage: e.Coverage, Review: e.Review, Model: e.Model, Evidence: e.Evidence,
 				MethodRoles: e.MethodRoles, FixCommits: e.FixCommits, ReleaseDiffs: e.ReleaseDiffs, NewSideOnly: e.Source == vulnmap.SourceDiff && e.NewSideOnly(),
+				InitializerOnly: e.InitializerOnly(), InitializerRedirect: e.InitializerRedirect,
 			}
 			for _, v := range e.Variants {
 				adv.Mapping.Variants = append(adv.Mapping.Variants, MappingVariant{Package: v.Package, Versions: v.Versions, Methods: v.Methods})
