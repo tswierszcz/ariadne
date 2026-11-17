@@ -356,6 +356,10 @@ type ExposedMethod struct {
 	Character []string         `json:"character,omitempty"`
 	Path      []string         `json:"path"`
 	PathEdges []reach.PathEdge `json:"path_edges,omitempty"`
+	// ClientDispatch (LIBRARY_MODE LB2): the method reaches the mapped
+	// code only through a client-code site dispatched to a library body
+	// that stands in for client code.
+	ClientDispatch bool `json:"client_dispatch,omitempty"`
 }
 
 // Coverage is what the findings do not say per instance.
@@ -800,7 +804,7 @@ func Write(path string, doc Document) error {
 func exposedMethods(xs []reach.ExposedMethod) []ExposedMethod {
 	var out []ExposedMethod
 	for _, x := range xs {
-		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges})
+		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges, ClientDispatch: x.ClientDispatch})
 	}
 	return out
 }

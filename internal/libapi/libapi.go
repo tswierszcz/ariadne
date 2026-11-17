@@ -14,11 +14,14 @@ import (
 	"ariadne/internal/hierarchy"
 )
 
-// Version versions the API definition; snapshots record it.
-const Version = "lb1-1"
+// Version versions the API definition and the client-code sites;
+// snapshots record it. lb2-1: ClientSites (LIBRARY_MODE LB2).
+const Version = "lb2-1"
 
 const (
+	accPrivate   = 0x0002
 	accProtected = 0x0004
+	accStatic    = 0x0008
 	accBridge    = 0x0040
 	accSynthetic = 0x1000
 )
@@ -79,63 +82,84 @@ func Module(appJar string) (*classfile.ModuleInfo, error) {
 	return cf.Module, nil
 }
 
+// selector holds the API's access rules (contract §8), shared by Roots
+// and ClientSites.
+type selector struct {
+	h         *hierarchy.Hierarchy
+	exclude   []string
+	exported  map[string]bool // nil: every package (classpath)
+	providers []Provider
+	cov       Coverage
+	memo      map[string]bool
+}
+
+func newSelector(h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, providers []Provider, opt Options) *selector {
+	s := &selector{h: h, exclude: opt.Exclude, providers: providers, memo: map[string]bool{},
+		cov: Coverage{JPMS: "classpath", Excluded: append([]string(nil), opt.Exclude...)}}
+	if opt.ModulePath && mod != nil {
+		s.cov.JPMS = "exports"
+		s.exported = map[string]bool{}
+		for _, e := range mod.Exports {
+			if len(e.To) == 0 {
+				s.exported[e.Package] = true
+				s.cov.Exports = append(s.cov.Exports, e.Package)
+			}
+		}
+		sort.Strings(s.cov.Exports)
+		s.providers = nil
+		for _, p := range mod.Provides {
+			for _, w := range p.With {
+				s.providers = append(s.providers, Provider{Service: p.Service, Class: w})
+			}
+		}
+	}
+	return s
+}
+
+// inScope: the class's package is neither excluded nor unexported.
+func (s *selector) inScope(fqcn string) bool {
+	pkg := ""
+	if i := strings.LastIndexByte(fqcn, '.'); i >= 0 {
+		pkg = fqcn[:i]
+	}
+	for _, ex := range s.exclude {
+		if pkg == ex || strings.HasPrefix(pkg, ex+".") {
+			return false
+		}
+	}
+	return s.exported == nil || s.exported[pkg]
+}
+
+// accessible: a public library class whose enclosing classes are all
+// accessible. A member class (Outer$Inner) is accessible only when every
+// enclosing class is; its own public flag also covers a protected member
+// (compiled public).
+func (s *selector) accessible(fqcn string) bool {
+	if v, ok := s.memo[fqcn]; ok {
+		return v
+	}
+	ci, ok := s.h.Lookup(fqcn)
+	v := ok && ci.IsApp && ci.AccessFlags&classfile.AccPublic != 0
+	if v {
+		if i := strings.LastIndexByte(fqcn, '$'); i > 0 {
+			if _, outer := s.h.Lookup(fqcn[:i]); outer {
+				v = s.accessible(fqcn[:i])
+			}
+		}
+	}
+	s.memo[fqcn] = v
+	return v
+}
+
 // Roots returns the API methods of the application input (the library)
 // as graph nodes, sorted by key, and what was counted. providers are the
 // library's own META-INF/services registrations; under ModulePath with a
 // module-info its provides are used instead.
 func Roots(g *callgraph.Graph, h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, providers []Provider, opt Options) ([]uint32, Coverage) {
-	cov := Coverage{JPMS: "classpath", Excluded: append([]string(nil), opt.Exclude...)}
-	var exported map[string]bool
-	if opt.ModulePath && mod != nil {
-		cov.JPMS = "exports"
-		exported = map[string]bool{}
-		for _, e := range mod.Exports {
-			if len(e.To) == 0 {
-				exported[e.Package] = true
-				cov.Exports = append(cov.Exports, e.Package)
-			}
-		}
-		sort.Strings(cov.Exports)
-		providers = nil
-		for _, p := range mod.Provides {
-			for _, w := range p.With {
-				providers = append(providers, Provider{Service: p.Service, Class: w})
-			}
-		}
-	}
-	inScope := func(fqcn string) bool {
-		pkg := ""
-		if i := strings.LastIndexByte(fqcn, '.'); i >= 0 {
-			pkg = fqcn[:i]
-		}
-		for _, ex := range opt.Exclude {
-			if pkg == ex || strings.HasPrefix(pkg, ex+".") {
-				return false
-			}
-		}
-		return exported == nil || exported[pkg]
-	}
-	memo := map[string]bool{}
-	var accessible func(fqcn string) bool
-	accessible = func(fqcn string) bool {
-		if v, ok := memo[fqcn]; ok {
-			return v
-		}
-		ci, ok := h.Lookup(fqcn)
-		v := ok && ci.IsApp && ci.AccessFlags&classfile.AccPublic != 0
-		if v {
-			// A member class (Outer$Inner) is accessible only when every
-			// enclosing class is; its own public flag also covers a
-			// protected member (compiled public).
-			if i := strings.LastIndexByte(fqcn, '$'); i > 0 {
-				if _, outer := h.Lookup(fqcn[:i]); outer {
-					v = accessible(fqcn[:i])
-				}
-			}
-		}
-		memo[fqcn] = v
-		return v
-	}
+	sel := newSelector(h, mod, providers, opt)
+	cov := sel.cov
+	providers = sel.providers
+	inScope, accessible := sel.inScope, sel.accessible
 
 	seen := map[uint32]bool{}
 	var roots []uint32
@@ -187,4 +211,80 @@ func Roots(g *callgraph.Graph, h *hierarchy.Hierarchy, mod *classfile.ModuleInfo
 	sort.Slice(roots, func(i, j int) bool { return g.Key(roots[i]) < g.Key(roots[j]) })
 	cov.Methods = len(roots)
 	return roots, cov
+}
+
+// ClientSite is a call the library makes on a method a client of the
+// library can implement or override (LIBRARY_MODE LB2,
+// docs/RESULTS_CONTRACT.MD §8 "Client code"): the code that runs there
+// may be the client's, which the input does not have.
+type ClientSite struct {
+	CallerFQCN, CallerName, CallerDesc string
+	PC                                 int
+	// Declared is the resolved method the call names (owner#name+desc):
+	// its own body, when it has one, is the library's default; any other
+	// dispatch target stands in for a client implementation.
+	Declared string
+	// Abstract: the declared method is abstract (an interface or abstract
+	// method), so the client's implementation is the only kind of code a
+	// client-created object runs there.
+	Abstract bool
+}
+
+// ClientSites lists, in deterministic order, the virtual and interface
+// calls in the library's own methods whose resolved method a client can
+// implement or override: declared in an accessible, in-scope library
+// type the client can subtype (an interface, or a class that is not final
+// and has a public or protected constructor), with public or protected
+// access, not static and not final. Calls into dependency or JDK types
+// are out of scope (other gap mechanisms cover callbacks there).
+func ClientSites(h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, opt Options) []ClientSite {
+	sel := newSelector(h, mod, nil, opt)
+	subtypable := map[string]bool{}
+	canSubtype := func(fqcn string) bool {
+		if v, ok := subtypable[fqcn]; ok {
+			return v
+		}
+		ci, ok := h.Lookup(fqcn)
+		v := ok && sel.accessible(fqcn) && sel.inScope(fqcn)
+		if v && !ci.IsInterface() {
+			v = ci.AccessFlags&classfile.AccFinal == 0
+			ctor := false
+			for _, m := range ci.Methods {
+				if m.Name == "<init>" && m.AccessFlags&(classfile.AccPublic|accProtected) != 0 {
+					ctor = true
+					break
+				}
+			}
+			v = v && ctor
+		}
+		subtypable[fqcn] = v
+		return v
+	}
+	var out []ClientSite
+	for _, fqcn := range h.SortedFQCNs() {
+		ci, _ := h.Lookup(fqcn)
+		if !ci.IsApp {
+			continue
+		}
+		for _, m := range ci.Methods {
+			for _, c := range m.Calls {
+				if c.Kind != classfile.CallVirtual && c.Kind != classfile.CallInterface {
+					continue
+				}
+				decl, ok := h.ResolveExact(c.Owner, c.Name, c.Desc)
+				if !ok || !canSubtype(decl) {
+					continue
+				}
+				dci, _ := h.Lookup(decl)
+				dm, _ := dci.MethodByNameAndDesc(c.Name, c.Desc)
+				f := dm.AccessFlags
+				if f&(classfile.AccPublic|accProtected) == 0 || f&(accPrivate|accStatic|classfile.AccFinal) != 0 || dm.Name == "<init>" {
+					continue
+				}
+				out = append(out, ClientSite{CallerFQCN: fqcn, CallerName: m.Name, CallerDesc: m.Descriptor, PC: c.PC,
+					Declared: decl + "#" + c.Name + c.Desc, Abstract: f&classfile.AccAbstract != 0})
+			}
+		}
+	}
+	return out
 }

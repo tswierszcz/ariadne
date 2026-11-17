@@ -895,9 +895,22 @@ API method from which its mapped code is reached — with the pass
 (`app_only`/`full`), an example path from that method and the path's
 character (`heuristic` = depends on a CHA expansion); `coverage.api`
 counts the API. Under RTA a class counts as created when it is an
-accessible class (a client can construct it); objects of the client's own
-classes are not in the input (LB2 will report those call sites as a
-`client_code` gap). Log lines `library API (lb1-1): …` and `roots: api
+accessible class (a client can construct it). **Client code (LB2,
+`lb2-1`, 2026-11-17):** a call the library makes on a method a client can
+implement or override — declared, with `public`/`protected` access and not
+`static`/`final`, in an accessible, non-excluded library type the client
+can subtype (an interface, or a non-`final` class with a public/protected
+constructor) — is a `client_code` gap (site code `client`, in
+`coverage.gaps`; its candidate set is empty, so it never makes a finding
+`MODEL_INCOMPLETE`: client code reaches the library only through its API,
+which is already the roots). No edge is invented for it. An
+`exposed_api` entry is marked `client_dispatch` (report: "client
+dispatch") when every path from that method passes such a site dispatched
+to a body other than the called method's own, in a class the input never
+creates — a stand-in for an object only the client could pass. Calls into
+dependency/JDK types are left to the other mechanisms. Log lines
+`library API (lb2-1): …, N client-code call sites (M to abstract
+methods)`, `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
 (…)`. Verified on `testdata/library` (cases in
 [EXPECTED.MD](testdata/library/EXPECTED.MD), written before the
 implementation; real-JVM oracle `scripts/library-oracle.sh`,
@@ -905,7 +918,9 @@ implementation; real-JVM oracle `scripts/library-oracle.sh`,
 library methods reaching CVE-2022-42889's `StringSubstitutor#replace`,
 three of which no client can call; `-roots api` exposes exactly the 5 (CHA)
 / 4 (RTA) / 3 (`-api-exclude lib.internal`) API methods expected, and under
-RTA only methods the JVM ran. `-roots all` and `profile` results are
+RTA only methods the JVM ran. Its three client-code sites are reported;
+under CHA only `Pipeline#run` (case (d), where the JVM runs the client's
+listener) is `client_dispatch`. `-roots all` and `profile` results are
 unchanged.
 
 **JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
@@ -1732,7 +1747,7 @@ incomplete facts, a trace's causes of calls missing from the graph — keeps
 its own codes, and each code maps to one mechanism (`reflection`,
 `method_handle`, `callback_async`, `service_loader`, `deserialization`,
 `dynamic_proxy`, `container_proxy`, `unknown_allocation`, `external_input`,
-`lambda`, `skipped_receiver`, `virtual_dispatch`, `class_init`,
+`client_code`, `lambda`, `skipped_receiver`, `virtual_dispatch`, `class_init`,
 `model_incomplete`, …; `internal/gaps`, table in
 [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD)). The report's "Model
 gaps by mechanism" table and v2 `coverage.gaps`/`findings[].gaps` use it.

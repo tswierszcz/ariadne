@@ -17,7 +17,7 @@ import (
 )
 
 // Version of the vocabulary and mapping.
-const Version = "b0-3"
+const Version = "lb2-1"
 
 // Mechanism is a canonical gap mechanism.
 type Mechanism string
@@ -33,6 +33,7 @@ const (
 	ContainerProxy    Mechanism = "container_proxy"    // a container-generated implementation (repository, AOP proxy)
 	UnknownAllocation Mechanism = "unknown_allocation" // an object created where the type is unknown (Unsafe, constructor handles)
 	ExternalInput     Mechanism = "external_input"     // roots=all: a root's parameters may be any subtype
+	ClientCode        Mechanism = "client_code"        // roots=api: a library call a client can implement or override
 	Lambda            Mechanism = "lambda"             // a functional-interface call whose lambda / method reference is unresolved
 	SkippedReceiver   Mechanism = "skipped_receiver"   // a call on java./javax./jdk./sun. types, never CHA-expanded
 	VirtualDispatch   Mechanism = "virtual_dispatch"   // a virtual call target the graph has no edge for (RTA pruning, inherited bodies)
@@ -44,7 +45,7 @@ const (
 
 // Mechanisms lists every mechanism, in documentation order.
 var Mechanisms = []Mechanism{Reflection, MethodHandle, CallbackAsync, ServiceLoader, Deserialization, DynamicProxy, ContainerProxy,
-	UnknownAllocation, ExternalInput, Lambda, SkippedReceiver, VirtualDispatch, ClassInit, ModelIncomplete, TraceAlignment, Unclassified}
+	UnknownAllocation, ExternalInput, ClientCode, Lambda, SkippedReceiver, VirtualDispatch, ClassInit, ModelIncomplete, TraceAlignment, Unclassified}
 
 // Sources: the analyzers whose own codes are mapped.
 const (
@@ -63,7 +64,7 @@ var Sources = []string{SourceSite, SourceAllocation, SourceLambda, SourceRuntime
 var Mapping = map[string]map[string]Mechanism{
 	SourceSite: {
 		"reflection": Reflection, "methodhandle": MethodHandle, "callback": CallbackAsync, "serviceloader": ServiceLoader,
-		"deserialization": Deserialization, "allocation": UnknownAllocation,
+		"deserialization": Deserialization, "allocation": UnknownAllocation, "client": ClientCode,
 	},
 	SourceAllocation: {
 		"reflection-unresolved": Reflection, "constructor-handle": MethodHandle, "service-unresolved": ServiceLoader,

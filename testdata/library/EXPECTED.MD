@@ -52,3 +52,17 @@ every method the JVM never entered is absent from `exposed_api` under RTA.
 Case (d) is the client-code case LB2 makes explicit: under CHA the library's own
 `ExpandingListener` stands in for client listeners; LB2 reports the call as a
 `client_code` gap.
+
+## LB2 (`lb2-1`, measured 2026-11-17)
+
+Client-code sites (a `client_code` gap, 3 sites, all reachable; never `MODEL_INCOMPLETE`):
+`Pipeline#run` → `Listener#onEvent` (abstract), `Codecs#decodeAll` → `Codec#decode`
+(abstract), `Templates#render` → `Templates#prepare` (protected, overridable). With
+`-api-exclude lib.api` there are none.
+
+`client_dispatch`: under CHA (with or without `-api-exclude lib.internal`) only
+`Pipeline#run` — its one path dispatches `Listener#onEvent` to `ExpandingListener`, which
+nothing creates; that is the one exposed method the JVM does not confirm. `Codecs#decodeAll`
+is not marked: its dispatch reaches `ExpandCodec`, which the library's `ServiceLoader`
+creates. Under RTA nothing is marked (the edge is pruned). The `exposed_api` sets above are
+unchanged.

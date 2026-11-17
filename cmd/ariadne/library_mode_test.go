@@ -15,7 +15,7 @@ const libraryFixture = "../../testdata/library/"
 // libraryExposed runs -roots api over testdata/library and returns, per
 // advisory, the exposed API method names (owner#name, "lib." dropped)
 // and their passes, plus coverage.api.
-func libraryExposed(t *testing.T, extra ...string) (map[string][]string, map[string]map[string]string, map[string]any) {
+func libraryExposed(t *testing.T, extra ...string) (map[string][]string, map[string]map[string]string, map[string]any, libraryClient) {
 	t.Helper()
 	dir := t.TempDir()
 	out := filepath.Join(dir, "r.json")
@@ -39,24 +39,42 @@ func libraryExposed(t *testing.T, extra ...string) (map[string][]string, map[str
 			AdvisoryID   string `json:"advisory_id"`
 			Reachability string `json:"reachability"`
 			ExposedAPI   []struct {
-				Method string   `json:"method"`
-				Pass   string   `json:"pass"`
-				Path   []string `json:"path"`
+				Method         string   `json:"method"`
+				Pass           string   `json:"pass"`
+				Path           []string `json:"path"`
+				ClientDispatch bool     `json:"client_dispatch"`
 			} `json:"exposed_api"`
 		} `json:"findings"`
 		Coverage struct {
-			API map[string]any `json:"api"`
+			API  map[string]any `json:"api"`
+			Gaps []struct {
+				Mechanism string `json:"mechanism"`
+				Count     int    `json:"count"`
+				Reachable *int   `json:"reachable"`
+			} `json:"gaps"`
 		} `json:"coverage"`
 	}
 	if err := json.Unmarshal(b, &doc); err != nil {
 		t.Fatal(err)
 	}
 	names, keys := map[string][]string{}, map[string]map[string]string{}
+	client := libraryClient{dispatch: map[string][]string{}}
+	for _, g := range doc.Coverage.Gaps {
+		if g.Mechanism == "client_code" {
+			client.sites = g.Count
+			if g.Reachable != nil {
+				client.reachable = *g.Reachable
+			}
+		}
+	}
 	for _, f := range doc.Findings {
 		keys[f.AdvisoryID] = map[string]string{}
 		for _, x := range f.ExposedAPI {
 			n := strings.TrimPrefix(x.Method[:strings.IndexByte(x.Method, '(')], "lib.")
 			names[f.AdvisoryID] = append(names[f.AdvisoryID], n)
+			if x.ClientDispatch {
+				client.dispatch[f.AdvisoryID] = append(client.dispatch[f.AdvisoryID], n)
+			}
 			keys[f.AdvisoryID][x.Method] = x.Pass
 			if len(x.Path) == 0 || x.Path[0] != x.Method {
 				t.Errorf("%s %s: example path %v does not start at the method", f.AdvisoryID, x.Method, x.Path)
@@ -67,29 +85,47 @@ func libraryExposed(t *testing.T, extra ...string) (map[string][]string, map[str
 			t.Errorf("%s: %s, want REACHABLE", f.AdvisoryID, f.Reachability)
 		}
 	}
-	return names, keys, doc.Coverage.API
+	return names, keys, doc.Coverage.API, client
 }
 
-// TestLibraryMode (LIBRARY_MODE LB1): -roots api on the control library
-// gives exactly the exposed API testdata/library/EXPECTED.MD wrote down
-// before the implementation — CHA, RTA and -api-exclude — and agrees
+// libraryClient is what a library-mode run says about client code
+// (LIBRARY_MODE LB2): the client_code gap's sites and reachable sites,
+// and per advisory the exposed methods marked client_dispatch.
+type libraryClient struct {
+	sites, reachable int
+	dispatch         map[string][]string
+}
+
+// TestLibraryMode (LIBRARY_MODE LB1, LB2): -roots api on the control
+// library gives exactly the exposed API testdata/library/EXPECTED.MD wrote
+// down before the implementation — CHA, RTA and -api-exclude — and agrees
 // with the real JVM (observed.txt): under RTA every exposed method is one
-// the JVM ran, and the code no client can call is never exposed.
+// the JVM ran, and the code no client can call is never exposed. LB2: the
+// three client-code sites are a client_code gap, and under CHA only
+// Pipeline#run (case d, the one exposed method the JVM does not confirm)
+// is marked client_dispatch.
 func TestLibraryMode(t *testing.T) {
 	never := []string{"api.Engine#expand", "api.Formatter#unsafe", "api.Hidden#run", "api.ExpandingListener#onEvent", "api.Formatter#hook"}
 	for _, c := range []struct {
-		name  string
-		extra []string
-		want  []string
+		name     string
+		extra    []string
+		want     []string
+		dispatch []string
 	}{
-		{"cha", nil, []string{"api.Codecs#decodeAll", "api.Pipeline#run", "api.Templates#render", "internal.ExpandCodec#decode", "internal.Util#expand"}},
-		{"rta", []string{"-callgraph-mode", "rta"}, []string{"api.Codecs#decodeAll", "api.Templates#render", "internal.ExpandCodec#decode", "internal.Util#expand"}},
-		{"exclude", []string{"-api-exclude", "lib.internal"}, []string{"api.Codecs#decodeAll", "api.Pipeline#run", "api.Templates#render"}},
+		{"cha", nil, []string{"api.Codecs#decodeAll", "api.Pipeline#run", "api.Templates#render", "internal.ExpandCodec#decode", "internal.Util#expand"}, []string{"api.Pipeline#run"}},
+		{"rta", []string{"-callgraph-mode", "rta"}, []string{"api.Codecs#decodeAll", "api.Templates#render", "internal.ExpandCodec#decode", "internal.Util#expand"}, nil},
+		{"exclude", []string{"-api-exclude", "lib.internal"}, []string{"api.Codecs#decodeAll", "api.Pipeline#run", "api.Templates#render"}, []string{"api.Pipeline#run"}},
 	} {
-		names, keys, cov := libraryExposed(t, c.extra...)
+		names, keys, cov, client := libraryExposed(t, c.extra...)
+		if client.sites != 3 || client.reachable != 3 {
+			t.Errorf("%s: client_code gap %d sites, %d reachable; want 3, 3", c.name, client.sites, client.reachable)
+		}
 		for _, cve := range []string{"CVE-2022-42889", "CVE-2025-48924"} {
 			if got := names[cve]; !reflect.DeepEqual(got, c.want) {
 				t.Errorf("%s %s: exposed %v, want %v", c.name, cve, got, c.want)
+			}
+			if got := client.dispatch[cve]; !reflect.DeepEqual(got, c.dispatch) {
+				t.Errorf("%s %s: client_dispatch %v, want %v", c.name, cve, got, c.dispatch)
 			}
 			for _, n := range never {
 				for _, g := range names[cve] {
