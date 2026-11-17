@@ -20,6 +20,7 @@ client: it calls each public entry once and passes its own `Listener`.
 | (f) | `lib.internal.Util#expand` → `replace` | yes (public), unless `-api-exclude lib.internal` | yes |
 | (g) | `Expander extends StringSubstitutor`, nothing declared (added 2026-11-17, `lb2-3`) | the inherited `StringSubstitutor` methods, `replace` among them | yes |
 | (h) | `SafeExpander extends StringSubstitutor`, overrides `replace(String)` to return its input (`lb2-3`) | its own `replace(String)` (reaches nothing); the other inherited overloads | its own `replace` runs, not the inherited one |
+| (i) | `StrictExpander extends StringSubstitutor`, overrides the protected `substitute(TextStringBuilder, int, int)` — which every inherited `replace` calls on `this` — to return `false` (`lb2-4`) | every inherited `replace`; its own `substitute` | the inherited `replace` runs, then its own `substitute`; never `StringSubstitutor#substitute` or `resolveVariable` |
 
 `observed.txt` (`scripts/library-oracle.sh`, JDI trace of `fx.Client`): the JVM ran
 `Templates#render`, `Engine#expand`, `Formatter#format`, `Pipeline#run`,
@@ -62,6 +63,18 @@ Case (d) is the client-code case LB2 makes explicit: under CHA the library's own
 ran `Expander#<init>`, `SafeExpander#replace` and `StringSubstitutor#replace(String)`
 (`observed.txt`). The `exposed_api` sets of the tables above count only the library's own
 methods; inherited entries come on top of them. `SafeExpander#replace` is never exposed.
+
+## Receiver specialization (`lb2-4`, case (i) written before the change, 2026-11-17)
+
+Expected and measured (CHA and RTA): `StrictExpander` is in `inherited_by` of every
+inherited `replace` overload for CVE-2022-42889 — the overloads are its mapped code — but
+of none for CVE-2025-48924: on a `StrictExpander` they call its own `substitute`, which
+reaches no lookup. It stays in `inherited_by` of `resolveVariable` (inherited directly).
+Before `lb2-4` (the inherited root was the shared `StringSubstitutor` node, so the call
+on `this` went to every `substitute`) it was listed for both advisories.
+`observed-strict.txt` (`fx.Client strict`, case (i) alone) is the oracle:
+`StringSubstitutor#replace(String)` and `StrictExpander#substitute` ran,
+`StringSubstitutor#substitute` and `resolveVariable` did not.
 
 ## LB2 (`lb2-1`, `lb2-2`, measured 2026-11-17)
 

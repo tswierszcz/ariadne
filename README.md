@@ -919,13 +919,26 @@ commons-configuration2 2.7, jackson-dataformat-yaml 2.12.3, jjwt-jackson
 778 methods per finding. With inherited methods as roots (`lb2-3`)
 jackson-dataformat-yaml goes from 1 to 17 of 26 advisories `REACHABLE`
 (databind deserialization through the inherited `readValue`/`readValueAs`);
-an inherited root is the dependency's own method node, so a call on
-`this` inside it is dispatched as for any receiver — CVE-2025-49128 there
-(`JsonFactory#createJsonParser` reaching the JSON parser, which
-`YAMLFactory` overrides) is such an over-approximation. Log lines
-`library API (lb2-3): …, N methods (M inherited from dependency
+**receiver specialization (`lb2-4`):** each inherited root is a copy of
+the dependency method per inheriting API class, and in that copy a call
+on the method's own unchanged `this` (local-value analysis of its
+bytecode) goes only to the bodies the API class and its subtypes select;
+a call on `this` to another method the class inherits goes to that
+method's copy for the same class, transitively. Other calls (on fields,
+parameters, results) dispatch as before. On jackson-dataformat-yaml 682
+copies drop 1007 CHA edges (777 under RTA): `JsonFactory#createJsonParser`
+on a `YAMLFactory` no longer reaches the JSON parser, and `exposed_api`
+of CVE-2025-49128 shrinks from 101 to 87 entries (CVE-2026-68494 and
+CVE-2026-89425: 61 → 53), verdicts unchanged — what stays comes through
+fields and parameters (`ObjectMapper#_jsonFactory`, a client's
+`JsonParser`) or is the mapped code itself (`JsonLocation#_appendSourceDesc`
+in a YAML exception's message); `coverage.api.receiver_specialization`
+counts copies, `this` sites, dropped edges and unanalyzed methods (their
+edges kept). Log lines
+`library API (lb2-4): …, N methods (M inherited from dependency
 supertypes), …, N client-code call sites (M to abstract
-methods)`, `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
+methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
+`client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
 (…)`. Verified on `testdata/library` (cases in
 [EXPECTED.MD](testdata/library/EXPECTED.MD), written before the
 implementation; real-JVM oracle `scripts/library-oracle.sh`,
@@ -935,8 +948,13 @@ three of which no client can call; `-roots api` exposes exactly the 5 (CHA)
 / 4 (RTA) / 3 (`-api-exclude lib.internal`) API methods expected, and under
 RTA only methods the JVM ran. Its three client-code sites are reported;
 under CHA only `Pipeline#run` (case (d), where the JVM runs the client's
-listener) is `client_dispatch`. `-roots all` and `profile` results are
-unchanged.
+listener) is `client_dispatch`. Case (i), `StrictExpander` overriding the
+protected `substitute` every inherited `replace` calls on `this`, is in
+`inherited_by` of the `replace` overloads for CVE-2022-42889 (they are its
+mapped code) but not for CVE-2025-48924, whose lookups only
+`StringSubstitutor#substitute` reaches — as the JVM shows
+(`observed-strict.txt`, `internal/libapi` `TestSpecialize`). `-roots all`
+and `profile` results are unchanged.
 
 **JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
 2026-11-16).** `DriverManager#getConnection(url)` offers the URL to every

@@ -28,6 +28,7 @@ import (
 	"ariadne/internal/bootfeatures"
 	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
+	"ariadne/internal/classfile"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
 	"ariadne/internal/dataflow"
@@ -1475,6 +1476,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	switch cfg.roots {
 	case "api":
 		log("roots: api (%d methods: the library's public API, %d bean lifecycle)", len(roots), beanRootCount)
+		// lb2-4: an inherited root runs on its API class — calls on this
+		// dispatch from it (after every graph narrowing, before reach).
+		var spec libapi.SpecializeStats
+		roots, apiInherited, spec = libapi.Specialize(g, h, roots, apiInherited, func(c classfile.Call) []string { return strategy.DispatchTargets(h, c) })
+		if apiCoverage != nil {
+			apiCoverage.Specialized = &spec
+		}
+		log("receiver specialization (LIBRARY_MODE %s): %d method copies for inherited roots, %d call sites on this, %d edges dropped, %d methods not analyzed (edges kept)",
+			libapi.Version, spec.Clones, spec.ThisSites, spec.Dropped, spec.Unanalyzed)
 		engine = reach.NewWithRoots(g, h, framework, roots)
 		calls := make([]reach.ClientCall, 0, len(clientSites))
 		for _, c := range clientSites {

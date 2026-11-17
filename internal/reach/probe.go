@@ -100,14 +100,15 @@ func (e *Engine) SetProbe(lambda []GapSite, skip callgraph.SkipFunc) {
 			if ed.Basis != callgraph.BasisDirect || (ed.Kind != classfile.CallVirtual && ed.Kind != classfile.CallInterface) {
 				continue
 			}
-			ti, seen := byTarget[ed.To]
+			to := e.g.Origin(ed.To) // a receiver-specialized copy is its method
+			ti, seen := byTarget[to]
 			if !seen {
 				ti = targetInfo{idx: -1}
-				if st, ok := e.skippedTarget(ed.To, ed.Kind, skip); ok {
+				if st, ok := e.skippedTarget(to, ed.Kind, skip); ok {
 					ti = targetInfo{idx: len(p.skipped), ok: true}
 					p.skipped = append(p.skipped, st)
 				}
-				byTarget[ed.To] = ti
+				byTarget[to] = ti
 			}
 			if ti.ok {
 				p.skipped[ti.idx].calls++

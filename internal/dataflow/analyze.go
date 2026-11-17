@@ -16,17 +16,26 @@ import (
 // handle (jsr/ret, an internal inconsistency) is reported through
 // MethodFacts.Aborted, never as an error or a panic.
 func Analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
-	return analyze(cf, fqcn, m, false)
+	return analyze(cf, fqcn, m, false, false)
+}
+
+// AnalyzeWithThis is Analyze with an instance method's own receiver
+// marked: local 0 starts as valueflow.This, so a consumer can tell a call
+// on the unchanged `this` (valueflow.Value.IsThis) from a call on another
+// object of the same type. A store to local 0, a checkcast or a merge
+// with another value drops the mark (LIBRARY_MODE lb2-4).
+func AnalyzeWithThis(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
+	return analyze(cf, fqcn, m, false, true)
 }
 
 // AnalyzeWithParameterRefs is Analyze with explicit formal-parameter markers
 // in the initial locals. It is intended for interprocedural consumers that
 // will substitute a returned parameter against one exact caller site.
 func AnalyzeWithParameterRefs(cf *classfile.ClassFile, fqcn string, m classfile.Method) (*MethodFacts, error) {
-	return analyze(cf, fqcn, m, true)
+	return analyze(cf, fqcn, m, true, false)
 }
 
-func analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method, parameterRefs bool) (*MethodFacts, error) {
+func analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method, parameterRefs, thisRef bool) (*MethodFacts, error) {
 	f := &MethodFacts{calls: map[bytecodeir.Site][]valueflow.Value{}, receivers: map[bytecodeir.Site]valueflow.Value{}, fieldWrites: map[bytecodeir.Site]valueflow.Value{}, returns: map[bytecodeir.Site]valueflow.Value{}}
 	if len(m.Code) == 0 {
 		return f, nil
@@ -75,7 +84,7 @@ func analyze(cf *classfile.ClassFile, fqcn string, m classfile.Method, parameter
 		}
 	}
 
-	it := &interp{fqcn: fqcn, m: m, opByPC: opByPC, site: site, facts: f, parameterRefs: parameterRefs}
+	it := &interp{fqcn: fqcn, m: m, opByPC: opByPC, site: site, facts: f, parameterRefs: parameterRefs, thisRef: thisRef}
 	f.reason = it.run(cfg)
 	f.aborted = f.reason != ""
 	return f, nil
@@ -96,6 +105,7 @@ type interp struct {
 	site          func(pc int, kind bytecodeir.OpKind) bytecodeir.Site
 	facts         *MethodFacts
 	parameterRefs bool
+	thisRef       bool
 }
 
 // stackEntry is one operand-stack slot: its abstract value and its JVM
@@ -177,6 +187,9 @@ func (it *interp) run(cfg *classfile.CFG) string {
 	}
 	if !it.m.IsStatic() && maxLocals > 0 {
 		initial.locals[0] = valueflow.Typed(it.fqcn)
+		if it.thisRef {
+			initial.locals[0] = valueflow.This(it.fqcn)
+		}
 	}
 	args, err := classfile.ArgumentSlots(it.m.Descriptor, it.m.IsStatic())
 	if err != nil {

@@ -1,12 +1,14 @@
 package libapi
 
 import (
+	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
 	"ariadne/internal/callgraph"
+	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/input"
 )
@@ -48,6 +50,7 @@ func TestRoots(t *testing.T) {
 		"api.Formatter#<init>", "api.Formatter#format",
 		"api.Listener#onEvent", "api.Pipeline#<init>", "api.Pipeline#run",
 		"api.SafeExpander#<init>", "api.SafeExpander#replace",
+		"api.StrictExpander#<init>", "api.StrictExpander#substitute",
 		"api.Templates$Options#<init>", "api.Templates$Options#strict",
 		"api.Templates#<init>", "api.Templates#prepare", "api.Templates#render",
 		"internal.ExpandCodec#<init>", "internal.ExpandCodec#decode",
@@ -65,21 +68,23 @@ func TestRoots(t *testing.T) {
 	if got := names(g, own); !reflect.DeepEqual(got, want) {
 		t.Errorf("roots\n got %v\nwant %v", got, want)
 	}
-	if cov.Classes != 11 || cov.Methods != len(roots) || cov.Inherited != len(inh) || cov.Providers != 1 || cov.JPMS != "classpath" {
+	if cov.Classes != 12 || cov.Methods != len(roots) || cov.Inherited != len(inh) || cov.Providers != 1 || cov.JPMS != "classpath" {
 		t.Errorf("coverage %+v", cov)
 	}
 	// lb2-3: (g) Expander inherits StringSubstitutor's public and
 	// protected instance methods; (h) SafeExpander overrides replace(String),
-	// so only Expander inherits that one. Static methods and constructors
-	// are never inherited roots.
+	// so only Expander inherits that one; (i) StrictExpander inherits it
+	// and overrides substitute. Static methods and constructors are never
+	// inherited roots.
 	by := map[string][]string{}
 	for _, r := range inh {
 		by[g.Key(r)] = inherited[r]
 	}
 	both := []string{"lib.api.Expander", "lib.api.SafeExpander"}
+	all := []string{"lib.api.Expander", "lib.api.SafeExpander", "lib.api.StrictExpander"}
 	for key, want := range map[string][]string{
-		"org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;":              {"lib.api.Expander"},
-		"org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/Object;)Ljava/lang/String;":              both,
+		"org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;":              {"lib.api.Expander", "lib.api.StrictExpander"},
+		"org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/Object;)Ljava/lang/String;":              all,
 		"org.apache.commons.text.StringSubstitutor#substitute(Lorg/apache/commons/text/TextStringBuilder;II)Z": both, // protected
 	} {
 		if got := by[key]; !reflect.DeepEqual(got, want) {
@@ -150,5 +155,86 @@ func TestConstructible(t *testing.T) {
 	}
 	if Constructible(h, nil, Options{Exclude: []string{"lib.api"}})("lib.api.Templates") {
 		t.Error("an excluded package's class counted as constructible")
+	}
+}
+
+// TestSpecialize (lb2-4): the copy of an inherited root runs on its API
+// class. On a StrictExpander (case i) the inherited replace(String)
+// calls the class's own substitute on this and never gets to
+// StringSubstitutor's substitute or resolveVariable — what the JVM ran
+// (observed-strict.txt) — while on an Expander (g) it does. Calls on
+// another object keep every target.
+func TestSpecialize(t *testing.T) {
+	g, h := build(t)
+	providers := []Provider{{Service: "lib.api.Codec", Class: "lib.internal.ExpandCodec"}}
+	roots, _, inherited := Roots(g, h, nil, providers, Options{})
+	nodes := g.NodeCount()
+	roots, byClone, stats := Specialize(g, h, roots, inherited, func(c classfile.Call) []string {
+		return callgraph.CHA{}.DispatchTargets(h, c)
+	})
+	if stats.Clones == 0 || stats.Dropped == 0 || stats.Unanalyzed != 0 || g.NodeCount() != nodes+stats.Clones {
+		t.Fatalf("stats %+v", stats)
+	}
+	replace := "org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;"
+	copies := map[string]uint32{}
+	for _, r := range roots {
+		if g.Key(r) == replace {
+			if g.Origin(r) == r || len(byClone[r]) != 1 {
+				t.Fatalf("root %d for %s is not a single-class copy", r, replace)
+			}
+			copies[byClone[r][0]] = r
+		}
+		if inherited[r] != nil {
+			t.Errorf("root %s is still the unspecialized inherited method", g.Key(r))
+		}
+	}
+	if len(copies) != 2 {
+		t.Fatalf("replace(String) copies for %v, want Expander and StrictExpander", copies)
+	}
+	reached := func(from uint32) map[string]bool {
+		seen, out, queue := map[uint32]bool{from: true}, map[string]bool{}, []uint32{from}
+		for len(queue) > 0 {
+			u := queue[0]
+			queue = queue[1:]
+			out[g.Key(u)] = true
+			for _, e := range g.Edges(u) {
+				if !seen[e.To] {
+					seen[e.To] = true
+					queue = append(queue, e.To)
+				}
+			}
+		}
+		return out
+	}
+	const (
+		own     = "lib.api.StrictExpander#substitute(Lorg/apache/commons/text/TextStringBuilder;II)Z"
+		dep     = "org.apache.commons.text.StringSubstitutor#substitute(Lorg/apache/commons/text/TextStringBuilder;II)Z"
+		resolve = "org.apache.commons.text.StringSubstitutor#resolveVariable(Ljava/lang/String;Lorg/apache/commons/text/TextStringBuilder;II)Ljava/lang/String;"
+	)
+	strict := reached(copies["lib.api.StrictExpander"])
+	if !strict[own] || strict[dep] || strict[resolve] {
+		t.Errorf("StrictExpander copy reaches own %v, StringSubstitutor#substitute %v, resolveVariable %v; want true, false, false", strict[own], strict[dep], strict[resolve])
+	}
+	plain := reached(copies["lib.api.Expander"])
+	if plain[own] || !plain[dep] || !plain[resolve] {
+		t.Errorf("Expander copy reaches StrictExpander#substitute %v, StringSubstitutor#substitute %v, resolveVariable %v; want false, true, true", plain[own], plain[dep], plain[resolve])
+	}
+	// The unspecialized method keeps every CHA target.
+	orig, _ := g.IDOfKey(replace)
+	if all := reached(orig); !all[own] || !all[dep] {
+		t.Errorf("original replace(String) lost a target: own %v, dep %v", all[own], all[dep])
+	}
+	// The oracle: on a StrictExpander the JVM ran its own substitute and
+	// neither of the other two.
+	b, err := os.ReadFile(fixture + "observed-strict.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran := map[string]bool{}
+	for _, l := range strings.Split(string(b), "\n") {
+		ran[strings.TrimSpace(l)] = true
+	}
+	if !ran[own] || !ran[replace] || ran[dep] || ran[resolve] {
+		t.Error("observed-strict.txt disagrees with the case; regenerate with scripts/library-oracle.sh")
 	}
 }

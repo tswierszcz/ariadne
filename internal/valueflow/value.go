@@ -150,9 +150,14 @@ type FieldRef struct {
 // ParameterRef identifies one formal parameter in the exact method body
 // that produced a return value. It is provenance metadata on KindTyped,
 // not evidence about a caller until a call-site consumer substitutes it.
+// Index ThisIndex marks the method's own receiver instead (This).
 type ParameterRef struct {
 	Index int
 }
+
+// ThisIndex is the ParameterRef index of an instance method's own
+// receiver (local 0 on entry), set only by dataflow.AnalyzeWithThis.
+const ThisIndex = -1
 
 // CallResultRef identifies one invokestatic/invokespecial call site's
 // target method — Owner/Name/Desc exactly as the bytecode's own
@@ -378,6 +383,16 @@ func Typed(typ string) Value { return Value{Kind: KindTyped, Type: typ} }
 // parameter index in the method currently being analyzed.
 func FormalParameter(typ string, index int) Value {
 	return Value{Kind: KindTyped, Type: typ, Parameter: &ParameterRef{Index: index}}
+}
+
+// This is an instance method's own receiver, typed as its class.
+func This(typ string) Value {
+	return Value{Kind: KindTyped, Type: typ, Parameter: &ParameterRef{Index: ThisIndex}}
+}
+
+// IsThis reports whether v is the analyzed method's unchanged receiver.
+func (v Value) IsThis() bool {
+	return v.Kind == KindTyped && v.Parameter != nil && v.Parameter.Index == ThisIndex
 }
 
 // Alloc returns a value identified by the allocation site that produced

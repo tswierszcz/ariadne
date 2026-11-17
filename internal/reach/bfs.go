@@ -8,6 +8,10 @@ import "ariadne/internal/callgraph"
 type bfsResult struct {
 	visited []bool
 	parent  []int32 // -1 for a root or an unvisited node
+	// clones lists a method's receiver-specialized copies
+	// (callgraph.Graph.AddClone, LIBRARY_MODE lb2-4): path to a method
+	// the search never entered itself goes through its nearest copy.
+	clones func(uint32) []uint32
 }
 
 // bfs runs a multi-source breadth-first search over g starting from
@@ -38,6 +42,7 @@ func bfsKeep(g *callgraph.Graph, roots []uint32, isSink func(id uint32) bool, ke
 	res := bfsResult{
 		visited: make([]bool, n),
 		parent:  make([]int32, n),
+		clones:  g.Clones,
 	}
 	for i := range res.parent {
 		res.parent[i] = -1
@@ -74,8 +79,22 @@ func bfsKeep(g *callgraph.Graph, roots []uint32, isSink func(id uint32) bool, ke
 // sequence of node ids from a root to target inclusive. ok is false if
 // target was never visited.
 func (r bfsResult) path(target uint32) ([]uint32, bool) {
-	if int(target) >= len(r.visited) || !r.visited[target] {
+	if int(target) >= len(r.visited) {
 		return nil, false
+	}
+	if !r.visited[target] {
+		// A method entered only as receiver-specialized copies is
+		// reached through the copy with the shortest path (the first
+		// copy on a tie: copies are created in a deterministic order).
+		var best []uint32
+		if r.clones != nil {
+			for _, c := range r.clones(target) {
+				if p, ok := r.path(c); ok && (best == nil || len(p) < len(best)) {
+					best = p
+				}
+			}
+		}
+		return best, best != nil
 	}
 	var rev []uint32
 	cur := int32(target)

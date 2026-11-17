@@ -9,6 +9,8 @@ lib.api.Pipeline#<init>()V
 lib.api.Pipeline#run(Llib/api/Listener;Ljava/lang/String;)V
 lib.api.SafeExpander#<init>()V
 lib.api.SafeExpander#replace(Ljava/lang/String;)Ljava/lang/String;
+lib.api.StrictExpander#<init>()V
+lib.api.StrictExpander#substitute(Lorg/apache/commons/text/TextStringBuilder;II)Z
 lib.api.Templates#<init>()V
 lib.api.Templates#prepare(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Templates#render(Ljava/lang/String;)Ljava/lang/String;
