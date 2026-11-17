@@ -226,7 +226,7 @@ A library jar answers a different question than an application: whether anyone u
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
-api`, `internal/libapi` version `lb1-1`, `-api-exclude`), except the `client_code` gap (LB2).
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap.
 Member-class accessibility follows the class's own access flag and its enclosing classes
 (a `protected` member class is compiled `public` and counts as accessible).
 
@@ -266,17 +266,32 @@ model. All reason codes keep their meaning.
 
 | Field | Content |
 |---|---|
-| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method). `path`/`path_edges` of the finding stay the overall shortest path. |
+| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"). `path`/`path_edges` of the finding stay the overall shortest path. |
 | `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 
-**Client code (reserved for LB2).** A call the library makes on a type the client can
-implement or override — an interface or abstract method with no implementation in the
-input, an overridable method on a client-supplied object — runs code the analysis does
-not have. LB2 adds the gap mechanism `client_code` to the gap vocabulary below; until
-then such sites are ordinary CHA call sites (a library class implementing the type is a
-CHA target; a client's is not in the input).
+**Client code (LB2, `lb2-1`/`lb2-2`, 2026-11-17).** A call the library makes on a method a client
+can implement or override runs code the analysis does not have. A *client-code site* is a
+virtual or interface call in a library method whose resolved method is declared in an
+accessible, in-scope library type the client can subtype (an interface, or a class that is
+not `final` and has a `public`/`protected` constructor), with `public` or `protected`
+access, not `static`, not `final`. Calls on dependency and JDK types are not client-code
+sites (callbacks there have their own mechanisms). Each site is a gap of mechanism
+`client_code` (site code `client`; `coverage.gaps` with `count` and `reachable`). Its
+candidate set is empty — the client's classes are not in the input, and client code
+reaches the library only through its API, which is already the roots — so it never makes
+a finding `MODEL_INCOMPLETE`. No edge is invented: such sites stay ordinary CHA/RTA call
+sites. A *client dispatch* is a graph edge whose every bytecode site is a client-code site
+and whose target is neither the called method's own body nor a body of a class (or a
+subtype of it) whose objects exist without client code — one the input creates
+(created-type catalog, any origin but an assumed entry) or one a client can construct or
+subclass without overriding (an accessible, in-scope interface, a class with a public
+constructor, a non-`final` class with a protected one; `lb2-2`): that body stands in for
+the client's own code. An `exposed_api`
+entry is `client_dispatch: true` when every path from it in its pass contains a client
+dispatch; otherwise its example path avoids them. Not yet: vulnerable code reached only
+after a client call returns is not marked conditional.
 
 **Control library:** [testdata/library/](../testdata/library/EXPECTED.MD) — cases (a)–(f)
 with the expected roots, `exposed_api` and verdicts written before LB1, checked against
@@ -297,6 +312,7 @@ the real JVM (`scripts/library-oracle.sh`).
 | `container_proxy` | a container-generated implementation (repository, AOP proxy) | allocation/`container-proxy` |
 | `unknown_allocation` | an object created where the type is unknown (Unsafe, constructor handles) | site/`allocation`, allocation/`unsafe-allocation` |
 | `external_input` | `-roots all`: a root's parameters may be any subtype | allocation/`external-input` |
+| `client_code` | `-roots api`: a library call a client can implement or override | site/`client` |
 | `lambda` | a functional-interface call whose lambda / method reference is unresolved | lambda/`bootstrap`, lambda/`budget`, lambda/`call-result`, lambda/`depth`, lambda/`field`, lambda/`instance-call`, lambda/`parameter`, lambda/`sam-argument`, lambda/`unknown-value`, runtime/`invokedynamic`, runtime/`sam-call` |
 | `skipped_receiver` | a call on `java.`/`javax.`/`jdk.`/`sun.` types, never CHA-expanded | runtime/`skipped-receiver` |
 | `virtual_dispatch` | a virtual call target the graph has no edge for (RTA pruning, inherited bodies) | runtime/`dispatch-missing`, runtime/`inherited-impl`, runtime/`rta-pruned` |

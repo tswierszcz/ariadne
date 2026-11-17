@@ -3,9 +3,11 @@ package main
 import (
 	"sort"
 
+	"ariadne/internal/alloc"
 	"ariadne/internal/callback"
 	"ariadne/internal/deserialize"
 	"ariadne/internal/hierarchy"
+	"ariadne/internal/libapi"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
@@ -96,4 +98,36 @@ func collectGapSites(h *hierarchy.Hierarchy, in gapInputs) []reach.GapSite {
 		out = append(out, reach.GapSite{Kind: "deserialization", CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc})
 	}
 	return out
+}
+
+// clientGapSites turns library mode's client-code sites (LIBRARY_MODE
+// LB2) into gap sites of kind "client". Their candidate set is bounded
+// and empty: the client's classes are not in the input, and client code
+// reaches the library only through its API, which is already the roots —
+// so they never make a finding MODEL_INCOMPLETE; they are counted
+// (coverage.gaps, mechanism client_code) and reachable ones reported.
+func clientGapSites(sites []libapi.ClientSite) []reach.GapSite {
+	out := make([]reach.GapSite, 0, len(sites))
+	for _, s := range sites {
+		out = append(out, reach.GapSite{Kind: "client", CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc, Owners: []string{}})
+	}
+	return out
+}
+
+// objectsExist: the classes whose objects exist without client code — the
+// ones the input itself creates (the created-type catalog, every origin
+// but an assumed entry) and the ones a client can construct or subclass
+// without overriding (libapi.Constructible). A client-code site's dispatch
+// to one of them runs library code on an ordinary object, so it is not a
+// stand-in for client code (LIBRARY_MODE LB2).
+func objectsExist(c alloc.Catalog, constructible func(string) bool) func(string) bool {
+	made := map[string]bool{}
+	for _, t := range c.Types {
+		for _, o := range t.Origins {
+			if o.Kind != alloc.KindEntry {
+				made[t.Class] = true
+			}
+		}
+	}
+	return func(fqcn string) bool { return made[fqcn] || (constructible != nil && constructible(fqcn)) }
 }

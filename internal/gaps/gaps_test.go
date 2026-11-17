@@ -13,10 +13,10 @@ import (
 // TestEveryProducerCodeMapped: every gap code the analyzers define maps
 // to a mechanism, so no gap falls back to "unclassified" silently. The
 // lists are each analyzer's own constants; the site kinds are the ones
-// cmd/ariadne's collectGapSites and rtaGapSites emit.
+// cmd/ariadne's collectGapSites, rtaGapSites and clientGapSites emit.
 func TestEveryProducerCodeMapped(t *testing.T) {
 	produced := map[string][]string{
-		SourceSite: {"reflection", "methodhandle", "callback", "serviceloader", "deserialization", "allocation"},
+		SourceSite: {"reflection", "methodhandle", "callback", "serviceloader", "deserialization", "allocation", "client"},
 		SourceAllocation: {alloc.GapReflection, alloc.GapProxy, alloc.GapUnsafe, alloc.GapHandle, alloc.GapService,
 			alloc.GapContainerProxy, alloc.GapExternalInput},
 		SourceLambda: {samcall.GapParameter, samcall.GapSAMArg, samcall.GapField, samcall.GapCallResult, samcall.GapInstance,

@@ -38,8 +38,8 @@ import (
 	"ariadne/internal/input"
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/jdbcurl"
-	"ariadne/internal/libapi"
 	"ariadne/internal/jpadispatch"
+	"ariadne/internal/libapi"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/methodhandle"
@@ -1215,6 +1215,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var roots []uint32
 	webXMLRootCount := 0
 	var apiCoverage *libapi.Coverage
+	var clientSites []libapi.ClientSite
+	var clientConstructible func(string) bool
 	if cfg.roots == "api" {
 		// LIBRARY_MODE LB1: the library's public API (docs/RESULTS_CONTRACT.MD §8).
 		mod, err := libapi.Module(prepared.AppClassesJar)
@@ -1234,10 +1236,20 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			}
 		}
 		var cov libapi.Coverage
-		roots, cov = libapi.Roots(g, h, mod, providers, libapi.Options{Exclude: exclude, ModulePath: jpmsScenario == serviceload.ScenarioModulePath})
+		apiOpt := libapi.Options{Exclude: exclude, ModulePath: jpmsScenario == serviceload.ScenarioModulePath}
+		roots, cov = libapi.Roots(g, h, mod, providers, apiOpt)
 		apiCoverage = &cov
-		log("library API (%s): %d accessible classes, %d methods, %d registered providers; JPMS %s%s",
-			libapi.Version, cov.Classes, cov.Methods, cov.Providers, cov.JPMS, apiExcludeNote(exclude))
+		// LIBRARY_MODE LB2: the calls a client can implement or override.
+		clientSites = libapi.ClientSites(h, mod, apiOpt)
+		clientConstructible = libapi.Constructible(h, mod, apiOpt)
+		abstract := 0
+		for _, c := range clientSites {
+			if c.Abstract {
+				abstract++
+			}
+		}
+		log("library API (%s): %d accessible classes, %d methods, %d registered providers; JPMS %s%s; %d client-code call sites (%d to abstract methods)",
+			libapi.Version, cov.Classes, cov.Methods, cov.Providers, cov.JPMS, apiExcludeNote(exclude), len(clientSites), abstract)
 	} else if cfg.roots == "profile" {
 		roots = prof.AppRoots(g, h)
 		webRoots := profile.WebXMLAppRoots(g, h, servletClasses, filterClasses, listenerClasses)
@@ -1463,7 +1475,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	case "api":
 		log("roots: api (%d methods: the library's public API, %d bean lifecycle)", len(roots), beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
-		engine.SetExposure()
+		calls := make([]reach.ClientCall, 0, len(clientSites))
+		for _, c := range clientSites {
+			calls = append(calls, reach.ClientCall{CallerFQCN: c.CallerFQCN, CallerName: c.CallerName, CallerDesc: c.CallerDesc, PC: c.PC, Declared: c.Declared})
+		}
+		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, objectsExist(allocCatalog, clientConstructible)))
 	case "profile":
 		log("roots: profile %q (%d entry-point methods, %d from web.xml, %d bean lifecycle)", prof.Name, len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
@@ -1481,6 +1497,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if rtaResult != nil {
 		gapSites = append(gapSites, rtaGapSites(allocCatalog)...)
 	}
+	gapSites = append(gapSites, clientGapSites(clientSites)...)
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
 	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)

@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`); LB3–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -56,6 +56,15 @@ Gotowe: tryb działa end-to-end na fixture i prawdziwej bibliotece; v1 aplikacji
 bez zmian (12 konfiguracji referencyjnych).
 
 ## LB2. Kod klienta i wejścia frameworka
+
+Postęp: **lb2-1 DONE (2026-11-17)** — miejsca kodu klienta (`libapi.ClientSites`), luka
+`client_code` (pusty zbiór kandydatów, bez `MODEL_INCOMPLETE`), `exposed_api[].client_dispatch`
+dla metod sięgających kodu tylko przez wysyłkę do klasy, której wejście nie tworzy; przypadek (d)
+fixture. Zostaje: ścieżki warunkowe po powrocie z kodu klienta, wywołania na typach zależności,
+autokonfiguracja jako korzenie, wyrocznia z przykładowym klientem dla (d) poza `observed.txt`.
+Pomiar 2026-11-17 (3 biblioteki, `scripts/library-measure.sh`): werdykty jak `-roots all`;
+poprawka `lb2-2` (klasy konstruowalne przez klienta nie są zastępstwem); otwarta decyzja:
+metody odziedziczone z nadklas zależności jako API (jackson-yaml: 1 → 17 `REACHABLE`).
 
 Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).
 

@@ -69,3 +69,52 @@ func TestRoots(t *testing.T) {
 		t.Errorf("excluded coverage %+v", cov)
 	}
 }
+
+// ClientSites (LIBRARY_MODE LB2) on testdata/library: the library's calls
+// on methods a client can implement or override — the client's Listener
+// in Pipeline#run (case d), the Codec a ServiceLoader yields — and never a
+// call into a final, inaccessible or dependency type.
+func TestClientSites(t *testing.T) {
+	_, h := build(t)
+	site := func(opt Options) []string {
+		var got []string
+		for _, s := range ClientSites(h, nil, opt) {
+			d := strings.TrimPrefix(s.Declared[:strings.IndexByte(s.Declared, '(')], "lib.")
+			if s.Abstract {
+				d += " (abstract)"
+			}
+			got = append(got, strings.TrimPrefix(s.CallerFQCN, "lib.")+"#"+s.CallerName+" -> "+d)
+		}
+		sort.Strings(got)
+		return got
+	}
+	want := []string{"api.Codecs#decodeAll -> api.Codec#decode (abstract)", "api.Pipeline#run -> api.Listener#onEvent (abstract)",
+		"api.Templates#render -> api.Templates#prepare"}
+	if got := site(Options{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("client sites %v, want %v", got, want)
+	}
+	// An excluded package's types are not the client's to implement.
+	if got := site(Options{Exclude: []string{"lib.api"}}); len(got) != 0 {
+		t.Errorf("with lib.api excluded: %v", got)
+	}
+}
+
+// Constructible (lb2-2): a client can get objects of public classes with a
+// public constructor and of public interfaces, never of a package-private
+// class — so only the latter's bodies stand in for client code.
+func TestConstructible(t *testing.T) {
+	_, h := build(t)
+	c := Constructible(h, nil, Options{})
+	for fqcn, want := range map[string]bool{
+		"lib.api.Templates": true, "lib.api.Listener": true, "lib.api.Pipeline": true,
+		"lib.api.ExpandingListener": false, "lib.api.Hidden": false, "lib.api.Engine": false,
+		"org.apache.commons.text.StringSubstitutor": false, // a dependency's, not the library's
+	} {
+		if got := c(fqcn); got != want {
+			t.Errorf("Constructible(%s) = %v, want %v", fqcn, got, want)
+		}
+	}
+	if Constructible(h, nil, Options{Exclude: []string{"lib.api"}})("lib.api.Templates") {
+		t.Error("an excluded package's class counted as constructible")
+	}
+}
