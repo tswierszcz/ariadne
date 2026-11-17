@@ -53,7 +53,7 @@ Case (d) is the client-code case LB2 makes explicit: under CHA the library's own
 `ExpandingListener` stands in for client listeners; LB2 reports the call as a
 `client_code` gap.
 
-## LB2 (`lb2-1`, measured 2026-11-17)
+## LB2 (`lb2-1`, `lb2-2`, measured 2026-11-17)
 
 Client-code sites (a `client_code` gap, 3 sites, all reachable; never `MODEL_INCOMPLETE`):
 `Pipeline#run` → `Listener#onEvent` (abstract), `Codecs#decodeAll` → `Codec#decode`

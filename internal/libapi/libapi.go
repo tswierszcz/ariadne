@@ -15,8 +15,10 @@ import (
 )
 
 // Version versions the API definition and the client-code sites;
-// snapshots record it. lb2-1: ClientSites (LIBRARY_MODE LB2).
-const Version = "lb2-1"
+// snapshots record it. lb2-1: ClientSites (LIBRARY_MODE LB2); lb2-2: a
+// class a client can construct is not a client-dispatch stand-in
+// (Constructible, measured on commons-configuration2).
+const Version = "lb2-2"
 
 const (
 	accPrivate   = 0x0002
@@ -211,6 +213,33 @@ func Roots(g *callgraph.Graph, h *hierarchy.Hierarchy, mod *classfile.ModuleInfo
 	sort.Slice(roots, func(i, j int) bool { return g.Key(roots[i]) < g.Key(roots[j]) })
 	cov.Methods = len(roots)
 	return roots, cov
+}
+
+// Constructible reports whether a client can get an object of a library
+// class without the library creating it: an accessible, in-scope
+// interface (a client implements it, inheriting its default bodies), a
+// class with a public constructor, or a non-final class with a protected
+// one (a client subclass inherits its bodies).
+func Constructible(h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, opt Options) func(fqcn string) bool {
+	sel := newSelector(h, mod, nil, opt)
+	return func(fqcn string) bool {
+		ci, ok := h.Lookup(fqcn)
+		if !ok || !sel.accessible(fqcn) || !sel.inScope(fqcn) {
+			return false
+		}
+		if ci.IsInterface() {
+			return true
+		}
+		for _, m := range ci.Methods {
+			if m.Name != "<init>" {
+				continue
+			}
+			if m.AccessFlags&classfile.AccPublic != 0 || (m.AccessFlags&accProtected != 0 && ci.AccessFlags&classfile.AccFinal == 0) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 // ClientSite is a call the library makes on a method a client of the

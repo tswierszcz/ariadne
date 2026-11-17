@@ -1,0 +1,67 @@
+#!/bin/bash
+# Library mode measurement on real libraries (LIBRARY_MODE LB2/LB4).
+#
+# Fetches three libraries with vulnerable dependencies from Maven Central
+# (mvn dependency:copy-dependencies) into work/libs/<name>/ — lib.jar is the
+# library, deps/ its runtime dependencies — and runs bin/ariadne on each
+# with -roots all and -roots api, under CHA and RTA, printing one summary
+# line per run. Results of 2026-11-17: RECOMMENDATION/IMPLEMENTATION_STATUS.MD
+# (LIBRARY_MODE:LB2 pomiar).
+#
+# Usage: scripts/library-measure.sh [OUTDIR] [extra ariadne args, e.g. -offline]
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+out="${1:-$root/work/libs/out}"
+shift || true
+cd "$root"
+go build -o bin/ariadne ./cmd/ariadne
+
+libs=(
+  "configuration2:org.apache.commons:commons-configuration2:2.7"           # facade/builder; commons-text 1.8, commons-lang3 3.9
+  "jackson-yaml:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.12.3" # factory/mapper subclass; snakeyaml 1.27, databind 2.12.3
+  "jjwt-jackson:io.jsonwebtoken:jjwt-jackson:0.11.2"                       # SPI (META-INF/services); databind 2.9.10.4
+)
+for spec in "${libs[@]}"; do
+  IFS=: read -r name g a v <<<"$spec"
+  d="work/libs/$name"
+  if [ ! -f "$d/lib.jar" ]; then
+    mkdir -p "$d/deps"
+    cat >"$d/pom.xml" <<EOF
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>
+<groupId>measure</groupId><artifactId>$name</artifactId><version>1</version>
+<dependencies><dependency><groupId>$g</groupId><artifactId>$a</artifactId><version>$v</version></dependency></dependencies></project>
+EOF
+    (cd "$d" && mvn -q dependency:copy-dependencies -DoutputDirectory=all -DincludeScope=runtime)
+    for f in "$d"/all/*.jar; do
+      if [ "$(basename "$f")" = "$a-$v.jar" ]; then cp "$f" "$d/lib.jar"; else cp "$f" "$d/deps/"; fi
+    done
+  fi
+done
+
+mkdir -p "$out"
+for spec in "${libs[@]}"; do
+  name="${spec%%:*}"
+  for roots in all api; do
+    for mode in cha rta; do
+      base="$out/$name-$roots-$mode"
+      bin/ariadne -cache-dir work/libs/cache -app "work/libs/$name/lib.jar" -deps "work/libs/$name/deps" -profile generic \
+        -roots "$roots" -callgraph-mode "$mode" -json-format v2 -out "$base.md" -json "$base.json" "$@" >"$base.log" 2>&1
+    done
+  done
+done
+
+python3 -I - "$out" <<'PY'
+import collections, json, sys
+out = sys.argv[1]
+for name in ["configuration2", "jackson-yaml", "jjwt-jackson"]:
+    for roots in ["all", "api"]:
+        for mode in ["cha", "rta"]:
+            j = json.load(open(f"{out}/{name}-{roots}-{mode}.json"))
+            st = dict(collections.Counter(f["reachability"] for f in j["findings"]))
+            exp = [len(f.get("exposed_api", [])) for f in j["findings"] if f["reachability"] in ("REACHABLE", "FRAMEWORK")]
+            cd = sum(1 for f in j["findings"] for x in f.get("exposed_api", []) if x.get("client_dispatch"))
+            cc = [(g["count"], g.get("reachable")) for g in j["coverage"].get("gaps", []) if g["mechanism"] == "client_code"]
+            api = j["coverage"].get("api", {}).get("methods")
+            print(f"{name:15} {roots:3} {mode}: {st} api_methods={api} exposed_sum={sum(exp)} exposed_max={max(exp) if exp else 0} "
+                  f"client_code(sites,reachable)={cc} client_dispatch={cd}")
+PY

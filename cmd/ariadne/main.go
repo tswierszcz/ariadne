@@ -1216,6 +1216,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	webXMLRootCount := 0
 	var apiCoverage *libapi.Coverage
 	var clientSites []libapi.ClientSite
+	var clientConstructible func(string) bool
 	if cfg.roots == "api" {
 		// LIBRARY_MODE LB1: the library's public API (docs/RESULTS_CONTRACT.MD §8).
 		mod, err := libapi.Module(prepared.AppClassesJar)
@@ -1240,6 +1241,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		apiCoverage = &cov
 		// LIBRARY_MODE LB2: the calls a client can implement or override.
 		clientSites = libapi.ClientSites(h, mod, apiOpt)
+		clientConstructible = libapi.Constructible(h, mod, apiOpt)
 		abstract := 0
 		for _, c := range clientSites {
 			if c.Abstract {
@@ -1477,7 +1479,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		for _, c := range clientSites {
 			calls = append(calls, reach.ClientCall{CallerFQCN: c.CallerFQCN, CallerName: c.CallerName, CallerDesc: c.CallerDesc, PC: c.PC, Declared: c.Declared})
 		}
-		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, createdByInput(allocCatalog)))
+		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, objectsExist(allocCatalog, clientConstructible)))
 	case "profile":
 		log("roots: profile %q (%d entry-point methods, %d from web.xml, %d bean lifecycle)", prof.Name, len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
