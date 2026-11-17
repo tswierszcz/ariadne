@@ -2,10 +2,13 @@
 # lib.* and StringSubstitutor method bodies that ran on the real JVM (owner#name+desc)
 lib.api.Codecs#decodeAll(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Engine#expand(Ljava/lang/String;)Ljava/lang/String;
+lib.api.Expander#<init>()V
 lib.api.Formatter#<init>()V
 lib.api.Formatter#format(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Pipeline#<init>()V
 lib.api.Pipeline#run(Llib/api/Listener;Ljava/lang/String;)V
+lib.api.SafeExpander#<init>()V
+lib.api.SafeExpander#replace(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Templates#<init>()V
 lib.api.Templates#prepare(Ljava/lang/String;)Ljava/lang/String;
 lib.api.Templates#render(Ljava/lang/String;)Ljava/lang/String;
@@ -13,6 +16,7 @@ lib.internal.ExpandCodec#<init>()V
 lib.internal.ExpandCodec#decode(Ljava/lang/String;)Ljava/lang/String;
 lib.internal.Util#expand(Ljava/lang/String;)Ljava/lang/String;
 org.apache.commons.text.StringSubstitutor#<clinit>()V
+org.apache.commons.text.StringSubstitutor#<init>()V
 org.apache.commons.text.StringSubstitutor#<init>(Lorg/apache/commons/text/lookup/StringLookup;)V
 org.apache.commons.text.StringSubstitutor#<init>(Lorg/apache/commons/text/lookup/StringLookup;Lorg/apache/commons/text/matcher/StringMatcher;Lorg/apache/commons/text/matcher/StringMatcher;C)V
 org.apache.commons.text.StringSubstitutor#<init>(Lorg/apache/commons/text/lookup/StringLookup;Lorg/apache/commons/text/matcher/StringMatcher;Lorg/apache/commons/text/matcher/StringMatcher;CLorg/apache/commons/text/matcher/StringMatcher;)V

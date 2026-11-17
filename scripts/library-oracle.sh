@@ -22,7 +22,7 @@ sha256sum -c --quiet - <<SUMS
 4ee380259c068d1dbe9e84ab52186f2acd65de067ec09beff731fca1697fdb16  $fx/deps/commons-lang3-3.11.jar
 SUMS
 java "$root/scripts/JavaBuild.java" "$fx/lib" "$fx/lib.jar" 11 "$fx/deps/commons-text-1.9.jar"
-java "$root/scripts/JavaBuild.java" "$fx/client" "$fx/client.jar" 11 "$fx/lib.jar"
+java "$root/scripts/JavaBuild.java" "$fx/client" "$fx/client.jar" 11 "$fx/lib.jar:$fx/deps/commons-text-1.9.jar"
 cp_list="$fx/client.jar:$fx/lib.jar:$fx/deps/commons-text-1.9.jar:$fx/deps/commons-lang3-3.11.jar"
 java "$root/scripts/MethodTrace.java" "$cp_list" fx.Client "$fx/observed.raw" 'lib.*' 'org.apache.commons.text.StringSubstitutor'
 {

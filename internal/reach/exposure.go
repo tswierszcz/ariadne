@@ -25,6 +25,9 @@ type ExposedMethod struct {
 	// than the called method's own — a stand-in for code a client
 	// supplies there. Path is then such a path.
 	ClientDispatch bool
+	// InheritedBy (lb2-3): when Method is a dependency method that API
+	// classes inherit, those classes — the receivers a client calls it on.
+	InheritedBy []string
 }
 
 // ClientCall is a call site where a client of the library may supply the
@@ -53,8 +56,9 @@ type exposure struct {
 	reverse [][]uint32
 	// strict is reverse without the client-dispatch edges; nil when
 	// there are none.
-	strict [][]uint32
-	cache  map[string][]ExposedMethod
+	strict    [][]uint32
+	cache     map[string][]ExposedMethod
+	inherited map[uint32][]string
 }
 
 // SetExposure makes Analyze list, on every positive finding, the roots
@@ -67,10 +71,12 @@ type exposure struct {
 // inheriting its body) the input never creates is a client-dispatch
 // edge: the body runs there only on an object the client creates and
 // passes. A root that reaches the code only through one is marked
-// ClientDispatch. It returns how many such edges there are.
-func (e *Engine) SetExposure(client []ClientCall, made func(fqcn string) bool) int {
+// ClientDispatch. inherited names, for roots that are dependency methods
+// API classes inherit, those classes (ExposedMethod.InheritedBy). It
+// returns how many client-dispatch edges there are.
+func (e *Engine) SetExposure(client []ClientCall, made func(fqcn string) bool, inherited map[uint32][]string) int {
 	n := e.g.NodeCount()
-	x := &exposure{e: e, isRoot: make([]bool, n), reverse: make([][]uint32, n), cache: map[string][]ExposedMethod{}}
+	x := &exposure{e: e, isRoot: make([]bool, n), reverse: make([][]uint32, n), cache: map[string][]ExposedMethod{}, inherited: inherited}
 	for _, r := range e.roots {
 		if int(r) < n {
 			x.isRoot[r] = true
@@ -179,7 +185,7 @@ func (x *exposure) of(targets []uint32) []ExposedMethod {
 		}
 		rendered := renderPath(x.e.g, path)
 		edges, char := pathEvidence(x.e.g, rendered)
-		out = append(out, ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client})
+		out = append(out, ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, InheritedBy: x.inherited[uint32(id)]})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Method < out[j].Method })
 	x.cache[key] = out

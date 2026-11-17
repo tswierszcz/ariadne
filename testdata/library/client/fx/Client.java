@@ -1,8 +1,10 @@
 package fx;
 
 import lib.api.Codecs;
+import lib.api.Expander;
 import lib.api.Formatter;
 import lib.api.Pipeline;
+import lib.api.SafeExpander;
 import lib.api.Templates;
 import lib.internal.Util;
 
@@ -18,5 +20,7 @@ public class Client {
         new Pipeline().run(text -> System.out.println("(d) client listener: " + text), t);
         System.out.println("(e) " + Codecs.decodeAll(t));
         System.out.println("(f) " + Util.expand(t));
+        System.out.println("(g) " + new Expander().replace(t));
+        System.out.println("(h) " + new SafeExpander().replace(t));
     }
 }

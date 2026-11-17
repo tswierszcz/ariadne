@@ -18,6 +18,8 @@ client: it calls each public entry once and passes its own `Listener`.
 | (d) | `Pipeline#run(Listener, …)` calls `listener.onEvent`; the library's package-private `ExpandingListener` (→ `replace`) is never created | `run` yes | no — the client's listener runs there |
 | (e) | `Codecs#decodeAll` runs every `ServiceLoader` `Codec`; the library registers `lib.internal.ExpandCodec` (→ `replace`) | `decodeAll` yes; `ExpandCodec` (public, and a registered provider) yes | yes |
 | (f) | `lib.internal.Util#expand` → `replace` | yes (public), unless `-api-exclude lib.internal` | yes |
+| (g) | `Expander extends StringSubstitutor`, nothing declared (added 2026-11-17, `lb2-3`) | the inherited `StringSubstitutor` methods, `replace` among them | yes |
+| (h) | `SafeExpander extends StringSubstitutor`, overrides `replace(String)` to return its input (`lb2-3`) | its own `replace(String)` (reaches nothing); the other inherited overloads | its own `replace` runs, not the inherited one |
 
 `observed.txt` (`scripts/library-oracle.sh`, JDI trace of `fx.Client`): the JVM ran
 `Templates#render`, `Engine#expand`, `Formatter#format`, `Pipeline#run`,
@@ -52,6 +54,14 @@ every method the JVM never entered is absent from `exposed_api` under RTA.
 Case (d) is the client-code case LB2 makes explicit: under CHA the library's own
 `ExpandingListener` stands in for client listeners; LB2 reports the call as a
 `client_code` gap.
+
+## Inherited methods (`lb2-3`, written with cases (g) and (h), 2026-11-17)
+
+`StringSubstitutor#replace(String)` is exposed with `inherited_by` = `Expander` only:
+`SafeExpander` overrides it. The other `replace` overloads are inherited by both. The JVM
+ran `Expander#<init>`, `SafeExpander#replace` and `StringSubstitutor#replace(String)`
+(`observed.txt`). The `exposed_api` sets of the tables above count only the library's own
+methods; inherited entries come on top of them. `SafeExpander#replace` is never exposed.
 
 ## LB2 (`lb2-1`, `lb2-2`, measured 2026-11-17)
 
