@@ -64,6 +64,10 @@ type Entry struct {
 	// NotCode is set, with no Methods, when the manual table declares
 	// that the advisory concerns no JVM code (reason NOT_CODE_MAPPABLE).
 	NotCode string `json:"not_code,omitempty"`
+	// InitializerRedirect is set when the source mapped only static
+	// initializers of a curated family and Methods are that family's
+	// entry points instead (Role entrypoint; initializers.go).
+	InitializerRedirect *InitializerRedirect `json:"initializer_redirect,omitempty"`
 }
 
 // Mapped reports whether the entry names at least one method.
@@ -73,7 +77,7 @@ func (e Entry) Mapped() bool { return len(e.Methods) > 0 }
 // order, diff attribution, grounding). Bump it on any change that can
 // change a mapping for the same inputs; it is part of every derivation
 // key (CVE:F3).
-const ResolverVersion = "7" // 7: manual not_code entries (NOT_CODE_MAPPABLE); 6: CVE:F10 pull requests, field initializers, release diff; 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
+const ResolverVersion = "8" // 8: static-initializer redirects (jackson-databind blocklist); 7: manual not_code entries (NOT_CODE_MAPPABLE); 6: CVE:F10 pull requests, field initializers, release diff; 2: CVE:F4 versioned manual variants, LLM per-method roles; 3: CVE:F5a both sides of a fix diff; 4: CVE:F5b bytecode verification, nested classes, release fit; 5: CVE:F5c release line from git tags
 
 // PromptVersion is the LLM prompt version (part of derivation keys).
 const PromptVersion = promptVersion
@@ -218,7 +222,7 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 	}
 	if len(methods) > 0 {
 		sort.Strings(methods)
-		return Entry{Methods: methods, Source: SourceDiff, FixCommits: commits}.WithDefaults(), true, nil
+		return redirected(Entry{Methods: methods, Source: SourceDiff, FixCommits: commits}).WithDefaults(), true, nil
 	}
 
 	if r.ReleaseDiff {
@@ -227,7 +231,7 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 			return Entry{}, false, err
 		}
 		if len(ms) > 0 {
-			return Entry{Methods: ms, Source: SourceReleaseDiff, FixCommits: commits, ReleaseDiffs: diffs}.WithDefaults(), true, nil
+			return redirected(Entry{Methods: ms, Source: SourceReleaseDiff, FixCommits: commits, ReleaseDiffs: diffs}).WithDefaults(), true, nil
 		}
 	}
 
@@ -247,6 +251,16 @@ func (r *Resolver) resolve(ctx context.Context, cve cves.CVE) (Entry, bool, erro
 		return Entry{SourceError: strings.Join(msgs, "; "), FixCommits: commits}, true, nil
 	}
 	return Entry{}, false, nil
+}
+
+// redirected applies initializerRedirects to a diff or release-diff
+// entry: the family's entry points replace the initializers, with role
+// entrypoint (they enable the vulnerable code, they are not it).
+func redirected(e Entry) Entry {
+	if ms, r, ok := redirectInitializers(e.Methods); ok {
+		e.Methods, e.InitializerRedirect, e.Role = ms, r, RoleEntrypoint
+	}
+	return e
 }
 
 func allFailed(commits []FixCommit) bool {

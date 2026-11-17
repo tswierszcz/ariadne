@@ -33,6 +33,9 @@ const (
 	MappingConflict         ReasonCode = "MAPPING_CONFLICT"
 	// CVE:F5: a fix-diff mapping read on the post-fix side only.
 	MappingNewSideOnly ReasonCode = "MAPPING_NEW_SIDE_ONLY"
+	// 2026-11-17: a fix-diff or release-diff mapping names only static
+	// initializers (<clinit>), which run whenever the class is first used.
+	MappingInitializerOnly ReasonCode = "MAPPING_INITIALIZER_ONLY"
 	// CVE:F10 (2026-11-16): the manual table declares that the advisory
 	// concerns no JVM code of the artifact (an installer, a deployment
 	// setting), so no method can be mapped (status NOT_APPLICABLE).
@@ -53,7 +56,7 @@ const (
 var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict, VersionCandidates,
 	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable, MappingMissing, MappedCodeAbsent,
-	MappingVersionUncovered, MappingConflict, MappingNewSideOnly, NotCodeMappable,
+	MappingVersionUncovered, MappingConflict, MappingNewSideOnly, MappingInitializerOnly, NotCodeMappable,
 	ModelIncomplete,
 	RuntimeUnsupported,
 }
@@ -63,5 +66,5 @@ var All = []ReasonCode{
 // advisory row, v2 carries it in the mapping, never on an instance
 // finding's reachability verdict.
 func MappingQualifier(c ReasonCode) bool {
-	return c == MappingPartial || c == MappingEntrypointOnly || c == MappingNewSideOnly
+	return c == MappingPartial || c == MappingEntrypointOnly || c == MappingNewSideOnly || c == MappingInitializerOnly
 }
