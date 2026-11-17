@@ -69,3 +69,32 @@ func TestRoots(t *testing.T) {
 		t.Errorf("excluded coverage %+v", cov)
 	}
 }
+
+// ClientSites (LIBRARY_MODE LB2) on testdata/library: the library's calls
+// on methods a client can implement or override — the client's Listener
+// in Pipeline#run (case d), the Codec a ServiceLoader yields — and never a
+// call into a final, inaccessible or dependency type.
+func TestClientSites(t *testing.T) {
+	_, h := build(t)
+	site := func(opt Options) []string {
+		var got []string
+		for _, s := range ClientSites(h, nil, opt) {
+			d := strings.TrimPrefix(s.Declared[:strings.IndexByte(s.Declared, '(')], "lib.")
+			if s.Abstract {
+				d += " (abstract)"
+			}
+			got = append(got, strings.TrimPrefix(s.CallerFQCN, "lib.")+"#"+s.CallerName+" -> "+d)
+		}
+		sort.Strings(got)
+		return got
+	}
+	want := []string{"api.Codecs#decodeAll -> api.Codec#decode (abstract)", "api.Pipeline#run -> api.Listener#onEvent (abstract)",
+		"api.Templates#render -> api.Templates#prepare"}
+	if got := site(Options{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("client sites %v, want %v", got, want)
+	}
+	// An excluded package's types are not the client's to implement.
+	if got := site(Options{Exclude: []string{"lib.api"}}); len(got) != 0 {
+		t.Errorf("with lib.api excluded: %v", got)
+	}
+}
