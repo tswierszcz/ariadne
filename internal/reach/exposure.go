@@ -153,6 +153,10 @@ func (x *exposure) of(targets []uint32) []ExposedMethod {
 	if out, ok := x.cache[key]; ok {
 		return out
 	}
+	// lb2-4: a target's receiver-specialized copies are the target too.
+	for _, t := range ts {
+		ts = append(ts, x.e.g.Clones(t)...)
+	}
 	appNext := x.backward(x.reverse, ts, true)
 	fullNext := x.backward(x.reverse, ts, false)
 	appStrict, fullStrict := appNext, fullNext
@@ -161,6 +165,7 @@ func (x *exposure) of(targets []uint32) []ExposedMethod {
 		fullStrict = x.backward(x.strict, ts, false)
 	}
 	var out []ExposedMethod
+	byMethod := map[string]int{}
 	for id := range x.isRoot {
 		if !x.isRoot[id] {
 			continue
@@ -185,7 +190,24 @@ func (x *exposure) of(targets []uint32) []ExposedMethod {
 		}
 		rendered := renderPath(x.e.g, path)
 		edges, char := pathEvidence(x.e.g, rendered)
-		out = append(out, ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, InheritedBy: x.inherited[uint32(id)]})
+		m := ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, InheritedBy: x.inherited[uint32(id)]}
+		if i, ok := byMethod[m.Method]; ok {
+			// lb2-4: one root per inheriting API class (receiver-
+			// specialized copies of the same method) — one entry naming
+			// every class whose copy reaches the code, with the best
+			// path (app-only over full, no client dispatch over client
+			// dispatch, then shorter).
+			o := &out[i]
+			by := append(append([]string(nil), o.InheritedBy...), m.InheritedBy...)
+			sort.Strings(by)
+			if better(m, *o) {
+				*o = m
+			}
+			o.InheritedBy = uniqueStrings(by)
+			continue
+		}
+		byMethod[m.Method] = len(out)
+		out = append(out, m)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Method < out[j].Method })
 	x.cache[key] = out
@@ -225,4 +247,26 @@ func (x *exposure) backward(reverse [][]uint32, targets []uint32, appOnly bool) 
 		}
 	}
 	return next
+}
+
+// better orders two exposures of one method (receiver-specialized
+// copies): an app-only pass, then no client dispatch, then a shorter path.
+func better(a, b ExposedMethod) bool {
+	if (a.Pass == PassAppOnly) != (b.Pass == PassAppOnly) {
+		return a.Pass == PassAppOnly
+	}
+	if a.ClientDispatch != b.ClientDispatch {
+		return !a.ClientDispatch
+	}
+	return len(a.Path) < len(b.Path)
+}
+
+func uniqueStrings(sorted []string) []string {
+	var out []string
+	for i, s := range sorted {
+		if i == 0 || s != sorted[i-1] {
+			out = append(out, s)
+		}
+	}
+	return out
 }

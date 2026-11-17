@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`); LB3–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy); LB3–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -65,7 +65,10 @@ autokonfiguracja jako korzenie, wyrocznia z przykładowym klientem dla (d) poza 
 Pomiar 2026-11-17 (3 biblioteki, `scripts/library-measure.sh`): werdykty jak `-roots all`;
 poprawka `lb2-2` (klasy konstruowalne przez klienta nie są zastępstwem); `lb2-3` (decyzja
 użytkownika): metody odziedziczone z nadtypów zależności są API (jackson-yaml: 1 → 17
-`REACHABLE`), bez specjalizacji do odbiorcy.
+`REACHABLE`); `lb2-4`: korzeń odziedziczony to kopia per klasa API, wywołania na `this`
+rozwiązywane od tej klasy (jackson-yaml: −1007 krawędzi CHA, `exposed_api` CVE-2025-49128
+101 → 87, werdykty bez zmian). Zostaje dla odziedziczonych: odbiorca w polu lub parametrze
+(`ObjectMapper#_jsonFactory`, `this` przekazany jako argument).
 
 Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).
 

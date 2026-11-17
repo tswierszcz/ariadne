@@ -247,8 +247,12 @@ override from outside its packages:
   supertype: `public` (or `protected`, unless the class is `final`) instance methods with a
   body, declared in a dependency superclass or superinterface, to which a call on the API
   class resolves (not overridden on the way) — `YAMLMapper#readValue` is
-  `ObjectMapper#readValue`. The root is the dependency's own method node: calls on `this`
-  inside it dispatch as for any receiver, not only the API class;
+  `ObjectMapper#readValue`. (`lb2-4`) The root is a copy of the dependency's method per
+  inheriting API class: in it, a virtual/interface call on the method's own unchanged
+  `this` goes only to the bodies that class and its subtypes select, and a call on `this`
+  to another method the class inherits from a proper supertype goes to that method's copy
+  for the class (transitively). Calls on any other receiver dispatch as in the graph. A
+  copy whose bytecode the local-value analysis cannot read keeps every edge;
 - the providers the library registers in its own `META-INF/services` (their public
   no-argument constructor and the service methods they implement) — a consumer's
   `ServiceLoader` creates them;
@@ -270,8 +274,8 @@ model. All reason codes keep their meaning.
 
 | Field | Content |
 |---|---|
-| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes). `path`/`path_edges` of the finding stay the overall shortest path. |
-| `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
+| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
+| `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 

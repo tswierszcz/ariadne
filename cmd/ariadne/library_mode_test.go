@@ -138,15 +138,29 @@ func TestLibraryMode(t *testing.T) {
 		}
 		for _, cve := range []string{"CVE-2022-42889", "CVE-2025-48924"} {
 			// lb2-3: (g) Expander inherits every replace overload; (h)
-			// SafeExpander overrides replace(String), so only Expander
-			// inherits that one.
+			// SafeExpander overrides replace(String), so it does not
+			// inherit that one. lb2-4: (i) StrictExpander inherits them
+			// all, and they are mapped code of CVE-2022-42889 themselves;
+			// but its own substitute, which they call on this, never gets
+			// to the lookups behind CVE-2025-48924 (observed-strict.txt) —
+			// only the inherited resolveVariable does.
 			inh := client.inherited[cve]
-			replace := "org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;"
-			if got := inh[replace]; !reflect.DeepEqual(got, []string{"lib.api.Expander"}) {
-				t.Errorf("%s %s: %s inherited by %v, want [lib.api.Expander]", c.name, cve, replace, got)
+			strict := []string{"lib.api.StrictExpander"}
+			if cve == "CVE-2025-48924" {
+				strict = nil
 			}
-			if got := inh["org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/Object;)Ljava/lang/String;"]; !reflect.DeepEqual(got, []string{"lib.api.Expander", "lib.api.SafeExpander"}) {
-				t.Errorf("%s %s: replace(Object) inherited by %v, want both expanders", c.name, cve, got)
+			replace := "org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;"
+			if got, want := inh[replace], append([]string{"lib.api.Expander"}, strict...); !reflect.DeepEqual(got, want) {
+				t.Errorf("%s %s: %s inherited by %v, want %v", c.name, cve, replace, got, want)
+			}
+			if got, want := inh["org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/Object;)Ljava/lang/String;"], append([]string{"lib.api.Expander", "lib.api.SafeExpander"}, strict...); !reflect.DeepEqual(got, want) {
+				t.Errorf("%s %s: replace(Object) inherited by %v, want %v", c.name, cve, got, want)
+			}
+			if cve == "CVE-2025-48924" {
+				resolve := "org.apache.commons.text.StringSubstitutor#resolveVariable(Ljava/lang/String;Lorg/apache/commons/text/TextStringBuilder;II)Ljava/lang/String;"
+				if got := inh[resolve]; !reflect.DeepEqual(got, []string{"lib.api.Expander", "lib.api.SafeExpander", "lib.api.StrictExpander"}) {
+					t.Errorf("%s %s: resolveVariable inherited by %v, want all three expanders", c.name, cve, got)
+				}
 			}
 			if got := names[cve]; !reflect.DeepEqual(got, c.want) {
 				t.Errorf("%s %s: exposed %v, want %v", c.name, cve, got, c.want)

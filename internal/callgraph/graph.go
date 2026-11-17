@@ -248,7 +248,53 @@ type Graph struct {
 	// siteCuts[id] is the bytecode offset past which method id never
 	// runs in this analysis (CutSitesAfter).
 	siteCuts map[uint32]int
+	// origin[clone] is the method a receiver-specialized copy stands for
+	// (AddClone); clones[orig] lists its copies in creation order.
+	origin map[uint32]uint32
+	clones map[uint32][]uint32
 }
+
+// AddClone adds a copy of method orig with no edges and returns its id
+// (LIBRARY_MODE lb2-4: the method run on a known receiver class, whose
+// calls on `this` dispatch from that class). The copy renders as orig's
+// key, but lookups by name or key (ID, IDsByName, IDOfKey) still return
+// orig: a consumer folds a copy into its original with Origin. Add its
+// edges with SetCloneEdges.
+func (g *Graph) AddClone(orig uint32) uint32 {
+	if g.origin == nil {
+		g.origin, g.clones = map[uint32]uint32{}, map[uint32][]uint32{}
+	}
+	orig = g.Origin(orig)
+	id := uint32(len(g.keys))
+	g.keys = append(g.keys, g.keys[orig])
+	g.adjacency = append(g.adjacency, nil)
+	g.origin[id] = orig
+	g.clones[orig] = append(g.clones[orig], id)
+	return id
+}
+
+// SetCloneEdges sets a copy's outgoing edges; it panics for a method that
+// is not an AddClone copy.
+func (g *Graph) SetCloneEdges(clone uint32, edges []Edge) {
+	if _, ok := g.origin[clone]; !ok {
+		panic(fmt.Sprintf("callgraph: SetCloneEdges on node %d, not a clone", clone))
+	}
+	g.adjacency[clone] = edges
+}
+
+// Origin returns the method a clone copies, or id itself.
+func (g *Graph) Origin(id uint32) uint32 {
+	if o, ok := g.origin[id]; ok {
+		return o
+	}
+	return id
+}
+
+// Clones lists orig's AddClone copies.
+func (g *Graph) Clones(orig uint32) []uint32 { return g.clones[orig] }
+
+// CloneCount is how many AddClone copies the graph holds.
+func (g *Graph) CloneCount() int { return len(g.origin) }
 
 // Config returns the graph's construction metadata.
 func (g *Graph) Config() Config { return g.config }

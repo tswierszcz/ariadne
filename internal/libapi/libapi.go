@@ -18,8 +18,10 @@ import (
 // snapshots record it. lb2-1: ClientSites (LIBRARY_MODE LB2); lb2-2: a
 // class a client can construct is not a client-dispatch stand-in
 // (Constructible, measured on commons-configuration2); lb2-3: methods an
-// API class inherits from a dependency supertype are roots (Inherited).
-const Version = "lb2-3"
+// API class inherits from a dependency supertype are roots (Inherited);
+// lb2-4: each inherited root is specialized to the receiver class
+// (Specialize).
+const Version = "lb2-4"
 
 const (
 	accPrivate   = 0x0002
@@ -50,11 +52,14 @@ type Coverage struct {
 	Methods int `json:"methods"`
 	// Inherited counts the roots that are dependency methods an API class
 	// inherits (lb2-3); they are part of Methods.
-	Inherited int      `json:"inherited_methods"`
-	Providers int      `json:"providers"`
-	Excluded  []string `json:"excluded_packages,omitempty"`
-	JPMS      string   `json:"jpms"` // "exports" or "classpath"
-	Exports   []string `json:"exports,omitempty"`
+	Inherited int `json:"inherited_methods"`
+	// Specialized is what receiver specialization of the inherited
+	// roots did (lb2-4); set by the caller after Specialize.
+	Specialized *SpecializeStats `json:"receiver_specialization,omitempty"`
+	Providers   int              `json:"providers"`
+	Excluded    []string         `json:"excluded_packages,omitempty"`
+	JPMS        string           `json:"jpms"` // "exports" or "classpath"
+	Exports     []string         `json:"exports,omitempty"`
 }
 
 // Module reads the library's module-info (root or a multi-release
