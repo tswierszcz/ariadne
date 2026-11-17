@@ -1447,6 +1447,34 @@ For each CVE, in priority order:
    method: next to changed methods such a change is usually a constant
    those methods use, and its `<clinit>` runs whenever the class is used.
 
+   **Static-initializer-only mappings (2026-11-17).** For the same reason
+   a mapping (fix diff or release diff) that names only `<clinit>`s says
+   little: reaching one means the class was used. Such a row keeps its
+   verdict and carries the mapping qualifier `MAPPING_INITIALIZER_ONLY`
+   (v2 `mapping.initializer_only`). One family is handled by hand
+   (`internal/vulnmap/initializers.go`): jackson-databind's
+   polymorphic-typing "gadget" advisories, whose fixes only add class
+   names to the deserialization blocklist (`SubTypeValidator`'s static
+   set, `BeanDeserializerFactory`'s before 2.9). That initializer runs on
+   any Jackson deserialization, so every Jackson user used to get all of
+   them as `REACHABLE`; the blocklist matters only when default typing
+   (or class-name type ids) is enabled. A mapping made only of those two
+   initializers is replaced by the API that enables default typing —
+   `ObjectMapper#enableDefaultTyping`/`enableDefaultTypingAsProperty`/
+   `activateDefaultTyping`/`activateDefaultTypingAsProperty`/
+   `setDefaultTyping` and the `MapperBuilder` equivalents — with role
+   `entrypoint` (`MAPPING_ENTRYPOINT_ONLY`), the initializers kept as
+   evidence (v2 `mapping.initializer_redirect`) and a row note.
+   `@JsonTypeInfo(use = CLASS)` on an application type enables the same
+   resolution without any of those calls and is **not** covered: a
+   `NOT_REACHABLE` there carries `MAPPING_PARTIAL` like every partial
+   mapping. On jjwt-jackson 0.11.2 (databind 2.9.10.4) 21 of 36
+   `REACHABLE` advisories were this family; they are now `NOT_REACHABLE`
+   (`REACHABLE` 36 → 15 with `-roots all`, CHA and RTA; with library
+   mode's `-roots api` 36 → 15 under CHA, 35 → 14 under RTA).
+   On petclinic/WebGoat/JPetStore no verdict changed; the qualifier marks
+   2/2/3 rows (`UriComponentsBuilder#<clinit>`, `MimeTypeUtils#<clinit>`).
+
 3. **The released bytecode (CVE:F10, `-release-diff`, on by default).** For
    a CVE sources 1 and 2 left unmapped, the methods whose code differs
    between the last release before the fix and the fixing release, read
