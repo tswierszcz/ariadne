@@ -117,7 +117,7 @@ implement or override, dispatched to a library body that stands in for the clien
 
 | CVE | Component | API method | Pass | Example path character | Reaches |
 |---|---|---|---|---|---|
-{{range .Exposed}}| {{.CVE}} | `{{.GAV}}` | `{{.Method}}`{{if .InheritedBy}} (inherited by `{{.InheritedBy}}`){{end}} | {{.Pass}}{{if .ClientDispatch}}, client dispatch{{end}} | {{.Character}} | `{{.Via}}` |
+{{range .Exposed}}| {{.CVE}} | `{{.GAV}}` | `{{.Method}}`{{if .InheritedBy}} (inherited by `{{.InheritedBy}}`){{end}}{{if .AnnouncedBy}} (announced: {{.AnnouncedBy}}){{end}} | {{.Pass}}{{if .ClientDispatch}}, client dispatch{{end}} | {{.Character}} | `{{.Via}}` |
 {{end}}
 {{end}}
 {{if .SnapshotComparedWith}}

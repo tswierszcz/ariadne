@@ -258,7 +258,21 @@ override from outside its packages:
 - the providers the library registers in its own `META-INF/services` (their public
   no-argument constructor and the service methods they implement) — a consumer's
   `ServiceLoader` creates them;
-- not roots: `private` and package-private methods, members of inaccessible classes,
+- (`lb2-5`, 2026-11-17) the classes the library announces to Spring in its own jar, whatever
+  their access — every class of every key of `META-INF/spring.factories`, every class of a
+  `META-INF/spring/*.imports` file (Spring Boot 2.7+; key = file name without `.imports`).
+  An `EnableAutoConfiguration`/`AutoConfiguration` entry, or one annotated `@Configuration`
+  (`@AutoConfiguration`, `@SpringBootConfiguration`), is a configuration class: its
+  constructors and `<clinit>`, its `@Bean` methods (any access, static too), its methods
+  annotated `@Autowired`/`@Value`/`@Inject`/`@Resource`/`@PostConstruct`/`@PreDestroy`/
+  `@EventListener`, the public methods of container callbacks it implements
+  (`InitializingBean`, `DisposableBean`, `ImportSelector`, `ImportBeanDefinitionRegistrar`,
+  bean (factory) post-processors), its member classes annotated as configuration and its
+  `@Import` targets, transitively. Any other `spring.factories` entry is a factory Spring
+  instantiates and calls through the key's type: constructors, `<clinit>`, public instance
+  methods. Conditions (`@ConditionalOn…`, `@Profile`) are not evaluated — an entry "may
+  run". `-api-exclude` drops announced classes as it drops providers;
+- not roots (unless announced): `private` and package-private methods, members of inaccessible classes,
   synthetic and bridge methods (their targets are roots in their own right), lambda bodies.
 
 Two scopes narrow it, both reported: with `-jpms-scenario module-path` and a library
@@ -276,8 +290,8 @@ model. All reason codes keep their meaning.
 
 | Field | Content |
 |---|---|
-| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
-| `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
+| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `announced_by` (`lb2-5`; for an entry of an announced class, how it was announced: `<file> <key>: <class>`, then ` > member <class>` / ` > @Import <class>` per step), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
+| `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 

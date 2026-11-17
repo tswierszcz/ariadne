@@ -20,8 +20,9 @@ import (
 // (Constructible, measured on commons-configuration2); lb2-3: methods an
 // API class inherits from a dependency supertype are roots (Inherited);
 // lb2-4: each inherited root is specialized to the receiver class
-// (Specialize).
-const Version = "lb2-4"
+// (Specialize); lb2-5: classes the library announces to Spring are
+// entries (AnnouncedRoots).
+const Version = "lb2-5"
 
 const (
 	accPrivate   = 0x0002
@@ -56,10 +57,16 @@ type Coverage struct {
 	// Specialized is what receiver specialization of the inherited
 	// roots did (lb2-4); set by the caller after Specialize.
 	Specialized *SpecializeStats `json:"receiver_specialization,omitempty"`
-	Providers   int              `json:"providers"`
-	Excluded    []string         `json:"excluded_packages,omitempty"`
-	JPMS        string           `json:"jpms"` // "exports" or "classpath"
-	Exports     []string         `json:"exports,omitempty"`
+	// Announced counts the classes the library announces to a framework
+	// (lb2-5: spring.factories, META-INF/spring/*.imports, and what they
+	// pull in), whose entries are roots; Announcements lists the
+	// announcements read.
+	Announced     int            `json:"announced_classes"`
+	Announcements []Announcement `json:"announcements,omitempty"`
+	Providers     int            `json:"providers"`
+	Excluded      []string       `json:"excluded_packages,omitempty"`
+	JPMS          string         `json:"jpms"` // "exports" or "classpath"
+	Exports       []string       `json:"exports,omitempty"`
 }
 
 // Module reads the library's module-info (root or a multi-release

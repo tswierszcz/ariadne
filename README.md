@@ -889,7 +889,13 @@ instance methods an accessible class inherits from a dependency supertype
 without overriding them (`lb2-3`: `YAMLMapper#readValue` is
 `ObjectMapper#readValue`; v2 `exposed_api[].inherited_by` names the API
 classes, `coverage.api.inherited_methods` counts them), and the providers the library registers in its own
-`META-INF/services` — never `private`/package-private code, synthetic or
+`META-INF/services`, and (`lb2-5`) what it announces to Spring whatever its access — the
+classes in `META-INF/spring.factories` and `META-INF/spring/*.imports`: an
+autoconfiguration's constructors, `@Bean` methods (package-private ones
+too), injection/lifecycle methods, member `@Configuration` classes and
+`@Import`s, transitively; any other factory's constructors and public
+methods (v2 `exposed_api[].announced_by` gives the file, key and steps,
+`coverage.api.announced_classes`/`announcements` count them) — otherwise never `private`/package-private code, synthetic or
 bridge methods. `-api-exclude` drops package prefixes the user calls
 internal; with `-jpms-scenario module-path` and a `module-info`, only the
 unqualified `exports` count (and its `provides` replace
@@ -935,9 +941,9 @@ fields and parameters (`ObjectMapper#_jsonFactory`, a client's
 in a YAML exception's message); `coverage.api.receiver_specialization`
 counts copies, `this` sites, dropped edges and unanalyzed methods (their
 edges kept). Log lines
-`library API (lb2-4): …, N methods (M inherited from dependency
-supertypes), …, N client-code call sites (M to abstract
-methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
+`library API (lb2-5): …, N methods (M inherited from dependency
+supertypes, K more from C framework-announced classes in A
+announcements), …, N client-code call sites (M to abstract methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
 `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
 (…)`. Verified on `testdata/library` (cases in
 [EXPECTED.MD](testdata/library/EXPECTED.MD), written before the
@@ -953,8 +959,20 @@ protected `substitute` every inherited `replace` calls on `this`, is in
 `inherited_by` of the `replace` overloads for CVE-2022-42889 (they are its
 mapped code) but not for CVE-2025-48924, whose lookups only
 `StringSubstitutor#substitute` reaches — as the JVM shows
-(`observed-strict.txt`, `internal/libapi` `TestSpecialize`). `-roots all`
-and `profile` results are unchanged.
+(`observed-strict.txt`, `internal/libapi` `TestSpecialize`). Framework
+announcements (`lb2-5`) are verified on `testdata/library-autoconfig`, a
+control starter whose vulnerable code only Spring can reach (package-private
+`@Bean` methods, a nested configuration class, an `@Import`, a
+`spring.factories` listener, an `AutoConfiguration.imports` entry, a
+never-announced configuration; [EXPECTED.MD](testdata/library-autoconfig/EXPECTED.MD),
+real-JVM oracle `scripts/library-autoconfig-oracle.sh` on Spring Boot 2.4.5,
+`TestLibraryAutoconfig`, `TestAnnouncedRoots`): before, both advisories were
+`NOT_REACHABLE` although the JVM runs `replace`; now `REACHABLE`, with exactly
+the five announced entries exposed and the unannounced one not. On a real
+starter (mybatis-spring-boot-autoconfigure 2.1.2, `scripts/library-measure.sh`)
+9 classes are entries, verdicts and `exposed_api` are unchanged (its
+autoconfigurations are public already) and the entries gain `announced_by`.
+`-roots all` and `profile` results are unchanged.
 
 **JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
 2026-11-16).** `DriverManager#getConnection(url)` offers the URL to every
