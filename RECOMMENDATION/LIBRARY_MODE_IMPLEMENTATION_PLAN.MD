@@ -67,8 +67,10 @@ poprawka `lb2-2` (klasy konstruowalne przez klienta nie są zastępstwem); `lb2-
 użytkownika): metody odziedziczone z nadtypów zależności są API (jackson-yaml: 1 → 17
 `REACHABLE`); `lb2-4`: korzeń odziedziczony to kopia per klasa API, wywołania na `this`
 rozwiązywane od tej klasy (jackson-yaml: −1007 krawędzi CHA, `exposed_api` CVE-2025-49128
-101 → 87, werdykty bez zmian). Zostaje dla odziedziczonych: odbiorca w polu lub parametrze
-(`ObjectMapper#_jsonFactory`, `this` przekazany jako argument). **`lb2-5` DONE (2026-11-17):**
+101 → 87, werdykty bez zmian). Zostaje dla odziedziczonych: odbiorca w parametrze (`this`
+przekazany jako argument); odbiorca w polu nie jest tu nadmiarem — `ObjectMapper#_jsonFactory`
+to w JVM także `MappingJsonFactory` (`new YAMLMapper(null)`, sprawdzone 2026-11-18), więc reguła
+typu pola z konstruktorów nie dałaby na jackson zysku (punkt odłożony). **`lb2-5` DONE (2026-11-17):**
 klasy ogłaszane przez bibliotekę w `META-INF/spring.factories` i `META-INF/spring/*.imports`
 (z klasami zagnieżdżonymi `@Configuration` i `@Import`) są korzeniami z pochodzeniem
 (`exposed_api[].announced_by`), niezależnie od dostępu; fixture `testdata/library-autoconfig`
