@@ -1,0 +1,12 @@
+{
+  "key": "c9f88df09f2e0c0216952eb4f7c089c7286a91c6e4fb92666554c5db4ff8bbdd",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.11/commons-lang3-3.11.pom",
+  "fetched_at": "2026-11-18T09:06:50.043916661Z",
+  "validated_at": "2026-11-18T09:06:50.043916661Z",
+  "sha256": "980d665d83fed04665134f0578e507442a0e750691073784391b0a7988724a75",
+  "bytes": 30032,
+  "etag": "W/\"93fa4ac769eb32c3311cbe38f6fa9660\"",
+  "last_modified": "Sun, 12 Jul 2020 13:32:02 GMT"
+}

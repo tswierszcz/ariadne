@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Control library for LIBRARY_MODE LB3 (testdata/library-deps/EXPECTED.MD). -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>fx</groupId>
+  <artifactId>library-deps</artifactId>
+  <version>1.0</version>
+  <properties>
+    <text.range>[1.6,1.10.0)</text.range>
+  </properties>
+  <dependencies>
+    <!-- (p) the user brings commons-text; the library accepts a range -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>${text.range}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- (q) a consumer gets commons-lang3 3.11 through the library -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.11</version>
+    </dependency>
+    <!-- (r) a consumer gets commons-io 2.6 through the library; not in the analysis input -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.6</version>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- (s) optional: only users who add it themselves; not in the input -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-core</artifactId>
+      <version>5.3.0</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

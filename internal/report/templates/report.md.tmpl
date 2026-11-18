@@ -120,6 +120,21 @@ implement or override, dispatched to a library body that stands in for the clien
 {{range .Exposed}}| {{.CVE}} | `{{.GAV}}` | `{{.Method}}`{{if .InheritedBy}} (inherited by `{{.InheritedBy}}`){{end}}{{if .AnnouncedBy}} (announced: {{.AnnouncedBy}}){{end}} | {{.Pass}}{{if .ClientDispatch}}, client dispatch{{end}} | {{.Character}} | `{{.Via}}` |
 {{end}}
 {{end}}
+{{with .LibraryDeps}}
+## Library dependencies (library mode)
+
+LIBRARY_MODE LB3. {{if .POM}}Declarations read from `{{.POM}}` (`{{.Library}}`). A dependency is supplied by the
+**library** when a consumer gets it through the library's compile/runtime, non-optional declarations
+(transitively, nearest first, as Maven resolves them), by the **user** when it is provided, optional, or
+only reached through those; an input instance the library does not declare is **undeclared**. The
+findings above are for the versions in the input — a user of the library may resolve others.
+
+| Dependency | Supplied by | Scope | Declared through | Declared version | In the input | Version check |
+|---|---|---|---|---|---|---|
+{{range .Declared}}| `{{.Package}}` | {{.SuppliedBy}} | {{.Scope}}{{if .Optional}}, optional{{end}} | {{if .Via}}{{range $i, $v := .Via}}{{if $i}} > {{end}}`{{$v}}`{{end}}{{else}}{{if .Scope}}direct{{end}}{{end}} | {{if .Version}}`{{.Version}}`{{if and .Declared (ne .Declared .Version)}} (`{{.Declared}}`){{end}}{{else}}{{if .Scope}}unresolved{{end}}{{end}} | {{if .InstanceVersion}}`{{.InstanceVersion}}`{{else}}—{{end}} | {{.Match}} |
+{{end}}{{else}}The library's dependency declarations were not read.{{end}}{{range .Notes}}
+- {{.}}{{end}}
+{{end}}
 {{if .SnapshotComparedWith}}
 ## Changes since snapshot {{.SnapshotComparedWith}}
 

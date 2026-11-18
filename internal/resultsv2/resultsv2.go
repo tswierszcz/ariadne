@@ -157,6 +157,10 @@ type Component struct {
 	// several published versions — its version is one of these (identity
 	// "version_candidates", gav "group:artifact:{v1,v2}").
 	VersionCandidates []string `json:"version_candidates,omitempty"`
+	// Declaration (LIBRARY_MODE LB3, -roots api): how the library's pom
+	// declares this dependency instance and who supplies it to a user of
+	// the library.
+	Declaration *component.DeclaredDependency `json:"declaration,omitempty"`
 }
 
 // Relocation is one package relocation (CVE:F7a).
@@ -352,6 +356,12 @@ type Finding struct {
 	// ExposedAPI (LIBRARY_MODE LB1, -roots api): every API method from
 	// which the finding's mapped code is reached.
 	ExposedAPI []ExposedMethod `json:"exposed_api,omitempty"`
+	// SuppliedBy (LIBRARY_MODE LB3, -roots api): who supplies the
+	// finding's instance to a user of the library — "library" (a
+	// consumer gets it through the library's compile/runtime
+	// declarations), "user" (provided, optional, or only through those)
+	// or "undeclared"; see components[].declaration.
+	SuppliedBy string `json:"supplied_by,omitempty"`
 }
 
 // ExposedMethod is one API method reaching a finding's mapped code
@@ -445,6 +455,9 @@ type V1Row struct {
 
 // Inputs is everything Build needs.
 type Inputs struct {
+	// LibraryDeps (LIBRARY_MODE LB3): the library's dependency
+	// declarations, with -roots api; nil otherwise.
+	LibraryDeps *component.LibraryDependencies
 	ToolVersion string
 	Offline     bool
 	Inventory   *component.Inventory
@@ -538,6 +551,7 @@ func Build(in Inputs) Document {
 				Identity: "identified", Detection: string(inst.Detection), Classes: inst.Classes,
 				Shadowed: inst.Shadowed, ShadowedDiffering: differing[inst.ID], EmbeddedIn: inst.HostInstance,
 				Relocations: relocations(inst.Relocations), VersionCandidates: inst.VersionCandidates,
+				Declaration: in.LibraryDeps.ForInstance(inst.ID),
 			}
 			if inst.GAV != nil {
 				c.GAV = inst.Label()
@@ -650,6 +664,7 @@ func Build(in Inputs) Document {
 				RuntimeObserved:       in.RuntimeObserved[cve.ID][f.Instance],
 				RuntimeTraced:         in.RuntimeTraced[cve.ID][f.Instance],
 				ExposedAPI:            exposedMethods(f.ExposedAPI),
+				SuppliedBy:            suppliedBy(in.LibraryDeps, f.Instance),
 			})
 			counts.Findings++
 			counts.FindingsByReachability[string(f.Status)]++
@@ -820,4 +835,13 @@ func exposedMethods(xs []reach.ExposedMethod) []ExposedMethod {
 		out = append(out, ExposedMethod{Method: x.Method, Pass: x.Pass, Character: x.Character, Path: x.Path, PathEdges: x.PathEdges, ClientDispatch: x.ClientDispatch, InheritedBy: x.InheritedBy, AnnouncedBy: x.AnnouncedBy})
 	}
 	return out
+}
+
+// suppliedBy is the supplier of instance id under the library's
+// declarations ("" without them, or for an instance they do not cover).
+func suppliedBy(d *component.LibraryDependencies, id string) string {
+	if x := d.ForInstance(id); x != nil {
+		return x.SuppliedBy
+	}
+	return ""
 }

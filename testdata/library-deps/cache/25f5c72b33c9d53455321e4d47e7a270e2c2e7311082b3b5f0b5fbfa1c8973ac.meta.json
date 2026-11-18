@@ -1,0 +1,12 @@
+{
+  "key": "25f5c72b33c9d53455321e4d47e7a270e2c2e7311082b3b5f0b5fbfa1c8973ac",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/commons-io/commons-io/2.6/commons-io-2.6.pom",
+  "fetched_at": "2026-11-18T09:06:50.184582427Z",
+  "validated_at": "2026-11-18T09:06:50.184582427Z",
+  "sha256": "0c23863893a2291f5a7afdbd8d15923b3948afd87e563fa341cdcf6eae338a60",
+  "bytes": 14256,
+  "etag": "W/\"142e515fa628cd8379aaac94ab237a8c\"",
+  "last_modified": "Sun, 15 Oct 2017 10:00:52 GMT"
+}

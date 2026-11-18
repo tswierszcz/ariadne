@@ -1,0 +1,12 @@
+{
+  "key": "f20ecf5d52c7cd82c4b745e4a8fa9e94d962c412b9fdad146ddce3bdeb05710f",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/org/apache/apache/23/apache-23.pom",
+  "fetched_at": "2026-11-18T09:06:50.163515346Z",
+  "validated_at": "2026-11-18T09:06:50.163515346Z",
+  "sha256": "bc10624e0623f36577fac5639ca2936d3240ed152fb6d8d533ab4d270543491c",
+  "bytes": 18422,
+  "etag": "W/\"299e015affdc6b789dab3a2f72c73fef\"",
+  "last_modified": "Wed, 22 Jan 2020 15:11:04 GMT"
+}

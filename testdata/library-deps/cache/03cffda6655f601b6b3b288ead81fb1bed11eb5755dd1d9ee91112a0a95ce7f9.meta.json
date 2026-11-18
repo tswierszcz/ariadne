@@ -1,0 +1,12 @@
+{
+  "key": "03cffda6655f601b6b3b288ead81fb1bed11eb5755dd1d9ee91112a0a95ce7f9",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/org/springframework/spring-jcl/5.3.0/spring-jcl-5.3.0.pom",
+  "fetched_at": "2026-11-18T09:06:50.330162544Z",
+  "validated_at": "2026-11-18T09:06:50.330162544Z",
+  "sha256": "2ddd369efd0c9b3ae27536c37ae2b0a3b98f93c80822f006706419d3ad919897",
+  "bytes": 1832,
+  "etag": "W/\"82c880d2625217f547af6451e280e2ba\"",
+  "last_modified": "Tue, 27 Oct 2020 15:48:04 GMT"
+}

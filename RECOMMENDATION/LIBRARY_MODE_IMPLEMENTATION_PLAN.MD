@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie); LB3–LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 nierozpoczęte; zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -92,6 +92,14 @@ Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfig
 Gotowe: callback klienta jest jawną luką, autokonfiguracja biblioteki — korzeniem.
 
 ## LB3. Wersje zależności
+
+Postęp: **lb3-1 DONE (2026-11-18)** — pom biblioteki (wbudowany albo `-library-pom`) z rodzicami
+i importowanymi BOM-ami; drzewo konsumenta jak w Mavenie (`compile`/`runtime` bez `optional`,
+przechodnio, najbliższy wygrywa, `exclusions`); `supplied_by` (`library`/`user`/`undeclared`) i
+`version_match` per instancja (`coverage.api.dependencies`, `components[].declaration`,
+`findings[].supplied_by`); fixture `testdata/library-deps` z wyrocznią Maven 3.9. Zostaje z LB3:
+ocena advisory dla innych wersji z zakresu, `MAPPING_VERSION_UNCOVERED`. Przy okazji: dostęp do
+Maven Central przez lokalne repozytorium (`ARIADNE_MAVEN_LOCAL`), bez ponawiania po 429.
 
 Zależności: LB1, CVE F4 (wersjonowane mapowania).
 

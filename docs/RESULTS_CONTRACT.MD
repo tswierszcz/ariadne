@@ -226,7 +226,7 @@ A library jar answers a different question than an application: whether anyone u
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
-api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap.
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations.
 Member-class accessibility follows the class's own access flag and its enclosing classes
 (a `protected` member class is compiled `public` and counts as accessible).
 
@@ -291,7 +291,9 @@ model. All reason codes keep their meaning.
 | Field | Content |
 |---|---|
 | `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `announced_by` (`lb2-5`; for an entry of an announced class, how it was announced: `<file> <key>: <class>`, then ` > member <class>` / ` > @Import <class>` per step), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
-| `coverage.api` | with `-roots api`: `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
+| `findings[].supplied_by` | (`lb3-1`, 2026-11-18) with `-roots api`: who supplies the finding's instance to a user of the library — `library`, `user` or `undeclared` (see "Dependency declarations"); absent for an instance the declarations do not cover. |
+| `components[].declaration` | (`lb3-1`) with `-roots api`: the declaration matched to that instance, as in `coverage.api.dependencies.declared[]`. |
+| `coverage.api` | with `-roots api`: `dependencies` (`lb3-1`: `pom`, `library`, `declared[]`, `notes[]` — see "Dependency declarations"), `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 
@@ -317,9 +319,46 @@ entry is `client_dispatch: true` when every path from it in its pass contains a 
 dispatch; otherwise its example path avoids them. Not yet: vulnerable code reached only
 after a client call returns is not marked conditional.
 
+**Dependency declarations (LB3, `lb3-1`, 2026-11-18).** The versions analyzed are the
+input's; a user of the library may get others, and some dependencies only exist if the user
+adds them. With `-roots api` the library's own pom is read — the one embedded in the jar
+(`META-INF/maven/<group>/<artifact>/pom.xml`; with several, the one whose artifactId names the
+jar file), or `-library-pom` — with its parents and their properties and
+`dependencyManagement` (versions and scopes, including BOMs it imports with `scope import`; the
+pom's own and inherited entries win over imports, the first import over later ones), fetched
+from Maven Central through the cache (a local Maven repository first with `ARIADNE_MAVEN_LOCAL`). The
+tree a *consumer* of the library gets is built as Maven builds it: the library's `compile` and
+`runtime` declarations that are not `optional`, then, transitively, every `compile`/`runtime`,
+non-`optional` declaration of their poms (each followed at the version in the input when it
+satisfies the declaration, else at the declared exact version; a range with no instance inside
+it is not followed), nearest first, a declaration's `exclusions` applying below it, scopes
+combined as Maven does (`runtime` above `compile` gives `runtime`), at most 6 levels. Every
+dependency of that tree has `supplied_by: library`. The library's `provided`, `system` and
+`optional` declarations, and what reaches the tree only through them, have `supplied_by: user`
+(`provided` is not transitive; `optional` exists only when the user adds it). `test` scope is
+not published and is ignored. An input dependency instance (identified, not embedded) the tree
+does not contain is `undeclared`. Each `declared[]` entry: `package` (`group:artifact`),
+`supplied_by`, `scope`, `optional`, `via` (the dependencies it is declared through, nearest the
+library first; empty when direct), `declared` (the version as written), `version` (resolved:
+exact version or range; empty when unresolved), `instance`/`instance_version` (the matching input
+instance) and `version_match`: `declared` (the declared exact version), `differs`, `in_range`,
+`out_of_range`, `undetermined` (the instance's version cannot be ordered), `unresolved` (the
+declared version is not known), `unidentified` (no identified instance, but an unidentified
+input jar is named `<artifact>-<version>.jar` — a jar without `pom.properties`; `instance` names
+it, `-deps-list` identifies it), `absent` (no instance in the input). For `absent` and
+`unidentified` the dependency's advisories are not assessed; a warning names each such
+dependency supplied by the library. What cannot be read
+(no pom, unavailable parent or dependency pom, unresolved property) is a note, never an error.
+Declarations change no verdict and no reason code. Not yet: advisories for other versions a
+user can get (the declared range, the newest release of the line) and `MAPPING_VERSION_UNCOVERED`;
+Gradle module metadata; profiles in the library's pom. Instances embedded in another jar
+(CVE:F6a) come with their host and carry no `supplied_by`.
+
 **Control library:** [testdata/library/](../testdata/library/EXPECTED.MD) — cases (a)–(f)
 with the expected roots, `exposed_api` and verdicts written before LB1, checked against
-the real JVM (`scripts/library-oracle.sh`).
+the real JVM (`scripts/library-oracle.sh`). Dependency declarations:
+[testdata/library-deps/](../testdata/library-deps/EXPECTED.MD) — `supplied_by: library` equals
+what Maven 3.9 resolves for a consumer of the library (`scripts/library-deps-oracle.sh`).
 
 ## Gap vocabulary
 
