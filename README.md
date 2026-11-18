@@ -1012,7 +1012,13 @@ databind); for the mybatis autoconfigure jar 8 Spring Boot/Spring jars
 come through `spring-boot-autoconfigure` and are `unidentified` in the
 input (their advisories were never assessed in that measurement), mybatis
 and mybatis-spring are optional (user), and 9 input jars are undeclared
-(the starter brings them). Not yet:
+(the starter brings them). Since 2026-11-18 the measurement passes the
+`mvn dependency:list` of each library as `-deps-list`: the Spring jars are
+identified, and the starter has 39 findings instead of 19 — 20 new on
+spring-boot/-autoconfigure/-beans/-context/-core/-expression, all supplied
+by the library, 13 `REACHABLE` from the API under CHA (11 under RTA),
+among them CVE-2022-22965 (spring-beans) and 8 SpEL advisories; the other
+three libraries are unchanged. Not yet:
 advisories for the other versions a user can get (the declared range).
 `-roots all` and `profile` results are unchanged.
 
