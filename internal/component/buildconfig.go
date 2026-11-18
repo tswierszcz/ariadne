@@ -67,6 +67,14 @@ type pomDep struct {
 	Type       string `xml:"type"`
 	Classifier string `xml:"classifier"`
 	Optional   string `xml:"optional"`
+	// Exclusions (LIBRARY_MODE LB3): the transitive dependencies this
+	// declaration leaves out; "*" matches any group or artifact.
+	Exclusions []pomExclusion `xml:"exclusions>exclusion"`
+}
+
+type pomExclusion struct {
+	GroupID    string `xml:"groupId"`
+	ArtifactID string `xml:"artifactId"`
 }
 
 type pomProp struct {
@@ -96,7 +104,10 @@ type pomCtx struct {
 	pom     *pomFile
 	props   map[string]string
 	managed map[string]string // group:artifact -> raw version
-	notes   []string
+	// managedScope (LIBRARY_MODE LB3): group:artifact -> the scope
+	// dependencyManagement gives a declaration without its own.
+	managedScope map[string]string
+	notes        []string
 }
 
 func parsePOM(b []byte) (*pomFile, error) {
@@ -115,6 +126,9 @@ type pomResolver struct {
 	fetch ReferenceFetcher
 	base  string
 	seen  map[string]*pomCtx
+	// imports (LIBRARY_MODE LB3) reads BOMs imported in
+	// dependencyManagement; off for CVE:F6b, which predates it.
+	imports bool
 }
 
 func (r *pomResolver) load(g input.GAV, depth int) (*pomCtx, error) {
@@ -141,7 +155,7 @@ func (r *pomResolver) load(g input.GAV, depth int) (*pomCtx, error) {
 
 // effective merges p over its parent chain (fetched while depth allows).
 func (r *pomResolver) effective(p *pomFile, depth int) *pomCtx {
-	c := &pomCtx{pom: p, props: map[string]string{}, managed: map[string]string{}}
+	c := &pomCtx{pom: p, props: map[string]string{}, managed: map[string]string{}, managedScope: map[string]string{}}
 	if p.Parent.ArtifactID != "" && p.Parent.Version != "" {
 		pg := input.GAV{Group: p.Parent.GroupID, Artifact: p.Parent.ArtifactID, Version: p.Parent.Version}
 		if depth >= maxPOMDepth {
@@ -154,6 +168,9 @@ func (r *pomResolver) effective(p *pomFile, depth int) *pomCtx {
 			}
 			for k, v := range pc.managed {
 				c.managed[k] = v
+			}
+			for k, v := range pc.managedScope {
+				c.managedScope[k] = v
 			}
 			c.notes = append(c.notes, pc.notes...)
 		}
@@ -177,11 +194,51 @@ func (r *pomResolver) effective(p *pomFile, depth int) *pomCtx {
 	c.props["project.artifactId"] = p.ArtifactID
 	c.props["project.parent.version"] = p.Parent.Version
 	c.props["project.parent.groupId"] = p.Parent.GroupID
+	var imports []pomDep
 	for _, d := range p.Managed {
-		if d.Scope == "import" {
+		if strings.TrimSpace(d.Scope) == "import" {
+			imports = append(imports, d)
 			continue
 		}
-		c.managed[c.resolve(d.GroupID)+":"+c.resolve(d.ArtifactID)] = d.Version
+		key := c.resolve(d.GroupID) + ":" + c.resolve(d.ArtifactID)
+		c.managed[key] = d.Version
+		if sc := strings.TrimSpace(d.Scope); sc != "" {
+			c.managedScope[key] = sc
+		}
+	}
+	// LIBRARY_MODE LB3: imported BOMs (scope import) add the managed
+	// versions and scopes the pom and its parents do not already give,
+	// the first import first — as Maven does. Their versions are resolved
+	// against the BOM's own properties.
+	for _, d := range imports {
+		if !r.imports {
+			break
+		}
+		bg := input.GAV{Group: c.resolve(d.GroupID), Artifact: c.resolve(d.ArtifactID), Version: c.resolve(d.Version)}
+		switch {
+		case bg.Group == "" || bg.Artifact == "" || bg.Version == "":
+			c.notes = append(c.notes, fmt.Sprintf("imported BOM %s:%s:%s unresolved", d.GroupID, d.ArtifactID, d.Version))
+			continue
+		case depth >= maxPOMDepth:
+			c.notes = append(c.notes, fmt.Sprintf("imported BOM %s not read (depth limit %d)", bg, maxPOMDepth))
+			continue
+		}
+		bc, err := r.load(bg, depth+1)
+		if err != nil {
+			c.notes = append(c.notes, fmt.Sprintf("imported BOM %s unavailable: %v", bg, err))
+			continue
+		}
+		c.notes = append(c.notes, bc.notes...)
+		for k, v := range bc.managed {
+			if _, ok := c.managed[k]; !ok {
+				c.managed[k] = bc.resolve(v)
+			}
+		}
+		for k, v := range bc.managedScope {
+			if _, ok := c.managedScope[k]; !ok {
+				c.managedScope[k] = v
+			}
+		}
 	}
 	return c
 }

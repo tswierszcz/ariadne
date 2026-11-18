@@ -114,7 +114,11 @@ jar/WAR/EAR) is then resolved to a Maven coordinate, in priority order:
    jar's own project (same version, related group) is part of the jar; a
    separate library is compared class by class with its jar of exactly
    that version from Maven Central (`ARIADNE_MAVEN_CENTRAL` overrides the
-   repository root). When its classes are there (same bytes, or the same
+   repository root; `ARIADNE_MAVEN_LOCAL=~/.m2/repository` reads files a
+   local Maven repository downloaded from a remote one before the network —
+   Central rate-limits automated clients (HTTP 429, met 2026-11-18): run
+   online once, then `-offline`; after a 429 nothing more is sent to it in
+   that run, and a failed URL is not asked twice). When its classes are there (same bytes, or the same
    content after a shading tool rewrote them), it becomes its own
    component instance inside the jar, with its own OSV lookup and its
    own findings; otherwise it is listed as an unconfirmed candidate
@@ -941,7 +945,7 @@ fields and parameters (`ObjectMapper#_jsonFactory`, a client's
 in a YAML exception's message); `coverage.api.receiver_specialization`
 counts copies, `this` sites, dropped edges and unanalyzed methods (their
 edges kept). Log lines
-`library API (lb2-5): …, N methods (M inherited from dependency
+`library API (lb3-1): …, N methods (M inherited from dependency
 supertypes, K more from C framework-announced classes in A
 announcements), …, N client-code call sites (M to abstract methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
 `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
@@ -972,6 +976,44 @@ the five announced entries exposed and the unannounced one not. On a real
 starter (mybatis-spring-boot-autoconfigure 2.1.2, `scripts/library-measure.sh`)
 9 classes are entries, verdicts and `exposed_api` are unchanged (its
 autoconfigurations are public already) and the entries gain `announced_by`.
+**Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
+the versions in `-deps`, but a user of the library may get others, and some
+dependencies exist only if the user adds them. With `-roots api` the
+library's own pom — embedded in the jar (`META-INF/maven/<g>/<a>/pom.xml`)
+or given with `-library-pom` — is read with its parents (properties,
+`dependencyManagement`), and the tree a consumer gets is built as Maven
+does: compile/runtime, non-optional declarations, transitively through
+their poms from Central (via the cache), nearest first, exclusions
+honoured. Those dependencies are `supplied_by: library`; `provided`,
+`system` and `optional` ones, and what comes only through them, are
+`user`; an input jar the library does not declare is `undeclared`. v2
+`coverage.api.dependencies` lists every declaration (scope, `via`,
+declared and resolved version, the matching instance and
+`version_match`: `declared`, `differs`, `in_range`, `out_of_range`,
+`absent`, …), `components[].declaration` and `findings[].supplied_by`
+repeat it per instance; the report has a "Library dependencies" table,
+and a warning names each dependency a consumer gets through the library
+that is missing from the input (its advisories are not assessed). Log
+line `library dependencies (lb3-1): <pom> (<gav>): N supplied by the
+library (M not in the input), …`. Verified on `testdata/library-deps`
+([EXPECTED.MD](testdata/library-deps/EXPECTED.MD), `TestLibraryDeps`,
+`internal/component` `TestLibraryDeclarations`): the set the library
+supplies equals what Maven 3.9 resolves for a consumer
+(`scripts/library-deps-oracle.sh`). Versions managed by an imported BOM
+(`scope import`, e.g. Spring Boot's) are resolved. A declared dependency
+whose jar is in the input without an identity (no `pom.properties`) is
+`unidentified`, with a warning. On the four measured libraries
+(`scripts/library-measure.sh`, offline, `ARIADNE_MAVEN_LOCAL`), verdicts
+and `exposed_api` are identical to `lb2-5`; commons-configuration2 has 3
+dependencies supplied by the library and 17 optional ones by the user;
+jackson-dataformat-yaml and jjwt-jackson 4 each, all supplied by the
+library at the declared versions (jackson-core/-annotations through
+databind); for the mybatis autoconfigure jar 8 Spring Boot/Spring jars
+come through `spring-boot-autoconfigure` and are `unidentified` in the
+input (their advisories were never assessed in that measurement), mybatis
+and mybatis-spring are optional (user), and 9 input jars are undeclared
+(the starter brings them). Not yet:
+advisories for the other versions a user can get (the declared range).
 `-roots all` and `profile` results are unchanged.
 
 **JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
@@ -1927,6 +1969,7 @@ Flags:
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, `stripes`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners), `profile` (the active profile's own entry points, plus the same `web.xml` methods) or `api` (library mode, below: the `-app` jar is a library and its public API is the roots). |
+| `-library-pom` | no | With `-roots api`: the library's `pom.xml`, read for its dependency declarations (LIBRARY_MODE LB3) — for a library jar that embeds none (e.g. a Gradle build); default: the pom in the jar's `META-INF/maven/`. |
 | `-api-exclude` | no | With `-roots api`: comma-separated package prefixes left out of the API (`com.example.internal`). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |
 | `-jpms-scenario` | no | ServiceLoader launch scenario (SERVICE_LOADING S3): `classpath` (default — every jar in the unnamed module, `module-info.class` ignored, providers from `META-INF/services`) or `module-path` (every jar, the app included, on the module path: explicit modules provide only through `provides`, a provider with `public static provider()` is created through it, automatic modules provide through `META-INF/services` with a constructor, and a caller in an explicit module must declare `uses`), or `mixed` (only the `-jpms-module-path` jars on the module path, every other jar on the class path; module-path modules assumed resolved as with `--add-modules ALL-MODULE-PATH`). Recorded in the report header; `results.json`'s format is unchanged. |

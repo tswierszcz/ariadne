@@ -6,7 +6,8 @@
 # library, deps/ its runtime dependencies — and runs bin/ariadne on each
 # with -roots all and -roots api, under CHA and RTA, printing one summary
 # line per run. Results of 2026-11-17: RECOMMENDATION/IMPLEMENTATION_STATUS.MD
-# (LIBRARY_MODE:LB2 pomiar, lb2-5 for the starter).
+# (LIBRARY_MODE:LB2 pomiar, lb2-5 for the starter, lb3-1 for the
+# dependency declarations).
 #
 # Usage: scripts/library-measure.sh [OUTDIR] [extra ariadne args, e.g. -offline]
 set -euo pipefail
@@ -43,6 +44,10 @@ EOF
   fi
 done
 
+# Poms (LB3) and reference jars come from the local Maven repository the
+# step above filled, before the cache and the network (Maven Central
+# rate-limits automated clients: run once online, then with -offline).
+export ARIADNE_MAVEN_LOCAL="${ARIADNE_MAVEN_LOCAL:-$HOME/.m2/repository}"
 mkdir -p "$out"
 for spec in "${libs[@]}"; do
   name="${spec%%:*}"
@@ -70,4 +75,12 @@ for name in ["configuration2", "jackson-yaml", "jjwt-jackson", "mybatis-starter"
             ann = j["coverage"].get("api", {}).get("announced_classes")
             print(f"{name:15} {roots:3} {mode}: {st} api_methods={api} announced_classes={ann} exposed_sum={sum(exp)} exposed_max={max(exp) if exp else 0} "
                   f"client_code(sites,reachable)={cc} client_dispatch={cd}")
+            deps = j["coverage"].get("api", {}).get("dependencies")
+            if deps:
+                by = dict(collections.Counter(d["supplied_by"] for d in deps["declared"]))
+                absent = sum(1 for d in deps["declared"] if d.get("version_match") == "absent" and d["supplied_by"] == "library")
+                vm = dict(collections.Counter(d.get("version_match") for d in deps["declared"] if d.get("instance")))
+                fs = dict(collections.Counter((f["reachability"], f.get("supplied_by")) for f in j["findings"]))
+                print(f"{'':15} lb3: pom={deps['pom'] or '-'} supplied_by={by} library_absent={absent} input_match={vm} notes={len(deps.get('notes', []))}")
+                print(f"{'':15} lb3: findings (reachability, supplied_by)={fs}")
 PY

@@ -150,6 +150,9 @@ type Data struct {
 	// Exposed (LIBRARY_MODE LB1, -roots api): per advisory × instance,
 	// the API methods reaching the mapped code.
 	Exposed []ExposedRow
+	// LibraryDeps (LIBRARY_MODE LB3, -roots api): the library pom's
+	// dependency declarations and who supplies each; set by the caller.
+	LibraryDeps *component.LibraryDependencies
 	// Withdrawn are advisories whose every OSV record is withdrawn: listed,
 	// not analyzed (CVE:F2).
 	Withdrawn []cves.CVE

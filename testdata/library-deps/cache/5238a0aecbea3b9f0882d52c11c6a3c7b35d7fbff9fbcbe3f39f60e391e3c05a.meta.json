@@ -1,0 +1,12 @@
+{
+  "key": "5238a0aecbea3b9f0882d52c11c6a3c7b35d7fbff9fbcbe3f39f60e391e3c05a",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/org/apache/apache/18/apache-18.pom",
+  "fetched_at": "2026-11-18T09:06:50.239104213Z",
+  "validated_at": "2026-11-18T09:06:50.239104213Z",
+  "sha256": "7831307285fd475bbc36b20ae38e7882f11c3153b1d5930f852d44eda8f33c17",
+  "bytes": 15667,
+  "etag": "W/\"e481817f3ac9e2b5a08584054012093f\"",
+  "last_modified": "Sun, 15 May 2016 20:52:10 GMT"
+}

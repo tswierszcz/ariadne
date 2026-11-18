@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -74,6 +73,7 @@ type config struct {
 	githubToken     string // GITHUB_TOKEN: authenticates fix-commit metadata requests (CVE:F5)
 	releaseDiff     bool   // CVE:F10: map from the bytecode of the releases around the fix
 	centralURL      string // ARIADNE_MAVEN_CENTRAL: repository root for embedded-component reference jars (CVE:F6a); default Maven Central
+	mavenLocal      string // ARIADNE_MAVEN_LOCAL: local Maven repository read before the network (centralClient); "" = none
 	app             string
 	deps            string
 	depsList        string
@@ -102,6 +102,7 @@ type config struct {
 	activeProfiles string
 	jpmsScenario   string
 	apiExclude     string
+	libraryPOM     string
 	jpmsModulePath string
 	taint          bool
 	callgraphMode  string
@@ -147,6 +148,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.sbom, "sbom", "", "CycloneDX JSON SBOM (spec 1.4-1.6): components nested in a component whose SHA-256 is an analyzed dependency jar's become embedded-component candidates of that jar, verified by their classes (CVE:F6b); nothing else from the SBOM is used")
 	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
 	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default), "profile" (only the active profile's entry points: annotated methods/classes, main) or "api" (library mode: the -app jar is a library, its public API — what a user can call or override — is the roots, and findings list the exposed API methods)`)
+	fs.StringVar(&cfg.libraryPOM, "library-pom", "", "with -roots api: the library's pom.xml, read for its dependency declarations (LIBRARY_MODE LB3); default: the pom embedded in the library jar (META-INF/maven/<group>/<artifact>/pom.xml)")
 	fs.StringVar(&cfg.apiExclude, "api-exclude", "", `with -roots api: comma-separated package prefixes left out of the API (e.g. "com.example.internal")`)
 	fs.IntVar(&cfg.targetJava, "target-java", 0, "Java feature version (e.g. 11, 17) to resolve multi-release JAR variants against; unset falls back to every jar's base classes, not the highest bytecode version seen (JVM_GRAPH G4)")
 	fs.StringVar(&cfg.activeProfiles, "active-profiles", "", "comma-separated Spring profile names to treat as active when evaluating @Profile conditions (FRAMEWORKS F1); unset reports every @Profile condition as unknown, never a guessed false")
@@ -196,6 +198,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 
 	cfg.githubToken = getenv("GITHUB_TOKEN")
 	cfg.centralURL = getenv("ARIADNE_MAVEN_CENTRAL")
+	cfg.mavenLocal = mavenLocal(getenv("ARIADNE_MAVEN_LOCAL"))
 	if cfg.llm || cfg.exploitCheck || cfg.frameworkCheck {
 		cfg.llmConfig = vulnmap.LLMConfigFromEnv(getenv)
 		if cfg.llmModel != "" {
@@ -251,6 +254,9 @@ func validate(cfg config) error {
 	}
 	if cfg.roots != "all" && cfg.roots != "profile" && cfg.roots != "api" {
 		return fmt.Errorf("-roots must be %q, %q or %q, got %q", "all", "profile", "api", cfg.roots)
+	}
+	if cfg.libraryPOM != "" && cfg.roots != "api" {
+		return fmt.Errorf("-library-pom needs -roots api")
 	}
 	for _, s := range strings.Split(cfg.runtimeStatus, ",") {
 		switch reach.Status(strings.TrimSpace(s)) {
@@ -1045,13 +1051,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	// CVE:F6a: embedded components, confirmed by their classes against
 	// the Maven Central reference jar of the declared version.
-	if err := components.ResolveEmbedded(ctx, func(ctx context.Context, url string) ([]byte, error) {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return nil, err
-		}
-		return httpcache.Fetch(http.DefaultClient, cache, httpcache.Key("GET", url), httpcache.KindForURL(url), req)
-	}, cfg.centralURL, h, embeddedDecls); err != nil {
+	centralBase := cfg.centralURL
+	if centralBase == "" {
+		centralBase = component.CentralBaseURL
+	}
+	central := &centralClient{cache: cache, base: strings.TrimRight(centralBase, "/"), local: cfg.mavenLocal, userAgent: "ariadne/" + version()}
+	centralFetch := central.fetch
+	if err := components.ResolveEmbedded(ctx, centralFetch, cfg.centralURL, h, embeddedDecls); err != nil {
 		return fmt.Errorf("resolving embedded components: %w", err)
 	}
 	embConfirmed, embUnconfirmed, embModules := components.EmbeddedCounts()
@@ -1220,6 +1226,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var clientConstructible func(string) bool
 	var apiInherited map[uint32][]string
 	var apiAnnounced map[uint32][]string
+	var libDeps *component.LibraryDependencies
 	if cfg.roots == "api" {
 		// LIBRARY_MODE LB1: the library's public API (docs/RESULTS_CONTRACT.MD §8).
 		mod, err := libapi.Module(prepared.AppClassesJar)
@@ -1253,6 +1260,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		newAnnounced := 0
 		roots, newAnnounced = appendNewRoots(roots, announcedRoots)
 		cov.Methods = len(roots)
+		// LIBRARY_MODE LB3: who supplies each dependency to a user of the
+		// library, from the library's own pom.
+		libDeps = components.LibraryDeclarations(ctx, centralFetch, cfg.centralURL, prepared.AppClassesJar, filepath.Base(cfg.app), cfg.libraryPOM)
+		cov.Dependencies = libDeps
+		logLibraryDeps(log, libDeps)
+		for _, d := range libDeps.Declared {
+			if d.SuppliedBy != component.SuppliedByLibrary {
+				continue
+			}
+			switch d.Match {
+			case component.MatchAbsent:
+				warnings = append(warnings, fmt.Sprintf("library mode: %s %s reaches users through the library (%s) but is not in the input; its advisories are not assessed", d.Package, orUnresolved(d.Version), declarationPath(d)))
+			case component.MatchUnidentified:
+				warnings = append(warnings, fmt.Sprintf("library mode: %s %s reaches users through the library (%s); its jar %s is in the input but unidentified (no pom.properties; -deps-list identifies it), so its advisories are not assessed", d.Package, orUnresolved(d.Version), declarationPath(d), strings.TrimPrefix(components.InstanceLocation(d.Instance), "deps:")))
+			}
+		}
 		apiCoverage = &cov
 		// LIBRARY_MODE LB2: the calls a client can implement or override.
 		clientSites = libapi.ClientSites(h, mod, apiOpt)
@@ -1771,8 +1794,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
+	if central.limited != nil {
+		warnings = append(warnings, fmt.Sprintf("maven repository: %v; files it was asked for are missing from this run (see the notes); use ARIADNE_MAVEN_LOCAL or a caching proxy (ARIADNE_MAVEN_CENTRAL)", central.limited))
+	}
 	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
 	data.Modules = moduleInventory
+	data.LibraryDeps = libDeps
 	data.Components = components
 	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded,
 		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
@@ -1794,7 +1821,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	//
 	// The v2 document is built on every run so that its v1 export is
 	// checked against the engine's v1 rows (contract §5) either way.
+	if st := central.stats; st.Local+st.Network+st.Failed+st.Skipped > 0 {
+		log("maven repository %s: %d files from the local repository %s, %d fetched (or from the cache), %d failed, %d not requested again%s",
+			central.base, st.Local, orNone(central.local), st.Network, st.Failed, st.Skipped, limitedNote(central.limited))
+	}
 	doc := resultsv2.Build(resultsv2.Inputs{
+		LibraryDeps: libDeps,
 		ToolVersion: version(), Offline: cfg.offline, Inventory: components, CVEs: cveList, Mappings: vm, Results: results,
 		Freshness:         resultsv2.DataFreshness{State: freshnessState, TTL: cfg.dataTTL.String(), MaxAge: maxAgeString(cfg.maxDataAge), Kinds: freshness},
 		Withdrawn:         resolution.Withdrawn,
@@ -2261,4 +2293,57 @@ func apiExcludeNote(exclude []string) string {
 		return ""
 	}
 	return "; excluded " + strings.Join(exclude, ", ")
+}
+
+// logLibraryDeps logs the library's dependency declarations (LB3).
+func logLibraryDeps(log func(string, ...any), d *component.LibraryDependencies) {
+	if d.POM == "" {
+		log("library dependencies (%s): not read: %s", libapi.Version, strings.Join(d.Notes, "; "))
+		return
+	}
+	lib, libAbsent := d.Count(component.SuppliedByLibrary)
+	user, userAbsent := d.Count(component.SuppliedByUser)
+	undeclared, _ := d.Count(component.SuppliedUndeclared)
+	differ := 0
+	for _, x := range d.Declared {
+		if x.Match == component.MatchDiffers || x.Match == component.MatchOutOfRange {
+			differ++
+		}
+	}
+	log("library dependencies (%s): %s (%s): %d supplied by the library (%d not in the input), %d by the user (provided/optional; %d not in the input), %d input instances undeclared, %d with another version than declared",
+		libapi.Version, d.POM, d.Library, lib, libAbsent, user, userAbsent, undeclared, differ)
+	for _, n := range d.Notes {
+		log("library dependencies: %s", n)
+	}
+}
+
+func orUnresolved(v string) string {
+	if v == "" {
+		return "(version unresolved)"
+	}
+	return v
+}
+
+// declarationPath says how a dependency is declared: "direct, runtime"
+// or "via a > b, compile".
+func declarationPath(d component.DeclaredDependency) string {
+	s := "direct"
+	if len(d.Via) > 0 {
+		s = "via " + strings.Join(d.Via, " > ")
+	}
+	return s + ", " + d.Scope
+}
+
+func orNone(s string) string {
+	if s == "" {
+		return "(none: ARIADNE_MAVEN_LOCAL unset)"
+	}
+	return s
+}
+
+func limitedNote(err error) string {
+	if err == nil {
+		return ""
+	}
+	return "; " + err.Error() + ", later requests skipped"
 }

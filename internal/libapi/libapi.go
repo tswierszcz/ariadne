@@ -5,6 +5,7 @@ package libapi
 
 import (
 	"archive/zip"
+	"ariadne/internal/component"
 	"io"
 	"sort"
 	"strings"
@@ -21,8 +22,10 @@ import (
 // API class inherits from a dependency supertype are roots (Inherited);
 // lb2-4: each inherited root is specialized to the receiver class
 // (Specialize); lb2-5: classes the library announces to Spring are
-// entries (AnnouncedRoots).
-const Version = "lb2-5"
+// entries (AnnouncedRoots); lb3-1: the library's dependency declarations
+// and who supplies each dependency (Coverage.Dependencies, read by
+// component.LibraryDeclarations).
+const Version = "lb3-1"
 
 const (
 	accPrivate   = 0x0002
@@ -63,10 +66,13 @@ type Coverage struct {
 	// announcements read.
 	Announced     int            `json:"announced_classes"`
 	Announcements []Announcement `json:"announcements,omitempty"`
-	Providers     int            `json:"providers"`
-	Excluded      []string       `json:"excluded_packages,omitempty"`
-	JPMS          string         `json:"jpms"` // "exports" or "classpath"
-	Exports       []string       `json:"exports,omitempty"`
+	// Dependencies (lb3-1) are the library pom's declarations, matched to
+	// the input's instances.
+	Dependencies *component.LibraryDependencies `json:"dependencies,omitempty"`
+	Providers    int                            `json:"providers"`
+	Excluded     []string                       `json:"excluded_packages,omitempty"`
+	JPMS         string                         `json:"jpms"` // "exports" or "classpath"
+	Exports      []string                       `json:"exports,omitempty"`
 }
 
 // Module reads the library's module-info (root or a multi-release
