@@ -940,9 +940,13 @@ copies drop 1007 CHA edges (777 under RTA): `JsonFactory#createJsonParser`
 on a `YAMLFactory` no longer reaches the JSON parser, and `exposed_api`
 of CVE-2025-49128 shrinks from 101 to 87 entries (CVE-2026-68494 and
 CVE-2026-89425: 61 → 53), verdicts unchanged — what stays comes through
-fields and parameters (`ObjectMapper#_jsonFactory`, a client's
-`JsonParser`) or is the mapped code itself (`JsonLocation#_appendSourceDesc`
-in a YAML exception's message); `coverage.api.receiver_specialization`
+fields and parameters or is the mapped code itself (`JsonLocation#_appendSourceDesc`
+in a YAML exception's message). The field path `ObjectMapper#createParser`
+→ `_jsonFactory.createParser` → JSON parser is real, not an
+approximation: `new YAMLMapper((YAMLFactory) null)` makes `ObjectMapper`
+store a `MappingJsonFactory`, and the JVM then returns a JSON parser
+(`scripts/YAMLMapperFactoryProbe.java`, 2026-11-18); a field-type rule
+would have to keep it. `coverage.api.receiver_specialization`
 counts copies, `this` sites, dropped edges and unanalyzed methods (their
 edges kept). Log lines
 `library API (lb3-1): …, N methods (M inherited from dependency
