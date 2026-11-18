@@ -4,7 +4,8 @@
 # Fetches four libraries with vulnerable dependencies from Maven Central
 # (mvn dependency:copy-dependencies) into work/libs/<name>/ — lib.jar is the
 # library, deps/ its runtime dependencies — and runs bin/ariadne on each
-# with -roots all and -roots api, under CHA and RTA, printing one summary
+# with -roots all and -roots api, under CHA and RTA (the mvn dependency:list
+# of each library is -deps-list), printing one summary
 # line per run. Results of 2026-11-17: RECOMMENDATION/IMPLEMENTATION_STATUS.MD
 # (LIBRARY_MODE:LB2 pomiar, lb2-5 for the starter, lb3-1 for the
 # dependency declarations).
@@ -42,6 +43,12 @@ EOF
       if [ "$(basename "$f")" = "$libA-$v.jar" ]; then cp "$f" "$d/lib.jar"; else cp "$f" "$d/deps/"; fi
     done
   fi
+  # The dependency list identifies jars without pom.properties (Gradle-built
+  # Spring jars in the starter) by file name; Maven runs offline (-o) on the
+  # local repository filled above.
+  if [ ! -f "$d/deps.txt" ]; then
+    (cd "$d" && mvn -o -q -B -Dstyle.color=never dependency:list -DincludeScope=runtime -DoutputFile=deps.txt)
+  fi
 done
 
 # Poms (LB3) and reference jars come from the local Maven repository the
@@ -54,7 +61,7 @@ for spec in "${libs[@]}"; do
   for roots in all api; do
     for mode in cha rta; do
       base="$out/$name-$roots-$mode"
-      bin/ariadne -cache-dir work/libs/cache -app "work/libs/$name/lib.jar" -deps "work/libs/$name/deps" -profile generic \
+      bin/ariadne -cache-dir work/libs/cache -app "work/libs/$name/lib.jar" -deps "work/libs/$name/deps" -deps-list "work/libs/$name/deps.txt" -profile generic \
         -roots "$roots" -callgraph-mode "$mode" -json-format v2 -out "$base.md" -json "$base.json" "$@" >"$base.log" 2>&1
     done
   done

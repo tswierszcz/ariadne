@@ -31,6 +31,13 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### LIBRARY_MODE: pomiar z `-deps-list` (po `lb3-1`) — DONE (2026-11-18)
+
+- **Problem (z `lb3-1`):** w pomiarze mybatis-spring-boot-autoconfigure 8 jarów Spring Boot/Spring (budowane Gradle, bez `pom.properties`) było w wejściu bez tożsamości — ich advisory nigdy nie były oceniane.
+- **Zmiana:** `scripts/library-measure.sh` zapisuje `mvn -o dependency:list` każdej biblioteki (`work/libs/<name>/deps.txt`, Maven offline na lokalnym repozytorium) i przekazuje go jako `-deps-list`. Kodu analizy bez zmian.
+- **Wynik (`-offline`; OSV dla nowych jarów pobrane jednym przebiegiem online tylko dla mybatis):** commons-configuration2, jackson-dataformat-yaml, jjwt-jackson — ustalenia, werdykty i `exposed_api` identyczne z `lb3-1` (wszystkie 12 przebiegów). mybatis: 25/25 jarów zidentyfikowanych, 19 → 39 ustaleń; 20 nowych na spring-boot, -autoconfigure, -beans, -context, -core, -expression, wszystkie `supplied_by: library`; `REACHABLE` z API 13 (CHA) / 11 (RTA), m.in. CVE-2022-22965 (spring-beans), CVE-2022-27772 (spring-boot), CVE-2024-38820 (spring-context) i 8 advisory SpEL (spring-expression); `lb3-1` raportuje 0 `unidentified`. Uwaga: CVE-2020-26945 (mybatis) i CVE-2024-12798 (logback-core) przeszły z `UNKNOWN` (`SOURCE_UNAVAILABLE`/`MAPPING_MISSING`) na `NOT_REACHABLE` z `MODEL_INCOMPLETE` — przez źródła poprawek dociągnięte do cache w przebiegu online, nie przez `-deps-list` (ten sam cache bez listy daje to samo).
+- **Następny krok:** LB3 część opcjonalna (advisory dla wersji z deklarowanego zakresu) albo LB4.
+
 ### LIBRARY_MODE:LB3 — deklaracje zależności biblioteki (`lb3-1`) — DONE for this scope (2026-11-18)
 
 - **Problem:** wyniki dotyczą wersji z `-deps`, ale użytkownik biblioteki może dostać inne, a część zależności (`provided`, `optional`) istnieje tylko, gdy doda je sam. Wynik nie mówił, kto dostarcza instancję ustalenia.
