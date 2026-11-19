@@ -134,7 +134,7 @@ callbacki — jetty-client 9.4.36) z ręcznie sprawdzonymi werdyktami
 (`testdata/library-lb4/EXPECTED.MD`), wyrocznia JVM dla jetty-client
 (`scripts/library-lb4-oracle.sh`, `TestLibraryJetty`), `-roots api` vs `-roots all` (żaden
 `REACHABLE` nie stracony), README „Library mode in a library's CI”, SUPPORT.MD ze zmierzonymi
-ograniczeniami. Zostaje z LB4: powiązanie z planem CI floty (tydzień od 2026-11-23), wyrocznie
+ograniczeniami. Wyrocznia startera mybatis (2026-11-19, `testdata/library-starter`): z 26 `REACHABLE` 5 wykonuje się w najmniejszej aplikacji, 7 więcej (snakeyaml) przez sam Boot przy `application.yml`, 14 nigdy; niewykonane wychodzą z biblioteki wywołaniem na obiekcie z kontenera (`ObjectProvider`, `BeanFactory`) — argument za LB2 „wywołania na typach zależności”. Zostaje z LB4: powiązanie z planem CI floty (tydzień od 2026-11-23), wyrocznie
 JVM dla pozostałych czterech bibliotek, krawędź przekazania asynchronicznego.
 
 ## Kolejność i szacunek
