@@ -70,3 +70,52 @@ logger) → `LoggerFactory#getLogger` → `StaticLoggerBinder#getLoggerFactory` 
 `BeanFactory` → `YamlMapFactoryBean`… — interface calls inside the dependencies whose
 implementation is chosen by configuration (a system property, a `logback-spring.xml`). That, not
 the caller-supplied objects, is what keeps the 14 never-run findings `REACHABLE`.
+
+## Where the paths leave the real execution (2026-11-19)
+
+Method: the classes on all 364 reported paths of the 26 `REACHABLE` findings (finding paths and
+`exposed_api` paths, `lb2-7`, CHA; `scripts/path-divergence.py classes`) traced in both scenarios
+with `scripts/MethodBreakTrace.java`; per path, the first method that never ran
+(`scripts/path-divergence.py diverge`). For each divergence at a CHA dispatch site, the CHA
+targets of that call site were listed from the graph (a scratch tool) and traced too.
+
+- **9 of 364 paths have every method run** (a set, not an ordered trace): CVE-2022-22965/22970 from
+  `MybatisAutoConfiguration#sqlSessionFactory` and `…$AutoConfiguredMapperScannerRegistrar` through
+  `BeanWrapperImpl` to `CachedIntrospectionResults#<init>`, CVE-2021-42550 from
+  `MybatisAutoConfiguration#<clinit>` through slf4j and logback's initialization to
+  `OptionHelper#isEmpty` (a helper of an 88-method mapping). Both scenarios give the same
+  divergences.
+- **Divergence edges** (18 distinct): `StaticLoggerBinder#getLoggerFactory` →
+  `ContextJNDISelector#getLoggerContext` (93 paths, interface/CHA); lambdas and private helpers
+  whose branch did not run (`resolveMapperLocations`, `MyBatisExceptionTranslator`,
+  `SqlSessionFactoryBean#scanClasses` — value-dependent, 70); roots this application never calls
+  (`SpringBootVFS#list`, `VFS#list`, `SpringBootVFS#<init>`, 79); and further CHA sites in the
+  container (`AbstractResource#exists`, SpEL `getValue`, `BeanPostProcessor`, `ObjectProvider`,
+  `BeanFactory#getBean`, `InitializingBean`).
+- **At 11 of the 13 diverging CHA sites the call did happen — the JVM chose another
+  implementation**: `DefaultContextSelector` (not `ContextJNDISelector`, which logback uses only
+  with `-Dlogback.ContextSelector=JNDI`), `LiteralExpression` (not SpEL: no `#{…}`),
+  `DependencyObjectProvider` (not `StaticListableBeanFactory`), `ClassPathResource#exists`, the
+  bean factory's own `getBean`… The implementation is chosen by configuration or by which beans
+  exist. The other 2 sites never ran.
+- **Experiment E1** (a scratch build dropping the one edge to `ContextJNDISelector`, i.e. modeling
+  logback's default selector): no verdict changes, on the starter (CHA/RTA) or on petclinic
+  (`-roots all`, CHA: its 3 logback-configuration advisories stay `FRAMEWORK` through other
+  routes). One model does not help: there are many redundant over-approximate routes.
+- **Experiment E2** (upper bound, oracle-guided: at every diverging CHA site where the JVM ran
+  another target, keep only the targets that ran; then trace the new paths and repeat): round 1
+  drops 135 edges at 11 sites, rounds 2–4 another 119 at 7 more sites, round 5 finds none left —
+  **all 26 stay `REACHABLE`** (CHA), the exposed methods fall from 338 to 175. *(A first run of this
+  experiment reported "all 26 `NOT_REACHABLE`": its rule separator was `;`, which JVM descriptors
+  contain, so one empty rule dropped every edge. Corrected and re-run.)* What holds them after that
+  (201 paths, 16 with every method run): **branches that depend on configuration or data**, called
+  directly — `DataSourceInitializerInvoker#initialize` (only with `schema.sql`/`data.sql`), logback's
+  `ContextInitializer#configureByResource` (only with a `logback.xml`), the exception-translation
+  lambda (only on an error), `SqlSessionFactoryBean#scanClasses` (only with
+  `type-aliases-package`), error paths (`raiseNoMatchingBeanFound`) — plus 4 CHA sites that never
+  ran and API methods this application never calls.
+- **`-profile spring`** (Spring packages are framework code, as for the reference applications):
+  25 of 26 are `FRAMEWORK` (CHA and RTA alike) — "reachable only through framework code" — and one
+  stays `REACHABLE`: CVE-2026-113730, mybatis → its embedded OGNL through `XMLConfigBuilder`, which
+  runs only with an XML configuration using `${…}` (this application has none). The measurement
+  runs (`scripts/library-measure.sh`) use `-profile generic`, where every path is "app only".
