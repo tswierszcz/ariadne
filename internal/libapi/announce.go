@@ -22,6 +22,12 @@ type Announcement struct {
 	Class string `json:"class"` // the announced class
 }
 
+// SpringAnnouncement reports an announcement read from Spring's own
+// files (spring.factories, META-INF/spring/*.imports), not a CDI bean.
+func SpringAnnouncement(a Announcement) bool {
+	return a.File == springFactories || strings.HasPrefix(a.File, springImportsDir)
+}
+
 const (
 	springFactories     = "META-INF/spring.factories"
 	springImportsDir    = "META-INF/spring/"

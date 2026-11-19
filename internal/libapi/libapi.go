@@ -27,8 +27,10 @@ import (
 // component.LibraryDeclarations); lb2-6: the beans of a CDI bean archive
 // (META-INF/beans.xml, Jandex index) are entries (CDIAnnouncements);
 // lb2-7: calls on objects the library's caller or container
-// supplies are marked (SuppliedSites, exposed_api[].supplied_dispatch).
-const Version = "lb2-7"
+// supplies are marked (SuppliedSites, exposed_api[].supplied_dispatch);
+// lb2-8: a library announcing classes to Spring gets the spring profile's
+// framework packages (Coverage.FrameworkAdded).
+const Version = "lb2-8"
 
 const (
 	accPrivate   = 0x0002
@@ -66,6 +68,9 @@ type Coverage struct {
 	// Supplied (lb2-7): calls on caller-supplied objects
 	// (SuppliedSites) and the analysis behind them.
 	Supplied *SuppliedCoverage `json:"supplied,omitempty"`
+	// FrameworkAdded (lb2-8): framework package patterns of the spring
+	// profile added because the library announces classes to Spring.
+	FrameworkAdded []string `json:"framework_packages_added,omitempty"`
 	// Announced counts the classes the library announces to a framework
 	// (lb2-5: spring.factories, META-INF/spring/*.imports, and what they
 	// pull in), whose entries are roots; Announcements lists the

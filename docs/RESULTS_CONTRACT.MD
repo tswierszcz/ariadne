@@ -227,7 +227,7 @@ A library jar answers a different question than an application: whether anyone u
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
-api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations; `lb2-6` (2026-11-18) CDI bean archives; `lb2-7` (2026-11-19) caller-supplied objects.
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations; `lb2-6` (2026-11-18) CDI bean archives; `lb2-7` (2026-11-19) caller-supplied objects; `lb2-8` (2026-11-19) Spring-announcing libraries are framework-mediated.
 Member-class accessibility follows the class's own access flag and its enclosing classes
 (a `protected` member class is compiled `public` and counts as accessible).
 
@@ -298,6 +298,13 @@ p1,p2` removes package prefixes the user calls internal (`…internal…` is pub
 JVM, so it is API by default). Kotlin `internal`, Java access through reflection
 (`setAccessible`) and `Unsafe` are not access rules here.
 
+**Spring-announcing libraries (`lb2-8`, 2026-11-19).** When the library announces classes to Spring
+(`spring.factories`, `META-INF/spring/*.imports`, see `lb2-5` below), the framework package
+patterns of the embedded `spring` profile that the selected profile lacks are added to the
+framework matcher, whatever `-profile` selects: such a library runs inside a Spring container, and
+what the container does is framework code, as for an application under `-profile spring`. The
+added patterns are `coverage.api.framework_packages_added`. A CDI bean archive adds nothing.
+
 **Verdicts.** `reachability` keeps its meaning with the API as the roots: `REACHABLE`
 means "reachable from the public API without passing through framework code", not "run
 by an application". `NOT_REACHABLE` means no API method reaches the mapped code in the
@@ -310,7 +317,7 @@ model. All reason codes keep their meaning.
 | `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `supplied_dispatch` (`lb2-7`; `true` only when every path in that pass goes through a call on a caller-supplied object — see "Caller-supplied objects"), `announced_by` (`lb2-5`; for an entry of an announced class, how it was announced: `<file> <key>: <class>`, then ` > member <class>` / ` > @Import <class>` per step), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
 | `findings[].supplied_by` | (`lb3-1`, 2026-11-18) with `-roots api`: who supplies the finding's instance to a user of the library — `library`, `user` or `undeclared` (see "Dependency declarations"); absent for an instance the declarations do not cover. |
 | `components[].declaration` | (`lb3-1`) with `-roots api`: the declaration matched to that instance, as in `coverage.api.dependencies.declared[]`. |
-| `coverage.api` | with `-roots api`: `dependencies` (`lb3-1`: `pom`, `library`, `declared[]`, `notes[]` — see "Dependency declarations"), `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `supplied` (`lb2-7`: `sites`, `field_sites`, `edges`, `fields`, `unanalyzed_methods` — see "Caller-supplied objects"), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
+| `coverage.api` | with `-roots api`: `dependencies` (`lb3-1`: `pom`, `library`, `declared[]`, `notes[]` — see "Dependency declarations"), `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `supplied` (`lb2-7`: `sites`, `field_sites`, `edges`, `fields`, `unanalyzed_methods` — see "Caller-supplied objects"), `framework_packages_added` (`lb2-8`: see "Spring-announcing libraries"), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 

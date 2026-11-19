@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -70,6 +71,7 @@ func TestLibraryAutoconfig(t *testing.T) {
 					Announcements []struct {
 						File, Key, Class string
 					} `json:"announcements"`
+					FrameworkAdded []string `json:"framework_packages_added"`
 				} `json:"api"`
 			} `json:"coverage"`
 		}
@@ -78,6 +80,12 @@ func TestLibraryAutoconfig(t *testing.T) {
 		}
 		if doc.Coverage.API.Announced != 5 || len(doc.Coverage.API.Announcements) != 3 {
 			t.Errorf("%s: coverage.api %d announced classes, %d announcements; want 5, 3", mode, doc.Coverage.API.Announced, len(doc.Coverage.API.Announcements))
+		}
+		// lb2-8: a Spring-announcing library gets the spring profile's
+		// framework packages under -profile generic; the fixture's path
+		// runs through commons-text only, so its verdicts stay.
+		if !slices.Contains(doc.Coverage.API.FrameworkAdded, "org.springframework.boot:*") {
+			t.Errorf("%s: framework_packages_added %v, want the spring profile's (org.springframework.boot:*)", mode, doc.Coverage.API.FrameworkAdded)
 		}
 		if len(doc.Findings) != 2 {
 			t.Fatalf("%s: %d findings, want CVE-2022-42889 and CVE-2025-48924", mode, len(doc.Findings))

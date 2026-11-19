@@ -1265,6 +1265,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		var announcedRoots []uint32
 		announcedRoots, apiAnnounced, cov.Announced = libapi.AnnouncedRoots(g, h, anns, apiOpt)
 		cov.Announcements = anns
+		// lb2-8: a library that announces classes to Spring runs inside a
+		// Spring container; what the container does (bean creation,
+		// configuration, logging) is framework code, as -profile spring
+		// says for an application — whatever profile is selected.
+		if added := springFrameworkPatterns(anns, catalog, prof, h); len(added) > 0 {
+			framework = reach.NewFrameworkMatcher(append(prof.ResolvePatterns(h), added...))
+			cov.FrameworkAdded = added
+			log("library mode (%s): the library announces classes to Spring, so %d Spring framework package patterns of the spring profile count as framework code (%s)",
+				libapi.Version, len(added), strings.Join(added, ", "))
+		}
 		newAnnounced := 0
 		roots, newAnnounced = appendNewRoots(roots, announcedRoots)
 		cov.Methods = len(roots)
@@ -2380,4 +2390,37 @@ func limitedNote(err error) string {
 		return ""
 	}
 	return "; " + err.Error() + ", later requests skipped"
+}
+
+// springFrameworkPatterns (LIBRARY_MODE lb2-8): when the library announces
+// classes to Spring (spring.factories, META-INF/spring/*.imports), the
+// spring profile's framework package patterns the selected profile does
+// not already have; nil otherwise.
+func springFrameworkPatterns(anns []libapi.Announcement, catalog profile.Catalog, prof profile.Profile, h *hierarchy.Hierarchy) []string {
+	spring := false
+	for _, a := range anns {
+		if libapi.SpringAnnouncement(a) {
+			spring = true
+			break
+		}
+	}
+	if !spring {
+		return nil
+	}
+	sp, ok := catalog.Get("spring")
+	if !ok {
+		return nil
+	}
+	have := map[string]bool{}
+	for _, p := range prof.ResolvePatterns(h) {
+		have[p] = true
+	}
+	var added []string
+	for _, p := range sp.ResolvePatterns(h) {
+		if !have[p] {
+			have[p] = true
+			added = append(added, p)
+		}
+	}
+	return added
 }
