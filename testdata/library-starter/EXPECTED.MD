@@ -119,3 +119,13 @@ targets of that call site were listed from the graph (a scratch tool) and traced
   stays `REACHABLE`: CVE-2026-113730, mybatis → its embedded OGNL through `XMLConfigBuilder`, which
   runs only with an XML configuration using `${…}` (this application has none). The measurement
   runs (`scripts/library-measure.sh`) use `-profile generic`, where every path is "app only".
+
+## After `lb2-8` (Spring-announcing libraries are framework-mediated, 2026-11-19)
+
+With `-roots api` this library's `spring.factories` makes the spring profile's framework packages
+framework code under any `-profile`. `scripts/library-measure.sh -offline` (`-profile generic`):
+CHA 25 `REACHABLE` → `FRAMEWORK`, 1 `REACHABLE` (CVE-2026-113730, OGNL); RTA 23 → `FRAMEWORK`, 1
+`REACHABLE`. Against the oracle: all 12 whose mapped methods run (5 plain, 7 with YAML) are
+`FRAMEWORK` — still reported, as reached through the container — and the one `REACHABLE` runs only
+with an XML configuration using `${…}`. The other four measured libraries and every `-roots all`
+run are unchanged.

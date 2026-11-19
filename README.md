@@ -949,7 +949,7 @@ store a `MappingJsonFactory`, and the JVM then returns a JSON parser
 would have to keep it. `coverage.api.receiver_specialization`
 counts copies, `this` sites, dropped edges and unanalyzed methods (their
 edges kept). Log lines
-`library API (lb2-7): …, N methods (M inherited from dependency
+`library API (lb2-8): …, N methods (M inherited from dependency
 supertypes, K more from C framework-announced classes in A
 announcements), …, N client-code call sites (M to abstract methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
 `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
@@ -1021,7 +1021,23 @@ it marks the starter's `MybatisAutoConfiguration#<init>` (its
 logging initialization (slf4j → logback's configurator → Spring's
 `Environment` → SpEL / `BeanFactory`), interface calls inside the
 dependencies whose implementation configuration selects.
-**Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
+**Spring-announcing libraries are framework-mediated (`lb2-8`,
+2026-11-19):** a library that announces classes to Spring
+(`spring.factories`, `META-INF/spring/*.imports`) runs inside a Spring
+container, so with `-roots api` the spring profile's framework packages
+(Spring Boot, beans, core, expression, aop, tx, logback, log4j, …) count as
+framework code whatever profile is selected, as `-profile spring` already
+does for applications; the added patterns are in
+`coverage.api.framework_packages_added` and the log. On the mybatis starter
+(`-profile generic`) 25 of 26 `REACHABLE` become `FRAMEWORK` and one stays
+`REACHABLE` — mybatis → OGNL through its XML configuration builder, which
+runs only with an XML configuration. Why not a model: a JVM path-divergence
+oracle (`testdata/library-starter`, `scripts/path-divergence.py`) showed
+that at 11 of 13 diverging CHA sites the container's implementation is
+chosen by configuration, and that even keeping only the executed targets
+everywhere leaves all 26 reached through configuration- and data-dependent
+branches in container code. Other libraries, CDI bean archives and
+`-roots all` are unchanged. **Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
 the versions in `-deps`, but a user of the library may get others, and some
 dependencies exist only if the user adds them. With `-roots api` the
 library's own pom — embedded in the jar (`META-INF/maven/<g>/<a>/pom.xml`)
@@ -2087,9 +2103,13 @@ bin/ariadne -app target/mylib-1.2.3.jar -deps target/deps -deps-list target/deps
   (jetty-client, `TestLibraryJetty`) confirm the verdicts, with these limits:
   example paths across asynchronous hand-offs (NIO selectors, executors) are
   not execution traces; public-but-internal classes count as API; a Spring
-  Boot starter's `REACHABLE` mostly runs through the container it plugs into
-  (`heuristic` paths, many `supplied_by: undeclared`); `exposed_api` can list
-  hundreds of methods for a facade or client library.
+  Boot starter's findings mostly run through the container it plugs into —
+  since `lb2-8` a library that announces classes to Spring gets the spring
+  profile's framework packages whatever `-profile` says, so those are
+  `FRAMEWORK` (reachable only through framework code; on the mybatis starter
+  25 of 26) and `REACHABLE` keeps what the library's own code reaches
+  (`coverage.api.framework_packages_added` lists what was added);
+  `exposed_api` can list hundreds of methods for a facade or client library.
 
 ### Latest full test run with the LLM source
 

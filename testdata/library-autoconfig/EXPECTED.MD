@@ -57,3 +57,10 @@ entries above with `announced_by`, e.g. `ImportedConfiguration#init`:
 `META-INF/spring.factories org.springframework.boot.autoconfigure.EnableAutoConfiguration:
 ac.autoconfigure.GreeterAutoConfiguration > @Import ac.autoconfigure.ImportedConfiguration`.
 The oracle (`observed.txt`) ran (j)–(m) and `replace`, and neither (n) nor (o).
+
+## `lb2-8` (2026-11-19)
+
+The library announces classes to Spring, so with `-roots api` the spring profile's framework
+packages are added (`coverage.api.framework_packages_added`, checked by `TestLibraryAutoconfig`).
+Its vulnerable code is reached through commons-text only — no framework package on the path — so
+the verdicts and exposed methods above are unchanged.
