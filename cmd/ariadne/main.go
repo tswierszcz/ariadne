@@ -627,13 +627,20 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// method (DYNAMIC_LINKAGE L0/L1).
 	resolvedCallbacks, callbackResolveWarnings := callback.ResolveCallbacks(h, callbackSites)
 	warnings = append(warnings, callbackResolveWarnings...)
-	resolvedCallbackCount := 0
+	resolvedSites, forwardedSites, cbSites := map[callback.RegistrationSite]bool{}, map[callback.RegistrationSite]bool{}, map[callback.RegistrationSite]bool{}
+	forwardedTargets := 0
 	for _, rc := range resolvedCallbacks {
+		cbSites[rc.Site] = true
 		if rc.TargetFQCN != "" || rc.ImplOwner != "" {
-			resolvedCallbackCount++
+			resolvedSites[rc.Site] = true
+			if len(rc.Forwarded) > 0 {
+				forwardedSites[rc.Site] = true
+				forwardedTargets++
+			}
 		}
 	}
-	log("callbacks: %d of %d cataloged sites resolved to a concrete class or lambda/method reference", resolvedCallbackCount, len(resolvedCallbacks))
+	log("callbacks: %d of %d cataloged sites resolved to a concrete class or lambda/method reference (%d through their method's callers — ASYNC_CALLBACKS a3-2 — with %d targets)",
+		len(resolvedSites), len(cbSites), len(forwardedSites), forwardedTargets)
 
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {
