@@ -24,8 +24,9 @@ import (
 // (Specialize); lb2-5: classes the library announces to Spring are
 // entries (AnnouncedRoots); lb3-1: the library's dependency declarations
 // and who supplies each dependency (Coverage.Dependencies, read by
-// component.LibraryDeclarations).
-const Version = "lb3-1"
+// component.LibraryDeclarations); lb2-6: the beans of a CDI bean archive
+// (META-INF/beans.xml, Jandex index) are entries (CDIAnnouncements).
+const Version = "lb2-6"
 
 const (
 	accPrivate   = 0x0002

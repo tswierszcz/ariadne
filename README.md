@@ -949,7 +949,7 @@ store a `MappingJsonFactory`, and the JVM then returns a JSON parser
 would have to keep it. `coverage.api.receiver_specialization`
 counts copies, `this` sites, dropped edges and unanalyzed methods (their
 edges kept). Log lines
-`library API (lb3-1): …, N methods (M inherited from dependency
+`library API (lb2-6): …, N methods (M inherited from dependency
 supertypes, K more from C framework-announced classes in A
 announcements), …, N client-code call sites (M to abstract methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
 `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
@@ -980,7 +980,26 @@ the five announced entries exposed and the unannounced one not. On a real
 starter (mybatis-spring-boot-autoconfigure 2.1.2, `scripts/library-measure.sh`)
 9 classes are entries, verdicts and `exposed_api` are unchanged (its
 autoconfigurations are public already) and the entries gain `announced_by`.
-**Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
+**CDI bean archives (`lb2-6`, 2026-11-18):** a library jar with
+`META-INF/beans.xml` (or only a Jandex index, as Quarkus reads it) is a
+bean archive; its beans — every class with a bean-defining annotation
+(`@ApplicationScoped`, `@Dependent`, `@Singleton`, …) in `annotated`
+mode, every concrete class with a no-argument or `@Inject` constructor in
+`all` mode (also an empty or pre-4.0 beans.xml) — are announcements, and
+their constructors, `@Produces`/`@Inject`/`@PostConstruct`/`@PreDestroy`/
+interceptor methods and `@Observes`/`@Disposes` methods (any access) and
+public methods are entries, with `announced_by` naming the archive, mode
+and annotation. Verified on `testdata/library-cdi`
+([EXPECTED.MD](testdata/library-cdi/EXPECTED.MD), real CDI container
+oracle `scripts/library-cdi-oracle.sh` on Weld SE 5.1.2, `TestLibraryCDI`,
+`TestCDIAnnouncements`, `TestCDIRoots`): before, both advisories were
+`NOT_REACHABLE` although Weld runs `replace` from a package-private
+producer, observer, `@PostConstruct` and `@Inject` method; now `REACHABLE`
+with exactly those four exposed, and a class without a bean-defining
+annotation never. On real jars (Quarkus 3.9.5 dependencies)
+smallrye-context-propagation 2.1.0 has one bean (a public interceptor:
+no new roots) and mutiny 2.5.8 a Jandex index but no bean; verdicts
+unchanged. **Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
 the versions in `-deps`, but a user of the library may get others, and some
 dependencies exist only if the user adds them. With `-roots api` the
 library's own pom — embedded in the jar (`META-INF/maven/<g>/<a>/pom.xml`)

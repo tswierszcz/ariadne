@@ -1254,6 +1254,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("library mode: reading framework announcements: %v", err))
 		}
+		// lb2-6: the beans of a CDI bean archive (META-INF/beans.xml,
+		// or a Jandex index for Quarkus) run whatever their access.
+		cdiAnns, err := libapi.CDIAnnouncements(prepared.AppClassesJar, h)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("library mode: reading the CDI bean archive: %v", err))
+		}
+		anns = append(anns, cdiAnns...)
 		var announcedRoots []uint32
 		announcedRoots, apiAnnounced, cov.Announced = libapi.AnnouncedRoots(g, h, anns, apiOpt)
 		cov.Announcements = anns
