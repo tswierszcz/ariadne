@@ -25,6 +25,12 @@ type ExposedMethod struct {
 	// than the called method's own — a stand-in for code a client
 	// supplies there. Path is then such a path.
 	ClientDispatch bool
+	// SuppliedDispatch (lb2-7): every path from Method in its pass goes
+	// through a call on an object the library's caller or
+	// container supplies (libapi.SuppliedSites) — the code that runs there
+	// is the implementation they choose, which the analysis took to be any
+	// (CHA). Path is then such a path.
+	SuppliedDispatch bool
 	// InheritedBy (lb2-3): when Method is a dependency method that API
 	// classes inherit, those classes — the receivers a client calls it on.
 	InheritedBy []string
@@ -43,6 +49,18 @@ type ClientCall struct {
 	Declared                           string
 }
 
+// SuppliedCall is a call site on an object the library's caller
+// supplies (libapi.SuppliedSites): every edge from it is a
+// supplied-dispatch edge.
+type SuppliedCall struct {
+	CallerFQCN, CallerName, CallerDesc string
+	PC                                 int
+	// Field: the object comes from a field (caller-supplied on every
+	// path); otherwise it is the caller method's own parameter, supplied
+	// only on paths that start at that method.
+	Field bool
+}
+
 // Exposed passes.
 const (
 	PassAppOnly = "app_only"
@@ -59,10 +77,17 @@ type exposure struct {
 	reverse [][]uint32
 	// strict is reverse without the client-dispatch edges; nil when
 	// there are none.
-	strict    [][]uint32
-	cache     map[string][]ExposedMethod
-	inherited map[uint32][]string
-	announced map[uint32][]string
+	strict [][]uint32
+	// suppliedAt (lb2-7): per caller node, its caller-supplied sites
+	// (true: the value comes from a field, so on every path).
+	suppliedAt map[uint32]map[int]bool
+	// suppliedStrict is reverse without the supplied-dispatch edges of
+	// field sites, both without those and the client-dispatch edges; nil
+	// when there are no supplied sites.
+	suppliedStrict, both [][]uint32
+	cache                map[string][]ExposedMethod
+	inherited            map[uint32][]string
+	announced            map[uint32][]string
 }
 
 // SetExposure makes Analyze list, on every positive finding, the roots
@@ -80,7 +105,12 @@ type exposure struct {
 // announced, for roots that are framework entries, their provenance
 // (ExposedMethod.AnnouncedBy). It returns how many client-dispatch edges
 // there are.
-func (e *Engine) SetExposure(client []ClientCall, made func(fqcn string) bool, inherited, announced map[uint32][]string) int {
+//
+// supplied (lb2-7) are the caller-supplied sites: an edge whose every site
+// is one is a supplied-dispatch edge, and a root that reaches the code only
+// through one is marked SuppliedDispatch; SuppliedEdges reports how many
+// there are.
+func (e *Engine) SetExposure(client []ClientCall, supplied []SuppliedCall, made func(fqcn string) bool, inherited, announced map[uint32][]string) int {
 	n := e.g.NodeCount()
 	x := &exposure{e: e, isRoot: make([]bool, n), reverse: make([][]uint32, n), cache: map[string][]ExposedMethod{}, inherited: inherited, announced: announced}
 	for _, r := range e.roots {
@@ -121,28 +151,111 @@ func (e *Engine) SetExposure(client []ClientCall, made func(fqcn string) bool, i
 		}
 		return true
 	}
-	clientEdges := 0
+	// suppliedAt: per caller node, its supplied sites (true: the value
+	// comes from a field).
+	x.suppliedAt = map[uint32]map[int]bool{}
+	for _, c := range supplied {
+		if id, ok := e.g.ID(c.CallerFQCN, c.CallerName, c.CallerDesc); ok {
+			if x.suppliedAt[id] == nil {
+				x.suppliedAt[id] = map[int]bool{}
+			}
+			x.suppliedAt[id][c.PC] = x.suppliedAt[id][c.PC] || c.Field
+		}
+	}
+	fromField := func(u uint32, ed callgraph.Edge) bool { return x.fromSupplied(u, ed, true) }
+	clientEdges, suppliedEdges, fieldEdges := 0, 0, 0
 	for u := 0; u < n; u++ {
 		for _, ed := range e.g.Edges(uint32(u)) {
 			x.reverse[ed.To] = append(x.reverse[ed.To], uint32(u))
 			if dispatch(uint32(u), ed) {
 				clientEdges++
 			}
-		}
-	}
-	if clientEdges > 0 {
-		x.strict = make([][]uint32, n)
-		for u := 0; u < n; u++ {
-			for _, ed := range e.g.Edges(uint32(u)) {
-				if !dispatch(uint32(u), ed) {
-					x.strict[ed.To] = append(x.strict[ed.To], uint32(u))
-				}
+			if x.fromSupplied(uint32(u), ed, false) {
+				suppliedEdges++
+			}
+			if fromField(uint32(u), ed) {
+				fieldEdges++
 			}
 		}
 	}
+	without := func(drop func(uint32, callgraph.Edge) bool) [][]uint32 {
+		r := make([][]uint32, n)
+		for u := 0; u < n; u++ {
+			for _, ed := range e.g.Edges(uint32(u)) {
+				if !drop(uint32(u), ed) {
+					r[ed.To] = append(r[ed.To], uint32(u))
+				}
+			}
+		}
+		return r
+	}
+	if clientEdges > 0 {
+		x.strict = without(dispatch)
+	}
+	if suppliedEdges > 0 {
+		// Field sites are caller-supplied on every path; a method's own
+		// parameter only on paths that start there (checked per root in of).
+		x.suppliedStrict = x.reverse
+		x.both = x.strict
+		if fieldEdges > 0 {
+			x.suppliedStrict = without(fromField)
+			x.both = without(func(u uint32, ed callgraph.Edge) bool { return dispatch(u, ed) || fromField(u, ed) })
+		}
+		if x.both == nil {
+			x.both = x.reverse
+		}
+	}
 	e.exposure = x
+	e.suppliedEdges = suppliedEdges
 	return clientEdges
 }
+
+// fromSupplied: every site of the edge is a supplied site of u (fieldOnly:
+// one whose value comes from a field).
+func (x *exposure) fromSupplied(u uint32, ed callgraph.Edge, fieldOnly bool) bool {
+	at := x.suppliedAt[u]
+	if at == nil || len(ed.Sites) == 0 {
+		return false
+	}
+	for _, s := range ed.Sites {
+		field, ok := at[s.PC]
+		if !ok || fieldOnly && !field {
+			return false
+		}
+	}
+	return true
+}
+
+// suppliedHop: the root's first steps that avoid its supplied sites, each
+// with the next-pointers (strict) a path continues on; ok is false when
+// no step reaches the code that way — every path from the root goes
+// through an object its caller supplies.
+func (x *exposure) suppliedHop(id uint32, strict [][]int32) (first uint32, cont []int32, ok bool) {
+	best := -1
+	for _, ed := range x.e.g.Edges(id) {
+		if x.fromSupplied(id, ed, false) {
+			continue
+		}
+		for _, next := range strict {
+			if next[ed.To] == notVisited {
+				continue
+			}
+			l := 1
+			for cur := ed.To; next[cur] != isTarget; cur = uint32(next[cur]) {
+				l++
+			}
+			if best < 0 || l < best {
+				best, first, cont = l, ed.To, next
+			}
+			break
+		}
+	}
+	return first, cont, best >= 0
+}
+
+// SuppliedEdges is the number of supplied-dispatch edges SetExposure found
+// (lb2-7).
+func (e *Engine) SuppliedEdges() int { return e.suppliedEdges }
 
 func (x *exposure) of(targets []uint32) []ExposedMethod {
 	if len(targets) == 0 {
@@ -170,33 +283,56 @@ func (x *exposure) of(targets []uint32) []ExposedMethod {
 		appStrict = x.backward(x.strict, ts, true)
 		fullStrict = x.backward(x.strict, ts, false)
 	}
+	appSup, fullSup, appBoth, fullBoth := appNext, fullNext, appStrict, fullStrict
+	if x.suppliedStrict != nil {
+		appSup = x.backward(x.suppliedStrict, ts, true)
+		fullSup = x.backward(x.suppliedStrict, ts, false)
+		appBoth = x.backward(x.both, ts, true)
+		fullBoth = x.backward(x.both, ts, false)
+	}
 	var out []ExposedMethod
 	byMethod := map[string]int{}
 	for id := range x.isRoot {
 		if !x.isRoot[id] {
 			continue
 		}
-		pass, next, strict := "", fullNext, fullStrict
+		pass, next, strict, sup, both := "", fullNext, fullStrict, fullSup, fullBoth
 		switch {
 		case appNext[id] != notVisited:
-			pass, next, strict = PassAppOnly, appNext, appStrict
+			pass, next, strict, sup, both = PassAppOnly, appNext, appStrict, appSup, appBoth
 		case fullNext[id] != notVisited:
 			pass = PassFull
 		default:
 			continue
 		}
 		client := strict[id] == notVisited
-		if !client {
-			next = strict
-		}
+		// lb2-7: the root is marked when every path from it goes through
+		// a supplied site — a field one anywhere, or one of its own
+		// parameter sites as its first step. The example path avoids
+		// both kinds of stand-in edges when it can, then whichever the
+		// method is not marked for.
 		path := []uint32{uint32(id)}
-		for cur := uint32(id); next[cur] != isTarget; {
+		supplied := false
+		if x.suppliedStrict != nil && next[id] != isTarget {
+			first, cont, ok := x.suppliedHop(uint32(id), [][]int32{both, sup})
+			supplied = !ok
+			if ok {
+				path = append(path, first)
+				next = cont
+			}
+		}
+		if supplied || x.suppliedStrict == nil {
+			if !client {
+				next = strict
+			}
+		}
+		for cur := path[len(path)-1]; next[cur] != isTarget; {
 			cur = uint32(next[cur])
 			path = append(path, cur)
 		}
 		rendered := renderPath(x.e.g, path)
 		edges, char := pathEvidence(x.e.g, rendered)
-		m := ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, InheritedBy: x.inherited[uint32(id)], AnnouncedBy: x.announced[uint32(id)]}
+		m := ExposedMethod{Method: x.e.g.Key(uint32(id)), Pass: pass, Path: rendered, PathEdges: edges, Character: char, ClientDispatch: client, SuppliedDispatch: supplied, InheritedBy: x.inherited[uint32(id)], AnnouncedBy: x.announced[uint32(id)]}
 		if i, ok := byMethod[m.Method]; ok {
 			// lb2-4: one root per inheriting API class (receiver-
 			// specialized copies of the same method) — one entry naming
@@ -256,13 +392,17 @@ func (x *exposure) backward(reverse [][]uint32, targets []uint32, appOnly bool) 
 }
 
 // better orders two exposures of one method (receiver-specialized
-// copies): an app-only pass, then no client dispatch, then a shorter path.
+// copies): an app-only pass, then no client dispatch, then no supplied
+// dispatch, then a shorter path.
 func better(a, b ExposedMethod) bool {
 	if (a.Pass == PassAppOnly) != (b.Pass == PassAppOnly) {
 		return a.Pass == PassAppOnly
 	}
 	if a.ClientDispatch != b.ClientDispatch {
 		return !a.ClientDispatch
+	}
+	if a.SuppliedDispatch != b.SuppliedDispatch {
+		return !a.SuppliedDispatch
 	}
 	return len(a.Path) < len(b.Path)
 }

@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie; lb2-6 2026-11-18: archiwa beanów CDI jako korzenie); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 w toku (lb4-1 2026-11-19: zestaw kwalifikacyjny 5 bibliotek, wyrocznia JVM jetty-client, użycie w CI); zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie; lb2-6 2026-11-18: archiwa beanów CDI jako korzenie; lb2-7 2026-11-19: obiekty dostarczane przez wywołującego jako luka); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 w toku (lb4-1 2026-11-19: zestaw kwalifikacyjny 5 bibliotek, wyrocznia JVM jetty-client, użycie w CI); zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -77,8 +77,10 @@ klasy ogłaszane przez bibliotekę w `META-INF/spring.factories` i `META-INF/spr
 z wyrocznią Spring Boot 2.4.5. **`lb2-6` DONE (2026-11-18):** beany archiwum CDI
 (`META-INF/beans.xml` albo indeks Jandex — Quarkus) są korzeniami z pochodzeniem, niezależnie od
 dostępu (producenci, obserwatorzy, `@Inject`, `@PostConstruct`…); fixture `testdata/library-cdi`
-z wyrocznią Weld SE 5.1.2. Zostaje z LB2: ścieżki warunkowe po powrocie z kodu klienta (do
-zdefiniowania), wywołania na typach zależności, Micronaut (najpierw pomiar, czy wygenerowane
+z wyrocznią Weld SE 5.1.2. **`lb2-7` DONE (2026-11-19):** wywołania na obiektach typu zależności dostarczonych przez
+wywołującego (parametr korzenia, pole ustawiane tylko przez korzenie spoza biblioteki) są luką
+`client_code` ze znacznikiem `supplied_dispatch`; werdykty bez zmian. Zostaje z LB2: ścieżki warunkowe po powrocie z kodu klienta (do
+zdefiniowania), wartości dostarczone przekazane do metod zależności, Micronaut (najpierw pomiar, czy wygenerowane
 definicje są już publicznym API), warunki `@ConditionalOn…`.
 
 Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).

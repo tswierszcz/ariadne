@@ -114,6 +114,19 @@ func clientGapSites(sites []libapi.ClientSite) []reach.GapSite {
 	return out
 }
 
+// suppliedGapSites turns library mode's caller-supplied sites (lb2-7)
+// into gap sites of kind "supplied" (mechanism client_code): the code
+// that runs there is the implementation the library's caller or container
+// passes. Like client sites their candidate set is bounded and empty, so
+// they never make a finding MODEL_INCOMPLETE.
+func suppliedGapSites(sites []libapi.SuppliedSite) []reach.GapSite {
+	out := make([]reach.GapSite, 0, len(sites))
+	for _, s := range sites {
+		out = append(out, reach.GapSite{Kind: "supplied", CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc, Owners: []string{}})
+	}
+	return out
+}
+
 // objectsExist: the classes whose objects exist without client code — the
 // ones the input itself creates (the created-type catalog, every origin
 // but an assumed entry) and the ones a client can construct or subclass

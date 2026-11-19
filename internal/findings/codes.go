@@ -47,6 +47,11 @@ const (
 
 	// Reachability-model axis.
 	ModelIncomplete ReasonCode = "MODEL_INCOMPLETE"
+	// LIBRARY_MODE lb2-7: every API method that reaches the code does so
+	// only through a call on an object the library's caller or
+	// container supplies; the code that runs there is their choice. The
+	// verdict is kept.
+	SuppliedDispatchOnly ReasonCode = "SUPPLIED_DISPATCH_ONLY"
 
 	// Runtime axis.
 	RuntimeUnsupported ReasonCode = "RUNTIME_UNSUPPORTED"
@@ -57,7 +62,7 @@ var All = []ReasonCode{
 	VersionUnknown, ClasspathConflict, VersionCandidates,
 	MappingPartial, MappingEntrypointOnly, MethodNotFound, SourceUnavailable, MappingMissing, MappedCodeAbsent,
 	MappingVersionUncovered, MappingConflict, MappingNewSideOnly, MappingInitializerOnly, NotCodeMappable,
-	ModelIncomplete,
+	ModelIncomplete, SuppliedDispatchOnly,
 	RuntimeUnsupported,
 }
 

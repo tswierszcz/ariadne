@@ -55,3 +55,18 @@ So for this starter, 5 of 26 `REACHABLE` findings are reached through the
 starter in its smallest application, 7 more are reached by Boot itself when
 the application has YAML, and 14 depend on what the application does —
 reached in the graph through calls on container-supplied objects.
+
+## After `lb2-7` (caller-supplied objects, 2026-11-19)
+
+`lb2-7` marks calls on objects the container hands the library
+(`testdata/library-supplied/EXPECTED.MD`). On this starter (CHA): 25 caller-supplied sites (one on a
+field), `MybatisAutoConfiguration#<init>` — its `ObjectProvider` parameters — is
+`supplied_dispatch` in all 26 findings; verdicts and exposed methods unchanged; no finding is
+`SUPPLIED_DISPATCH_ONLY`. In every finding 7–11 of the 13 exposed methods reach the code through
+**logging initialization** instead: `MybatisAutoConfiguration#<clinit>` (or anything that creates a
+logger) → `LoggerFactory#getLogger` → `StaticLoggerBinder#getLoggerFactory` → (CHA over
+`ContextSelector`) `ContextJNDISelector` → logback's `GenericConfigurator` → (CHA over joran
+`Action`s) `SpringPropertyAction` → `Environment#getProperty` → conversion service → SpEL /
+`BeanFactory` → `YamlMapFactoryBean`… — interface calls inside the dependencies whose
+implementation is chosen by configuration (a system property, a `logback-spring.xml`). That, not
+the caller-supplied objects, is what keeps the 14 never-run findings `REACHABLE`.
