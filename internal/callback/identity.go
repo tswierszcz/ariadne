@@ -42,6 +42,21 @@ type ResolvedCallback struct {
 	// target reached the site. A site can then have several
 	// ResolvedCallbacks, one per target its callers pass.
 	Forwarded []string
+	// Origin (a3-2/a3-3): for a forwarded target, the outermost call
+	// site passing it — where the object enters the chain. A3-3's queue
+	// hand-offs draw their edge from there, so each caller reaches only
+	// what it hands in.
+	Origin *Origin
+	// SamInterface/SamMethod: for a forwarded lambda/method reference,
+	// the functional interface method it implements (a3-3 matches it
+	// against the method a drain calls).
+	SamInterface, SamMethod string
+}
+
+// Origin is a call site: owner#name+desc at PC.
+type Origin struct {
+	FQCN, Name, Desc string
+	PC               int
 }
 
 // Forwarding bounds (a3-2): how many caller levels a parameter is

@@ -88,9 +88,9 @@ func (f *forwarder) resolve(method string, param int, chain []string, depth int)
 		var found []ResolvedCallback
 		switch {
 		case v.Kind == valueflow.KindAlloc:
-			found = []ResolvedCallback{{Site: f.site, TargetFQCN: v.Type, Forwarded: via}}
+			found = []ResolvedCallback{{Site: f.site, TargetFQCN: v.Type, Forwarded: via, Origin: &Origin{cs.fqcn, cs.m.Name, cs.m.Descriptor, cs.pc}}}
 		case v.Kind == valueflow.KindFunctional && v.Func != nil && v.Func.ImplOwner != "":
-			found = []ResolvedCallback{{Site: f.site, ImplOwner: v.Func.ImplOwner, ImplName: v.Func.ImplName, ImplDesc: v.Func.ImplDesc, Forwarded: via}}
+			found = []ResolvedCallback{{Site: f.site, ImplOwner: v.Func.ImplOwner, ImplName: v.Func.ImplName, ImplDesc: v.Func.ImplDesc, SamInterface: v.Func.SamInterface, SamMethod: v.Func.SamMethod, Forwarded: via, Origin: &Origin{cs.fqcn, cs.m.Name, cs.m.Descriptor, cs.pc}}}
 		case v.Kind == valueflow.KindTyped && v.Parameter != nil && v.Parameter.Index >= 0:
 			found = f.resolve(key, v.Parameter.Index, via, depth+1)
 		}

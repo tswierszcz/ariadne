@@ -47,6 +47,12 @@ Gotowe: dwie kontynuacje, exceptional branch, nieaktywny pipeline i znana subskr
 wywołujących (3 poziomy, 32 miejsca), krawędź „może wykonać” z miejsca rejestracji; fixture
 `testdata/async-forward` z wyrocznią JVM; motywacja i pomiar: jetty-client (LIBRARY_MODE LB4).
 
+**Wycinek 3 (`a3-3`, 2026-11-19):** przekazania przez kolejkę w polu (magazyn → metoda opróżniająca,
+krawędź od miejsca, gdzie obiekt wchodzi, do metody wołanej na nim przez drenaż; warunek `queued`) i
+przez załącznik klucza NIO (`register(…, att)`/`attach` → pętla selektora; warunek `selected`); fixture
+`testdata/async-handoff` z wyrocznią JVM; wyrocznia krawędzi `scripts/MethodEdgeTrace.java`; pomiar:
+jetty-client.
+
 ## A4. Weryfikacja i kwalifikacja
 
 - Fixtures: direct executor, thread override, task object, lambda, constructor, dwa tasks, rejection, future success/failure, listener i wybrany reactive pipeline.

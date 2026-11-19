@@ -131,7 +131,21 @@ two runs). Jars from `work/libs` (`scripts/library-measure.sh`); no network.
    adding `SelectorManager#execute` → `ManagedSelector$CreateEndPoint#run`.
    Fully executed reported paths 40 → 66 of 402, verdicts unchanged; the path
    from `HttpClient#GET` still is not real — the connect request crosses
-   Jetty's own selector queue, `ManagedSelector#submit`.)*
+   Jetty's own selector queue, `ManagedSelector#submit`.)* *(2026-11-19,
+   `a3-3`: hand-offs through a queue field and an NIO key attachment are
+   edges — `SelectorManager#connect` → `ManagedSelector$Connect#update`
+   (queued), `Connect#update` → `SelectorProducer#processSelected`
+   (selected). An edge oracle, `scripts/MethodEdgeTrace.java` (every caller →
+   callee pair the JVM took), and `scripts/real-edge-paths.py` show the graph
+   now holds real paths to `HttpURI#parse` from 43 of the 103 exposed-API
+   entries that ran (36 before); over real edges `HttpClient#GET` now reaches
+   the selector loop, `processConnect`, `CreateEndPoint#run`, `onOpen` and
+   `ChannelEndPoint#onSelected`. Still missing for `convertContentLength`
+   (3 of 103 unchanged): the task `onSelected` *returns* (`_runFillable`),
+   which Jetty's `EatWhatYouKill` runs — a task passed as a return value.
+   Reported paths are unchanged (66 of 408 fully executed): BFS keeps the
+   shorter CHA route. `exposed_api` 200 → 203 (`SelectorManager#accept`,
+   `#acceptor`, server side). Verdicts unchanged.)*
 2. **Public is not intended API.** jetty-client's shortest finding path starts
    at `HttpReceiverOverHTTP#receive`, public in a public package, which no user
    calls. `-api-exclude` helps only when internals live in separate packages.

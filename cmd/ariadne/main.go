@@ -909,6 +909,25 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	callbackEdgesAdded := callgraph.ApplyCallbackEdges(g, callbackGraphEdges)
 	log("callbacks: %d resolved identities modeled as call-graph targets (%d edges added)", len(callbackEdgeTargets), callbackEdgesAdded)
 
+	// ASYNC_CALLBACKS a3-3: hand-offs — an object put into a work queue
+	// held in a field ("may run" edge from where it enters to the method
+	// the drain calls on it, condition "queued") or attached to an NIO
+	// selection key (edge to the select loop reading it, "selected").
+	handoffEdges, handoffStats, handoffWarnings := callback.FindHandoffs(h)
+	warnings = append(warnings, handoffWarnings...)
+	var handoffGraphEdges []callgraph.CallbackEdge
+	for _, e := range handoffEdges {
+		handoffGraphEdges = append(handoffGraphEdges, callgraph.CallbackEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetMethod: e.TargetMethod, TargetMethodDesc: e.TargetMethodDesc,
+			Condition: e.Condition,
+		})
+	}
+	handoffEdgesAdded := callgraph.ApplyCallbackEdges(g, handoffGraphEdges)
+	log("hand-offs (ASYNC_CALLBACKS a3-3): %d of %d queue stores and %d of %d selection-key attachments drained by %d methods (%d edges added; %d stores with more than %d drains left out)",
+		handoffStats.QueueStoresDrained, handoffStats.QueueStores, handoffStats.SelectorStoresDrained, handoffStats.SelectorStores,
+		handoffStats.Drains, handoffEdgesAdded, handoffStats.TooManyDrains, callback.MaxDrains)
+
 	// DYNAMIC_LINKAGE L2: find every MethodHandle#invoke/invokeExact
 	// call site, read its receiver back via DATA_FLOW D2's
 	// Facts.ReceiverAt, and connect it to every overload of the

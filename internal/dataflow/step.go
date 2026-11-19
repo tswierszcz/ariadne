@@ -421,7 +421,7 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 			st.push(valueflow.CallResult(valueflow.CallResultRef{Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc, Site: it.site(op.PC, bytecodeir.OpCall)}), op.Width)
 			return ""
 		}
-		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && (isServiceLoaderTraceOwner(op.CallOwner) || isClassLoaderTraceCall(op.CallOwner, op.CallName, op.CallDesc)) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
+		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && (isServiceLoaderTraceOwner(op.CallOwner) || isClassLoaderTraceCall(op.CallOwner, op.CallName, op.CallDesc) || IsCollectionRetrieval(op.CallOwner, op.CallName, op.CallDesc)) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
 			receiver := entries[0].v
 			if valueflow.CallTraceDepth(receiver) < valueflow.MaxCallTraceDepth {
 				st.push(valueflow.TracedCall(valueflow.CallTraceValue{
@@ -460,6 +460,50 @@ func isReferenceReturn(desc string) bool {
 func isClassLoaderTraceCall(owner, name, desc string) bool {
 	return (owner == "java.lang.Thread" && name == "getContextClassLoader" && desc == "()Ljava/lang/ClassLoader;") ||
 		(owner == "java.lang.Class" && name == "getClassLoader" && desc == "()Ljava/lang/ClassLoader;")
+}
+
+// IsCollectionRetrieval names the JDK collection calls whose result is an
+// element taken out of the receiver, or its iterator (ASYNC_CALLBACKS
+// a3-3): Collection#iterator and the queue/deque retrievals. Traced so a
+// consumer can tell which collection an element came from; the trace
+// claims nothing about which element it is.
+func IsCollectionRetrieval(owner, name, desc string) bool {
+	if !IsJDKCollection(owner) {
+		return false
+	}
+	switch name {
+	case "iterator":
+		return desc == "()Ljava/util/Iterator;"
+	case "poll", "take", "remove", "pop", "pollFirst", "pollLast", "removeFirst", "removeLast",
+		"peek", "peekFirst", "peekLast", "element", "getFirst", "getLast":
+		return desc == "()Ljava/lang/Object;" || (name == "poll" && desc == "(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;")
+	}
+	return false
+}
+
+// IsJDKCollection: a java.util collection interface or one of the JDK's
+// own Collection/Queue implementations, as a call's owner names it.
+func IsJDKCollection(owner string) bool {
+	return jdkCollections[owner]
+}
+
+var jdkCollections = map[string]bool{}
+
+func init() {
+	for _, c := range []string{
+		"java.util.Collection", "java.util.List", "java.util.Set", "java.util.SortedSet", "java.util.NavigableSet",
+		"java.util.Queue", "java.util.Deque", "java.util.AbstractCollection", "java.util.AbstractList", "java.util.AbstractQueue",
+		"java.util.ArrayList", "java.util.LinkedList", "java.util.ArrayDeque", "java.util.PriorityQueue", "java.util.HashSet",
+		"java.util.LinkedHashSet", "java.util.TreeSet", "java.util.Vector", "java.util.Stack",
+		"java.util.concurrent.BlockingQueue", "java.util.concurrent.BlockingDeque", "java.util.concurrent.TransferQueue",
+		"java.util.concurrent.ConcurrentLinkedQueue", "java.util.concurrent.ConcurrentLinkedDeque",
+		"java.util.concurrent.LinkedBlockingQueue", "java.util.concurrent.LinkedBlockingDeque", "java.util.concurrent.ArrayBlockingQueue",
+		"java.util.concurrent.PriorityBlockingQueue", "java.util.concurrent.DelayQueue", "java.util.concurrent.SynchronousQueue",
+		"java.util.concurrent.LinkedTransferQueue", "java.util.concurrent.CopyOnWriteArrayList", "java.util.concurrent.CopyOnWriteArraySet",
+		"java.util.concurrent.ConcurrentSkipListSet",
+	} {
+		jdkCollections[c] = true
+	}
 }
 
 func isServiceLoaderTraceOwner(owner string) bool {
