@@ -268,7 +268,36 @@ func AnnouncedRoots(g *callgraph.Graph, h *hierarchy.Hierarchy, anns []Announcem
 			}
 		}
 	}
+	// visitCDI: a CDI bean (CDIAnnouncements). The container constructs
+	// it and calls its producers, observers, disposers, initializers,
+	// lifecycle callbacks and interceptor methods whatever their access
+	// (static producers too); a client calls its public instance methods
+	// through the bean's types.
+	visitCDI := func(fqcn, prov string) {
+		ci, ok := h.Lookup(fqcn)
+		if !ok || !ci.IsApp || !sel.inScope(fqcn) {
+			return
+		}
+		if !counted[fqcn] {
+			counted[fqcn] = true
+			classes++
+		}
+		for _, m := range ci.Methods {
+			f := m.AccessFlags
+			if f&(accSynthetic|accBridge) != 0 {
+				continue
+			}
+			public := f&classfile.AccPublic != 0 && f&accStatic == 0
+			if m.Name == "<init>" || m.Name == "<clinit>" || cdiEntry(m) || public {
+				add(fqcn, m.Name, m.Descriptor, prov)
+			}
+		}
+	}
 	for _, a := range anns {
+		if a.isCDI() {
+			visitCDI(a.Class, a.File+" "+a.Key+": "+a.Class)
+			continue
+		}
 		config := a.Key == enableAutoConfigKey || a.Key == autoConfigImports
 		visit(a.Class, a.File+" "+a.Key+": "+a.Class, config)
 	}

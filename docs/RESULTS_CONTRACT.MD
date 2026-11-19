@@ -226,7 +226,7 @@ A library jar answers a different question than an application: whether anyone u
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
-api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations.
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations; `lb2-6` (2026-11-18) CDI bean archives.
 Member-class accessibility follows the class's own access flag and its enclosing classes
 (a `protected` member class is compiled `public` and counts as accessible).
 
@@ -272,6 +272,22 @@ override from outside its packages:
   instantiates and calls through the key's type: constructors, `<clinit>`, public instance
   methods. Conditions (`@ConditionalOn…`, `@Profile`) are not evaluated — an entry "may
   run". `-api-exclude` drops announced classes as it drops providers;
+- (`lb2-6`, 2026-11-18) the beans of a CDI bean archive, whatever their access: a library jar
+  with `META-INF/beans.xml` (or only a Jandex index, `META-INF/jandex.idx`, which Quarkus
+  discovers as `annotated`). The discovery mode is beans.xml's `bean-discovery-mode`; without one
+  an empty or pre-4.0 file is `all` (CDI 1.1–3.0's default; 4.0 made it `annotated`, so `all` is
+  what some container may do) and a 4.0+ one `annotated`; `none` discovers nothing. In `all` mode
+  a bean is every concrete class of the jar with a no-argument or `@Inject` constructor; in
+  `annotated` mode a class with a bean-defining annotation (`@ApplicationScoped`,
+  `@RequestScoped`, `@SessionScoped`, `@ConversationScoped`, `@Dependent`, `@Singleton` — Quarkus
+  treats it as one —, `@Interceptor`, `@Decorator`, `javax.*` and `jakarta.*`, or a library
+  annotation meta-annotated `@Stereotype`/`@NormalScope`/`@Scope`). A bean's entries: its
+  constructors and `<clinit>`, every method annotated `@Inject`, `@Produces`, `@PostConstruct`,
+  `@PreDestroy`, `@AroundInvoke`, `@AroundConstruct` or with an `@Observes`/`@ObservesAsync`/
+  `@Disposes` parameter (any access, static too), and its public instance methods. Provenance
+  (`announced_by`): `<file> bean-discovery-mode=<mode>[ @<annotation>]: <class>`; the beans are
+  `announcements` and count in `announced_classes`. Alternatives, specialization, vetoes and
+  extensions are not evaluated (a bean "may run");
 - not roots (unless announced): `private` and package-private methods, members of inaccessible classes,
   synthetic and bridge methods (their targets are roots in their own right), lambda bodies.
 
@@ -358,7 +374,9 @@ Gradle module metadata; profiles in the library's pom. Instances embedded in ano
 with the expected roots, `exposed_api` and verdicts written before LB1, checked against
 the real JVM (`scripts/library-oracle.sh`). Dependency declarations:
 [testdata/library-deps/](../testdata/library-deps/EXPECTED.MD) — `supplied_by: library` equals
-what Maven 3.9 resolves for a consumer of the library (`scripts/library-deps-oracle.sh`).
+what Maven 3.9 resolves for a consumer of the library (`scripts/library-deps-oracle.sh`). CDI bean
+archives: [testdata/library-cdi/](../testdata/library-cdi/EXPECTED.MD) — every exposed entry ran
+on Weld SE 5.1.2 (`scripts/library-cdi-oracle.sh`), the non-bean never.
 
 ## Gap vocabulary
 
