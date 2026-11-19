@@ -1,0 +1,10 @@
+{
+  "key": "764deee02652bbd89032c147460d8528b2075ab1e140d8ca6f4822aff55847d8",
+  "kind": "osv",
+  "method": "GET",
+  "url": "https://api.osv.dev/v1/vulns/GHSA-355h-qmc2-wpwf",
+  "fetched_at": "2026-11-19T10:45:00.256626598Z",
+  "validated_at": "2026-11-19T10:45:00.256626598Z",
+  "sha256": "edff2b69473bb53c3cc36d674ea0ead0c0484b23040c38dba9dc8501f04fbfa9",
+  "bytes": 10095
+}

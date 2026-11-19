@@ -1,7 +1,7 @@
 #!/bin/bash
 # Library mode measurement on real libraries (LIBRARY_MODE LB2/LB4).
 #
-# Fetches four libraries with vulnerable dependencies from Maven Central
+# Fetches five libraries with vulnerable dependencies from Maven Central
 # (mvn dependency:copy-dependencies) into work/libs/<name>/ — lib.jar is the
 # library, deps/ its runtime dependencies — and runs bin/ariadne on each
 # with -roots all and -roots api, under CHA and RTA (the mvn dependency:list
@@ -26,6 +26,7 @@ libs=(
   # dependencies what the starter brings (mybatis 3.5.4, mybatis-spring
   # 2.0.4, Spring Boot 2.2.5 jdbc).
   "mybatis-starter:org.mybatis.spring.boot:mybatis-spring-boot-starter:2.1.2:mybatis-spring-boot-autoconfigure"
+  "jetty-client:org.eclipse.jetty:jetty-client:9.4.36.v20210114"           # callbacks (Response.Listener); jetty-http/io/util 9.4.36 (LB4)
 )
 for spec in "${libs[@]}"; do
   IFS=: read -r name g a v libA <<<"$spec"
@@ -67,10 +68,10 @@ for spec in "${libs[@]}"; do
   done
 done
 
-python3 -I - "$out" <<'PY'
+python3 -I - "$out" "${libs[@]%%:*}" <<'PY'
 import collections, json, sys
 out = sys.argv[1]
-for name in ["configuration2", "jackson-yaml", "jjwt-jackson", "mybatis-starter"]:
+for name in sys.argv[2:]:
     for roots in ["all", "api"]:
         for mode in ["cha", "rta"]:
             j = json.load(open(f"{out}/{name}-{roots}-{mode}.json"))

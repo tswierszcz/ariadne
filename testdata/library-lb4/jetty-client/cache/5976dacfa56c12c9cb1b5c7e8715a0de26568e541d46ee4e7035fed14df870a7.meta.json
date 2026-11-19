@@ -1,0 +1,10 @@
+{
+  "key": "5976dacfa56c12c9cb1b5c7e8715a0de26568e541d46ee4e7035fed14df870a7",
+  "kind": "osv",
+  "method": "GET",
+  "url": "https://api.osv.dev/v1/vulns/GHSA-hmr7-m48g-48f6",
+  "fetched_at": "2026-11-19T10:45:00.256839349Z",
+  "validated_at": "2026-11-19T10:45:00.256839349Z",
+  "sha256": "128070e9593048e29a8cb6ad02724884606cf3d04afeb6c4036d275be7b59b8e",
+  "bytes": 7308
+}

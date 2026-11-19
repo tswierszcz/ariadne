@@ -1183,3 +1183,35 @@ CVE-2025-49124: # Tomcat's Windows installer runs icacls.exe from the search pat
   # code in any Tomcat jar (OSV lists tomcat-embed-core anyway).
   not_code: "Windows installer (icacls.exe resolved through the search path); no class in the jar is involved"
   review: reviewed
+
+# Jetty HTTP (LIBRARY_MODE LB4, 2026-11-19): OSV gives these advisories no
+# fix commit, so the diff source had no mapping (MAPPING_MISSING on
+# jetty-client 9.4.36). Both checked in the bytecode of jetty-http
+# 9.4.36.v20210114 (vulnerable) against the copy in jetty-runner
+# 9.4.57.v20241219 (fixed); only the 9.4 line is covered (10.x-12.x moved
+# the parser: MAPPING_VERSION_UNCOVERED there).
+CVE-2023-40167: # HttpParser accepts a "+"-prefixed Content-Length
+  # 9.4.36: convertContentLength is Long.parseLong, which takes "+16";
+  # 9.4.57 parses digit by digit. parsedHeader calls it for every
+  # Content-Length field, requests (server) and responses (HttpClient).
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.eclipse.jetty:jetty-http
+      versions: "[9.4.0,9.4.52)"
+      methods:
+        - org.eclipse.jetty.http.HttpParser#convertContentLength(Ljava/lang/String;)J
+CVE-2022-2047: # HttpURI parses "http://localhost;/path" with host "localhost;"
+  # The authority is split in the private parse(State, String, int, int)
+  # every public parse/constructor goes through; 9.4.47 added the
+  # character check there (9.4.57: isUnreservedPctEncodedOrSubDelim),
+  # 9.4.36 has none. HttpClient builds an HttpURI for each request URI.
+  role: vulnerable
+  coverage: partial
+  review: reviewed
+  variants:
+    - package: org.eclipse.jetty:jetty-http
+      versions: "[9.4.0,9.4.47)"
+      methods:
+        - org.eclipse.jetty.http.HttpURI#parse(Lorg/eclipse/jetty/http/HttpURI$State;Ljava/lang/String;II)V

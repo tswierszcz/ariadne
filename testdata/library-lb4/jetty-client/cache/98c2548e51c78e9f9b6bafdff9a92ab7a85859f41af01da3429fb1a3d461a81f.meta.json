@@ -1,0 +1,12 @@
+{
+  "key": "98c2548e51c78e9f9b6bafdff9a92ab7a85859f41af01da3429fb1a3d461a81f",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-jmx/9.4.36.v20210114/jetty-jmx-9.4.36.v20210114.pom",
+  "fetched_at": "2026-11-19T10:45:06.818416399Z",
+  "validated_at": "2026-11-19T10:45:06.818416399Z",
+  "sha256": "3eff8c0faf2720233535fbf23dca8cbc2c6c44556e89f3825274dc47c791c1e7",
+  "bytes": 1248,
+  "etag": "W/\"6d9ea1e7b1162c8a204541048f6b3942\"",
+  "last_modified": "Thu, 14 Jan 2021 16:45:50 GMT"
+}

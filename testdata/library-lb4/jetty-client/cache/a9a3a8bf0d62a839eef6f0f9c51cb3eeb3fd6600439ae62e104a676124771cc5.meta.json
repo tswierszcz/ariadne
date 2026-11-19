@@ -1,0 +1,11 @@
+{
+  "key": "a9a3a8bf0d62a839eef6f0f9c51cb3eeb3fd6600439ae62e104a676124771cc5",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://github.com/jetty/jetty.project/commit/c880d9309b6f7b0730d69b4ec2179763d5d281cb.diff",
+  "fetched_at": "2026-11-19T10:45:01.484479388Z",
+  "validated_at": "2026-11-19T10:45:01.484479388Z",
+  "sha256": "0d5b8212d2b17843b3dc5b2c2edec6d4c4307e9a3ec5b37d8a5da8eca62e93fb",
+  "bytes": 42000,
+  "etag": "W/\"0d5b8212d2b17843b3dc5b2c2edec6d4\""
+}

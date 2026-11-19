@@ -1,0 +1,11 @@
+{
+  "key": "9102058686f48c340c97d4eac11f2d8419c13db125f6db6d598215d78185cec0",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://raw.githubusercontent.com/jetty/jetty.project/803fe5c86b380fe9eaf27351be41aba77eacfa2b/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/HttpConfiguration.java",
+  "fetched_at": "2026-11-19T10:45:03.840163952Z",
+  "validated_at": "2026-11-19T10:45:03.840163952Z",
+  "sha256": "8cadc163807c676f73c19e2d7b93cb867cc64515e404d94f74d75ded8c41ce5d",
+  "bytes": 30145,
+  "etag": "W/\"7fb4c5a0e5df4740ec84e226667e23c63ab4f90cc825d4cfdc1add85f5ccdb1e\""
+}

@@ -88,6 +88,12 @@ func TestServerManualMappings(t *testing.T) {
 		{"CVE-2026-22733", "org.springframework.boot:spring-boot-starter-actuator", "2.3.12.RELEASE",
 			[]string{"org.springframework.boot.actuate.autoconfigure.cloudfoundry.servlet.CloudFoundryActuatorAutoConfiguration$IgnoredPathsWebSecurityConfigurer#configure"}},
 		{"CVE-2026-22733", "org.springframework.boot:spring-boot-starter-actuator", "3.5.12", nil},
+		// LIBRARY_MODE LB4: Jetty 9.4 (jetty-client measurement).
+		{"CVE-2023-40167", "org.eclipse.jetty:jetty-http", "9.4.36.v20210114", []string{"org.eclipse.jetty.http.HttpParser#convertContentLength(Ljava/lang/String;)J"}},
+		{"CVE-2023-40167", "org.eclipse.jetty:jetty-http", "9.4.52.v20230823", nil},
+		{"CVE-2023-40167", "org.eclipse.jetty:jetty-http", "10.0.15", nil},
+		{"CVE-2022-2047", "org.eclipse.jetty:jetty-http", "9.4.36.v20210114", []string{"org.eclipse.jetty.http.HttpURI#parse(Lorg/eclipse/jetty/http/HttpURI$State;Ljava/lang/String;II)V"}},
+		{"CVE-2022-2047", "org.eclipse.jetty:jetty-http", "9.4.47.v20220610", nil},
 	} {
 		if got := pick(c.id, c.pkg, c.v); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s %s %s = %v, want %v", c.id, c.pkg, c.v, got, c.want)
