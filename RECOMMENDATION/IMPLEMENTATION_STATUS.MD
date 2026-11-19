@@ -31,6 +31,15 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### LIBRARY_MODE: wyrocznia startera mybatis (po `lb4-1`) — DONE, pomiar (2026-11-19)
+
+- **Pytanie:** które z 26 `REACHABLE` startera mybatis-spring-boot-autoconfigure 2.1.2 (`-roots api`, CHA) naprawdę się wykonują — pomiar LB4 pokazał 22 ścieżki `heuristic` przez kontener Springa.
+- **Wyrocznia (`testdata/library-starter`, `scripts/library-starter-oracle.sh`):** najmniejsza aplikacja startera (Boot 2.2.5, HSQLDB 2.5.1 z `~/.m2`, jeden `@Mapper`), scenariusze `plain` i `yml` (`application.yml` z jedną właściwością `mybatis.*`); nowy `scripts/MethodBreakTrace.java` — jednorazowe breakpointy JDI na metodach zmapowanych klas (9 s; `MethodTrace` z wejściem do każdej metody nie skończył w 8 min). Bez sieci.
+- **Wynik:** wykonane w obu scenariuszach 5 (CVE-2022-22965/22970 `CachedIntrospectionResults`, CVE-2026-41848 `AntPathMatcher` z `SpringBootVFS#list`, CVE-2021-42550 i CVE-2026-41851 tylko przez metody pomocnicze szerokich mapowań diff); tylko z `application.yml` 7 (snakeyaml, `undeclared` — na JVM z ładowania konfiguracji przez sam Boot, zgłoszone ścieżki przez mybatis się nie wykonały); nigdy 14 (7 SpEL, 4 konfiguracja logback, serwer WWW, `MimeType`, OGNL — wymagają, by aplikacja coś zrobiła).
+- **Wzorzec:** 10 z 14 niewykonanych i wszystkie 7 snakeyaml opuszczają kod mybatis wywołaniem na obiekcie **przekazanym bibliotece przez kontener** (parametr `ObjectProvider` → `getIfAvailable`, `BeanFactory` w `AutoConfigurationPackages#get`), który CHA rozsyła do wszystkich implementacji Springa. To otwarty punkt LB2 „wywołania na typach zależności”, zmierzony na prawdziwej bibliotece. `heuristic` ich nie oddziela (12 z 14 niewykonanych, ale też 9 z 12 wykonanych).
+- **Kod analizy bez zmian.** Szczegóły: `testdata/library-starter/EXPECTED.MD`.
+- **Następny krok (decyzja użytkownika):** jak traktować wywołanie na odbiorcy typu zależności, którego biblioteka nie tworzy (parametr, wartość z kontenera) — np. jak `client_code`: luka i oznaczenie zamiast pełnego CHA po implementacjach zależności.
+
 ### LIBRARY_MODE:LB4 — zestaw kwalifikacyjny i użycie w CI (`lb4-1`) — DONE for this scope (2026-11-19)
 
 - **Zestaw (`testdata/library-lb4/EXPECTED.MD`):** pięć prawdziwych bibliotek, po jednej na styl API — commons-configuration2 2.7 (fasada/builder), jackson-dataformat-yaml 2.12.3 (fabryka, podklasa mappera), jjwt-jackson 0.11.2 (SPI), mybatis-spring-boot-autoconfigure 2.1.2 (starter), **nowa: jetty-client 9.4.36** (callbacki, selektor NIO). `scripts/library-measure.sh` (piąta biblioteka, lista nazw z tablicy) × `-roots all`/`api` × CHA/RTA, offline na `lb2-6`; jetty: jeden przebieg online za zgodą użytkownika — 1 plik z Central, bez 429, reszta z `~/.m2`.
