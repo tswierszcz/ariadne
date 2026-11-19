@@ -1,0 +1,12 @@
+{
+  "key": "aaf4d994b29239866bb9aaa8bd5997e12c851c98311aefedf9f6fe4ab308c7e4",
+  "kind": "mutable",
+  "method": "GET",
+  "url": "https://api.github.com/repos/jetty/jetty.project/pulls/12012",
+  "fetched_at": "2026-11-19T10:45:00.526618138Z",
+  "validated_at": "2026-11-19T10:45:00.526618138Z",
+  "sha256": "21d10b4d60742554640b3513ff6a40072b0b2c5d0e3c991658abd07f262693ab",
+  "bytes": 17340,
+  "etag": "\"97402edfb7d9ee9cfeefa0d5ac43fc3ca7903a96454564c906cd8d3a4950e03d\"",
+  "last_modified": "Fri, 30 Oct 2026 03:07:27 GMT"
+}

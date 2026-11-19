@@ -1,0 +1,11 @@
+{
+  "key": "1634690fe9b6ba6eb0c88e4e5dc34444006e4f2ec221c32ab8944b163bd59fa3",
+  "kind": "pinned",
+  "method": "GET",
+  "url": "https://raw.githubusercontent.com/jetty/jetty.project/c880d9309b6f7b0730d69b4ec2179763d5d281cb/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/UriCompliance.java",
+  "fetched_at": "2026-11-19T10:45:02.882834218Z",
+  "validated_at": "2026-11-19T10:45:02.882834218Z",
+  "sha256": "0b873b31373b94003926e2a2de1a03092549db9bc14f7a57682686c440900d7c",
+  "bytes": 16065,
+  "etag": "W/\"493602797e5d4f299a9935d501d47d8a7bcfd6d105aa55dfe3dfc1e8e6f18c82\""
+}

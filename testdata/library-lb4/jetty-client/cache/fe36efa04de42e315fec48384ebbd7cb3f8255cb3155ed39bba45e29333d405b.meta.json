@@ -1,0 +1,12 @@
+{
+  "key": "fe36efa04de42e315fec48384ebbd7cb3f8255cb3155ed39bba45e29333d405b",
+  "kind": "mutable",
+  "method": "GET",
+  "url": "https://api.github.com/repos/jetty/jetty.project/git/matching-refs/tags/release-9.4.36.v20210114",
+  "fetched_at": "2026-11-19T10:45:05.889518636Z",
+  "validated_at": "2026-11-19T10:45:05.889518636Z",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "bytes": 2,
+  "etag": "\"74d1db57f0fec3481bb6b4d9bcdc020d656635ec6c53ee589d27a8831cbbe280\"",
+  "last_modified": "Wed, 18 Nov 2026 07:04:37 GMT"
+}

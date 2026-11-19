@@ -1,0 +1,861 @@
+diff --git a/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/HttpURI.java b/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/HttpURI.java
+index 0d1eae72c18b..6db99245a561 100644
+--- a/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/HttpURI.java
++++ b/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/HttpURI.java
+@@ -16,7 +16,6 @@
+ import java.io.Serial;
+ import java.io.Serializable;
+ import java.net.URI;
+-import java.util.Arrays;
+ import java.util.Collection;
+ import java.util.Collections;
+ import java.util.EnumSet;
+@@ -65,12 +64,15 @@
+  * Thus this class avoid and/or detects such ambiguities. Furthermore, by decoding characters and
+  * removing parameters before relative path normalization, ambiguous paths will be resolved in such
+  * a way to be non-standard-but-non-ambiguous to down stream interpretation of the decoded path string.
+- * The violations are recorded and available by API such as {@link #hasAmbiguousSegment()} so that requests
+- * containing them may be rejected in case the non-standard-but-non-ambiguous interpretations
+- * are not satisfactory for a given compliance configuration.
+  * </p>
+  * <p>
+- * Implementations that wish to process ambiguous URI paths must configure the compliance modes
++ * This class collates any {@link UriCompliance.Violation violations} against the specification
++ * and/or best practises in the {@link #getViolations()}.  Users of this class should check against a
++ * configured {@link UriCompliance} mode if the {@code HttpURI} is suitable for use
++ * (see {@link UriCompliance#checkUriCompliance(UriCompliance, HttpURI, ComplianceViolation.Listener)}).
++ * </p>
++ * <p>
++ * For example, implementations that wish to process ambiguous URI paths must configure the compliance modes
+  * to accept them and then perform their own decoding of {@link #getPath()}.
+  * </p>
+  * <p>
+@@ -549,16 +551,41 @@ private enum State
+             .with("%u002e%u002e", Boolean.TRUE)
+             .build();
+ 
+-        /**
+-         * Encoded character sequences that violate the Servlet 6.0 spec
+-         * https://jakarta.ee/specifications/servlet/6.0/jakarta-servlet-spec-6.0.html#uri-path-canonicalization
+-         */
+         private static final boolean[] __suspiciousPathCharacters;
+ 
+-        /**
+-         * Unencoded US-ASCII character sequences not allowed by HTTP or URI specs in path segments.
+-         */
+-        private static final boolean[] __illegalPathCharacters;
++        private static final boolean[] __unreservedPctEncodedSubDelims;
++
++        private static final boolean[] __pathCharacters;
++
++        private static boolean isDigit(char c)
++        {
++            return (c >= '0') && (c <= '9');
++        }
++
++        private static boolean isHexDigit(char c)
++        {
++            return (((c >= 'a') && (c <= 'f')) || // ALPHA (lower)
++                ((c >= 'A') && (c <= 'F')) ||  // ALPHA (upper)
++                ((c >= '0') && (c <= '9')));
++        }
++
++        private static boolean isUnreserved(char c)
++        {
++            return (((c >= 'a') && (c <= 'z')) || // ALPHA (lower)
++                ((c >= 'A') && (c <= 'Z')) ||  // ALPHA (upper)
++                ((c >= '0') && (c <= '9')) || // DIGIT
++                (c == '-') || (c == '.') || (c == '_') || (c == '~'));
++        }
++
++        private static boolean isSubDelim(char c)
++        {
++            return c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' || c == ')' || c == '*' || c == '+' || c == ',' || c == ';' || c == '=';
++        }
++
++        static boolean isUnreservedPctEncodedOrSubDelim(char c)
++        {
++            return c < __unreservedPctEncodedSubDelims.length && __unreservedPctEncodedSubDelims[c];
++        }
+ 
+         static
+         {
+@@ -588,39 +615,32 @@ private enum State
+             //   gen-delims    = ":" / "/" / "?" / "#" / "[" / "]" / "@"
+             //   sub-delims    = "!" / "$" / "&" / "'" / "(" / ")"
+             //                 / "*" / "+" / "," / ";" / "="
+-
++            //
++            //   authority     = [ userinfo "@" ] host [ ":" port ]
++            //   userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
++            //   host          = IP-literal / IPv4address / reg-name
++            //   port          = *DIGIT
++            //
++            //   reg-name      = *( unreserved / pct-encoded / sub-delims )
++            //
+             // we are limited to US-ASCII per https://datatracker.ietf.org/doc/html/rfc3986#section-2
+-            boolean[] illegalChars = new boolean[128];
+-            Arrays.fill(illegalChars, true);
+-            // pct-encoded
+-            illegalChars['%'] = false;
+-            // unreserved
+-            for (int i = 0; i < illegalChars.length; i++)
++            __unreservedPctEncodedSubDelims = new boolean[128];
++            __pathCharacters = new boolean[128];
++
++            for (int i = 0; i < __pathCharacters.length; i++)
+             {
+-                if (((i >= 'a') && (i <= 'z')) || // ALPHA (lower)
+-                    ((i >= 'A') && (i <= 'Z')) ||  // ALPHA (upper)
+-                    ((i >= '0') && (i <= '9')) || // DIGIT
+-                    (i == '-') || (i == '.') || (i == '_') || (i == '_') || (i == '~')
+-                )
+-                {
+-                    illegalChars[i] = false;
+-                }
++                char c = (char)i;
++
++                __unreservedPctEncodedSubDelims[i] = isUnreserved(c) || c == '%' || isSubDelim(c);
++                __pathCharacters[i] = __unreservedPctEncodedSubDelims[i] ||  c == ':' || c == '@';
+             }
+-            // reserved
+-            String reserved = ":/?#[]@!$&'()*+,=";
+-            for (char c: reserved.toCharArray())
+-                illegalChars[c] = false;
+-            __illegalPathCharacters = illegalChars;
+-            // anything else in the US-ASCII space is not allowed
+ 
+             // suspicious path characters
+-            boolean[] suspicious = new boolean[128];
+-            Arrays.fill(suspicious, false);
+-            suspicious['\\'] = true;
+-            suspicious[0x7F] = true;
++            __suspiciousPathCharacters = new boolean[128];
++            __suspiciousPathCharacters['\\'] = true;
++            __suspiciousPathCharacters[0x7F] = true;
+             for (int i = 0; i <= 0x1F; i++)
+-                suspicious[i] = true;
+-            __suspiciousPathCharacters = suspicious;
++                __suspiciousPathCharacters[i] = true;
+         }
+ 
+         private String _scheme;
+@@ -650,6 +670,8 @@ private Mutable(HttpURI baseURI, String pathQuery)
+             _uri = null;
+             _scheme = baseURI.getScheme();
+             _user = baseURI.getUser();
++            if (_user != null)
++                _violations = EnumSet.of(Violation.USER_INFO);
+             _host = baseURI.getHost();
+             _port = baseURI.getPort();
+             if (pathQuery != null)
+@@ -661,6 +683,8 @@ private Mutable(HttpURI baseURI, String path, String param, String query)
+             _uri = null;
+             _scheme = baseURI.getScheme();
+             _user = baseURI.getUser();
++            if (_user != null)
++                _violations = EnumSet.of(Violation.USER_INFO);
+             _host = baseURI.getHost();
+             _port = baseURI.getPort();
+             if (path != null)
+@@ -686,6 +710,8 @@ private Mutable(URI uri)
+                 _host = "";
+             _port = uri.getPort();
+             _user = uri.getUserInfo();
++            if (_user != null)
++                _violations = EnumSet.of(Violation.USER_INFO);
+             String path = uri.getRawPath();
+             if (path != null)
+                 parse(State.PATH, path);
+@@ -1086,6 +1112,10 @@ public Mutable uri(String uri, int offset, int length)
+         public Mutable user(String user)
+         {
+             _user = user;
++            if (user == null)
++                removeViolation(Violation.USER_INFO);
++            else
++                addViolation(Violation.USER_INFO);
+             _uri = null;
+             return this;
+         }
+@@ -1095,12 +1125,13 @@ private void parse(State state, final String uri)
+             int mark = 0; // the start of the current section being parsed
+             int pathMark = 0; // the start of the path section
+             int segment = 0; // the start of the current segment within the path
+-            boolean encodedPath = false; // set to true if the path contains % encoded characters
++            boolean encoded = false; // set to true if the string contains % encoded characters
+             boolean encodedUtf16 = false; // Is the current encoding for UTF16?
+             int encodedCharacters = 0; // partial state of parsing a % encoded character<x>
+             int encodedValue = 0; // the partial encoded value
+             boolean dot = false; // set to true if the path contains . or .. segments
+             int end = uri.length();
++            boolean password = false;
+             _emptySegment = false;
+             for (int i = 0; i < end; i++)
+             {
+@@ -1140,7 +1171,7 @@ private void parse(State state, final String uri)
+                                 state = State.ASTERISK;
+                                 break;
+                             case '%':
+-                                encodedPath = true;
++                                encoded = true;
+                                 encodedCharacters = 2;
+                                 encodedValue = 0;
+                                 mark = pathMark = segment = i;
+@@ -1194,7 +1225,7 @@ private void parse(State state, final String uri)
+                                 break;
+                             case '%':
+                                 // must have been in an encoded path
+-                                encodedPath = true;
++                                encoded = true;
+                                 encodedCharacters = 2;
+                                 encodedValue = 0;
+                                 state = State.PATH;
+@@ -1244,27 +1275,53 @@ private void parse(State state, final String uri)
+                         switch (c)
+                         {
+                             case '/':
++                                if (encodedCharacters > 0 || password)
++                                    throw new IllegalArgumentException("Bad authority");
+                                 _host = uri.substring(mark, i);
+                                 pathMark = mark = i;
+                                 segment = mark + 1;
+                                 state = State.PATH;
++                                encoded = false;
+                                 break;
+                             case ':':
++                                if (encodedCharacters > 0 || password)
++                                    throw new IllegalArgumentException("Bad authority");
+                                 if (i > mark)
+                                     _host = uri.substring(mark, i);
+                                 mark = i + 1;
+                                 state = State.PORT;
+                                 break;
+                             case '@':
+-                                if (_user != null)
++                                if (encodedCharacters > 0)
+                                     throw new IllegalArgumentException("Bad authority");
+                                 _user = uri.substring(mark, i);
++                                addViolation(Violation.USER_INFO);
++                                password = false;
++                                encoded = false;
+                                 mark = i + 1;
+                                 break;
+                             case '[':
++                                if (i != mark)
++                                    throw new IllegalArgumentException("Bad authority");
+                                 state = State.IPV6;
+                                 break;
++                            case '%':
++                                if (encodedCharacters > 0)
++                                    throw new IllegalArgumentException("Bad authority");
++                                encoded = true;
++                                encodedCharacters = 2;
++                                break;
+                             default:
++                                if (encodedCharacters > 0)
++                                {
++                                    encodedCharacters--;
++                                    if (!isHexDigit(c))
++                                        throw new IllegalArgumentException("Bad authority");
++                                }
++                                else if (!isUnreservedPctEncodedOrSubDelim(c))
++                                {
++                                    throw new IllegalArgumentException("Bad authority");
++                                }
+                                 break;
+                         }
+                         break;
+@@ -1289,7 +1346,11 @@ private void parse(State state, final String uri)
+                                     state = State.PATH;
+                                 }
+                                 break;
++                            case ':':
++                                break;
+                             default:
++                                if (!isHexDigit(c))
++                                    throw new IllegalArgumentException("Bad authority");
+                                 break;
+                         }
+                         break;
+@@ -1302,6 +1363,7 @@ private void parse(State state, final String uri)
+                                 throw new IllegalArgumentException("Bad authority");
+                             // It wasn't a port, but a password!
+                             _user = _host + ":" + uri.substring(mark, i);
++                            addViolation(Violation.USER_INFO);
+                             mark = i + 1;
+                             state = State.HOST;
+                         }
+@@ -1312,6 +1374,22 @@ else if (c == '/')
+                             segment = i + 1;
+                             state = State.PATH;
+                         }
++                        else if (!isDigit(c))
++                        {
++                            if (isUnreservedPctEncodedOrSubDelim(c))
++                            {
++                                // must be a password
++                                password = true;
++                                state = State.HOST;
++                                if (_host != null)
++                                {
++                                    mark = mark - _host.length() - 1;
++                                    _host = null;
++                                }
++                                break;
++                            }
++                            throw new IllegalArgumentException("Bad authority");
++                        }
+                         break;
+                     }
+                     case PATH:
+@@ -1353,18 +1431,18 @@ else if (c == '/')
+                             switch (c)
+                             {
+                                 case ';':
+-                                    checkSegment(uri, dot || encodedPath, segment, i, true);
++                                    checkSegment(uri, dot || encoded, segment, i, true);
+                                     mark = i + 1;
+                                     state = State.PARAM;
+                                     break;
+                                 case '?':
+-                                    checkSegment(uri, dot || encodedPath, segment, i, false);
++                                    checkSegment(uri, dot || encoded, segment, i, false);
+                                     _path = uri.substring(pathMark, i);
+                                     mark = i + 1;
+                                     state = State.QUERY;
+                                     break;
+                                 case '#':
+-                                    checkSegment(uri, dot || encodedPath, segment, i, false);
++                                    checkSegment(uri, dot || encoded, segment, i, false);
+                                     _path = uri.substring(pathMark, i);
+                                     mark = i + 1;
+                                     state = State.FRAGMENT;
+@@ -1372,21 +1450,21 @@ else if (c == '/')
+                                 case '/':
+                                     // There is no leading segment when parsing only a path that starts with slash.
+                                     if (i != 0)
+-                                        checkSegment(uri, dot || encodedPath, segment, i, false);
++                                        checkSegment(uri, dot || encoded, segment, i, false);
+                                     segment = i + 1;
+                                     break;
+                                 case '.':
+                                     dot |= segment == i;
+                                     break;
+                                 case '%':
+-                                    encodedPath = true;
++                                    encoded = true;
+                                     encodedUtf16 = false;
+                                     encodedCharacters = 2;
+                                     encodedValue = 0;
+                                     break;
+                                 default:
+                                     // The RFC does not allow unencoded path characters that are outside the ABNF
+-                                    if (c > __illegalPathCharacters.length || __illegalPathCharacters[c])
++                                    if (c > __pathCharacters.length || !__pathCharacters[c])
+                                         addViolation(Violation.ILLEGAL_PATH_CHARACTERS);
+                                     if (c < __suspiciousPathCharacters.length && __suspiciousPathCharacters[c])
+                                        addViolation(Violation.SUSPICIOUS_PATH_CHARACTERS);
+@@ -1412,7 +1490,7 @@ else if (c == '/')
+                                 state = State.FRAGMENT;
+                                 break;
+                             case '/':
+-                                encodedPath = true;
++                                encoded = true;
+                                 segment = i + 1;
+                                 state = State.PATH;
+                                 break;
+@@ -1477,7 +1555,7 @@ else if (c == '/')
+                     _param = uri.substring(mark, end);
+                     break;
+                 case PATH:
+-                    checkSegment(uri, dot || encodedPath, segment, end, false);
++                    checkSegment(uri, dot || encoded, segment, end, false);
+                     _path = uri.substring(pathMark, end);
+                     break;
+                 case QUERY:
+@@ -1490,7 +1568,7 @@ else if (c == '/')
+                     throw new IllegalStateException(state.toString());
+             }
+ 
+-            if (!encodedPath && !dot)
++            if (!encoded && !dot)
+             {
+                 if (_param == null)
+                     _canonicalPath = _path;
+@@ -1576,5 +1654,12 @@ private void addViolation(Violation violation)
+             else 
+                 _violations.add(violation);
+         }
++
++        private void removeViolation(Violation violation)
++        {
++            if (_violations == null)
++                return;
++            _violations.remove(violation);
++        }
+     }
+ }
+diff --git a/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/UriCompliance.java b/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/UriCompliance.java
+index 574530ddb098..183a283c9e0c 100644
+--- a/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/UriCompliance.java
++++ b/jetty-core/jetty-http/src/main/java/org/eclipse/jetty/http/UriCompliance.java
+@@ -109,7 +109,12 @@ public enum Violation implements ComplianceViolation
+          * Allow path characters not allowed in the path portion of the URI and HTTP specs.
+          * <p>This would allow characters that fall outside of the {@code unreserved / pct-encoded / sub-delims / ":" / "@"} ABNF</p>
+          */
+-        ILLEGAL_PATH_CHARACTERS("https://datatracker.ietf.org/doc/html/rfc3986#section-3.3", "Illegal Path Character");
++        ILLEGAL_PATH_CHARACTERS("https://datatracker.ietf.org/doc/html/rfc3986#section-3.3", "Illegal Path Character"),
++
++        /**
++         * Allow user info in the authority portion of the URI and HTTP specs.
++         */
++        USER_INFO("https://datatracker.ietf.org/doc/html/rfc9110#name-deprecation-of-userinfo-in-", "Deprecated User Info");
+ 
+         private final String _url;
+         private final String _description;
+@@ -175,7 +180,8 @@ public String getDescription()
+             Violation.AMBIGUOUS_PATH_SEPARATOR,
+             Violation.AMBIGUOUS_PATH_ENCODING,
+             Violation.AMBIGUOUS_EMPTY_SEGMENT,
+-            Violation.UTF16_ENCODINGS));
++            Violation.UTF16_ENCODINGS,
++            Violation.USER_INFO));
+ 
+     /**
+      * Compliance mode that allows all URI Violations, including allowing ambiguous paths in non-canonical form, and illegal characters
+diff --git a/jetty-core/jetty-http/src/test/java/org/eclipse/jetty/http/HttpURITest.java b/jetty-core/jetty-http/src/test/java/org/eclipse/jetty/http/HttpURITest.java
+index be00b41d00c6..228584785a45 100644
+--- a/jetty-core/jetty-http/src/test/java/org/eclipse/jetty/http/HttpURITest.java
++++ b/jetty-core/jetty-http/src/test/java/org/eclipse/jetty/http/HttpURITest.java
+@@ -34,6 +34,7 @@
+ import static org.hamcrest.Matchers.nullValue;
+ import static org.hamcrest.Matchers.sameInstance;
+ import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
+ import static org.junit.jupiter.api.Assertions.assertNull;
+ import static org.junit.jupiter.api.Assertions.assertThrows;
+ import static org.junit.jupiter.api.Assertions.assertTrue;
+@@ -59,6 +60,7 @@ public void testBuilder()
+ 
+         assertThat(uri.getScheme(), is("http"));
+         assertThat(uri.getUser(), is("user:password"));
++        assertTrue(uri.hasViolation(Violation.USER_INFO));
+         assertThat(uri.getHost(), is("host"));
+         assertThat(uri.getPort(), is(8888));
+         assertThat(uri.getPath(), is("/ignored/../p%61th;ignored/info;param"));
+@@ -81,6 +83,7 @@ public void testBuilder()
+ 
+         assertThat(uri.getScheme(), is("https"));
+         assertThat(uri.getUser(), nullValue());
++        assertFalse(uri.hasViolation(Violation.USER_INFO));
+         assertThat(uri.getHost(), is("[::1]"));
+         assertThat(uri.getPort(), is(8080));
+         assertThat(uri.getPath(), is("/some%20encoded/evening;id=12345"));
+@@ -98,6 +101,7 @@ public void testExample()
+ 
+         assertThat(uri.getScheme(), is("http"));
+         assertThat(uri.getUser(), is("user:password"));
++        assertTrue(uri.hasViolation(Violation.USER_INFO));
+         assertThat(uri.getHost(), is("host"));
+         assertThat(uri.getPort(), is(8888));
+         assertThat(uri.getPath(), is("/ignored/../p%61th;ignored/info;param"));
+@@ -155,11 +159,8 @@ public void testParse()
+         assertThat(uri.getHost(), is("foo"));
+         assertThat(uri.getPath(), is("/bar"));
+ 
+-        // We do allow nulls if not encoded.  This can be used for testing 2nd line of defence.
+-        builder.uri("http://fo\000/bar");
+-        uri = builder.asImmutable();
+-        assertThat(uri.getHost(), is("fo\000"));
+-        assertThat(uri.getPath(), is("/bar"));
++        // We do not allow nulls if not encoded.
++        assertThrows(IllegalArgumentException.class, () -> builder.uri("http://fo\000/bar").asImmutable());
+     }
+ 
+     @Test
+@@ -327,6 +328,7 @@ public void testBasicAuthCredentials()
+         assertEquals("http://user:password@example.com:8888/blah", uri.toString());
+         assertEquals(uri.getAuthority(), "example.com:8888");
+         assertEquals(uri.getUser(), "user:password");
++        assertTrue(uri.hasViolation(Violation.USER_INFO));
+     }
+ 
+     @Test
+@@ -1198,4 +1200,36 @@ public void testFromBad(String scheme, String server, int port, String expectedS
+         HttpURI httpURI = HttpURI.from(scheme, server, port, null);
+         assertThat(httpURI.asString(), is(expectedStr));
+     }
++
++    public static Stream<String> badAuthorities()
++    {
++        return Stream.of(
++            "http://#host/path",
++            "https:// host/path",
++            "https://h st/path",
++            "https://h\000st/path",
++            "https://h%GGst/path",
++            "https://host%/path",
++            "https://host%0/path",
++            "https://host%u001f/path",
++            "https://host%:8080/path",
++            "https://host%0:8080/path",
++            "https://user%@host/path",
++            "https://user%0@host/path",
++            "https://host:notport/path",
++            "https://user@host:notport/path",
++            "https://user:password@host:notport/path",
++            "https://user @host.com/",
++            "https://user#@host.com/",
++            "https://[notIpv6]/",
++            "https://bad[0::1::2::3::4]/"
++        );
++    }
++
++    @ParameterizedTest
++    @MethodSource("badAuthorities")
++    public void testBadAuthority(String uri)
++    {
++        assertThrows(IllegalArgumentException.class, () -> HttpURI.from(uri));
++    }
+ }
+diff --git a/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/HttpConfiguration.java b/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/HttpConfiguration.java
+index 69d9396470e2..70360dac03c4 100644
+--- a/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/HttpConfiguration.java
++++ b/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/HttpConfiguration.java
+@@ -79,6 +79,7 @@ public class HttpConfiguration implements Dumpable
+     private long _minResponseDataRate;
+     private HttpCompliance _httpCompliance = HttpCompliance.RFC7230;
+     private UriCompliance _uriCompliance = UriCompliance.DEFAULT;
++    private UriCompliance _redirectUriCompliance = null; // TODO default to UriCompliance.DEFAULT in 12.1 ?;
+     private CookieCompliance _requestCookieCompliance = CookieCompliance.RFC6265;
+     private CookieCompliance _responseCookieCompliance = CookieCompliance.RFC6265;
+     private MultiPartCompliance _multiPartCompliance = MultiPartCompliance.RFC7578;
+@@ -159,6 +160,7 @@ public HttpConfiguration(HttpConfiguration config)
+         _notifyRemoteAsyncErrors = config._notifyRemoteAsyncErrors;
+         _relativeRedirectAllowed = config._relativeRedirectAllowed;
+         _uriCompliance = config._uriCompliance;
++        _redirectUriCompliance = config._redirectUriCompliance;
+         _serverAuthority = config._serverAuthority;
+         _localAddress = config._localAddress;
+     }
+@@ -598,11 +600,24 @@ public UriCompliance getUriCompliance()
+         return _uriCompliance;
+     }
+ 
++    public UriCompliance getRedirectUriCompliance()
++    {
++        return _redirectUriCompliance;
++    }
++
+     public void setUriCompliance(UriCompliance uriCompliance)
+     {
+         _uriCompliance = uriCompliance;
+     }
+ 
++    /**
++     * @param uriCompliance The {@link UriCompliance} to apply in {@link Response#toRedirectURI(Request, String)} or {@code null}.
++     */
++    public void setRedirectUriCompliance(UriCompliance uriCompliance)
++    {
++        _redirectUriCompliance = uriCompliance;
++    }
++
+     /**
+      * @return The CookieCompliance used for parsing request {@code Cookie} headers.
+      * @see #getResponseCookieCompliance()
+diff --git a/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/Response.java b/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/Response.java
+index 4e8b26a322ab..9d37ad0bdabd 100644
+--- a/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/Response.java
++++ b/jetty-core/jetty-server/src/main/java/org/eclipse/jetty/server/Response.java
+@@ -33,6 +33,7 @@
+ import org.eclipse.jetty.http.HttpURI;
+ import org.eclipse.jetty.http.HttpVersion;
+ import org.eclipse.jetty.http.Trailers;
++import org.eclipse.jetty.http.UriCompliance;
+ import org.eclipse.jetty.io.ByteBufferPool;
+ import org.eclipse.jetty.io.Content;
+ import org.eclipse.jetty.io.QuietException;
+@@ -301,25 +302,32 @@ static void sendRedirect(Request request, Response response, Callback callback,
+             return;
+         }
+ 
+-        if (consumeAvailable)
++        try
+         {
+-            while (true)
++            if (consumeAvailable)
+             {
+-                Content.Chunk chunk = response.getRequest().read();
+-                if (chunk == null)
++                while (true)
+                 {
+-                    response.getHeaders().put(HttpHeader.CONNECTION, HttpHeaderValue.CLOSE);
+-                    break;
++                    Content.Chunk chunk = response.getRequest().read();
++                    if (chunk == null)
++                    {
++                        response.getHeaders().put(HttpHeader.CONNECTION, HttpHeaderValue.CLOSE);
++                        break;
++                    }
++                    chunk.release();
++                    if (chunk.isLast())
++                        break;
+                 }
+-                chunk.release();
+-                if (chunk.isLast())
+-                    break;
+             }
+-        }
+ 
+-        response.getHeaders().put(HttpHeader.LOCATION, toRedirectURI(request, location));
+-        response.setStatus(code);
+-        response.write(true, null, callback);
++            response.getHeaders().put(HttpHeader.LOCATION, toRedirectURI(request, location));
++            response.setStatus(code);
++            response.write(true, null, callback);
++        }
++        catch (Throwable failure)
++        {
++            callback.failed(failure);
++        }
+     }
+ 
+     /**
+@@ -333,6 +341,8 @@ static void sendRedirect(Request request, Response response, Callback callback,
+      */
+     static String toRedirectURI(Request request, String location)
+     {
++        HttpConfiguration httpConfiguration = request.getConnectionMetaData().getHttpConfiguration();
++
+         // is the URI absolute already?
+         if (!URIUtil.hasScheme(location))
+         {
+@@ -353,12 +363,19 @@ static String toRedirectURI(Request request, String location)
+                 throw new IllegalStateException("redirect path cannot be above root");
+ 
+             // if relative redirects are not allowed?
+-            if (!request.getConnectionMetaData().getHttpConfiguration().isRelativeRedirectAllowed())
+-            {
++            if (!httpConfiguration.isRelativeRedirectAllowed())
+                 // make the location an absolute URI
+                 location = URIUtil.newURI(uri.getScheme(), Request.getServerName(request), Request.getServerPort(request), location, null);
+-            }
+         }
++
++        UriCompliance redirectCompliance = httpConfiguration.getRedirectUriCompliance();
++        if (redirectCompliance != null)
++        {
++            String violations = UriCompliance.checkUriCompliance(redirectCompliance, HttpURI.from(location), null);
++            if (StringUtil.isNotBlank(violations))
++                throw new IllegalArgumentException(violations);
++        }
++
+         return location;
+     }
+ 
+diff --git a/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/RequestTest.java b/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/RequestTest.java
+index 14010cd6c7fc..03a8e2763b50 100644
+--- a/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/RequestTest.java
++++ b/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/RequestTest.java
+@@ -22,6 +22,7 @@
+ import java.util.concurrent.TimeUnit;
+ import java.util.stream.Stream;
+ 
++import org.eclipse.jetty.http.HttpCompliance;
+ import org.eclipse.jetty.http.HttpCookie;
+ import org.eclipse.jetty.http.HttpHeader;
+ import org.eclipse.jetty.http.HttpStatus;
+@@ -100,6 +101,76 @@ public void testEncodedPath() throws Exception
+         assertEquals(HttpStatus.BAD_REQUEST_400, response.getStatus());
+     }
+ 
++    public static Stream<Arguments> getUriTests()
++    {
++        return Stream.of(
++            Arguments.of(UriCompliance.DEFAULT, "/", 200, "local"),
++            Arguments.of(UriCompliance.DEFAULT, "https://local/", 200, "local"),
++            Arguments.of(UriCompliance.DEFAULT, "https://other/", 400, "Authority!=Host"),
++            Arguments.of(UriCompliance.UNSAFE, "https://other/", 200, "other"),
++            Arguments.of(UriCompliance.DEFAULT, "https://user@local/", 400, "Deprecated User Info"),
++            Arguments.of(UriCompliance.LEGACY, "https://user@local/", 200, "local"),
++            Arguments.of(UriCompliance.LEGACY, "https://user@local:port/", 400, "Bad Request"),
++            Arguments.of(UriCompliance.LEGACY, "https://user@local:8080/", 400, "Authority!=Host"),
++            Arguments.of(UriCompliance.UNSAFE, "https://user@local:8080/", 200, "local:8080"),
++            Arguments.of(UriCompliance.DEFAULT, "https://user:password@local/", 400, "Deprecated User Info"),
++            Arguments.of(UriCompliance.LEGACY, "https://user:password@local/", 200, "local"),
++            Arguments.of(UriCompliance.DEFAULT, "https://user@other/", 400, "Deprecated User Info"),
++            Arguments.of(UriCompliance.LEGACY, "https://user@other/", 400, "Authority!=Host"),
++            Arguments.of(UriCompliance.DEFAULT, "https://user:password@other/", 400, "Deprecated User Info"),
++            Arguments.of(UriCompliance.LEGACY, "https://user:password@other/", 400, "Authority!=Host"),
++            Arguments.of(UriCompliance.UNSAFE, "https://user:password@other/", 200, "other"),
++            Arguments.of(UriCompliance.DEFAULT, "/%2F/", 400, "Ambiguous URI path separator"),
++            Arguments.of(UriCompliance.UNSAFE, "/%2F/", 200, "local")
++        );
++    }
++
++    @ParameterizedTest
++    @MethodSource("getUriTests")
++    public void testGETUris(UriCompliance compliance, String uri, int status, String content) throws Exception
++    {
++        server.stop();
++        for (Connector connector: server.getConnectors())
++        {
++            HttpConnectionFactory httpConnectionFactory = connector.getConnectionFactory(HttpConnectionFactory.class);
++            if (httpConnectionFactory != null)
++            {
++                HttpConfiguration httpConfiguration = httpConnectionFactory.getHttpConfiguration();
++                httpConfiguration.setUriCompliance(compliance);
++                if (compliance == UriCompliance.UNSAFE)
++                    httpConfiguration.setHttpCompliance(HttpCompliance.RFC2616_LEGACY);
++            }
++        }
++
++        server.setHandler(new Handler.Abstract()
++        {
++            @Override
++            public boolean handle(Request request, Response response, Callback callback)
++            {
++                String msg = String.format("authority=\"%s\"", request.getHttpURI().getAuthority());
++                response.getHeaders().put(HttpHeader.CONTENT_TYPE, "text/plain;charset=utf-8");
++                Content.Sink.write(response, true, msg, callback);
++                return true;
++            }
++        });
++        server.start();
++        String request = """
++                GET %s HTTP/1.1\r
++                Host: local\r
++                Connection: close\r
++                \r
++                """.formatted(uri);
++        HttpTester.Response response = HttpTester.parseResponse(connector.getResponse(request));
++        assertThat(response.getStatus(), is(status));
++        if (content != null)
++        {
++            if (status == 200)
++                assertThat(response.getContent(), is("authority=\"%s\"".formatted(content)));
++            else
++                assertThat(response.getContent(), containsString(content));
++        }
++    }
++
+     @Test
+     public void testAmbiguousPathSep() throws Exception
+     {
+diff --git a/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/ResponseTest.java b/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/ResponseTest.java
+index 15484e0409a9..3529615c73d1 100644
+--- a/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/ResponseTest.java
++++ b/jetty-core/jetty-server/src/test/java/org/eclipse/jetty/server/ResponseTest.java
+@@ -16,6 +16,7 @@
+ import java.util.Iterator;
+ import java.util.List;
+ import java.util.ListIterator;
++import java.util.stream.Stream;
+ 
+ import org.eclipse.jetty.http.HttpCookie;
+ import org.eclipse.jetty.http.HttpField;
+@@ -24,15 +25,21 @@
+ import org.eclipse.jetty.http.HttpStatus;
+ import org.eclipse.jetty.http.HttpTester;
+ import org.eclipse.jetty.http.SetCookieParser;
++import org.eclipse.jetty.http.UriCompliance;
+ import org.eclipse.jetty.io.Content;
++import org.eclipse.jetty.logging.StacklessLogging;
+ import org.eclipse.jetty.util.Callback;
+ import org.eclipse.jetty.util.component.LifeCycle;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.Arguments;
++import org.junit.jupiter.params.provider.MethodSource;
+ 
+ import static org.hamcrest.MatcherAssert.assertThat;
+ import static org.hamcrest.Matchers.containsInAnyOrder;
++import static org.hamcrest.Matchers.containsString;
+ import static org.hamcrest.Matchers.is;
+ import static org.hamcrest.Matchers.notNullValue;
+ import static org.junit.jupiter.api.Assertions.assertEquals;
+@@ -389,6 +396,81 @@ public boolean handle(Request request, Response response, Callback callback)
+         assertThat(response.get(HttpHeader.LOCATION), is("/somewhere/else"));
+     }
+ 
++    public static Stream<Arguments> redirectComplianceTest()
++    {
++        return Stream.of(
++            Arguments.of(null, "http://[bad]:xyz/", HttpStatus.FOUND_302, null),
++            Arguments.of(UriCompliance.UNSAFE, "http://[bad]:xyz/", HttpStatus.INTERNAL_SERVER_ERROR_500, "Bad authority"),
++            Arguments.of(UriCompliance.DEFAULT, "http://[bad]:xyz/", HttpStatus.INTERNAL_SERVER_ERROR_500, "Bad authority"),
++            Arguments.of(null, "http://user:password@host.com/", HttpStatus.FOUND_302, null),
++            Arguments.of(UriCompliance.DEFAULT, "http://user:password@host.com/", HttpStatus.INTERNAL_SERVER_ERROR_500, "Deprecated User Info"),
++            Arguments.of(UriCompliance.LEGACY, "http://user:password@host.com/", HttpStatus.FOUND_302, null),
++            Arguments.of(null, "http://host.com/very%2Funsafe", HttpStatus.FOUND_302, null),
++            Arguments.of(UriCompliance.LEGACY, "http://host.com/very%2Funsafe", HttpStatus.FOUND_302, null),
++            Arguments.of(UriCompliance.DEFAULT, "http://host.com/very%2Funsafe", HttpStatus.INTERNAL_SERVER_ERROR_500, "Ambiguous")
++        );
++    }
++
++    @ParameterizedTest
++    @MethodSource("redirectComplianceTest")
++    public void testRedirectCompliance(UriCompliance compliance, String location, int status, String content) throws Exception
++    {
++        try (StacklessLogging ignored = new StacklessLogging(Response.class))
++        {
++            server.getConnectors()[0].getConnectionFactory(HttpConnectionFactory.class).getHttpConfiguration().setRedirectUriCompliance(compliance);
++            server.getConnectors()[0].getConnectionFactory(HttpConnectionFactory.class).getHttpConfiguration().setRelativeRedirectAllowed(true);
++            server.setHandler(new Handler.Abstract()
++            {
++                @Override
++                public boolean handle(Request request, Response response, Callback callback)
++                {
++                    Response.sendRedirect(request, response, callback, location);
++                    return true;
++                }
++            });
++            server.start();
++
++            String request = """
++                GET /path HTTP/1.0\r
++                Host: hostname\r
++                \r
++                """;
++            HttpTester.Response response = HttpTester.parseResponse(connector.getResponse(request));
++            assertThat(response.getStatus(), is(status));
++            if (HttpStatus.isRedirection(status))
++                assertThat(response.get(HttpHeader.LOCATION), is(location));
++            if (content != null)
++                assertThat(response.getContent(), containsString(content));
++        }
++    }
++
++    @Test
++    public void testAuthorityUserNotAllowedWithNonRelativeRedirect() throws Exception
++    {
++        server.getConnectors()[0].getConnectionFactory(HttpConnectionFactory.class).getHttpConfiguration().setRelativeRedirectAllowed(false);
++        server.getConnectors()[0].getConnectionFactory(HttpConnectionFactory.class).getHttpConfiguration().setUriCompliance(UriCompliance.LEGACY);
++        server.getConnectors()[0].getConnectionFactory(HttpConnectionFactory.class).getHttpConfiguration().setRedirectUriCompliance(UriCompliance.DEFAULT);
++        server.setHandler(new Handler.Abstract()
++        {
++            @Override
++            public boolean handle(Request request, Response response, Callback callback)
++            {
++                Response.sendRedirect(request, response, callback, "/somewhere/else");
++                return true;
++            }
++        });
++        server.start();
++
++        String request = """
++                GET http://user:password@hostname:8888/path HTTP/1.0\r
++                Host: hostname:8888\r
++                \r
++                """;
++        HttpTester.Response response = HttpTester.parseResponse(connector.getResponse(request));
++        assertEquals(HttpStatus.MOVED_TEMPORARILY_302, response.getStatus());
++        assertThat(response.get(HttpHeader.LOCATION), is("http://hostname:8888/somewhere/else"));
++    }
++
+     @Test
+     public void testXPoweredByDefault() throws Exception
+     {

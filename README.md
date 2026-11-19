@@ -1420,7 +1420,7 @@ For each CVE, in priority order:
    checked against the installed Maven's own `ComparableVersion` on 38809
    pairs and `VersionRange` on 396 cases). The embedded table's
    CVE-2022-1471 (SnakeYAML) is versioned to `(,2.0)`.
-   The table has 107 entries (audit:
+   The table has 109 entries (audit:
    `testdata/cve-control/MANUAL_MAPPING_AUDIT.MD`); 22 of them (2026-11-13)
    cover advisories with neither a fix commit nor a class name — SnakeYAML
    DoS, Spring MVC static resources/SSE/script templates, SpEL, Spring log
@@ -1456,7 +1456,10 @@ For each CVE, in priority order:
    the analyzed classpath does not ship at all is `NOT_REACHABLE` with
    `MAPPED_CODE_ABSENT` (2026-11-16; 3/1/3 → 1/0/0); the one left is
    CVE-2022-21363, which neither Oracle's advisory nor the release diff
-   attributes to any code.
+   attributes to any code. 2 more (2026-11-19, LIBRARY_MODE LB4) cover
+   Jetty 9.4's HTTP parser (`+`-prefixed Content-Length, CVE-2023-40167)
+   and `HttpURI` authority parsing (CVE-2022-2047), whose OSV records
+   carry no fix commit; checked in the bytecode of 9.4.36 against 9.4.57.
 2. **A GitHub fix-commit diff.** For every reference matching
    `github.com/<owner>/<repo>/commit/<sha>`, ariadne downloads
    `<url>.diff`, keeps only non-test `.java` files
@@ -2033,6 +2036,38 @@ Flags:
 | `-exploit-check` | no | For each REACHABLE CVE, ask an LLM whether its call path plausibly carries attacker-controlled input. Uses the same `ARIADNE_LLM_*` settings as `-llm` (and works without `-llm` itself); one extra request per REACHABLE CVE. |
 | `-framework-check` | no | For each FRAMEWORK CVE, ask an LLM whether its call path looks like a real framework call chain or a CHA over-approximation artifact. Same `ARIADNE_LLM_*` settings; one extra request per FRAMEWORK CVE. |
 | `-version` | no | Print the ariadne version and exit. |
+
+### Library mode in a library's CI (LIBRARY_MODE LB4)
+
+For a library artifact (a jar others depend on), run the analysis on the
+built jar with its runtime dependencies and `-roots api`:
+
+```bash
+mvn -q dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=target/deps
+mvn -q dependency:list -DincludeScope=runtime -DoutputFile=target/deps.txt
+bin/ariadne -app target/mylib-1.2.3.jar -deps target/deps -deps-list target/deps.txt \
+  -roots api -json-format v2 -out ariadne.md -json ariadne.json
+```
+
+- Add `-api-exclude com.example.mylib.internal` for packages that are public
+  to the JVM but not API (repeatable). The library's own pom (embedded in the
+  jar) is read for `supplied_by`; set `ARIADNE_MAVEN_LOCAL` (default
+  `~/.m2/repository`) so parent poms come from the local repository, not
+  Maven Central.
+- Read a finding as: **can a user of this library's API reach the vulnerable
+  code** — not whether a particular application does. `exposed_api` lists the
+  API methods that reach it, each with an example path; `supplied_by` says who
+  picks the dependency version (`library`: the library's declaration;
+  `user`/`undeclared`: the application decides, so upgrading it is theirs).
+- Qualification (`testdata/library-lb4/EXPECTED.MD`, five real libraries:
+  facade, factory/subclass, SPI, Spring Boot starter, callbacks): `-roots api`
+  never lost a `REACHABLE` of `-roots all`; hand checks and one JVM oracle
+  (jetty-client, `TestLibraryJetty`) confirm the verdicts, with these limits:
+  example paths across asynchronous hand-offs (NIO selectors, executors) are
+  not execution traces; public-but-internal classes count as API; a Spring
+  Boot starter's `REACHABLE` mostly runs through the container it plugs into
+  (`heuristic` paths, many `supplied_by: undeclared`); `exposed_api` can list
+  hundreds of methods for a facade or client library.
 
 ### Latest full test run with the LLM source
 
