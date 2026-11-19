@@ -949,7 +949,7 @@ store a `MappingJsonFactory`, and the JVM then returns a JSON parser
 would have to keep it. `coverage.api.receiver_specialization`
 counts copies, `this` sites, dropped edges and unanalyzed methods (their
 edges kept). Log lines
-`library API (lb2-6): …, N methods (M inherited from dependency
+`library API (lb2-7): …, N methods (M inherited from dependency
 supertypes, K more from C framework-announced classes in A
 announcements), …, N client-code call sites (M to abstract methods)`, `receiver specialization (LIBRARY_MODE lb2-4): …`,
 `client-code dispatch (LIBRARY_MODE LB2): …` and `roots: api
@@ -999,7 +999,29 @@ with exactly those four exposed, and a class without a bean-defining
 annotation never. On real jars (Quarkus 3.9.5 dependencies)
 smallrye-context-propagation 2.1.0 has one bean (a public interceptor:
 no new roots) and mutiny 2.5.8 a Jandex index but no bean; verdicts
-unchanged. **Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
+unchanged. **Caller-supplied objects (`lb2-7`, 2026-11-19):** a call the
+library makes on an object of a dependency type that its caller hands it —
+a parameter of the API method the path starts at, or a library field set
+only by roots the library never calls itself (a Spring `ObjectProvider` or
+`BeanFactory`, a commons-text `StringLookup`) — runs whatever
+implementation the caller chose; CHA takes it to be any. Such calls are a
+`client_code` gap (site code `supplied`, never `MODEL_INCOMPLETE`), the
+`exposed_api` entries reached only through one are `supplied_dispatch`
+(report: "caller-supplied"), and a finding all of whose entries are carries
+`SUPPLIED_DISPATCH_ONLY`; verdicts are kept. Verified on
+`testdata/library-supplied` ([EXPECTED.MD](testdata/library-supplied/EXPECTED.MD),
+`TestLibrarySupplied`, `TestSuppliedSites`). Motivated by a JVM oracle of
+the mybatis Spring Boot starter (`testdata/library-starter`,
+`scripts/library-starter-oracle.sh`): of its 26 `REACHABLE` findings 5 run
+in the smallest application, 7 more from Boot's own YAML loading, 14 never.
+On the five measured libraries `lb2-7` changes no verdict or exposed method;
+it marks the starter's `MybatisAutoConfiguration#<init>` (its
+`ObjectProvider`s) in all 26 findings, but no finding becomes
+`SUPPLIED_DISPATCH_ONLY` — the other entries reach the same code through
+logging initialization (slf4j → logback's configurator → Spring's
+`Environment` → SpEL / `BeanFactory`), interface calls inside the
+dependencies whose implementation configuration selects.
+**Dependency declarations (LB3, `lb3-1`, 2026-11-18):** the findings are for
 the versions in `-deps`, but a user of the library may get others, and some
 dependencies exist only if the user adds them. With `-roots api` the
 library's own pom — embedded in the jar (`META-INF/maven/<g>/<a>/pom.xml`)

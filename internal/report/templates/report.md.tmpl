@@ -111,13 +111,14 @@ None.
 With `-roots api` the roots are the library's public API (docs/RESULTS_CONTRACT.MD §8): every API
 method below reaches the advisory's mapped code in the model. `app_only` reaches it without passing
 through framework code, `full` only through it; `heuristic` in the character means the example path
-depends on a CHA expansion. `client dispatch` (LB2) means every path goes through a call a client can
+depends on a CHA expansion. `caller-supplied` (lb2-7) means every path goes through a call on an object the
+library's caller or container hands it, whose implementation they choose. `client dispatch` (LB2) means every path goes through a call a client can
 implement or override, dispatched to a library body that stands in for the client's code. A method
 "inherited by" API classes is a dependency's method a client calls on those classes.
 
 | CVE | Component | API method | Pass | Example path character | Reaches |
 |---|---|---|---|---|---|
-{{range .Exposed}}| {{.CVE}} | `{{.GAV}}` | `{{.Method}}`{{if .InheritedBy}} (inherited by `{{.InheritedBy}}`){{end}}{{if .AnnouncedBy}} (announced: {{.AnnouncedBy}}){{end}} | {{.Pass}}{{if .ClientDispatch}}, client dispatch{{end}} | {{.Character}} | `{{.Via}}` |
+{{range .Exposed}}| {{.CVE}} | `{{.GAV}}` | `{{.Method}}`{{if .InheritedBy}} (inherited by `{{.InheritedBy}}`){{end}}{{if .AnnouncedBy}} (announced: {{.AnnouncedBy}}){{end}} | {{.Pass}}{{if .ClientDispatch}}, client dispatch{{end}}{{if .SuppliedDispatch}}, caller-supplied{{end}} | {{.Character}} | `{{.Via}}` |
 {{end}}
 {{end}}
 {{with .LibraryDeps}}

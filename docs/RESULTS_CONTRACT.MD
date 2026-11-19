@@ -56,7 +56,7 @@ output contract: never renamed, never reused for another meaning; a superseded c
 deprecated. CVE:F0 defines them. Since CVE:F1b, `METHOD_NOT_FOUND`, `CLASSPATH_CONFLICT`,
 `MAPPING_PARTIAL`, `MAPPING_ENTRYPOINT_ONLY` and `MODEL_INCOMPLETE` are emitted (v1 `reasons`);
 CVE:F4 adds `VERSION_UNKNOWN`, `MAPPING_VERSION_UNCOVERED`, `MAPPING_CONFLICT`; CVE:F5 adds
-`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings); `MAPPED_CODE_ABSENT` (2026-11-16, on `NOT_REACHABLE` findings, and on the v1 row when every finding carries it); `MAPPING_INITIALIZER_ONLY` (2026-11-17, mapping qualifier);
+`MAPPING_NEW_SIDE_ONLY` and emits `SOURCE_UNAVAILABLE`; CVE:F6b adds `VERSION_CANDIDATES`; CVE:F10 adds `NOT_CODE_MAPPABLE` (on `NOT_APPLICABLE` findings); `MAPPED_CODE_ABSENT` (2026-11-16, on `NOT_REACHABLE` findings, and on the v1 row when every finding carries it); `MAPPING_INITIALIZER_ONLY` (2026-11-17, mapping qualifier); `SUPPLIED_DISPATCH_ONLY` (2026-11-19, `-roots api`);
 `RUNTIME_UNSUPPORTED` is not set yet.
 `MAPPING_NEW_SIDE_ONLY`, like `MAPPING_PARTIAL`, qualifies the advisory row and stays off
 instance findings (v2 carries it as `mapping.new_side_only`); so does `MAPPING_INITIALIZER_ONLY`
@@ -82,6 +82,7 @@ its own axis.
 | `NOT_CODE_MAPPABLE` | mapping | (CVE:F10, 2026-11-16) The manual table declares (`not_code`, with the reason) that the advisory concerns no JVM code of the artifact — an installer, a deployment setting — so no method can be mapped; the finding is `NOT_APPLICABLE`, like a WebJar, and the note carries the reason. Not a verdict that the app is safe | Tomcat's Windows installer (CVE-2025-49124) filed against `tomcat-embed-core` |
 | `MAPPED_CODE_ABSENT` | mapping | (2026-11-16) No class the selected mapping names is on the analyzed classpath — the instance's version or the application does not ship that code (e.g. a Spring advisory mapped to `spring-webmvc` in an application without it) — so nothing can run it: the finding is `NOT_REACHABLE`, the note names the classes. A class that is present without the mapped method stays `METHOD_NOT_FOUND`. Assumes, like every `NOT_REACHABLE`, that the inputs are the deployed classpath | JPetStore (no `spring-webmvc`) and CVE-2018-1271 |
 | `MODEL_INCOMPLETE` | model | An explicit gap in the call-graph model (unresolved reflection, ServiceLoader, callback, …) is relevant to this finding | an unresolved `Method#invoke` in the affected package |
+| `SUPPLIED_DISPATCH_ONLY` | model | (`lb2-7`, `-roots api`) Every API method that reaches the code does so only through a call on an object the library's caller or container supplies (see "Caller-supplied objects"); the implementation that runs there is theirs. The verdict is kept | mybatis-spring-boot-autoconfigure: `MybatisAutoConfiguration#<init>` → `ObjectProvider#getIfAvailable` → (CHA) `YamlMapFactoryBean` → `Yaml#loadAll` |
 | `RUNTIME_UNSUPPORTED` | runtime | The finding depends on runtime behavior ariadne does not model (JDK/JRE vulnerabilities, custom class loaders) | a CVE in the JDK itself |
 
 ## 4. Model gaps and verdicts (B0)
@@ -226,7 +227,7 @@ A library jar answers a different question than an application: whether anyone u
 public API can reach mapped vulnerable code in its dependencies, and through which API
 methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
-api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations; `lb2-6` (2026-11-18) CDI bean archives.
+api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations; `lb2-6` (2026-11-18) CDI bean archives; `lb2-7` (2026-11-19) caller-supplied objects.
 Member-class accessibility follows the class's own access flag and its enclosing classes
 (a `protected` member class is compiled `public` and counts as accessible).
 
@@ -306,10 +307,10 @@ model. All reason codes keep their meaning.
 
 | Field | Content |
 |---|---|
-| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `announced_by` (`lb2-5`; for an entry of an announced class, how it was announced: `<file> <key>: <class>`, then ` > member <class>` / ` > @Import <class>` per step), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
+| `findings[].exposed_api[]` | with `-roots api`, on a `REACHABLE`/`FRAMEWORK` finding: every API method from which a mapped method of the finding is reached, sorted by key — `method` (`owner#name+desc`), `pass` (`app_only` or `full`, the BFS pass that reaches it), `character` (the set of its example path's step characters, as `findings[].character`), `path` (one shortest example path from that method; one without a client dispatch when there is one), `client_dispatch` (LB2; `true` only when every path in that pass is one — see "Client code"), `supplied_dispatch` (`lb2-7`; `true` only when every path in that pass goes through a call on a caller-supplied object — see "Caller-supplied objects"), `announced_by` (`lb2-5`; for an entry of an announced class, how it was announced: `<file> <key>: <class>`, then ` > member <class>` / ` > @Import <class>` per step), `inherited_by` (`lb2-3`; for a dependency method API classes inherit, those classes — `lb2-4`: only the classes whose receiver-specialized copy reaches the code; the entry's `pass`/`path` are the best among them). `path`/`path_edges` of the finding stay the overall shortest path. |
 | `findings[].supplied_by` | (`lb3-1`, 2026-11-18) with `-roots api`: who supplies the finding's instance to a user of the library — `library`, `user` or `undeclared` (see "Dependency declarations"); absent for an instance the declarations do not cover. |
 | `components[].declaration` | (`lb3-1`) with `-roots api`: the declaration matched to that instance, as in `coverage.api.dependencies.declared[]`. |
-| `coverage.api` | with `-roots api`: `dependencies` (`lb3-1`: `pom`, `library`, `declared[]`, `notes[]` — see "Dependency declarations"), `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
+| `coverage.api` | with `-roots api`: `dependencies` (`lb3-1`: `pom`, `library`, `declared[]`, `notes[]` — see "Dependency declarations"), `classes` (accessible classes), `methods` (root methods), `inherited_methods` (`lb2-3`: of those, dependency methods API classes inherit), `receiver_specialization` (`lb2-4`: `clones` — method copies, `this_sites` — copied call sites on `this`, `edges_dropped` — their edges to a body the API class does not select, `unanalyzed_methods` — copies whose edges were kept unchanged), `supplied` (`lb2-7`: `sites`, `field_sites`, `edges`, `fields`, `unanalyzed_methods` — see "Caller-supplied objects"), `announced_classes` (`lb2-5`: classes made entries from framework announcements, with member classes and `@Import`s), `announcements[]` (`file`, `key`, `class` — what the jar announces), `providers` (`META-INF/services` providers counted as roots), `excluded_packages` (from `-api-exclude`), `jpms` (`exports` when the module's exports decided, `classpath` otherwise), `exports[]` (the exported packages used). |
 
 v1 rows are unchanged in meaning; a v1 row has no `exposed_api`.
 
@@ -334,6 +335,28 @@ the client's own code. An `exposed_api`
 entry is `client_dispatch: true` when every path from it in its pass contains a client
 dispatch; otherwise its example path avoids them. Not yet: vulnerable code reached only
 after a client call returns is not marked conditional.
+
+**Caller-supplied objects (LB2, `lb2-7`, 2026-11-19).** A library is often handed objects of its
+dependencies' types — a parameter of an API method, a Spring `ObjectProvider` or `BeanFactory`
+the container passes to an announced class. Which implementation of that type runs is chosen by
+whoever supplies it; CHA/RTA dispatch to every implementation in the dependencies. A value is
+*caller-supplied* in a library method when it is a parameter of a dependency type (a class or
+interface outside the library and the JDK that a caller can subtype: an interface or a
+non-`final` class) of that method and the method is a root — caller-supplied only on paths that
+start at that root, since the library may call the same method with its own object — or when it is
+read from a library instance field of a dependency type every write of which in the library stores
+a parameter of a root that no library method calls (on every path). A *caller-supplied site* is a
+virtual or interface call on a dependency type whose receiver is caller-supplied. Each site is a gap of mechanism `client_code` (site code `supplied`),
+with an empty candidate set — never `MODEL_INCOMPLETE`; no edge is added or removed. An edge whose
+every bytecode site is a caller-supplied site is a *supplied dispatch* (for a parameter site, only
+as the first step of a path from its own method); an `exposed_api` entry is `supplied_dispatch:
+true` when every path from it in its pass contains one (otherwise its example path avoids them), and a positive finding all of whose `exposed_api` entries are marked carries
+`SUPPLIED_DISPATCH_ONLY` (v1: the row too, when every positive finding does). The verdict is
+kept: the mark says the code that runs there is the caller's choice, not that the path is false.
+Not followed: a caller-supplied value handed to a dependency method or stored inside a dependency
+object and called there, values passed on between library methods. Verified on
+[testdata/library-supplied/](../testdata/library-supplied/EXPECTED.MD) and, as the motivating
+measurement, the JVM oracle of [testdata/library-starter/](../testdata/library-starter/EXPECTED.MD).
 
 **Dependency declarations (LB3, `lb3-1`, 2026-11-18).** The versions analyzed are the
 input's; a user of the library may get others, and some dependencies only exist if the user
@@ -393,7 +416,7 @@ on Weld SE 5.1.2 (`scripts/library-cdi-oracle.sh`), the non-bean never.
 | `container_proxy` | a container-generated implementation (repository, AOP proxy) | allocation/`container-proxy` |
 | `unknown_allocation` | an object created where the type is unknown (Unsafe, constructor handles) | site/`allocation`, allocation/`unsafe-allocation` |
 | `external_input` | `-roots all`: a root's parameters may be any subtype | allocation/`external-input` |
-| `client_code` | `-roots api`: a library call a client can implement or override | site/`client` |
+| `client_code` | `-roots api`: a library call a client can implement or override | site/`client`, site/`supplied` |
 | `lambda` | a functional-interface call whose lambda / method reference is unresolved | lambda/`bootstrap`, lambda/`budget`, lambda/`call-result`, lambda/`depth`, lambda/`field`, lambda/`instance-call`, lambda/`parameter`, lambda/`sam-argument`, lambda/`unknown-value`, runtime/`invokedynamic`, runtime/`sam-call` |
 | `skipped_receiver` | a call on `java.`/`javax.`/`jdk.`/`sun.` types, never CHA-expanded | runtime/`skipped-receiver` |
 | `virtual_dispatch` | a virtual call target the graph has no edge for (RTA pruning, inherited bodies) | runtime/`dispatch-missing`, runtime/`inherited-impl`, runtime/`rta-pruned` |

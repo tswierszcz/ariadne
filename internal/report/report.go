@@ -118,6 +118,7 @@ type Header struct {
 type ExposedRow struct {
 	CVE, GAV, Method, Pass, Character, Via string
 	ClientDispatch                         bool
+	SuppliedDispatch                       bool
 	InheritedBy                            string
 	AnnouncedBy                            string
 }
@@ -515,7 +516,7 @@ func Build(h Header, list []cves.CVE, results []reach.Result, warnings []string,
 				if len(x.Path) > 1 {
 					via = x.Path[len(x.Path)-1]
 				}
-				data.Exposed = append(data.Exposed, ExposedRow{CVE: r.CVE, GAV: f.GAV, Method: x.Method, Pass: x.Pass, Character: strings.Join(x.Character, ", "), Via: via, ClientDispatch: x.ClientDispatch, InheritedBy: strings.Join(x.InheritedBy, ", "), AnnouncedBy: strings.Join(x.AnnouncedBy, "; ")})
+				data.Exposed = append(data.Exposed, ExposedRow{CVE: r.CVE, GAV: f.GAV, Method: x.Method, Pass: x.Pass, Character: strings.Join(x.Character, ", "), Via: via, ClientDispatch: x.ClientDispatch, SuppliedDispatch: x.SuppliedDispatch, InheritedBy: strings.Join(x.InheritedBy, ", "), AnnouncedBy: strings.Join(x.AnnouncedBy, "; ")})
 			}
 		}
 

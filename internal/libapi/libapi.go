@@ -25,8 +25,10 @@ import (
 // entries (AnnouncedRoots); lb3-1: the library's dependency declarations
 // and who supplies each dependency (Coverage.Dependencies, read by
 // component.LibraryDeclarations); lb2-6: the beans of a CDI bean archive
-// (META-INF/beans.xml, Jandex index) are entries (CDIAnnouncements).
-const Version = "lb2-6"
+// (META-INF/beans.xml, Jandex index) are entries (CDIAnnouncements);
+// lb2-7: calls on objects the library's caller or container
+// supplies are marked (SuppliedSites, exposed_api[].supplied_dispatch).
+const Version = "lb2-7"
 
 const (
 	accPrivate   = 0x0002
@@ -61,6 +63,9 @@ type Coverage struct {
 	// Specialized is what receiver specialization of the inherited
 	// roots did (lb2-4); set by the caller after Specialize.
 	Specialized *SpecializeStats `json:"receiver_specialization,omitempty"`
+	// Supplied (lb2-7): calls on caller-supplied objects
+	// (SuppliedSites) and the analysis behind them.
+	Supplied *SuppliedCoverage `json:"supplied,omitempty"`
 	// Announced counts the classes the library announces to a framework
 	// (lb2-5: spring.factories, META-INF/spring/*.imports, and what they
 	// pull in), whose entries are roots; Announcements lists the

@@ -17,7 +17,7 @@ import (
 )
 
 // Version of the vocabulary and mapping.
-const Version = "lb2-1"
+const Version = "lb2-7" // lb2-7: site code "supplied" (client_code)
 
 // Mechanism is a canonical gap mechanism.
 type Mechanism string
@@ -64,7 +64,7 @@ var Sources = []string{SourceSite, SourceAllocation, SourceLambda, SourceRuntime
 var Mapping = map[string]map[string]Mechanism{
 	SourceSite: {
 		"reflection": Reflection, "methodhandle": MethodHandle, "callback": CallbackAsync, "serviceloader": ServiceLoader,
-		"deserialization": Deserialization, "allocation": UnknownAllocation, "client": ClientCode,
+		"deserialization": Deserialization, "allocation": UnknownAllocation, "client": ClientCode, "supplied": ClientCode,
 	},
 	SourceAllocation: {
 		"reflection-unresolved": Reflection, "constructor-handle": MethodHandle, "service-unresolved": ServiceLoader,

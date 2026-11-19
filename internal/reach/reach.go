@@ -146,7 +146,7 @@ type InstanceFinding struct {
 // EngineVersion versions the reachability semantics (statuses, per-instance
 // findings, aggregation, gap rule). Bump it on any change that can change
 // a result for the same graph and mapping; snapshots record it (CVE:F3).
-const EngineVersion = "3" // 3: ROADMAP B0 b0-2 — a path with no CHA-only step is reported when one exists; 2: CVE:F4 descriptor selectors, variant selection
+const EngineVersion = "4" // 4: LIBRARY_MODE lb2-7 — exposed_api supplied_dispatch and SUPPLIED_DISPATCH_ONLY (-roots api only); 3: ROADMAP B0 b0-2 — a path with no CHA-only step is reported when one exists; 2: CVE:F4 descriptor selectors, variant selection
 
 // Engine holds everything needed to answer "is this CVE reachable" for
 // every CVE in one run: the call graph, the class hierarchy (for roots,
@@ -175,6 +175,8 @@ type Engine struct {
 	// exposure, when set (SetExposure), lists every root reaching a
 	// positive finding's targets (LIBRARY_MODE LB1).
 	exposure *exposure
+	// suppliedEdges: SetExposure's supplied-dispatch edges (lb2-7).
+	suppliedEdges int
 
 	// webAssetPkgs holds "group:artifact" of dependencies that are WebJars
 	// (see input.DepJar.WebAssetsOnly); set with SetWebAssetPackages.
@@ -295,7 +297,23 @@ func (e *Engine) Analyze(list []cves.CVE, vm map[string]vulnmap.Entry) []Result 
 			f.PathEdges, f.Character = pathEvidence(e.g, f.Path)
 			if e.exposure != nil && (f.Status == StatusReachable || f.Status == StatusFramework) {
 				f.ExposedAPI = e.exposure.of(f.targets)
+				if suppliedOnly(f.ExposedAPI) {
+					f.Reasons = orderedReasons(append(f.Reasons, findings.SuppliedDispatchOnly))
+				}
 			}
+		}
+		// lb2-7: the row says so when every positive finding does.
+		positive, only := 0, 0
+		for _, f := range r.Findings {
+			if f.Status == StatusReachable || f.Status == StatusFramework {
+				positive++
+				if hasReason(f.Reasons, findings.SuppliedDispatchOnly) {
+					only++
+				}
+			}
+		}
+		if positive > 0 && only == positive {
+			r.Reasons = orderedReasons(append(r.Reasons, findings.SuppliedDispatchOnly))
 		}
 	}
 	return results
@@ -1138,4 +1156,18 @@ func hasReason(rs []findings.ReasonCode, c findings.ReasonCode) bool {
 		}
 	}
 	return false
+}
+
+// suppliedOnly (lb2-7): every exposed method reaches the code only through
+// calls on caller-supplied objects.
+func suppliedOnly(exposed []ExposedMethod) bool {
+	if len(exposed) == 0 {
+		return false
+	}
+	for _, x := range exposed {
+		if !x.SuppliedDispatch {
+			return false
+		}
+	}
+	return true
 }

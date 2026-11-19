@@ -1223,6 +1223,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	webXMLRootCount := 0
 	var apiCoverage *libapi.Coverage
 	var clientSites []libapi.ClientSite
+	var suppliedSites []libapi.SuppliedSite
 	var clientConstructible func(string) bool
 	var apiInherited map[uint32][]string
 	var apiAnnounced map[uint32][]string
@@ -1286,6 +1287,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		apiCoverage = &cov
 		// LIBRARY_MODE LB2: the calls a client can implement or override.
 		clientSites = libapi.ClientSites(h, mod, apiOpt)
+		// lb2-7: calls on objects the caller or container
+		// supplies (a root's parameters, fields set only from them).
+		rootKeys := make(map[string]bool, len(roots))
+		for _, r := range roots {
+			rootKeys[g.Key(r)] = true
+		}
+		var supStats libapi.SuppliedStats
+		suppliedSites, supStats = libapi.SuppliedSites(h, func(owner, name, desc string) bool { return rootKeys[owner+"#"+name+desc] })
+		supCov := &libapi.SuppliedCoverage{Sites: len(suppliedSites), SuppliedStats: supStats}
+		for _, s := range suppliedSites {
+			if s.Field {
+				supCov.FieldSites++
+			}
+		}
+		cov.Supplied = supCov
 		clientConstructible = libapi.Constructible(h, mod, apiOpt)
 		abstract := 0
 		for _, c := range clientSites {
@@ -1533,7 +1549,17 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		for _, c := range clientSites {
 			calls = append(calls, reach.ClientCall{CallerFQCN: c.CallerFQCN, CallerName: c.CallerName, CallerDesc: c.CallerDesc, PC: c.PC, Declared: c.Declared})
 		}
-		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, objectsExist(allocCatalog, clientConstructible), apiInherited, apiAnnounced))
+		supplied := make([]reach.SuppliedCall, 0, len(suppliedSites))
+		for _, s := range suppliedSites {
+			supplied = append(supplied, reach.SuppliedCall{CallerFQCN: s.CallerFQCN, CallerName: s.CallerName, CallerDesc: s.CallerDesc, PC: s.PC, Field: s.Field})
+		}
+		log("client-code dispatch (LIBRARY_MODE LB2): %d graph edges from client-code sites to library bodies standing in for client code", engine.SetExposure(calls, supplied, objectsExist(allocCatalog, clientConstructible), apiInherited, apiAnnounced))
+		if apiCoverage != nil && apiCoverage.Supplied != nil {
+			apiCoverage.Supplied.Edges = engine.SuppliedEdges()
+			sc := apiCoverage.Supplied
+			log("caller-supplied objects (LIBRARY_MODE %s): %d call sites on them (%d on a field's value), %d library fields set only from parameters of roots the library never calls, %d graph edges from those sites, %d methods not analyzed",
+				libapi.Version, sc.Sites, sc.FieldSites, sc.Fields, sc.Edges, sc.Unanalyzed)
+		}
 	case "profile":
 		log("roots: profile %q (%d entry-point methods, %d from web.xml, %d bean lifecycle)", prof.Name, len(roots), webXMLRootCount, beanRootCount)
 		engine = reach.NewWithRoots(g, h, framework, roots)
@@ -1552,6 +1578,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		gapSites = append(gapSites, rtaGapSites(allocCatalog)...)
 	}
 	gapSites = append(gapSites, clientGapSites(clientSites)...)
+	gapSites = append(gapSites, suppliedGapSites(suppliedSites)...)
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
 	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)
