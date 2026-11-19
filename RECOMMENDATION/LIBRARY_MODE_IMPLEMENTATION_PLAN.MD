@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie; lb2-6 2026-11-18: archiwa beanów CDI jako korzenie; lb2-7 2026-11-19: obiekty dostarczane przez wywołującego jako luka; lb2-8 2026-11-19: biblioteki ogłaszające klasy Springowi — pakiety Springa jako framework); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 w toku (lb4-1 2026-11-19: zestaw kwalifikacyjny 5 bibliotek, wyrocznia JVM jetty-client, użycie w CI); zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie; lb2-6 2026-11-18: archiwa beanów CDI jako korzenie; lb2-7 2026-11-19: obiekty dostarczane przez wywołującego jako luka; lb2-8 2026-11-19: biblioteki ogłaszające klasy Springowi — pakiety Springa jako framework); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 w toku (lb4-1 2026-11-19: zestaw kwalifikacyjny 5 bibliotek, wyrocznia JVM jetty-client, użycie w CI; lb4-2: wyrocznie JVM pozostałych bibliotek); zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -136,8 +136,10 @@ callbacki — jetty-client 9.4.36) z ręcznie sprawdzonymi werdyktami
 (`testdata/library-lb4/EXPECTED.MD`), wyrocznia JVM dla jetty-client
 (`scripts/library-lb4-oracle.sh`, `TestLibraryJetty`), `-roots api` vs `-roots all` (żaden
 `REACHABLE` nie stracony), README „Library mode in a library's CI”, SUPPORT.MD ze zmierzonymi
-ograniczeniami. Wyrocznia startera mybatis (2026-11-19, `testdata/library-starter`): z 26 `REACHABLE` 5 wykonuje się w najmniejszej aplikacji, 7 więcej (snakeyaml) przez sam Boot przy `application.yml`, 14 nigdy; niewykonane wychodzą z biblioteki wywołaniem na obiekcie z kontenera (`ObjectProvider`, `BeanFactory`) — argument za LB2 „wywołania na typach zależności”. Zostaje z LB4: powiązanie z planem CI floty (tydzień od 2026-11-23), wyrocznie
-JVM dla pozostałych czterech bibliotek, krawędź przekazania asynchronicznego.
+ograniczeniami. Wyrocznia startera mybatis (2026-11-19, `testdata/library-starter`): z 26 `REACHABLE` 5 wykonuje się w najmniejszej aplikacji, 7 więcej (snakeyaml) przez sam Boot przy `application.yml`, 14 nigdy; niewykonane wychodzą z biblioteki wywołaniem na obiekcie z kontenera (`ObjectProvider`, `BeanFactory`) — argument za LB2 „wywołania na typach zależności”. **`lb4-2` DONE (2026-11-19):** wyrocznie JVM dla commons-configuration2, jackson-dataformat-yaml,
+jjwt-jackson (`scripts/library-lb4-jvm-oracle.sh`): 2/2, 15/17, 14/15 `REACHABLE` wykonane, 0
+`NOT_REACHABLE` wykonanych. Zostaje z LB4: powiązanie z planem CI floty (przesunięte na połowę
+grudnia 2026), krawędź przekazania asynchronicznego.
 
 ## Kolejność i szacunek
 

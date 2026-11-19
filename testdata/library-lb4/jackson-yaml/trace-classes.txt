@@ -1,0 +1,2 @@
+# extra classes to trace: the dependency supertypes whose methods YAMLMapper users call (lb2-3 inherited API)
+com.fasterxml.jackson.databind.ObjectMapper

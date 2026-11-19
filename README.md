@@ -2099,8 +2099,10 @@ bin/ariadne -app target/mylib-1.2.3.jar -deps target/deps -deps-list target/deps
   `user`/`undeclared`: the application decides, so upgrading it is theirs).
 - Qualification (`testdata/library-lb4/EXPECTED.MD`, five real libraries:
   facade, factory/subclass, SPI, Spring Boot starter, callbacks): `-roots api`
-  never lost a `REACHABLE` of `-roots all`; hand checks and one JVM oracle
-  (jetty-client, `TestLibraryJetty`) confirm the verdicts, with these limits:
+  never lost a `REACHABLE` of `-roots all`; a JVM oracle per library
+  (`TestLibraryJetty`, `TestLibraryLB4Oracles`: of the `REACHABLE` findings
+  2/2, 15/17, 14/15 and 2/2 run from the public API, no `NOT_REACHABLE` one
+  ever ran) confirms the verdicts, with these limits:
   example paths across asynchronous hand-offs (NIO selectors, executors) are
   not execution traces; public-but-internal classes count as API; a Spring
   Boot starter's findings mostly run through the container it plugs into —

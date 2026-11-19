@@ -84,6 +84,37 @@ more than `all`.
   (`MAPPING_MISSING`): no fix commit, and 9.4 is end-of-life, so no fixed
   9.4 release to diff.
 
+## JVM oracles for the other three libraries (2026-11-19)
+
+`scripts/library-lb4-jvm-oracle.sh` builds, per library, a client that uses only the library's
+public API (`<lib>/client/fx`) and runs it under `scripts/MethodBreakTrace.java` (one-shot JDI
+breakpoints) on every class of the library, every class of a mapped method of any finding
+(`<lib>/mapped.txt`, the `-roots api` CHA verdicts at `lb2-8`) and, for jackson-dataformat-yaml,
+`ObjectMapper` (`trace-classes.txt`: the inherited API). Output: `<lib>/observed.txt` (stable over
+two runs). Jars from `work/libs` (`scripts/library-measure.sh`); no network.
+`TestLibraryLB4Oracles` checks the recorded files.
+
+| Library | Client (public API only) | `REACHABLE` whose mapped code ran | `NOT_REACHABLE` that ran |
+|---|---|---|---|
+| commons-configuration2 | `FileHandler#load` of a properties text with `${sys:…}` and `${const:…}`, `getString` | 2 of 2 | — (none) |
+| jackson-dataformat-yaml | `YAMLMapper#readValue` (inherited) into a map, POJOs with enum/`Date`/`Path`/`UUID`/`InetSocketAddress`, `@JsonUnwrapped`, `@JsonTypeInfo` name and class ids, object-id forward references, `UNWRAP_SINGLE_VALUE_ARRAYS`, `activateDefaultTyping` with `BasicPolymorphicTypeValidator` / `DefaultBaseTypeLimitingValidator`, a type mismatch | 15 of 17 | 0 of 9 |
+| jjwt-jackson | `JacksonSerializer#serialize`, `JacksonDeserializer#deserialize` with and without claim types (`Path`, `UUID`, `InetSocketAddress`, `Locale`, `@JsonUnwrapped`, polymorphic, object ids, `org.w3c.dom.Document`), malformed JSON | 14 of 15 | 0 of 21 |
+
+- For every finding whose mapped code ran, the API method the client called
+  (`AbstractConfiguration#getString`/`FileHandler#load`, `ObjectMapper#readValue` inherited by
+  `YAMLMapper`, `JacksonDeserializer#deserialize`/`JacksonSerializer#serialize`) is in its
+  `exposed_api`.
+- **Not shown (3):** CVE-2026-68494 in both Jackson libraries (`NonBlockingJsonParser`, the async
+  parser — neither library creates one; in jjwt RTA already says `NOT_REACHABLE`) and
+  CVE-2026-89425 in jackson-dataformat-yaml (`_reportInvalidToken` of the JSON parsers —
+  `YAMLMapper` parses with `YAMLParser`). Both are reached in the model only through a `JsonParser`
+  the caller would pass to an inherited method or through CHA over `JsonParser#nextToken`: a
+  caller-supplied parser (the `lb2-7` idea, which does not cover inherited roots) — over-approximate
+  for ordinary use.
+- No `NOT_REACHABLE` finding's mapped code ran in any scenario: no false negative was found.
+  Together with jetty-client (above) every library of the set now has a JVM oracle; the starter has
+  its own (`testdata/library-starter`).
+
 ## Limits found (not fixed in this slice)
 
 1. **Async hand-off is not in the graph.** In jetty-client the real path is
