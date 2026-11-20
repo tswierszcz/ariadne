@@ -25,8 +25,10 @@ const contFixture = "../../testdata/continuations/"
 // through a parameter is resolved at its caller (a3-2; a reported gap
 // before). The callbacks the JVM did not run here — a
 // normal-branch function on a failed stage, an exceptionally on a
-// succeeding one, a continuation of a future nothing completes — keep
-// their "may run" edge: the model does not decide completion.
+// succeeding one — keep their "may run" edge: those stages come from
+// supplyAsync, whose completion the model does not decide. The
+// continuation of a `new CompletableFuture` nothing completes has had no
+// edge since a3-7 (its body did not run).
 func TestContinuationsOracle(t *testing.T) {
 	dir := t.TempDir()
 	graph := filepath.Join(dir, "g.txt")
@@ -85,7 +87,6 @@ func TestContinuationsOracle(t *testing.T) {
 		"failure -> fx.c.Main#lambda$failure$3(Ljava/lang/String;Ljava/lang/Throwable;)Ljava/lang/String;",
 		"failure -> fx.c.Main#lambda$failure$4(Ljava/lang/String;Ljava/lang/Throwable;)V",
 		"failure -> fx.c.Main#lambda$failure$5(Ljava/lang/Throwable;)Ljava/lang/String;",
-		"never -> fx.c.Main#lambda$never$0(Ljava/lang/String;)V",
 		"success -> fx.c.Main#lambda$success$0(Ljava/lang/Throwable;)Ljava/lang/String;",
 		"throughInterface -> fx.c.Main#lambda$throughInterface$0(Ljava/lang/String;)V",
 	}

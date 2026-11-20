@@ -588,7 +588,7 @@ The IDs are `jdk:service-loader-classpath-provider`,
 `dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
 `jpa:objects`, `jdbc:drivers`, `framework:proxies`, `spring:events`,
 `spring:aop`, `async-callbacks:returned-tasks`, `async-callbacks:listeners`,
-`async-callbacks:reactive` (gates). An ID the analyzer does not know stops the run
+`async-callbacks:reactive`, `async-callbacks:completion` (gates). An ID the analyzer does not know stops the run
 with the list of known ones; profiles merged by auto-detection disable the
 union of their lists; the embedded profiles disable nothing. A disabled
 model is removed from the registry and a disabled gate adds no edge. The
@@ -2396,10 +2396,10 @@ report:
   to reachability is an object of a class handed to a continuation
   (`runAsync(new Task(), executor)`, `thenApply(new Render())`), whose
   method nothing reached before. Whether a stage ever completes, and how,
-  is not decided: a continuation of a future nothing completes, the
-  normal branch of a stage that always fails and the exceptional branch
-  of one that always succeeds keep their "may run" edge (the oracle has
-  one of each). Edges are per registration site, so a long pipeline needs
+  was not decided by that slice (since `a3-7` it is for hand-completed
+  `new CompletableFuture`s, below): the normal branch of a `supplyAsync`
+  stage that always fails and the exceptional branch of one that always
+  succeeds keep their "may run" edge (the oracle has one of each). Edges are per registration site, so a long pipeline needs
   no budget. Control app `scripts/prepare-continuations-demo.sh`
   (commons-text 1.9, `thenApply(new Render())`): CVE-2022-42889 under
   `-profile generic -roots profile` was `NOT_REACHABLE` and is now
@@ -2441,6 +2441,15 @@ report:
   (log line `reactive streams (ASYNC_CALLBACKS a3-6 …)`;
   `testdata/async-reactive`, `scripts/async-reactive-oracle.sh`). A
   pipeline nothing emits into gives no `onNext`; demand is not modeled.
+  Since `a3-7` the completion of a future created with
+  `new CompletableFuture<>()` and completed by hand is decided: its
+  continuations are gated on reachable completion calls of the right kind
+  on that future (`complete`… for `then*`, `completeExceptionally`/
+  `cancel`… for `exceptionally*`, either for `handle`/`whenComplete`),
+  and a future nothing completes gets no `callback` edge (log line
+  `future completion (ASYNC_CALLBACKS a3-7)`; `testdata/async-completion`).
+  Stages from `supplyAsync`, other continuations or libraries keep their
+  "may run" edge.
   Not modeled: other reactive libraries, Spring's `ListenableFuture`,
   a callback passed through a parameter or field (a reported gap, as
   before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.

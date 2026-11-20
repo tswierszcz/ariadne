@@ -73,6 +73,11 @@ Katalog: `subscribe` → `onSubscribe`; `submit`/`offer` → `onNext` + `onError
 `this` w procesorze); bramka: metoda subskrybująca. Zbudowany pipeline bez emisji i znana subskrypcja
 rozróżnione na fixture `testdata/async-reactive` z wyrocznią JVM.
 
+**Wycinek 7 (`a3-7`, 2026-11-20):** zakończenie future — dla `new CompletableFuture<>()` kończonego ręcznie
+kontynuacje są bramkowane wywołaniami kończącymi właściwego rodzaju na tym future (parowanie po miejscu
+`new`), a future, którego nic nie kończy (albo kończy tylko błędem dla `then*`), nie daje krawędzi; inne etapy
+bez zmian; fixture `testdata/async-completion` z wyrocznią JVM.
+
 ## A4. Weryfikacja i kwalifikacja
 
 - Fixtures: direct executor, thread override, task object, lambda, constructor, dwa tasks, rejection, future success/failure, listener i wybrany reactive pipeline.
