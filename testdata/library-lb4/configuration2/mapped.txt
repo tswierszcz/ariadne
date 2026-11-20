@@ -1,0 +1,14 @@
+# mapped methods of every finding of configuration2 (-roots api, CHA, lb2-8): advisory<TAB>verdict<TAB>selector
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/CharSequence;)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/CharSequence;II)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/Object;)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/String;II)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/StringBuffer;)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Ljava/lang/StringBuffer;II)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Lorg/apache/commons/text/TextStringBuilder;)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace(Lorg/apache/commons/text/TextStringBuilder;II)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace([C)Ljava/lang/String;
+CVE-2022-42889	REACHABLE	org.apache.commons.text.StringSubstitutor#replace([CII)Ljava/lang/String;
+CVE-2025-48924	REACHABLE	org.apache.commons.lang3.ClassUtils#getClass(Ljava/lang/ClassLoader;Ljava/lang/String;Z)Ljava/lang/Class;
+CVE-2025-48924	REACHABLE	org.apache.commons.lang3.ClassUtils#toCanonicalName(Ljava/lang/String;)Ljava/lang/String;
