@@ -31,6 +31,12 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### LIBRARY_MODE:LB2 — warunki `@ConditionalOn…` (pomiar) — DONE dla pomiaru (2026-11-20); model nie budowany
+
+- **Pytanie:** czy znakowanie wejść autokonfiguracji ich warunkami (`@ConditionalOnClass` itd.) zmieniłoby ocenę ustaleń prawdziwego startera — np. ustalenia osiągalne tylko przez konfigurację warunkową na opcjonalnej zależności.
+- **Pomiar (mybatis-spring-boot-autoconfigure 2.1.2, `work/libs/mybatis-starter`, `-roots api`, CHA, offline, cache `work/libs/cache`):** adnotacje warunków odczytane z bajtkodu (skrypt roboczy, poza repo): `MybatisAutoConfiguration` — `@ConditionalOnClass(SqlSessionFactory, SqlSessionFactoryBean)` (obie z zależności zadeklarowanych jako nieopcjonalne — przy użyciu startera zawsze spełnione), `@ConditionalOnSingleCandidate(DataSource)`, `@Bean` z `@ConditionalOnMissingBean`; klasa wewnętrzna `MapperScannerRegistrarNotFoundConfiguration` — `@ConditionalOnMissingBean`; `MybatisLanguageDriverAutoConfiguration` i 5 konfiguracji wewnętrznych — `@ConditionalOnClass` na opcjonalnych sterownikach FreeMarker/Velocity/Thymeleaf. Wynik: 25 `FRAMEWORK` + 1 `REACHABLE`; **każde** z 26 ma wejścia w publicznym API bez warunków (`VFS#list`, `SpringBootVFS`, `MybatisProperties`) oraz w `MybatisAutoConfiguration`; konfiguracje sterowników językowych nie są wejściem żadnego ustalenia (0 wejść). Znakowanie warunkami zmieniłoby 0 z 26.
+- **Decyzja (w ramach zatwierdzonego „warunki `@ConditionalOn…`”):** modelu nie budujemy; wracamy przy bibliotece, na której ustalenie zależy wyłącznie od konfiguracji warunkowej na opcjonalnej/nieobecnej klasie. Kod i dokumentacja wsparcia bez zmian (plan LB2 zaktualizowany).
+
 ### LIBRARY_MODE:LB2 — pomiar Micronauta (`lb2-9m`) — DONE dla pomiaru (2026-11-20); model NIE zaczęty
 
 - **Pytanie (plan LB2):** czy wygenerowane przez Micronaut definicje beanów są już publicznym API, tak że `-roots api` dochodzi do metod beanów bez osobnego modelu (jak `lb2-6` dla CDI).
