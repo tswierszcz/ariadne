@@ -43,6 +43,10 @@ Zależności: DATA_FLOW D3, FRAMEWORK F2/F4 dla framework listeners.
 
 Gotowe: dwie kontynuacje, exceptional branch, nieaktywny pipeline i znana subskrypcja są rozróżnione na wersjonowanych fixtures.
 
+**Wycinek 2 (`a3-2`, 2026-11-19):** callback będący parametrem metody rejestrującej rozwiązywany u jej
+wywołujących (3 poziomy, 32 miejsca), krawędź „może wykonać” z miejsca rejestracji; fixture
+`testdata/async-forward` z wyrocznią JVM; motywacja i pomiar: jetty-client (LIBRARY_MODE LB4).
+
 ## A4. Weryfikacja i kwalifikacja
 
 - Fixtures: direct executor, thread override, task object, lambda, constructor, dwa tasks, rejection, future success/failure, listener i wybrany reactive pipeline.

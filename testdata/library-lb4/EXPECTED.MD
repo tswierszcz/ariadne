@@ -124,7 +124,14 @@ two runs). Jars from `work/libs` (`scripts/library-measure.sh`); no network.
    (`HttpRequest#abort` → `ResponseNotifier#notifyComplete` →
    `AuthenticationListener#onComplete` → `HttpConnection#send`, …) whose
    middle never ran. Example paths of callback-style libraries are therefore
-   not execution traces.
+   not execution traces. *(2026-11-19, ASYNC_CALLBACKS `a3-2`: a JVM stack
+   oracle, `scripts/MethodStackTrace.java`, showed the one real edge the graph
+   lacks is the pool's `runJob` → `task.run()`; tasks handed through a
+   method's parameter to `Executor#execute` are now resolved at its callers,
+   adding `SelectorManager#execute` → `ManagedSelector$CreateEndPoint#run`.
+   Fully executed reported paths 40 → 66 of 402, verdicts unchanged; the path
+   from `HttpClient#GET` still is not real — the connect request crosses
+   Jetty's own selector queue, `ManagedSelector#submit`.)*
 2. **Public is not intended API.** jetty-client's shortest finding path starts
    at `HttpReceiverOverHTTP#receive`, public in a public package, which no user
    calls. `-api-exclude` helps only when internals live in separate packages.

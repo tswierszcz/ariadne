@@ -36,7 +36,21 @@ type ResolvedCallback struct {
 	// set — e.g. a parameter, field read, or an unresolved dynamic
 	// bootstrap (StringConcatFactory and the like, never guessed at).
 	UnresolvedReason string
+	// Forwarded (ASYNC_CALLBACKS a3-2): the argument was a parameter of
+	// the registering method, resolved at its callers — the caller
+	// methods (owner#name+desc, outermost last) through which this
+	// target reached the site. A site can then have several
+	// ResolvedCallbacks, one per target its callers pass.
+	Forwarded []string
 }
+
+// Forwarding bounds (a3-2): how many caller levels a parameter is
+// followed through, and how many caller sites in all, per registration
+// site.
+const (
+	forwardDepth   = 3
+	forwardCallers = 32
+)
 
 // ResolveCallbacks is ASYNC_CALLBACKS A1: for every cataloged
 // RegistrationSite (A0), resolve its callback argument via DATA_FLOW
@@ -56,11 +70,19 @@ type ResolvedCallback struct {
 // constructors, so that pattern produces no RegistrationSite at all to
 // resolve — a separate detection, not a resolution step, and left as
 // this increment's own open scope rather than silently claimed.
+//
+// a3-2: when the argument is the registering method's own parameter, it
+// is resolved at that method's callers: each caller site that passes a
+// direct `new` or a lambda/method reference contributes a target, and a
+// caller passing its own parameter on is followed further (forwardDepth
+// levels, forwardCallers caller sites per registration site). The site
+// then has one ResolvedCallback per distinct target, each with Forwarded.
 func ResolveCallbacks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]ResolvedCallback, []string) {
 	var out []ResolvedCallback
 	var warnings []string
 	var jarReader classfile.JarClassReader
 	defer jarReader.Close()
+	fw := newForwarder(h, &jarReader)
 
 	byClass := map[string][]RegistrationSite{}
 	for _, s := range sites {
@@ -97,7 +119,7 @@ func ResolveCallbacks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]Resol
 						"%s#%s%s: method not found in the re-read class file", fqcn, s.CallerName, s.CallerDesc))
 					continue
 				}
-				f, err := dataflow.Analyze(cf, fqcn, m.Method)
+				f, err := dataflow.AnalyzeWithParameterRefs(cf, fqcn, m.Method)
 				if err != nil {
 					warnings = append(warnings, fmt.Sprintf("%s#%s%s: local-value analysis: %v", fqcn, s.CallerName, s.CallerDesc, err))
 					continue
@@ -105,10 +127,33 @@ func ResolveCallbacks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]Resol
 				factsByMethod[key] = f
 				facts = f
 			}
-			out = append(out, resolveOne(fqcn, s, facts))
+			rc := resolveOne(fqcn, s, facts)
+			if p, ok := parameterArgument(fqcn, s, facts); ok && rc.TargetFQCN == "" && rc.ImplOwner == "" {
+				fw.site = s
+				if found := fw.resolve(fqcn+"#"+s.CallerName+s.CallerDesc, p, nil, 0); len(found) > 0 {
+					out = append(out, found...)
+					continue
+				}
+				rc.UnresolvedReason = fmt.Sprintf("the argument is parameter %d of %s#%s%s, and no caller (of at most %d, %d levels) passes a direct `new` or a lambda/method reference",
+					p, fqcn, s.CallerName, s.CallerDesc, forwardCallers, forwardDepth)
+			}
+			out = append(out, rc)
 		}
 	}
 	return out, warnings
+}
+
+// parameterArgument: the site's callback argument is the registering
+// method's own parameter; its index (receiver excluded).
+func parameterArgument(fqcn string, s RegistrationSite, facts *dataflow.MethodFacts) (int, bool) {
+	if aborted, _ := facts.Aborted(); aborted {
+		return 0, false
+	}
+	val, ok := argumentAt(facts, bytecodeir.Site{Method: fqcn + "#" + s.CallerName, Descriptor: s.CallerDesc, PC: s.PC, Op: bytecodeir.OpCall}, s.Model.CallbackArgIndex)
+	if ok && val.Kind == valueflow.KindTyped && val.Parameter != nil && val.Parameter.Index >= 0 {
+		return val.Parameter.Index, true
+	}
+	return 0, false
 }
 
 func resolveOne(fqcn string, s RegistrationSite, facts *dataflow.MethodFacts) ResolvedCallback {

@@ -22,7 +22,8 @@ const contFixture = "../../testdata/continuations/"
 // handed to runAsync was not — the gap this slice closes. Every
 // registration with a lambda, a method reference or an allocated class
 // now also has a callback edge to it; the one receiving its callback
-// through a parameter is a reported gap, as in A1. The callbacks the JVM did not run here — a
+// through a parameter is resolved at its caller (a3-2; a reported gap
+// before). The callbacks the JVM did not run here — a
 // normal-branch function on a failed stage, an exceptionally on a
 // succeeding one, a continuation of a future nothing completes — keep
 // their "may run" edge: the model does not decide completion.
@@ -70,6 +71,9 @@ func TestContinuationsOracle(t *testing.T) {
 	want := []string{
 		"async -> fx.c.Main#after()V",
 		"async -> fx.c.Task#run()V",
+		// a3-2: attach's callback is its parameter; fromParam passes the
+		// lambda, which ran on the JVM (observed.txt).
+		"attach -> fx.c.Main#lambda$fromParam$0(Ljava/lang/String;)V",
 		"chain -> fx.c.Main#lambda$chain$0()Ljava/lang/String;",
 		"chain -> fx.c.Main#lambda$chain$1(Ljava/lang/String;)V",
 		"chain -> fx.c.Main#upper(Ljava/lang/String;)Ljava/lang/String;",
@@ -89,8 +93,8 @@ func TestContinuationsOracle(t *testing.T) {
 		t.Errorf("callback edges:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
-	// The registration in attach gets its callback through a parameter: a
-	// reported gap (the lambda itself is reached from where it is created).
+	// The registration in attach gets its callback through a parameter;
+	// since a3-2 it is resolved at attach's caller, so no gap is left.
 	h, _, err := hierarchy.Build(contFixture+"app.jar", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -106,8 +110,8 @@ func TestContinuationsOracle(t *testing.T) {
 			conds[c.Site.CallerName+" "+c.Site.Model.Name] = c.Site.Model.Condition
 		}
 	}
-	if len(gaps) != 1 || gaps["attach"] == "" {
-		t.Errorf("callback gaps = %v, want only attach (the callback is a parameter)", gaps)
+	if len(gaps) != 0 {
+		t.Errorf("callback gaps = %v, want none (attach's parameter is resolved at its caller, a3-2)", gaps)
 	}
 	wantConds := map[string]string{"failure exceptionally": callback.ConditionExceptional, "success exceptionally": callback.ConditionExceptional}
 	if len(conds) != len(wantConds) || conds["failure exceptionally"] != wantConds["failure exceptionally"] || conds["success exceptionally"] != wantConds["success exceptionally"] {

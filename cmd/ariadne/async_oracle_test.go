@@ -49,7 +49,9 @@ func TestAsyncOracle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unresolved := map[string]bool{"fx.a.FromParam#run()V": true, "fx.a.Handled#chosenAtRunTime()V": true}
+	// a3-2: FromParam, the parameter of runOn, is resolved at runOn's
+	// caller; only the method handle chosen at run time stays unresolved.
+	unresolved := map[string]bool{"fx.a.Handled#chosenAtRunTime()V": true}
 	reach := reachableFrom(ex, "fx.a.Main#main([Ljava/lang/String;)V")
 	obs := (benchFixture{observed: asyncFixture + "observed.txt", bodyColumn: 0}).observedBodies(t)
 	if len(obs) != 10 {
@@ -79,6 +81,7 @@ func TestAsyncOracle(t *testing.T) {
 		"callback fx.a.Main#lambdaToExecutor()V -> fx.a.Main#lambda$lambdaToExecutor$0()V",
 		"callback fx.a.Main#lambdaToExecutor()V -> fx.a.Main#lambda$lambdaToExecutor$1()V",
 		"callback fx.a.Main#privileged()V -> fx.a.Action#run()Ljava/lang/Object;",
+		"callback fx.a.Main#runOn(Ljava/lang/Runnable;)V -> fx.a.FromParam#run()V",
 		"callback fx.a.Main#thread()V -> fx.a.Task#run()V",
 		"methodhandle fx.a.Main#handleStatic()V -> fx.a.Handled#stat(I)I",
 		"methodhandle fx.a.Main#handleVirtual()V -> fx.a.Handled#virt()V",
@@ -117,8 +120,8 @@ func TestAsyncOracle(t *testing.T) {
 			cbGaps[c.Site.CallerName] = c.UnresolvedReason
 		}
 	}
-	if len(cbGaps) != 1 || cbGaps["runOn"] == "" {
-		t.Errorf("callback gaps = %v, want only runOn (the callback is a parameter)", cbGaps)
+	if len(cbGaps) != 0 {
+		t.Errorf("callback gaps = %v, want none (runOn's parameter is resolved at its caller, a3-2)", cbGaps)
 	}
 	handles, _ := methodhandle.ResolveInvokes(h, methodhandle.FindInvokeSites(h))
 	hGaps := map[string]string{}
