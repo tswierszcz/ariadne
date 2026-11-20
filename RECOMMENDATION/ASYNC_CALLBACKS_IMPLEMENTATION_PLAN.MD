@@ -60,6 +60,12 @@ krawędź „może wykonać” z warunkiem `produced`, bramkowana (creator gate)
 zadanie; fixture `testdata/async-returned` z wyrocznią JVM; pomiar: jetty-client (`EatWhatYouKill` →
 `ChannelEndPoint$1#run`).
 
+**Wycinek 5 (`a3-5`, 2026-11-20):** listenery — rejestracja powiązana z modelem źródła zdarzenia: lista
+listenerów w polu (magazyn a3-3 + *rozgłoszenie*: obejście pola bez zdejmowania i czyszczenia) oraz
+`PropertyChangeSupport` w polu (`addPropertyChangeListener` + `fire*` na tym samym polu); krawędź z wywołania
+powiadamiającego do metody listenera (warunek `notified`), bramkowana metodą rejestrującą; sama rejestracja
+bez powiadomienia nie daje krawędzi; fixture `testdata/async-listeners` z wyrocznią JVM.
+
 ## A4. Weryfikacja i kwalifikacja
 
 - Fixtures: direct executor, thread override, task object, lambda, constructor, dwa tasks, rejection, future success/failure, listener i wybrany reactive pipeline.

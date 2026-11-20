@@ -587,7 +587,8 @@ The IDs are `jdk:service-loader-classpath-provider`,
 `servlet-container:dispatch`, `service-provider:dispatch` (models) and
 `dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
 `jpa:objects`, `jdbc:drivers`, `framework:proxies`, `spring:events`,
-`spring:aop`, `async-callbacks:returned-tasks` (gates). An ID the analyzer does not know stops the run
+`spring:aop`, `async-callbacks:returned-tasks`, `async-callbacks:listeners`
+(gates). An ID the analyzer does not know stops the run
 with the list of known ones; profiles merged by auto-detection disable the
 union of their lists; the embedded profiles disable nothing. A disabled
 model is removed from the registry and a disabled gate adds no edge. The
@@ -2419,7 +2420,18 @@ report:
   a3-4)`; `testdata/async-returned`, `scripts/async-returned-oracle.sh`).
   On jetty-client this is the edge from Jetty's `EatWhatYouKill` to
   `ChannelEndPoint$1#run` (`_runFillable`).
-  Not modeled: listeners, reactive operators, Spring's `ListenableFuture`,
+  Since `a3-5` a listener runs when its source notifies: a listener
+  stored into a JDK collection field and a method walking that field
+  without removing or clearing it (a broadcast), or
+  `PropertyChangeSupport#addPropertyChangeListener` with
+  `firePropertyChange` on the same field, give a `callback` edge
+  (condition `notified`) from the notifying call to the listener's
+  method, gated on the method registering it (log line `listeners
+  (ASYNC_CALLBACKS a3-5)`; `testdata/async-listeners`,
+  `scripts/async-listeners-oracle.sh`). Listener arrays, lists walked
+  through a parameter, `forEach` with a lambda and `Observable` are not
+  modeled.
+  Not modeled: reactive operators, Spring's `ListenableFuture`,
   a callback passed through a parameter or field (a reported gap, as
   before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.
   `StringConcatFactory`), left unresolved rather than guessed at.

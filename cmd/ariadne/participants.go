@@ -21,6 +21,8 @@ const (
 	servletGateID = "servlet-container:objects"
 	// ASYNC_CALLBACKS a3-4: tasks a method returns to the code running them.
 	returnedGateID = "async-callbacks:returned-tasks"
+	// ASYNC_CALLBACKS a3-5: listeners notified by their event source.
+	listenersGateID = "async-callbacks:listeners"
 )
 
 // participantCatalog is every fixed-point participant the analyzer has
@@ -45,5 +47,6 @@ func participantCatalog() []analysis.Participant {
 		{ID: springevents.ModelID, Version: springevents.Version, Kind: analysis.KindGate},
 		{ID: springaop.ModelID, Version: springaop.Version, Kind: analysis.KindGate},
 		{ID: returnedGateID, Version: callback.ReturnedVersion, Kind: analysis.KindGate},
+		{ID: listenersGateID, Version: callback.ListenersVersion, Kind: analysis.KindGate},
 	}
 }

@@ -913,8 +913,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// held in a field ("may run" edge from where it enters to the method
 	// the drain calls on it, condition "queued") or attached to an NIO
 	// selection key (edge to the select loop reading it, "selected").
-	handoffEdges, handoffStats, handoffWarnings := callback.FindHandoffs(h)
-	warnings = append(warnings, handoffWarnings...)
+	handoffScan := callback.ScanHandoffs(h)
+	handoffEdges, handoffStats := handoffScan.Edges, handoffScan.Stats
+	warnings = append(warnings, handoffScan.Warnings...)
+	// ASYNC_CALLBACKS a3-5: listeners — a "may run" edge from the
+	// notifying call (a broadcast over a listener field, a
+	// PropertyChangeSupport fire) to the registered listener's method,
+	// condition "notified", gated (below) on the method registering it.
+	listenerGate := callgraph.NewCreatorGate(g, h, gatedGraphEdges(handoffScan.Listeners), callgraph.BasisCallback)
 	var handoffGraphEdges []callgraph.CallbackEdge
 	for _, e := range handoffEdges {
 		handoffGraphEdges = append(handoffGraphEdges, callgraph.CallbackEdge{
@@ -935,15 +941,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	returnedStart := time.Now()
 	returnedEdges, returnedStats, returnedWarnings := callback.FindReturnedTasks(h, callbackSites)
 	warnings = append(warnings, returnedWarnings...)
-	var returnedGraphEdges []callgraph.SAMEdge
-	for _, e := range returnedEdges {
-		var creators []callgraph.MethodRef
-		for _, c := range e.Creators {
-			creators = append(creators, callgraph.MethodRef{FQCN: c.FQCN, Name: c.Name, Desc: c.Desc})
-		}
-		returnedGraphEdges = append(returnedGraphEdges, callgraph.SAMEdge{CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
-			PC: e.PC, Kind: e.Kind, TargetFQCN: e.TargetFQCN, TargetName: e.TargetMethod, TargetDesc: e.TargetMethodDesc, Creators: creators, Condition: e.Condition})
-	}
+	returnedGraphEdges := gatedGraphEdges(returnedEdges)
 	returnedGate := callgraph.NewCreatorGate(g, h, returnedGraphEdges, callgraph.BasisCallback)
 	returnedTime := time.Since(returnedStart)
 
@@ -1490,7 +1488,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}, {listenersGateID, listenerGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1523,6 +1521,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	eventsApplied := applyGate(springevents.ModelID, eventsGate)
 	aopApplied := applyGate(springaop.ModelID, aopGate)
 	returnedApplied := applyGate(returnedGateID, returnedGate)
+	listenersApplied := applyGate(listenersGateID, listenerGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1541,6 +1540,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("returned tasks (ASYNC_CALLBACKS %s): %d of %d task sites run a task a method returns, %d returning methods; %d candidates, %d edges added, %d already in the graph, %d left out (no method returning the task is reachable from the roots); %d calls with more than %d implementations, %d fields unresolved, %d sites over budget, in %s",
 		callback.ReturnedVersion, returnedStats.Resolved, returnedStats.Sites, returnedStats.Returners, len(returnedGraphEdges), returnedApplied.Added, returnedApplied.Covered, returnedApplied.Gated,
 		returnedStats.TooManyImpls, callback.MaxReturnImpls, returnedStats.Unresolved, returnedStats.Budget, returnedTime.Round(time.Millisecond))
+	ls := handoffScan.ListenerStats
+	log("listeners (ASYNC_CALLBACKS %s): %d broadcast methods over listener fields, %d PropertyChangeSupport fire calls; %d registrations with a notifying source (%d listeners unresolved); %d candidates, %d edges added, %d already in the graph, %d left out (no method registering the listener is reachable from the roots)",
+		callback.ListenersVersion, ls.Broadcasts, ls.Fires, ls.Registrations, ls.Unresolved, len(handoffScan.Listeners), listenersApplied.Added, listenersApplied.Covered, listenersApplied.Gated)
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
 		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)
@@ -2472,4 +2474,19 @@ func springFrameworkPatterns(anns []libapi.Announcement, catalog profile.Catalog
 		}
 	}
 	return added
+}
+
+// gatedGraphEdges converts callback's creator-gated candidates (a3-4,
+// a3-5) to the call graph's.
+func gatedGraphEdges(edges []callback.GatedEdge) []callgraph.SAMEdge {
+	var out []callgraph.SAMEdge
+	for _, e := range edges {
+		var creators []callgraph.MethodRef
+		for _, c := range e.Creators {
+			creators = append(creators, callgraph.MethodRef{FQCN: c.FQCN, Name: c.Name, Desc: c.Desc})
+		}
+		out = append(out, callgraph.SAMEdge{CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, Kind: e.Kind, TargetFQCN: e.TargetFQCN, TargetName: e.TargetMethod, TargetDesc: e.TargetMethodDesc, Creators: creators, Condition: e.Condition})
+	}
+	return out
 }
