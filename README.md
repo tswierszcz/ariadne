@@ -587,8 +587,8 @@ The IDs are `jdk:service-loader-classpath-provider`,
 `servlet-container:dispatch`, `service-provider:dispatch` (models) and
 `dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
 `jpa:objects`, `jdbc:drivers`, `framework:proxies`, `spring:events`,
-`spring:aop`, `async-callbacks:returned-tasks`, `async-callbacks:listeners`
-(gates). An ID the analyzer does not know stops the run
+`spring:aop`, `async-callbacks:returned-tasks`, `async-callbacks:listeners`,
+`async-callbacks:reactive` (gates). An ID the analyzer does not know stops the run
 with the list of known ones; profiles merged by auto-detection disable the
 union of their lists; the embedded profiles disable nothing. A disabled
 model is removed from the registry and a disabled gate adds no edge. The
@@ -2431,7 +2431,17 @@ report:
   `scripts/async-listeners-oracle.sh`). Listener arrays, lists walked
   through a parameter, `forEach` with a lambda and `Observable` are not
   modeled.
-  Not modeled: reactive operators, Spring's `ListenableFuture`,
+  Since `a3-6` reactive streams of one library — the JDK's `Flow` with
+  `SubmissionPublisher` — are modeled: `subscribe(s)` gives
+  `s.onSubscribe`; `submit`/`offer` on the same publisher (same `new`
+  site, or `this` in a processor subclass) give `onNext` and `onError`;
+  `close` gives `onComplete`, `closeExceptionally` `onError`; `consume(c)`
+  gives `c.accept` — `callback` edges with conditions `subscribed`,
+  `published`, `completed`, `exceptional`, gated on the method subscribing
+  (log line `reactive streams (ASYNC_CALLBACKS a3-6 …)`;
+  `testdata/async-reactive`, `scripts/async-reactive-oracle.sh`). A
+  pipeline nothing emits into gives no `onNext`; demand is not modeled.
+  Not modeled: other reactive libraries, Spring's `ListenableFuture`,
   a callback passed through a parameter or field (a reported gap, as
   before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.
   `StringConcatFactory`), left unresolved rather than guessed at.
