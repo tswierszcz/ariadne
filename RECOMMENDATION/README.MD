@@ -37,6 +37,13 @@ zarchiwizowane w
 (`COMPLETION.md` tam: co dostarczono, wyrocznia JVM, zestaw CVE, aplikacje kontrolne,
 jawne ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje `Partial`.
 
+**Callbacki i wykonywanie asynchroniczne — DONE (2026-11-20), wszystkie fazy A0–A4.** Dawne
+`ASYNC_CALLBACKS.MD`/`ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-20/async_callbacks/`](../archive/2026-11-20/async_callbacks/COMPLETION.md)
+(`COMPLETION.md` tam: co dostarczono, wyrocznie JVM, kwalifikacja
+`testdata/async-qualify/RESULTS.MD`, jawne ograniczenia). Wiersz w `docs/SUPPORT.MD` pozostaje
+`Partial`.
+
 **Przepływ wartości i danych — DONE (2026-11-07), wszystkie fazy D0–D5.** Dawne
 `DATA_FLOW.MD`/`DATA_FLOW_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
 [`archive/2026-11-07/data_flow/`](../archive/2026-11-07/data_flow/COMPLETION.md)
@@ -48,7 +55,6 @@ pozostaje `Partial`.
 |---|---|---|
 | Refleksja i rozpoznawanie nazw klas/metod | [REFLECTION.MD](REFLECTION.MD) | [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD) |
 | Frameworki: proxy, AOP, DI, konfiguracja i zewnętrzne wejścia | [FRAMEWORKS.MD](FRAMEWORKS.MD) | [FRAMEWORKS_IMPLEMENTATION_PLAN.MD](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) |
-| Callbacki i wykonywanie asynchroniczne | [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD) | [ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD) |
 | MethodHandle, invokedynamic i dynamiczne stałe | [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD) | [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) |
 | Precyzja grafu: RTA i analiza możliwych obiektów | [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD) | [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
@@ -65,7 +71,7 @@ pozostaje `Partial`.
 | ServiceLoader i JPMS | SERVICE_LOADING — **DONE, zarchiwizowane** (S0–S4) |
 | Refleksja przez literały, zmienne i konfigurację | REFLECTION; wartości dostarcza DATA_FLOW, konfigurację FRAMEWORKS |
 | Proxy, AOP i dependency injection | FRAMEWORKS |
-| Callbacki i kod asynchroniczny | ASYNC_CALLBACKS |
+| Callbacki i kod asynchroniczny | ASYNC_CALLBACKS — **DONE, zarchiwizowane** (A0–A4) |
 | MethodHandle i pozostałe invokedynamic | DYNAMIC_LINKAGE |
 | Deserializacja | DESERIALIZATION — **DONE, zarchiwizowane** (Z0–Z4); dopływ danych z DATA_FLOW D4 |
 | Konfiguracja i wejścia frameworka | FRAMEWORKS |

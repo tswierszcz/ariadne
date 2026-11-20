@@ -1,6 +1,6 @@
 # Callbacki i asynchroniczność — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD). Zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: **DONE (A0–A4), zarchiwizowane 2026-11-20** — zob. [COMPLETION.md](COMPLETION.md). Fazy: [ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD](ASYNC_CALLBACKS_IMPLEMENTATION_PLAN.MD). Zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## Cel i stan obecny
 

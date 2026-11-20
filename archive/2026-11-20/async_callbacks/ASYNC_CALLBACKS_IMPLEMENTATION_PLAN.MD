@@ -1,6 +1,6 @@
 # Callbacki i asynchroniczność — fazy A0–A4
 
-Status: A0–A4 zrealizowane (2026-11-20, rejestr w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD)). Wymagania: [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD). Kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: **DONE (A0–A4), zarchiwizowane 2026-11-20** — zob. [COMPLETION.md](COMPLETION.md) (rejestr w [IMPLEMENTATION_STATUS.MD](../../../RECOMMENDATION/IMPLEMENTATION_STATUS.MD)). Wymagania: [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD). Kolejność: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## A0. Katalog modeli callbacków
 
