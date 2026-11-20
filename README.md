@@ -2460,6 +2460,34 @@ report:
   a callback passed through a parameter or field (a reported gap, as
   before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.
   `StringConcatFactory`), left unresolved rather than guessed at.
+- **What an asynchronous edge means (ASYNC_CALLBACKS A4 `a4-2`).** Every
+  edge the async models add (basis `callback`) is a "may run" relation from
+  the place where control may pass — a registration, an emission, a
+  notification, a drain, a run of a returned task — to the body that may
+  run. It is not a call stack of one thread and not a time order: the
+  body may run on another thread, later, or never (a pool that rejects
+  the task, a future nothing completes, a source that never notifies —
+  the gated models drop what the input proves cannot happen, the rest
+  stays may-run). Conditions on the edge say what has to happen first:
+  `exceptional`, `queued`, `selected`, `produced`, `notified`,
+  `subscribed`, `published`, `completed`, `started`, `rejected`; v2 path
+  evidence and the report's arrow carry them. Not modeled: thread
+  identity, interleavings, scheduling and cancellation policy, demand in
+  reactive streams, memory visibility — none of these can make an edge
+  disappear, and an unknown possibility of cancellation never proves a
+  task never runs. Qualification: `testdata/async-qualify/RESULTS.MD`
+  (`TestAsyncQualification`): the whole pipeline on all nine async
+  fixtures against their real-JVM oracles — every body that ran is
+  reached (one miss, a `MethodHandle` name chosen at run time —
+  DYNAMIC_LINKAGE), and of the 6 of 60 `callback` edges to bodies the
+  oracles did not record, 2 lead to bodies that ran unmarked and 4 are
+  documented may-run cases — none a wrong association;
+  `TestAsyncTwoTasks`: two tasks at two sites never mix. The gated async
+  models (`async-callbacks:*`) and their versions are recorded in every
+  snapshot's configuration (`models`) and in v2 `callgraph.participants`,
+  so a comparison names a model change; the plain-edge rules (A2,
+  `a3-2`, `a3-3`, `a4-1`'s `start()`) are not participants and show only
+  as edge differences.
 - **Lambdas run in another method than the one creating them** get a `sam`
   edge only where DATA_FLOW follows the value (DYNAMIC_LINKAGE L1, above):
   not through the result of an instance call (except a `Runnable`/`Callable`
