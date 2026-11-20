@@ -66,6 +66,13 @@ listenerów w polu (magazyn a3-3 + *rozgłoszenie*: obejście pola bez zdejmowan
 powiadamiającego do metody listenera (warunek `notified`), bramkowana metodą rejestrującą; sama rejestracja
 bez powiadomienia nie daje krawędzi; fixture `testdata/async-listeners` z wyrocznią JVM.
 
+**Wycinek 6 (`a3-6`, 2026-11-20):** reactive — jedna biblioteka i wersja: JDK `Flow` z `SubmissionPublisher`
+(Java 9+, sprawdzane na JDK 25; Reactor/RxJava nie ma w lokalnym repozytorium, a Central blokuje pobieranie).
+Katalog: `subscribe` → `onSubscribe`; `submit`/`offer` → `onNext` + `onError`; `close` → `onComplete`;
+`closeExceptionally` → `onError`; `consume` → `Consumer#accept`; parowanie po obiekcie wydawcy (miejsce `new`,
+`this` w procesorze); bramka: metoda subskrybująca. Zbudowany pipeline bez emisji i znana subskrypcja
+rozróżnione na fixture `testdata/async-reactive` z wyrocznią JVM.
+
 ## A4. Weryfikacja i kwalifikacja
 
 - Fixtures: direct executor, thread override, task object, lambda, constructor, dwa tasks, rejection, future success/failure, listener i wybrany reactive pipeline.

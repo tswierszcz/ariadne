@@ -921,6 +921,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// PropertyChangeSupport fire) to the registered listener's method,
 	// condition "notified", gated (below) on the method registering it.
 	listenerGate := callgraph.NewCreatorGate(g, h, gatedGraphEdges(handoffScan.Listeners), callgraph.BasisCallback)
+	// ASYNC_CALLBACKS a3-6: JDK Flow — a subscriber of a SubmissionPublisher
+	// runs when it is subscribed (onSubscribe) and when that publisher
+	// emits (onNext/onError on submit/offer, onComplete on close, onError
+	// on closeExceptionally); gated on the method subscribing it.
+	reactiveEdges, reactiveStats, _ := callback.FindReactive(h)
+	reactiveGate := callgraph.NewCreatorGate(g, h, gatedGraphEdges(reactiveEdges), callgraph.BasisCallback)
 	var handoffGraphEdges []callgraph.CallbackEdge
 	for _, e := range handoffEdges {
 		handoffGraphEdges = append(handoffGraphEdges, callgraph.CallbackEdge{
@@ -1488,7 +1494,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}, {listenersGateID, listenerGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}, {listenersGateID, listenerGate}, {reactiveGateID, reactiveGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1522,6 +1528,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	aopApplied := applyGate(springaop.ModelID, aopGate)
 	returnedApplied := applyGate(returnedGateID, returnedGate)
 	listenersApplied := applyGate(listenersGateID, listenerGate)
+	reactiveApplied := applyGate(reactiveGateID, reactiveGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1540,6 +1547,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("returned tasks (ASYNC_CALLBACKS %s): %d of %d task sites run a task a method returns, %d returning methods; %d candidates, %d edges added, %d already in the graph, %d left out (no method returning the task is reachable from the roots); %d calls with more than %d implementations, %d fields unresolved, %d sites over budget, in %s",
 		callback.ReturnedVersion, returnedStats.Resolved, returnedStats.Sites, returnedStats.Returners, len(returnedGraphEdges), returnedApplied.Added, returnedApplied.Covered, returnedApplied.Gated,
 		returnedStats.TooManyImpls, callback.MaxReturnImpls, returnedStats.Unresolved, returnedStats.Budget, returnedTime.Round(time.Millisecond))
+	log("reactive streams (ASYNC_CALLBACKS %s, JDK Flow/SubmissionPublisher): %d subscriptions, %d emitting calls (%d unresolved publishers or subscribers); %d candidates, %d edges added, %d already in the graph, %d left out (no method subscribing the subscriber is reachable from the roots)",
+		callback.ReactiveVersion, reactiveStats.Subscriptions, reactiveStats.Emissions, reactiveStats.Unresolved, len(reactiveEdges), reactiveApplied.Added, reactiveApplied.Covered, reactiveApplied.Gated)
 	ls := handoffScan.ListenerStats
 	log("listeners (ASYNC_CALLBACKS %s): %d broadcast methods over listener fields, %d PropertyChangeSupport fire calls; %d registrations with a notifying source (%d listeners unresolved); %d candidates, %d edges added, %d already in the graph, %d left out (no method registering the listener is reachable from the roots)",
 		callback.ListenersVersion, ls.Broadcasts, ls.Fires, ls.Registrations, ls.Unresolved, len(handoffScan.Listeners), listenersApplied.Added, listenersApplied.Covered, listenersApplied.Gated)

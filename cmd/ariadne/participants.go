@@ -23,6 +23,8 @@ const (
 	returnedGateID = "async-callbacks:returned-tasks"
 	// ASYNC_CALLBACKS a3-5: listeners notified by their event source.
 	listenersGateID = "async-callbacks:listeners"
+	// ASYNC_CALLBACKS a3-6: Flow subscribers of a SubmissionPublisher.
+	reactiveGateID = "async-callbacks:reactive"
 )
 
 // participantCatalog is every fixed-point participant the analyzer has
@@ -48,5 +50,6 @@ func participantCatalog() []analysis.Participant {
 		{ID: springaop.ModelID, Version: springaop.Version, Kind: analysis.KindGate},
 		{ID: returnedGateID, Version: callback.ReturnedVersion, Kind: analysis.KindGate},
 		{ID: listenersGateID, Version: callback.ListenersVersion, Kind: analysis.KindGate},
+		{ID: reactiveGateID, Version: callback.ReactiveVersion, Kind: analysis.KindGate},
 	}
 }

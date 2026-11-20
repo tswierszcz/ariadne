@@ -432,36 +432,66 @@ func (r *returnedResolver) implementations(owner, name, desc string) ([]handoffM
 	return out, true
 }
 
+// objID is one object a receiver may be: its class, and the `new` that
+// created it ("" for `this`, whose allocation is not one site).
+type objID struct{ typ, site string }
+
 // receiverTypes: the classes a call's receiver v (in method ctx) may be,
-// when every way it gets its value is known — a `new`, a parameter
-// (what the callers pass), or a private or final instance field (what
-// its class's methods store; a constructor parameter from the callers of
-// that constructor). An empty, ok result: nothing in the input supplies
-// a receiver (a strategy nothing constructs — Jetty's ProduceConsume —
-// runs no producer's task). false: unknown, the caller falls back to CHA.
+// when every way it gets its value is known (receiverObjs). An empty, ok
+// result: nothing in the input supplies a receiver (a strategy nothing
+// constructs — Jetty's ProduceConsume — runs no producer's task). false:
+// unknown, the caller falls back to CHA.
 func (r *returnedResolver) receiverTypes(v *valueflow.Value, ctx handoffMethod, depth int) ([]string, bool) {
+	objs, ok := r.receiverObjs(v, ctx, depth)
+	if !ok {
+		return nil, false
+	}
+	var out []string
+	for _, o := range objs {
+		out = append(out, o.typ)
+	}
+	return out, true
+}
+
+// receiverObjs: the objects a receiver v (in method ctx) may be — a
+// `new`, `this` (its class and concrete subclasses), a parameter (what
+// the callers pass), or a private or final instance field (what its
+// class's methods store; a constructor parameter from the callers of
+// that constructor). false: some way it gets its value is unknown.
+func (r *returnedResolver) receiverObjs(v *valueflow.Value, ctx handoffMethod, depth int) ([]objID, bool) {
 	if v == nil || depth > maxReturnDepth || !r.spend() {
 		return nil, false
 	}
 	switch v.Kind {
 	case valueflow.KindAlloc:
-		return []string{v.Type}, true
+		site := ""
+		if v.AllocSite != nil {
+			site = fmt.Sprintf("%s%s@%d", v.AllocSite.Method, v.AllocSite.Descriptor, v.AllocSite.PC)
+		}
+		return []objID{{v.Type, site}}, true
 	case valueflow.KindSet:
-		var out []string
+		var out []objID
 		for i := range v.Candidates {
-			ts, ok := r.receiverTypes(&v.Candidates[i], ctx, depth)
+			os, ok := r.receiverObjs(&v.Candidates[i], ctx, depth)
 			if !ok {
 				return nil, false
 			}
-			out = append(out, ts...)
+			out = append(out, os...)
 		}
 		return out, true
 	case valueflow.KindTyped:
+		if v.Parameter == nil && ctx.fqcn != "" && v.Type == ctx.fqcn && ctx.name != "<clinit>" {
+			// `this` (AnalyzeWithParameterRefs types local 0 as the
+			// method's class, without a parameter mark).
+			if m, ok := r.method(ctx); ok && !m.IsStatic() {
+				return r.thisObjs(ctx.fqcn), true
+			}
+		}
 		if v.Parameter == nil || v.Parameter.Index < 0 || ctx.fqcn == "" {
 			return nil, false
 		}
 		r.fw.index()
-		var out []string
+		var out []objID
 		for _, cs := range r.fw.callers[ctx.key()] {
 			facts := r.fw.analyze(cs.fqcn, cs.m)
 			if facts == nil {
@@ -472,22 +502,42 @@ func (r *returnedResolver) receiverTypes(v *valueflow.Value, ctx handoffMethod, 
 			if !ok {
 				return nil, false
 			}
-			ts, ok := r.receiverTypes(&arg, handoffMethod{cs.fqcn, cs.m.Name, cs.m.Descriptor}, depth+1)
+			os, ok := r.receiverObjs(&arg, handoffMethod{cs.fqcn, cs.m.Name, cs.m.Descriptor}, depth+1)
 			if !ok {
 				return nil, false
 			}
-			out = append(out, ts...)
+			out = append(out, os...)
 		}
 		return out, true
 	case valueflow.KindField:
-		return r.fieldTypes(*v.Field, depth)
+		return r.fieldObjs(*v.Field, depth)
 	}
 	return nil, false
 }
 
-// fieldTypes: receiverTypes of an instance field written only in its
-// own class (private: its nest; final: its constructors).
-func (r *returnedResolver) fieldTypes(ref valueflow.FieldRef, depth int) ([]string, bool) {
+func (r *returnedResolver) method(m handoffMethod) (hierarchy.Method, bool) {
+	ci, ok := r.h.Lookup(m.fqcn)
+	if !ok {
+		return hierarchy.Method{}, false
+	}
+	return ci.MethodByNameAndDesc(m.name, m.desc)
+}
+
+// thisObjs: `this` in a method of fqcn — fqcn, if concrete, and its
+// concrete subclasses.
+func (r *returnedResolver) thisObjs(fqcn string) []objID {
+	var out []objID
+	for _, c := range append([]string{fqcn}, r.h.Subtypes(fqcn)...) {
+		if ci, ok := r.h.Lookup(c); ok && !ci.IsInterface() && ci.AccessFlags&classfile.AccAbstract == 0 {
+			out = append(out, objID{typ: c})
+		}
+	}
+	return out
+}
+
+// fieldObjs: receiverObjs of an instance field written only in its own
+// class (private: its nest; final: its constructors).
+func (r *returnedResolver) fieldObjs(ref valueflow.FieldRef, depth int) ([]objID, bool) {
 	decl, ok := r.h.ResolveField(ref.Owner, ref.Name, ref.Desc)
 	if !ok {
 		return nil, false
@@ -509,7 +559,7 @@ func (r *returnedResolver) fieldTypes(ref valueflow.FieldRef, depth int) ([]stri
 			}
 		}
 	}
-	var out []string
+	var out []objID
 	for _, w := range writers {
 		wci, _ := r.h.Lookup(w)
 		for _, m := range wci.Methods {
@@ -535,11 +585,11 @@ func (r *returnedResolver) fieldTypes(ref valueflow.FieldRef, depth int) ([]stri
 					continue
 				}
 				val := fw.Value
-				ts, ok := r.receiverTypes(&val, handoffMethod{w, m.Name, m.Descriptor}, depth+1)
+				os, ok := r.receiverObjs(&val, handoffMethod{w, m.Name, m.Descriptor}, depth+1)
 				if !ok {
 					return nil, false
 				}
-				out = append(out, ts...)
+				out = append(out, os...)
 			}
 		}
 	}

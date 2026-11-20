@@ -138,6 +138,10 @@ func (h *Hierarchy) resolveField(fqcn, name, desc string, seen map[string]bool) 
 // superclassChain returns fqcn and every superclass above it, in order,
 // stopping at java.lang.Object or at the first class ariadne never read
 // (a JDK type outside the app+dependency universe).
+// SuperclassChain is fqcn followed by its superclasses, as far as the
+// hierarchy knows them (the first class it has not read ends the chain).
+func (h *Hierarchy) SuperclassChain(fqcn string) []string { return h.superclassChain(fqcn) }
+
 func (h *Hierarchy) superclassChain(fqcn string) []string {
 	var chain []string
 	seen := make(map[string]bool)
