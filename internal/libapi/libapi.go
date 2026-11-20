@@ -29,8 +29,10 @@ import (
 // lb2-7: calls on objects the library's caller or container
 // supplies are marked (SuppliedSites, exposed_api[].supplied_dispatch);
 // lb2-8: a library announcing classes to Spring gets the spring profile's
-// framework packages (Coverage.FrameworkAdded).
-const Version = "lb2-8"
+// framework packages (Coverage.FrameworkAdded); lb2-9: what the bean
+// definitions a Micronaut library lists call is an entry
+// (MicronautAnnouncements).
+const Version = "lb2-9"
 
 const (
 	accPrivate   = 0x0002

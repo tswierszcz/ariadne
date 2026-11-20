@@ -1,4 +1,4 @@
-# Control library for Micronaut bean definitions (LIBRARY_MODE LB2, measurement)
+# Control library for Micronaut bean definitions (LIBRARY_MODE LB2, `lb2-9`)
 
 Written 2026-11-20 for the LB2 question "are Micronaut's generated bean
 definitions already public API?". Contract: `docs/RESULTS_CONTRACT.MD` §8.
@@ -45,7 +45,7 @@ ran `Producers#banner`, `AuditListener#onStartup`, `CachedStore#warm`,
 - `-roots all`: both `REACHABLE`, but every method is a root, `Unmanaged`'s
   too.
 
-## Expected with Micronaut definitions as announcements (not implemented)
+## Expected with Micronaut definitions as announcements (`lb2-9`, met 2026-11-20)
 
 `-roots api`, CHA and RTA: both advisories `REACHABLE`; `exposed_api` is
 exactly `Producers#banner`, `AuditListener#onStartup`, `CachedStore#warm`,
@@ -56,3 +56,10 @@ entry. Never in `exposed_api`: `Unmanaged#never`, `Expand#expand`. Micronaut
 2.x lists the references in `META-INF/services/io.micronaut.inject.BeanDefinitionReference`
 instead; 4.x is not measured here (its jars need Java 17+ class files, fine
 for ariadne, but the layout has to be checked).
+
+**Result (`lb2-9`, 2026-11-20):** as expected, in CHA and RTA —
+`coverage.api.announced_classes` 4, both advisories `REACHABLE`,
+`exposed_api` exactly the four methods, each with `announced_by` naming the
+definition's own entry under `META-INF/micronaut/…BeanDefinitionReference/`;
+every one ran on the JVM. `TestLibraryMicronaut`, `TestMicronautRoots`,
+`TestMicronautAnnouncements` (also the 2.x services-file listing).

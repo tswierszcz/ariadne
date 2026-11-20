@@ -1331,6 +1331,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			warnings = append(warnings, fmt.Sprintf("library mode: reading the CDI bean archive: %v", err))
 		}
 		anns = append(anns, cdiAnns...)
+		// lb2-9: the bean definitions a Micronaut library lists for the
+		// framework; what their generated code calls runs whatever its access.
+		mnAnns, err := libapi.MicronautAnnouncements(prepared.AppClassesJar)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("library mode: reading Micronaut bean definitions: %v", err))
+		}
+		anns = append(anns, mnAnns...)
 		var announcedRoots []uint32
 		announcedRoots, apiAnnounced, cov.Announced = libapi.AnnouncedRoots(g, h, anns, apiOpt)
 		cov.Announcements = anns

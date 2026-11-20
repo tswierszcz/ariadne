@@ -1002,13 +1002,27 @@ with exactly those four exposed, and a class without a bean-defining
 annotation never. On real jars (Quarkus 3.9.5 dependencies)
 smallrye-context-propagation 2.1.0 has one bean (a public interceptor:
 no new roots) and mutiny 2.5.8 a Jandex index but no bean; verdicts
-unchanged. **Micronaut libraries are not covered (measured 2026-11-20):**
-Micronaut's generated `$X$Definition` classes, which call a bean's
-`@Factory`/`@Inject`/`@PostConstruct`/`@EventListener` methods, are
-package-private and synthetic, so `-roots api` does not root them; code
-reached only from package-private bean methods is `NOT_REACHABLE` in
-`-roots api` although Micronaut runs it — check such a library with
-`-roots all` ([testdata/library-micronaut/EXPECTED.MD](testdata/library-micronaut/EXPECTED.MD)).
+unchanged. **Micronaut bean definitions (`lb2-9`, 2026-11-20):** a library
+jar that lists bean definitions for Micronaut
+(`META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/*`, 3.x;
+`META-INF/services/io.micronaut.inject.BeanDefinitionReference`, 1.x/2.x)
+announces them: Micronaut's generated `$X$Definition` classes
+(package-private, synthetic) call the bean's constructor, factory,
+`@Inject`, `@PostConstruct` and — through `$Exec#dispatch` —
+`@EventListener` methods directly, whatever their access, so every library
+method a definition's code calls directly is an entry (`announced_by` names
+the listing entry), with the bean's public instance methods; the
+definitions' own superclasses are not. Private bean methods, which
+Micronaut calls through reflection, are not found. Verified on
+`testdata/library-micronaut` ([EXPECTED.MD](testdata/library-micronaut/EXPECTED.MD),
+Micronaut 3.9.7, JVM oracle `scripts/library-micronaut-oracle.sh`,
+`TestLibraryMicronaut`, `TestMicronautRoots`): before, both advisories were
+`NOT_REACHABLE` although Micronaut runs `replace` from four package-private
+bean methods; now `REACHABLE` with exactly those four exposed, and a class
+without a definition never. On Micronaut's own jars (micronaut-inject,
+-context, -http 3.9.7: 11/24/23 announced classes, +0/+11/+9 entries)
+verdicts and `exposed_api` are unchanged — their beans are public. The 4.x
+layout is not verified.
 **Caller-supplied objects (`lb2-7`, 2026-11-19):** a call the
 library makes on an object of a dependency type that its caller hands it —
 a parameter of the API method the path starts at, or a library field set
