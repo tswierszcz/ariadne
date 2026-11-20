@@ -65,9 +65,12 @@ const (
 	maxReturnWork = 256
 )
 
-// ReturnedEdge is one candidate edge: the site, the method its task may
-// run, and the methods whose return handed that task out (the gate).
-type ReturnedEdge struct {
+// GatedEdge is one candidate edge for a creator gate
+// (callgraph.NewCreatorGate): the site, the method it may run, and the
+// methods one of which must be reachable for the edge to count — for a
+// returned task (a3-4) the methods returning it, for a listener (a3-5)
+// the methods registering it.
+type GatedEdge struct {
 	CallerFQCN, CallerName, CallerDesc         string
 	PC                                         int
 	Kind                                       classfile.CallKind
@@ -131,7 +134,7 @@ func isTaskRun(c classfile.Call) bool {
 // return and their candidate edges (see above). sites are A2's
 // registration sites (FindRegistrationSites); only cataloged ones are
 // used.
-func FindReturnedTasks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]ReturnedEdge, ReturnedStats, []string) {
+func FindReturnedTasks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]GatedEdge, ReturnedStats, []string) {
 	var (
 		stats    ReturnedStats
 		warnings []string
@@ -181,7 +184,7 @@ func FindReturnedTasks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]Retu
 			arg: s.Model.CallbackArgIndex, iface: s.Model.CallbackInterface, method: s.Model.CallbackMethod, methodDesc: s.Model.CallbackMethodDesc})
 	}
 
-	var edges []ReturnedEdge
+	var edges []GatedEdge
 	seen := map[string]int{}
 	for _, s := range all {
 		stats.Sites++
@@ -223,7 +226,7 @@ func FindReturnedTasks(h *hierarchy.Hierarchy, sites []RegistrationSite) ([]Retu
 				continue
 			}
 			seen[k] = len(edges)
-			edges = append(edges, ReturnedEdge{
+			edges = append(edges, GatedEdge{
 				CallerFQCN: s.at.fqcn, CallerName: s.at.name, CallerDesc: s.at.desc, PC: s.pc, Kind: s.kind,
 				TargetFQCN: t.fqcn, TargetMethod: t.name, TargetMethodDesc: t.desc,
 				Creators: []MethodID{creator}, Condition: ConditionProduced,

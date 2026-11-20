@@ -474,6 +474,10 @@ func IsCollectionRetrieval(owner, name, desc string) bool {
 	switch name {
 	case "iterator":
 		return desc == "()Ljava/util/Iterator;"
+	case "get":
+		// List#get(int): an indexed walk (ASYNC_CALLBACKS a3-5's listener
+		// loops); a Map's get(Object) is not a retrieval.
+		return desc == "(I)Ljava/lang/Object;"
 	case "poll", "take", "remove", "pop", "pollFirst", "pollLast", "removeFirst", "removeLast",
 		"peek", "peekFirst", "peekLast", "element", "getFirst", "getLast":
 		return desc == "()Ljava/lang/Object;" || (name == "poll" && desc == "(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;")

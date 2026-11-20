@@ -1,0 +1,11 @@
+package al;
+
+import java.util.function.Consumer;
+
+/** A listener of a JDK type: CHA never expands Consumer#accept. */
+public class U implements Consumer<String> {
+    @Override
+    public void accept(String e) {
+        Work.hit("U");
+    }
+}

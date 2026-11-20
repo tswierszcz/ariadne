@@ -105,11 +105,29 @@ type queued struct {
 // FindHandoffs finds hand-off stores and their drains and returns their
 // edges (see above).
 func FindHandoffs(h *hierarchy.Hierarchy) ([]CallbackEdge, HandoffStats, []string) {
+	r := ScanHandoffs(h)
+	return r.Edges, r.Stats, r.Warnings
+}
+
+// HandoffResult is ScanHandoffs' result: the hand-off edges (a3-3) and
+// the listener candidates (a3-5), from one scan of the input.
+type HandoffResult struct {
+	Edges         []CallbackEdge
+	Stats         HandoffStats
+	Listeners     []GatedEdge
+	ListenerStats ListenerStats
+	Warnings      []string
+}
+
+// ScanHandoffs finds hand-offs (a3-3) and listener notifications (a3-5).
+func ScanHandoffs(h *hierarchy.Hierarchy) HandoffResult {
 	var (
 		stats     HandoffStats
 		warnings  []string
 		stores    []queueStore
 		drains    []queueDrain
+		bcasts    []queueDrain
+		pcs       pcsSites
 		selStores []queueStore // holder: the store's class nest
 		selDrains = map[string][]handoffMethod{}
 		jar       classfile.JarClassReader
@@ -141,9 +159,12 @@ func FindHandoffs(h *hierarchy.Hierarchy) ([]CallbackEdge, HandoffStats, []strin
 				continue
 			}
 			at := handoffMethod{fqcn, m.Name, m.Descriptor}
-			s, d, ss, sd := scanMethod(h, at, m.Calls, facts)
+			s, d, ss, sd, b, p := scanMethod(h, at, m.Calls, facts)
 			stores = append(stores, s...)
 			drains = append(drains, d...)
+			bcasts = append(bcasts, b...)
+			pcs.adds = append(pcs.adds, p.adds...)
+			pcs.fires = append(pcs.fires, p.fires...)
 			selStores = append(selStores, ss...)
 			if sd {
 				n := nest(fqcn)
@@ -229,7 +250,8 @@ func FindHandoffs(h *hierarchy.Hierarchy) ([]CallbackEdge, HandoffStats, []strin
 		kb := b.CallerFQCN + "#" + b.CallerName + b.CallerDesc + fmt.Sprintf("@%06d", b.PC) + b.TargetFQCN + "#" + b.TargetMethod + b.TargetMethodDesc
 		return ka < kb
 	})
-	return edges, stats, warnings
+	lis, lstats := listenerEdges(h, fw, stores, bcasts, pcs)
+	return HandoffResult{Edges: edges, Stats: stats, Listeners: lis, ListenerStats: lstats, Warnings: warnings}
 }
 
 const (
@@ -268,14 +290,14 @@ func candidateMethod(calls []classfile.Call) bool {
 		if c.Kind == classfile.CallDynamic {
 			continue
 		}
-		if isQueueStore(c) || isSelectorStore(c) || isAttachmentRead(c) || dataflow.IsCollectionRetrieval(c.Owner, c.Name, c.Desc) {
+		if isQueueStore(c) || isSelectorStore(c) || isAttachmentRead(c) || dataflow.IsCollectionRetrieval(c.Owner, c.Name, c.Desc) || isPCSAdd(c) || isPCSFire(c) {
 			return true
 		}
 	}
 	return false
 }
 
-func scanMethod(h *hierarchy.Hierarchy, at handoffMethod, calls []classfile.Call, facts *dataflow.MethodFacts) (stores []queueStore, drains []queueDrain, selStores []queueStore, selDrain bool) {
+func scanMethod(h *hierarchy.Hierarchy, at handoffMethod, calls []classfile.Call, facts *dataflow.MethodFacts) (stores []queueStore, drains []queueDrain, selStores []queueStore, selDrain bool, bcasts []queueDrain, pcs pcsSites) {
 	site := func(pc int) bytecodeir.Site {
 		return bytecodeir.Site{Method: at.fqcn + "#" + at.name, Descriptor: at.desc, PC: pc, Op: bytecodeir.OpCall}
 	}
@@ -321,6 +343,20 @@ func scanMethod(h *hierarchy.Hierarchy, at handoffMethod, calls []classfile.Call
 			if v, ok := argumentAt(facts, site(c.PC), arg); ok && v.Kind != valueflow.KindNull {
 				selStores = append(selStores, queueStore{at: at, pc: c.PC, holder: nest(at.fqcn)})
 			}
+		case isPCSAdd(c):
+			field, ok := anyField(h, receiverAt(facts, site(c.PC)))
+			if !ok {
+				continue
+			}
+			v, _ := argumentAt(facts, site(c.PC), pcsListenerArg(c))
+			if v.Kind == valueflow.KindNull || v.Kind == valueflow.KindConst {
+				continue
+			}
+			pcs.adds = append(pcs.adds, queueStore{at: at, pc: c.PC, field: field, holder: fieldClass(field), value: v})
+		case isPCSFire(c):
+			if field, ok := anyField(h, receiverAt(facts, site(c.PC))); ok {
+				pcs.fires = append(pcs.fires, pcsFire{at: at, pc: c.PC, field: field, kind: c.Kind})
+			}
 		case isAttachmentRead(c):
 			attachment = true
 		case isReadinessCall(c):
@@ -361,6 +397,10 @@ func scanMethod(h *hierarchy.Hierarchy, at handoffMethod, calls []classfile.Call
 		// drain: the elements stay for the next event.
 		if removed[field] || cleared[field] {
 			drains = append(drains, queueDrain{at: at, field: field, holder: fieldClass(field), calls: taken[field]})
+		} else {
+			// A walk that keeps the elements: a broadcast to listeners
+			// (a3-5).
+			bcasts = append(bcasts, queueDrain{at: at, field: field, holder: fieldClass(field), calls: taken[field]})
 		}
 	}
 	// A selection-key drain dispatches on readiness: it reads the
@@ -368,7 +408,7 @@ func scanMethod(h *hierarchy.Hierarchy, at handoffMethod, calls []classfile.Call
 	// keys from selectedKeys() itself — not code that walks every
 	// registered key (dump, close, shutdown).
 	selDrain = attachment && ready
-	return stores, drains, selStores, selDrain
+	return stores, drains, selStores, selDrain, bcasts, pcs
 }
 
 func isReadinessCall(c classfile.Call) bool {
@@ -464,7 +504,7 @@ func collectionField(h *hierarchy.Hierarchy, v valueflow.Value) (string, bool) {
 
 func removes(name string) bool {
 	switch name {
-	case "peek", "peekFirst", "peekLast", "element", "getFirst", "getLast":
+	case "peek", "peekFirst", "peekLast", "element", "getFirst", "getLast", "get":
 		return false
 	}
 	return true
