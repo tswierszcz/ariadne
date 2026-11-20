@@ -586,7 +586,8 @@ The IDs are `jdk:service-loader-classpath-provider`,
 `jdk:service-loader-consumption`, `jdk:service-loader-provider-dispatch`,
 `servlet-container:dispatch`, `service-provider:dispatch` (models) and
 `dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
-`jpa:objects`, `framework:proxies` (gates). An ID the analyzer does not know stops the run
+`jpa:objects`, `jdbc:drivers`, `framework:proxies`, `spring:events`,
+`spring:aop`, `async-callbacks:returned-tasks` (gates). An ID the analyzer does not know stops the run
 with the list of known ones; profiles merged by auto-detection disable the
 union of their lists; the embedded profiles disable nothing. A disabled
 model is removed from the registry and a disabled gate adds no edge. The
@@ -2407,13 +2408,25 @@ report:
   Reference apps (petclinic, WebGoat, JPetStore; `-roots all`/`profile`,
   CHA/RTA): +9/+9/+2 registration sites and `callback` edges, all in
   libraries; v1 results byte-identical.
+  Since `a3-4` a task a method *returns* to the code running it
+  (`task = producer.produce(); task.run()`, or handed to an executor) is
+  followed through the return values of the called method — its exact
+  target, or the implementations of a virtual/interface call declared to
+  return `Runnable`/`Callable`, narrowed by the receiver's field/parameter
+  values when those are known — and final fields: a `callback` edge with
+  condition `produced` from the running site to the task's body, gated on
+  a reachable method returning it (log line `returned tasks (ASYNC_CALLBACKS
+  a3-4)`; `testdata/async-returned`, `scripts/async-returned-oracle.sh`).
+  On jetty-client this is the edge from Jetty's `EatWhatYouKill` to
+  `ChannelEndPoint$1#run` (`_runFillable`).
   Not modeled: listeners, reactive operators, Spring's `ListenableFuture`,
   a callback passed through a parameter or field (a reported gap, as
   before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.
   `StringConcatFactory`), left unresolved rather than guessed at.
 - **Lambdas run in another method than the one creating them** get a `sam`
   edge only where DATA_FLOW follows the value (DYNAMIC_LINKAGE L1, above):
-  not through the result of an instance call, an array element, a
+  not through the result of an instance call (except a `Runnable`/`Callable`
+  run or submitted after being returned — ASYNC_CALLBACKS `a3-4`, above), an array element, a
   collection, a value live across an exception handler, a field written
   outside its class, a method overriding one declared outside the input,
   or past the caller and work limits — those sites are counted as gaps in the

@@ -13,6 +13,7 @@ const classMagic = 0xCAFEBABE
 // uint16 on each struct.
 const (
 	AccPublic    = 0x0001
+	AccPrivate   = 0x0002
 	AccStatic    = 0x0008
 	AccFinal     = 0x0010
 	AccInterface = 0x0200

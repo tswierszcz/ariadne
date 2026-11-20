@@ -928,6 +928,25 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		handoffStats.QueueStoresDrained, handoffStats.QueueStores, handoffStats.SelectorStoresDrained, handoffStats.SelectorStores,
 		handoffStats.Drains, handoffEdgesAdded, handoffStats.TooManyDrains, callback.MaxDrains)
 
+	// ASYNC_CALLBACKS a3-4: a task a method returns to the code that runs
+	// it (task.run(), or an executor) — "may run" edges from that site to
+	// the task's body, condition "produced", gated (below, with the SAM
+	// edges) on a reachable method whose return hands the task out.
+	returnedStart := time.Now()
+	returnedEdges, returnedStats, returnedWarnings := callback.FindReturnedTasks(h, callbackSites)
+	warnings = append(warnings, returnedWarnings...)
+	var returnedGraphEdges []callgraph.SAMEdge
+	for _, e := range returnedEdges {
+		var creators []callgraph.MethodRef
+		for _, c := range e.Creators {
+			creators = append(creators, callgraph.MethodRef{FQCN: c.FQCN, Name: c.Name, Desc: c.Desc})
+		}
+		returnedGraphEdges = append(returnedGraphEdges, callgraph.SAMEdge{CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, Kind: e.Kind, TargetFQCN: e.TargetFQCN, TargetName: e.TargetMethod, TargetDesc: e.TargetMethodDesc, Creators: creators, Condition: e.Condition})
+	}
+	returnedGate := callgraph.NewCreatorGate(g, h, returnedGraphEdges, callgraph.BasisCallback)
+	returnedTime := time.Since(returnedStart)
+
 	// DYNAMIC_LINKAGE L2: find every MethodHandle#invoke/invokeExact
 	// call site, read its receiver back via DATA_FLOW D2's
 	// Facts.ReceiverAt, and connect it to every overload of the
@@ -1471,7 +1490,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1503,6 +1522,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	jpaApplied := applyGate(jpadispatch.ModelID, jpaGate)
 	eventsApplied := applyGate(springevents.ModelID, eventsGate)
 	aopApplied := applyGate(springaop.ModelID, aopGate)
+	returnedApplied := applyGate(returnedGateID, returnedGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1518,6 +1538,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("Spring AOP (%s %s): %d aspects (%d beans), %d advice methods (%d from <aop:config>, %d unresolved), %d advised bean methods, %d advice × method pairs undecided (pointcut parts not evaluated), %d self-invocations left out; %d candidates%s, %d edges added, %d already in the graph, %d left out (no method creating Spring's advice objects is reachable from the roots)%s, in %s",
 		springaop.ModelID, springaop.Version, len(aopRes.Aspects), aopRes.RegisteredAspects(), len(aopRes.Advice), aopRes.XMLCount(), len(aopRes.Unresolved), len(aopRes.JoinPoints), aopRes.UndecidedCount(), aopRes.SelfCalls,
 		len(aopRes.Edges), aopTruncated(aopRes), aopApplied.Added, aopApplied.Covered, aopApplied.Gated, aopNoCreator(aopRes), aopTime.Round(time.Millisecond))
+	log("returned tasks (ASYNC_CALLBACKS %s): %d of %d task sites run a task a method returns, %d returning methods; %d candidates, %d edges added, %d already in the graph, %d left out (no method returning the task is reachable from the roots); %d calls with more than %d implementations, %d fields unresolved, %d sites over budget, in %s",
+		callback.ReturnedVersion, returnedStats.Resolved, returnedStats.Sites, returnedStats.Returners, len(returnedGraphEdges), returnedApplied.Added, returnedApplied.Covered, returnedApplied.Gated,
+		returnedStats.TooManyImpls, callback.MaxReturnImpls, returnedStats.Unresolved, returnedStats.Budget, returnedTime.Round(time.Millisecond))
 	samLine := samSummary(samStats, samApplied)
 	log("SAM-call edges (DYNAMIC_LINKAGE L1): %d added, %d already in the graph, %d left out (no method creating the value is reachable from the roots), %d without a node",
 		samApplied.Added, samApplied.Covered, samApplied.Gated, samApplied.Missing)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"ariadne/internal/analysis"
+	"ariadne/internal/callback"
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/jdbcurl"
 	"ariadne/internal/jpadispatch"
@@ -18,6 +19,8 @@ import (
 const (
 	samGateID     = "dynamic-linkage:sam-calls"
 	servletGateID = "servlet-container:objects"
+	// ASYNC_CALLBACKS a3-4: tasks a method returns to the code running them.
+	returnedGateID = "async-callbacks:returned-tasks"
 )
 
 // participantCatalog is every fixed-point participant the analyzer has
@@ -41,5 +44,6 @@ func participantCatalog() []analysis.Participant {
 		{ID: proxycatalog.ModelID, Version: proxycatalog.Version, Kind: analysis.KindGate},
 		{ID: springevents.ModelID, Version: springevents.Version, Kind: analysis.KindGate},
 		{ID: springaop.ModelID, Version: springaop.Version, Kind: analysis.KindGate},
+		{ID: returnedGateID, Version: callback.ReturnedVersion, Kind: analysis.KindGate},
 	}
 }
