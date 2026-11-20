@@ -31,6 +31,14 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### LIBRARY_MODE:LB2 — pomiar Micronauta (`lb2-9m`) — DONE dla pomiaru (2026-11-20); model NIE zaczęty
+
+- **Pytanie (plan LB2):** czy wygenerowane przez Micronaut definicje beanów są już publicznym API, tak że `-roots api` dochodzi do metod beanów bez osobnego modelu (jak `lb2-6` dla CDI).
+- **Fixture:** `testdata/library-micronaut` — te same przypadki (t)–(x) co `testdata/library-cdi`, w Micronaucie 3.9.7: pakietowe `@Factory`/`@Singleton` producer, `@EventListener`, `@PostConstruct`, `@Inject`, klasa bez adnotacji beana; jedyny wywołujący `StringSubstitutor#replace` (commons-text 1.9) to pakietowe `Expand#expand`. Budowa z procesorem adnotacji (`scripts/JavaBuild.java` przyjmuje teraz `proc` → `-proc:full`; JDK 25 bez tego nie uruchamia procesorów). Wyrocznia JVM `scripts/library-micronaut-oracle.sh` (JDI, `observed.txt`): wykonane `Producers#banner`, `AuditListener#onStartup`, `CachedStore#warm`, `Wiring#init`, `Expand#expand`, `replace`; `Unmanaged` nigdy. Micronaut pobrany raz przez `mvn dependency:copy-dependencies` do `work/micronaut-oracle/lib` (niecommitowany).
+- **Wynik:** **nie** — `$X$Definition` (wołające `build`/`injectBean`/`initialize`, `$Exec#dispatch` dla `@EventListener`) są pakietowe i syntetyczne; publiczne `$X$Definition$Reference` też syntetyczne i tylko tworzą definicję; ogłoszenie w `META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/<klasa>` (3.x; 2.x: `META-INF/services/…`). `-roots api` (CHA, RTA; profil `generic` i wykryty `micronaut`; z jarami Micronauta w `-deps` i bez): CVE-2022-42889 i CVE-2025-48924 `NOT_REACHABLE`, `exposed_api` puste, `coverage.api` 4 klasy / 5 metod / 0 ogłoszonych — **fałszywy negatyw**. `-roots all`: `REACHABLE` (każda metoda korzeniem, także `Unmanaged`).
+- **Utrwalone:** `TestLibraryMicronaut_measuredGap` (sprawdza `observed.txt` i obecny wynik; do odwrócenia, gdy model powstanie); EXPECTED.MD z oczekiwaniem dla modelu. Dokumentacja: README (tryb biblioteki: Micronaut nieobsługiwany, sprawdzać `-roots all`), SUPPORT.MD (wiersz Library mode), plan LB2.
+- **Następny krok (wymaga zgody użytkownika):** model ogłoszeń Micronauta — każda definicja z listy `BeanDefinitionReference` → korzenie `build`/`injectBean`/`initialize`/`Exec#dispatch` z `announced_by`; oczekiwanie w EXPECTED.MD (4 metody w `exposed_api`, `Unmanaged` nigdy). Do sprawdzenia przy tym: układ Micronautu 4.x.
+
 ### ROADMAP:B0 — preferencja ścieżek przykładowych (pomiar) — NIE REALIZOWANE, decyzja 2026-11-20
 
 - **Pytanie:** czy inna reguła wyboru ścieżki przykładowej (zamiast najkrótszej) da więcej ścieżek, które naprawdę się wykonują.

@@ -1002,7 +1002,14 @@ with exactly those four exposed, and a class without a bean-defining
 annotation never. On real jars (Quarkus 3.9.5 dependencies)
 smallrye-context-propagation 2.1.0 has one bean (a public interceptor:
 no new roots) and mutiny 2.5.8 a Jandex index but no bean; verdicts
-unchanged. **Caller-supplied objects (`lb2-7`, 2026-11-19):** a call the
+unchanged. **Micronaut libraries are not covered (measured 2026-11-20):**
+Micronaut's generated `$X$Definition` classes, which call a bean's
+`@Factory`/`@Inject`/`@PostConstruct`/`@EventListener` methods, are
+package-private and synthetic, so `-roots api` does not root them; code
+reached only from package-private bean methods is `NOT_REACHABLE` in
+`-roots api` although Micronaut runs it — check such a library with
+`-roots all` ([testdata/library-micronaut/EXPECTED.MD](testdata/library-micronaut/EXPECTED.MD)).
+**Caller-supplied objects (`lb2-7`, 2026-11-19):** a call the
 library makes on an object of a dependency type that its caller hands it —
 a parameter of the API method the path starts at, or a library field set
 only by roots the library never calls itself (a Spring `ObjectProvider` or

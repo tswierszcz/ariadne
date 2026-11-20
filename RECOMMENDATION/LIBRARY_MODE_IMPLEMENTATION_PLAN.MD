@@ -80,8 +80,7 @@ dostępu (producenci, obserwatorzy, `@Inject`, `@PostConstruct`…); fixture `te
 z wyrocznią Weld SE 5.1.2. **`lb2-7` DONE (2026-11-19):** wywołania na obiektach typu zależności dostarczonych przez
 wywołującego (parametr korzenia, pole ustawiane tylko przez korzenie spoza biblioteki) są luką
 `client_code` ze znacznikiem `supplied_dispatch`; werdykty bez zmian. Zostaje z LB2: ścieżki warunkowe po powrocie z kodu klienta (do
-zdefiniowania), wartości dostarczone przekazane do metod zależności, Micronaut (najpierw pomiar, czy wygenerowane
-definicje są już publicznym API), warunki `@ConditionalOn…`.
+zdefiniowania), wartości dostarczone przekazane do metod zależności, Micronaut (pomiar 2026-11-20: wygenerowane definicje **nie** są publicznym API — `$X$Definition` pakietowe i syntetyczne, `$Reference` syntetyczne; `-roots api` daje fałszywy negatyw, `testdata/library-micronaut`; model ogłoszeń Micronauta do zatwierdzenia), warunki `@ConditionalOn…`.
 
 Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).
 
