@@ -44,3 +44,30 @@ func TestParseAdvisoryHTML(t *testing.T) {
 		t.Error("earlier_affected without the statement")
 	}
 }
+
+// TestParseAdvisoryHTML_emergency: the shape of the real pages — score and
+// vector in one cell, five-element versions kept whole (once cut into
+// "17.0.21.0" plus a bogus line "2").
+func TestParseAdvisoryHTML_emergency(t *testing.T) {
+	b, err := os.ReadFile("testdata/advisory-synthetic-emergency.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := ParseAdvisoryHTML("2026-10-24", string(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"8": "8u504", "11": "11.0.32.1", "17": "17.0.21.0.2", "21": "21.0.13.0.2", "27": "27.0.1.0.2"}
+	if len(a.LastAffected) != len(want) {
+		t.Errorf("last affected = %v", a.LastAffected)
+	}
+	for k, v := range want {
+		if a.LastAffected[k] != v {
+			t.Errorf("line %s = %q, want %q", k, a.LastAffected[k], v)
+		}
+	}
+	if len(a.CVEs) != 2 || a.CVEs[0].CVSS != 9.1 || a.CVEs[0].Component != "security-libs/java.security" || len(a.CVEs[0].Lines) != 5 ||
+		a.CVEs[1].CVSS != 4.8 || len(a.CVEs[1].Lines) != 2 || a.CVEs[1].Lines[0] != 21 {
+		t.Errorf("cves = %+v", a.CVEs)
+	}
+}
