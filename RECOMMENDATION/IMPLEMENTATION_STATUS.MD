@@ -31,6 +31,15 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### ROADMAP:B0 — preferencja ścieżek przykładowych (pomiar) — NIE REALIZOWANE, decyzja 2026-11-20
+
+- **Pytanie:** czy inna reguła wyboru ścieżki przykładowej (zamiast najkrótszej) da więcej ścieżek, które naprawdę się wykonują.
+- **Pomiar (2026-11-20, prototyp w Pythonie, poza repo):** jetty-client, zapisany graf, krawędzie wzięte przez JVM (`scripts/MethodEdgeTrace.java`, logika jak `scripts/path-divergence.py`). Zgłaszane dziś ścieżki: 18 z 408 prawdziwych krawędź po krawędzi. Najkrótsza: 14–27; „najmniej kroków CHA, potem długość”: 18–28 — rozrzut zależy wyłącznie od kolejności rozstrzygania remisów; ważenie rozgałęzieniem CHA nie lepsze; górna granica (prawdziwa ścieżka istnieje w grafie): 81. RTA i `-callgraph-mode pta` dają te same liczby. Jedyny stały efekt „najmniej CHA”: −26 % kroków CHA, +2 średniej długości.
+- **Dlaczego heurystyka nie pomoże:** brakujące ścieżki zależą od danych (resolver Sync vs Async ustawiany publicznym setterem, callback `FillInterest`, ścieżki błędów `abort`) — w trybie biblioteki legalnie możliwe, bo te obiekty może dostarczyć klient. Odzyskać je mogłaby tylko wiedza o typach odbiorców, nie kolejność przeszukiwania.
+- **Decyzja (użytkownik, 2026-11-20, rekomendacja „zrezygnować”):** reguły nie zmieniamy; ścieżka przykładowa pozostaje najkrótszą ścieżką z dowodem kroków (B0 `b0-2`: bez kroków tylko-CHA, gdy istnieje). Nic nie zmienione w kodzie ani dokumentacji wsparcia.
+- **Gdyby wracać:** tylko z modelem typów odbiorców (np. listenery przez parametr — jetty `ResponseNotifier`), nie z heurystyką kolejności.
+
+
 ### ASYNC_CALLBACKS:A4 `a4-2` — kwalifikacja obszaru — DONE for this scope (2026-11-20)
 
 - **Wymaganie (plan A4):** fixtures dla direct executor, thread override, task object, lambda, constructor, dwa zadania, rejection, future success/failure, listener i wybrany pipeline reactive; porównanie celów z kontrolowanymi uruchomieniami bez wnioskowania o niemożliwości niezaobserwowanych scenariuszy; liczba dodanych krawędzi i błędnych skojarzeń; B4 i snapshoty; udokumentowane ograniczenia współbieżności.
