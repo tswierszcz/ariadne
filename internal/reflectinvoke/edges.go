@@ -130,3 +130,9 @@ func EdgeTargets(results []InvokeEdgeResult) []InvokeEdge {
 	}
 	return out
 }
+
+// Version names the base reflection rules (REFLECTION R0–R2:
+// Method#invoke and Class/Constructor#newInstance edges); the R3 steps
+// carry their own versions. A snapshot records it (ROADMAP B3 b3-4);
+// bump it with any change to these rules.
+const Version = "r2-1"

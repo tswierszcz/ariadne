@@ -86,3 +86,10 @@ func EdgeTargets(results []CallbackEdgeResult) []CallbackEdge {
 	}
 	return out
 }
+
+// Version names the base callback rules — the A0 catalog, A1 receiver
+// resolution, A2 "may run" edges and the A3 continuation catalog,
+// forwarding through parameters and hand-offs through queues and selector
+// keys (a3-1…a3-3); the later gates carry their own versions. A snapshot
+// records it (ROADMAP B3 b3-4); bump it with any change to these rules.
+const Version = "a3-3"

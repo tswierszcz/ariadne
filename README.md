@@ -2189,7 +2189,15 @@ snapshot: new or gone advisory, advisory content, affected instances, mapping or
 sources, resolver/LLM/algorithm versions, analyzer version, configuration, input artifact,
 and the verdict change. Algorithm versions (`callgraph.builder`, `reach.engine`,
 `vulnmap.resolver`, prompt versions) are constants bumped by hand when semantics change;
-the analyzer version check is the backstop.
+the analyzer version check is the backstop. Every kind of call-graph edge has the version
+of the rules that add it in the snapshot (ROADMAP B3 `b3-4`, 2026-11-20: the fixed-point
+models and gates through the `models` configuration with their versions, the one-shot
+passes — base callback rules `callback.resolver`, `methodhandle.edges`,
+`reflection.invoke` — and `jdk.api`, `gaps.rules` as algorithm versions);
+`TestAlgorithmVersions_everyEdgeBasis` reads every edge basis `internal/callgraph`
+declares and fails until a new one is mapped to a version. The comparison is per run,
+not per model: a version change invalidates every advisory, not only those whose paths
+use the changed edges.
 
 ### Exploit-check (PLAN.md Phase 8)
 
