@@ -27,6 +27,8 @@ const (
 	reactiveGateID = "async-callbacks:reactive"
 	// ASYNC_CALLBACKS a3-7: continuations of hand-completed futures.
 	completionGateID = "async-callbacks:completion"
+	// ASYNC_CALLBACKS a4-1: rejected-execution handlers.
+	rejectionGateID = "async-callbacks:rejection"
 )
 
 // participantCatalog is every fixed-point participant the analyzer has
@@ -54,5 +56,6 @@ func participantCatalog() []analysis.Participant {
 		{ID: listenersGateID, Version: callback.ListenersVersion, Kind: analysis.KindGate},
 		{ID: reactiveGateID, Version: callback.ReactiveVersion, Kind: analysis.KindGate},
 		{ID: completionGateID, Version: callback.CompletionVersion, Kind: analysis.KindGate},
+		{ID: rejectionGateID, Version: callback.ThreadsVersion, Kind: analysis.KindGate},
 	}
 }

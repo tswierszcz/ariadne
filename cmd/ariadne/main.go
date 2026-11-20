@@ -911,6 +911,21 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			Condition: e.Condition,
 		})
 	}
+	// ASYNC_CALLBACKS a4-1: a started Thread subclass runs its own run()
+	// (plain edge, "started"); a RejectedExecutionHandler registered with a
+	// ThreadPoolExecutor may run on execute/submit ("rejected", gated on
+	// the registering method).
+	threadStarts, rejectionEdges, threadStats := callback.FindThreadModels(h)
+	for _, e := range threadStarts {
+		callbackGraphEdges = append(callbackGraphEdges, callgraph.CallbackEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc,
+			PC: e.PC, TargetFQCN: e.TargetFQCN, TargetMethod: e.TargetMethod, TargetMethodDesc: e.TargetMethodDesc,
+			Condition: e.Condition,
+		})
+	}
+	rejectionGate := callgraph.NewCreatorGate(g, h, gatedGraphEdges(rejectionEdges), callgraph.BasisCallback)
+	log("threads and rejection (ASYNC_CALLBACKS %s): %d start() calls on Thread subclasses, %d edges to their run(); %d RejectedExecutionHandler registrations paired with %d execute/submit calls (%d candidates)",
+		callback.ThreadsVersion, threadStats.Starts, threadStats.StartEdges, threadStats.Handlers, threadStats.Submissions, len(rejectionEdges))
 	callbackEdgesAdded := callgraph.ApplyCallbackEdges(g, callbackGraphEdges)
 	log("callbacks: %d resolved identities modeled as call-graph targets (%d edges added)", len(callbackEdgeTargets), callbackEdgesAdded)
 
@@ -1499,7 +1514,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	gates := []struct {
 		id   string
 		gate *callgraph.SAMGate
-	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}, {listenersGateID, listenerGate}, {reactiveGateID, reactiveGate}, {completionGateID, completionGate}}
+	}{{samGateID, samGate}, {servletGateID, objGate}, {jdbcdispatch.ModelID, jdbcGate}, {jpadispatch.ModelID, jpaGate}, {proxycatalog.ModelID, proxyGate}, {springevents.ModelID, eventsGate}, {springaop.ModelID, aopGate}, {returnedGateID, returnedGate}, {listenersGateID, listenerGate}, {reactiveGateID, reactiveGate}, {completionGateID, completionGate}, {rejectionGateID, rejectionGate}}
 	var steps []analysis.Step
 	for _, gt := range gates {
 		if !partOff[gt.id] {
@@ -1535,6 +1550,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	listenersApplied := applyGate(listenersGateID, listenerGate)
 	reactiveApplied := applyGate(reactiveGateID, reactiveGate)
 	completionApplied := applyGate(completionGateID, completionGate)
+	rejectionApplied := applyGate(rejectionGateID, rejectionGate)
 	log("servlet objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
 		servletdispatch.ModelID, servletdispatch.Version, len(objEdges), objApplied.Added, objApplied.Covered, objApplied.Gated, objTime.Round(time.Millisecond))
 	log("JDBC objects (%s %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method creating the class is reachable from the roots), in %s",
@@ -1558,6 +1574,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("future completion (ASYNC_CALLBACKS %s): %d continuation edges, %d on a CompletableFuture created with new and completed by hand; %d gated on its completing calls (%d edges added, %d already in the graph, %d left out — no completing method reachable), %d dropped (no completion of their kind anywhere); %d completion calls examined, only when a manual future has continuations (%d with an unresolved receiver)",
 		callback.CompletionVersion, completionStats.Continuations, completionStats.Manual, completionStats.Gated, completionApplied.Added, completionApplied.Covered, completionApplied.Gated,
 		completionStats.Dropped, completionStats.Completers, completionStats.Unresolved)
+	log("rejected execution (ASYNC_CALLBACKS %s): %d candidates, %d edges added, %d already in the graph, %d left out (no method registering the handler is reachable from the roots)",
+		callback.ThreadsVersion, len(rejectionEdges), rejectionApplied.Added, rejectionApplied.Covered, rejectionApplied.Gated)
 	ls := handoffScan.ListenerStats
 	log("listeners (ASYNC_CALLBACKS %s): %d broadcast methods over listener fields, %d PropertyChangeSupport fire calls; %d registrations with a notifying source (%d listeners unresolved); %d candidates, %d edges added, %d already in the graph, %d left out (no method registering the listener is reachable from the roots)",
 		callback.ListenersVersion, ls.Broadcasts, ls.Fires, ls.Registrations, ls.Unresolved, len(handoffScan.Listeners), listenersApplied.Added, listenersApplied.Covered, listenersApplied.Gated)

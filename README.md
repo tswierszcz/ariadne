@@ -588,7 +588,8 @@ The IDs are `jdk:service-loader-classpath-provider`,
 `dynamic-linkage:sam-calls`, `servlet-container:objects`, `jdbc:objects`,
 `jpa:objects`, `jdbc:drivers`, `framework:proxies`, `spring:events`,
 `spring:aop`, `async-callbacks:returned-tasks`, `async-callbacks:listeners`,
-`async-callbacks:reactive`, `async-callbacks:completion` (gates). An ID the analyzer does not know stops the run
+`async-callbacks:reactive`, `async-callbacks:completion`,
+`async-callbacks:rejection` (gates). An ID the analyzer does not know stops the run
 with the list of known ones; profiles merged by auto-detection disable the
 union of their lists; the embedded profiles disable nothing. A disabled
 model is removed from the registry and a disabled gate adds no edge. The
@@ -2450,6 +2451,11 @@ report:
   `future completion (ASYNC_CALLBACKS a3-7)`; `testdata/async-completion`).
   Stages from `supplyAsync`, other continuations or libraries keep their
   "may run" edge.
+  Since `a4-1` `start()` on a `Thread` subclass of the input reaches the
+  subclass's own `run()` (condition `started`), and a
+  `RejectedExecutionHandler` given to a `ThreadPoolExecutor` may run on
+  `execute`/`submit` on that executor (condition `rejected`, gated on the
+  registering method; `testdata/async-threads`).
   Not modeled: other reactive libraries, Spring's `ListenableFuture`,
   a callback passed through a parameter or field (a reported gap, as
   before), and a lambda whose own bootstrap isn't LambdaMetafactory (e.g.

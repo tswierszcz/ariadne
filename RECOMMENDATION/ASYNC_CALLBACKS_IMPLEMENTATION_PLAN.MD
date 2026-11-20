@@ -84,3 +84,8 @@ bez zmian; fixture `testdata/async-completion` z wyrocznią JVM.
 - Przy kontrolowanych uruchomieniach porównać cele i zdarzenia, bez wnioskowania o niemożliwości niezaobserwowanych scenariuszy.
 - Zmierzyć liczbę dodanych krawędzi i błędnych skojarzeń. Nie znosić globalnie skip dla `java.*` tylko po to, by fixtures stały się dodatnie.
 - Wykonać B4, zapisać modele/scenariusz w snapshotach i udokumentować ograniczenia współbieżności.
+
+**`a4-1` (2026-11-20):** brakujące modele z listy fixtures A4 — „thread override” (`start()` na podklasie
+`Thread` → jej `run()`, warunek `started`) i „rejection” (`RejectedExecutionHandler` w `ThreadPoolExecutor` →
+`rejectedExecution` przy `execute`/`submit` na tym executorze, warunek `rejected`, bramka metodą rejestrującą);
+fixture `testdata/async-threads` z wyrocznią JVM.
