@@ -20,17 +20,21 @@ import (
 	"ariadne/internal/alloc"
 	"ariadne/internal/analysis"
 	"ariadne/internal/bootfeatures"
+	"ariadne/internal/callback"
 	"ariadne/internal/callgraph"
 	"ariadne/internal/component"
 	"ariadne/internal/cves"
 	"ariadne/internal/exploit"
+	"ariadne/internal/gaps"
 	"ariadne/internal/httpcache"
 	"ariadne/internal/jdbcdispatch"
 	"ariadne/internal/jdbcurl"
-	"ariadne/internal/libapi"
+	"ariadne/internal/jdkapi"
 	"ariadne/internal/jpadispatch"
+	"ariadne/internal/libapi"
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
+	"ariadne/internal/methodhandle"
 	"ariadne/internal/proxycatalog"
 	"ariadne/internal/pta"
 	"ariadne/internal/reach"
@@ -115,6 +119,13 @@ func algorithmVersions(mode string) map[string]string {
 		// OpenJDK advisory catalog.
 		"runtime.identity":        runtimeinfo.Version,
 		"runtime.openjdk_catalog": runtimevuln.EmbeddedCatalogVersion(),
+		// ROADMAP B3 b3-4: passes outside the fixed point that add edges in
+		// every run, and the rules of the result's gap codes.
+		"callback.resolver":  callback.Version,
+		"methodhandle.edges": methodhandle.Version,
+		"reflection.invoke":  reflectinvoke.Version,
+		"jdk.api":            jdkapi.Version,
+		"gaps.rules":         gaps.Version,
 	}
 	// GRAPH_PRECISION P4: with RTA the created-type catalog and the fixed
 	// point decide edges, so their rule versions are part of the

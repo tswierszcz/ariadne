@@ -1002,7 +1002,14 @@ with exactly those four exposed, and a class without a bean-defining
 annotation never. On real jars (Quarkus 3.9.5 dependencies)
 smallrye-context-propagation 2.1.0 has one bean (a public interceptor:
 no new roots) and mutiny 2.5.8 a Jandex index but no bean; verdicts
-unchanged. **Caller-supplied objects (`lb2-7`, 2026-11-19):** a call the
+unchanged. **Micronaut libraries are not covered (measured 2026-11-20):**
+Micronaut's generated `$X$Definition` classes, which call a bean's
+`@Factory`/`@Inject`/`@PostConstruct`/`@EventListener` methods, are
+package-private and synthetic, so `-roots api` does not root them; code
+reached only from package-private bean methods is `NOT_REACHABLE` in
+`-roots api` although Micronaut runs it — check such a library with
+`-roots all` ([testdata/library-micronaut/EXPECTED.MD](testdata/library-micronaut/EXPECTED.MD)).
+**Caller-supplied objects (`lb2-7`, 2026-11-19):** a call the
 library makes on an object of a dependency type that its caller hands it —
 a parameter of the API method the path starts at, or a library field set
 only by roots the library never calls itself (a Spring `ObjectProvider` or
@@ -2182,7 +2189,15 @@ snapshot: new or gone advisory, advisory content, affected instances, mapping or
 sources, resolver/LLM/algorithm versions, analyzer version, configuration, input artifact,
 and the verdict change. Algorithm versions (`callgraph.builder`, `reach.engine`,
 `vulnmap.resolver`, prompt versions) are constants bumped by hand when semantics change;
-the analyzer version check is the backstop.
+the analyzer version check is the backstop. Every kind of call-graph edge has the version
+of the rules that add it in the snapshot (ROADMAP B3 `b3-4`, 2026-11-20: the fixed-point
+models and gates through the `models` configuration with their versions, the one-shot
+passes — base callback rules `callback.resolver`, `methodhandle.edges`,
+`reflection.invoke` — and `jdk.api`, `gaps.rules` as algorithm versions);
+`TestAlgorithmVersions_everyEdgeBasis` reads every edge basis `internal/callgraph`
+declares and fails until a new one is mapped to a version. The comparison is per run,
+not per model: a version change invalidates every advisory, not only those whose paths
+use the changed edges.
 
 ### Exploit-check (PLAN.md Phase 8)
 

@@ -71,3 +71,8 @@ func EdgeTargets(results []HandleEdgeResult) []HandleEdge {
 	}
 	return out
 }
+
+// Version names the MethodHandle rules (DYNAMIC_LINKAGE L2: find* lookups
+// resolved by DATA_FLOW D2, edges to every overload). A snapshot records
+// it (ROADMAP B3 b3-4); bump it with any change to these rules.
+const Version = "l2-1"

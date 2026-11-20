@@ -10,7 +10,10 @@ import java.util.spi.ToolProvider;
  * ToolProvider APIs — for environments with a Java runtime that has the
  * jdk.compiler module but no javac/jar binaries.
  *
- * Usage: java scripts/JavaBuild.java SRC_DIR OUT_JAR TARGET [CLASSPATH]
+ * Usage: java scripts/JavaBuild.java SRC_DIR OUT_JAR TARGET [CLASSPATH [proc]]
+ *
+ * "proc" runs the annotation processors found on CLASSPATH (-proc:full;
+ * JDK 23+ javac runs none by default), e.g. Micronaut's bean definitions.
  */
 public class JavaBuild {
     public static void main(String[] a) throws Exception {
@@ -22,6 +25,7 @@ public class JavaBuild {
         // cannot check the API of an older release, only emit its class files.
         List<String> args = new ArrayList<>(List.of("-source", a[2], "-target", a[2], "-Xlint:-options", "-d", classes.toString()));
         if (a.length > 3) { args.add("-cp"); args.add(a[3]); }
+        if (a.length > 4 && a[4].equals("proc")) args.add("-proc:full");
         args.addAll(files);
         int rc = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err, args.toArray(String[]::new));
         if (rc != 0) System.exit(rc);
