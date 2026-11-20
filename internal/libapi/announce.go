@@ -299,7 +299,37 @@ func AnnouncedRoots(g *callgraph.Graph, h *hierarchy.Hierarchy, anns []Announcem
 			}
 		}
 	}
+	// visitMicronaut: a Micronaut bean definition (MicronautAnnouncements).
+	// The library methods its generated code calls are entries; a bean
+	// class it reaches is counted, and a client calls the bean's public
+	// instance methods through its types, as for a CDI bean.
+	visitMicronaut := func(def, prov string) {
+		for _, id := range micronautTargets(g, h, def) {
+			key := g.Key(id)
+			owner := key[:strings.IndexByte(key, '#')]
+			if !sel.inScope(owner) {
+				continue
+			}
+			provenance[id] = appendOnce(provenance[id], prov, func() { roots = append(roots, id) })
+			if counted[owner] {
+				continue
+			}
+			counted[owner] = true
+			classes++
+			ci, _ := h.Lookup(owner)
+			for _, m := range ci.Methods {
+				f := m.AccessFlags
+				if f&(accSynthetic|accBridge) == 0 && f&classfile.AccPublic != 0 && f&accStatic == 0 && m.Name != "<init>" {
+					add(owner, m.Name, m.Descriptor, prov)
+				}
+			}
+		}
+	}
 	for _, a := range anns {
+		if a.isMicronaut() {
+			visitMicronaut(a.Class, a.File+" "+a.Key+": "+a.Class)
+			continue
+		}
 		if a.isCDI() {
 			visitCDI(a.Class, a.File+" "+a.Key+": "+a.Class)
 			continue
@@ -328,4 +358,18 @@ func implementsAny(h *hierarchy.Hierarchy, fqcn string, set map[string]bool) boo
 		cur = ci.SuperClass
 	}
 	return false
+}
+
+// appendOnce appends p to list unless present; first runs when list was
+// empty (the node becomes a root).
+func appendOnce(list []string, p string, first func()) []string {
+	if len(list) == 0 {
+		first()
+	}
+	for _, x := range list {
+		if x == p {
+			return list
+		}
+	}
+	return append(list, p)
 }
