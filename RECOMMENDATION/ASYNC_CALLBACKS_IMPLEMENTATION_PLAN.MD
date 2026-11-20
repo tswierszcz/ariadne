@@ -1,6 +1,6 @@
 # Callbacki i asynchroniczność — fazy A0–A4
 
-Status: plan. Wymagania: [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD). Kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: A0–A4 zrealizowane (2026-11-20, rejestr w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD)). Wymagania: [ASYNC_CALLBACKS.MD](ASYNC_CALLBACKS.MD). Kolejność: [ROADMAP.MD](ROADMAP.MD).
 
 ## A0. Katalog modeli callbacków
 
@@ -89,3 +89,8 @@ bez zmian; fixture `testdata/async-completion` z wyrocznią JVM.
 `Thread` → jej `run()`, warunek `started`) i „rejection” (`RejectedExecutionHandler` w `ThreadPoolExecutor` →
 `rejectedExecution` przy `execute`/`submit` na tym executorze, warunek `rejected`, bramka metodą rejestrującą);
 fixture `testdata/async-threads` z wyrocznią JVM.
+
+**`a4-2` (2026-11-20):** kwalifikacja — `TestAsyncQualification` uruchamia pełny pipeline na dziewięciu fixtures
+async i porównuje z wyroczniami JVM (`testdata/async-qualify/RESULTS.MD`: pominięcia, krawędzie do niewykonanych
+ciał z wyjaśnieniem); `TestAsyncTwoTasks` (scenariusz 3); modele bramkowane w snapshotach (`models`) i
+`callgraph.participants`; README: znaczenie i granice krawędzi asynchronicznych (współbieżność).
