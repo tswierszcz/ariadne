@@ -72,6 +72,10 @@ type Release struct {
 	Interim int `json:"interim"`
 	Update  int `json:"update"`
 	Patch   int `json:"patch"`
+	// Extra holds the fifth and later version elements, which JEP 322
+	// leaves to implementors ("17.0.21.0.2"), dot-separated; empty when
+	// absent. compare-style orderings treat a missing element as 0.
+	Extra string `json:"extra,omitempty"`
 	// Build is the +N (or -bNN) build number, 0 when absent.
 	Build int `json:"build,omitempty"`
 	// Opt is what follows the build ("LTS", "1-Debian", …), unparsed.
@@ -81,8 +85,11 @@ type Release struct {
 // String renders feature.interim.update[.patch][+build].
 func (r Release) String() string {
 	s := fmt.Sprintf("%d.%d.%d", r.Feature, r.Interim, r.Update)
-	if r.Patch > 0 {
+	if r.Patch > 0 || r.Extra != "" {
 		s += fmt.Sprintf(".%d", r.Patch)
+	}
+	if r.Extra != "" {
+		s += "." + r.Extra
 	}
 	if r.Build > 0 {
 		s += fmt.Sprintf("+%d", r.Build)
@@ -91,7 +98,7 @@ func (r Release) String() string {
 }
 
 var (
-	jep322Re = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?(?:\.\d+)*(?:-[A-Za-z0-9.]+)?(?:\+(\d+))?(?:-(.+))?$`)
+	jep322Re = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?((?:\.\d+)*)(?:-[A-Za-z0-9.]+)?(?:\+(\d+))?(?:-(.+))?$`)
 	legacyRe = regexp.MustCompile(`^1\.(\d+)\.0(?:_(\d+))?(?:-b(\d+))?`)
 )
 
@@ -107,7 +114,7 @@ func ParseVersion(s string) (Release, bool) {
 	if m == nil {
 		return Release{}, false
 	}
-	r := Release{Feature: atoi(m[1]), Interim: atoi(m[2]), Update: atoi(m[3]), Patch: atoi(m[4]), Build: atoi(m[5]), Opt: m[6]}
+	r := Release{Feature: atoi(m[1]), Interim: atoi(m[2]), Update: atoi(m[3]), Patch: atoi(m[4]), Extra: strings.TrimPrefix(m[5], "."), Build: atoi(m[6]), Opt: m[7]}
 	return r, r.Feature > 0
 }
 

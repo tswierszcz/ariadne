@@ -20,7 +20,7 @@ var (
 	tagRe     = regexp.MustCompile(`(?s)<[^>]*>`)
 	spaceRe   = regexp.MustCompile(`\s+`)
 	affectRe  = regexp.MustCompile(`(?i)affected versions are\s+(.+?)\.(?:\s+[A-Z]|\s*$)`)
-	versionRe = regexp.MustCompile(`\b(\d+u\d+|\d+(?:\.\d+){0,3})\b`)
+	versionRe = regexp.MustCompile(`\b(\d+u\d+|\d+(?:\.\d+)*)\b`)
 	cvssRe    = regexp.MustCompile(`^\d+(\.\d+)?$`)
 )
 
@@ -88,8 +88,9 @@ func ParseAdvisoryHTML(date, page string) (Advisory, error) {
 			}
 			cve := CVE{ID: id, Component: strings.ReplaceAll(text(cells[1][2]), " ", "")}
 			if len(cells) > 2 {
-				if s := text(cells[2][2]); cvssRe.MatchString(s) {
-					cve.CVSS, _ = strconv.ParseFloat(s, 64)
+				// The cell holds the score and the vector ("7.5<br>NLNNUNNH").
+				if f := strings.Fields(text(cells[2][2])); len(f) > 0 && cvssRe.MatchString(f[0]) {
+					cve.CVSS, _ = strconv.ParseFloat(f[0], 64)
 				}
 			}
 			// Line columns are the last len(lines) cells.

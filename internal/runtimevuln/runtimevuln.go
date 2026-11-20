@@ -167,7 +167,7 @@ func ParseCatalog(b []byte) (Catalog, error) {
 }
 
 // ParseUpstream parses an upstream release name: "25", "17.0.16",
-// "11.0.21.1", "8u461".
+// "11.0.21.1", "17.0.21.0.2", "8u461".
 func ParseUpstream(s string) (runtimeinfo.Release, bool) {
 	if m := jdk8uRe.FindStringSubmatch(s); m != nil {
 		u, _ := strconv.Atoi(m[1])
@@ -176,18 +176,40 @@ func ParseUpstream(s string) (runtimeinfo.Release, bool) {
 	return runtimeinfo.ParseVersion(s)
 }
 
-// compare orders releases of one line by interim, update and patch; the
-// build number is not part of a release's identity here.
+// compare orders releases of one line by interim, update, patch and the
+// implementor's further elements (a missing one counts as 0); the build
+// number is not part of a release's identity here.
 func compare(a, b runtimeinfo.Release) int {
-	for _, d := range [][2]int{{a.Interim, b.Interim}, {a.Update, b.Update}, {a.Patch, b.Patch}} {
-		if d[0] != d[1] {
-			if d[0] < d[1] {
+	x := []int{a.Interim, a.Update, a.Patch}
+	y := []int{b.Interim, b.Update, b.Patch}
+	x, y = append(x, extra(a)...), append(y, extra(b)...)
+	for len(x) < len(y) {
+		x = append(x, 0)
+	}
+	for len(y) < len(x) {
+		y = append(y, 0)
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			if x[i] < y[i] {
 				return -1
 			}
 			return 1
 		}
 	}
 	return 0
+}
+
+func extra(r runtimeinfo.Release) []int {
+	if r.Extra == "" {
+		return nil
+	}
+	var out []int
+	for _, p := range strings.Split(r.Extra, ".") {
+		n, _ := strconv.Atoi(p)
+		out = append(out, n)
+	}
+	return out
 }
 
 // OpenJDK is the provider over a catalog.
@@ -285,6 +307,16 @@ func (p *OpenJDK) Assess(r runtimeinfo.Runtime, now time.Time) Assessment {
 			}
 			out.Counts[f.Applicability]++
 			out.Findings = append(out.Findings, f)
+		}
+	}
+	// A runtime older than the oldest covering advisory's last affected
+	// release may carry flaws fixed before the catalog starts.
+	for _, a := range p.C.Advisories {
+		if last, ok := a.LastAffected[line]; ok {
+			if lv, _ := ParseUpstream(last); compare(v, lv) < 0 {
+				out.Notes = append(out.Notes, fmt.Sprintf("the runtime predates the catalog's oldest advisory for line %s (%s, last affected %s): advisories published before it are not included", line, a.Date, last))
+			}
+			break
 		}
 	}
 	if uncovered > 0 {

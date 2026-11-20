@@ -66,8 +66,10 @@ func TestAssess(t *testing.T) {
 		{"17.0.16+8", map[string]string{"CVE-2026-00001": Affected, "CVE-2026-00002": NotAffected, "CVE-2026-00003": Affected}, 0},
 		// later than the first advisory's 17.0.16: fixed there
 		{"17.0.17+10", map[string]string{"CVE-2026-00001": NotAffected, "CVE-2026-00002": NotAffected, "CVE-2026-00003": Affected}, 0},
-		// earlier, without an "and earlier" statement: undetermined
-		{"17.0.9+9", map[string]string{"CVE-2026-00001": Undetermined, "CVE-2026-00002": NotAffected, "CVE-2026-00003": Affected}, 0},
+		// earlier, without an "and earlier" statement: undetermined; earlier
+		// than the oldest advisory's release, so a note that older
+		// advisories are not in the catalog
+		{"17.0.9+9", map[string]string{"CVE-2026-00001": Undetermined, "CVE-2026-00002": NotAffected, "CVE-2026-00003": Affected}, 1},
 		{"25.0.2+10", map[string]string{"CVE-2026-00001": NotAffected, "CVE-2026-00002": NotAffected, "CVE-2026-00003": NotAffected}, 0},
 		// JDK 8 (8uNNN): only the first advisory covers line 8
 		{"1.8.0_461-b11", map[string]string{"CVE-2026-00001": Affected, "CVE-2026-00002": NotAffected}, 1},
@@ -152,5 +154,28 @@ func TestEmbeddedCatalog(t *testing.T) {
 	}
 	if EmbeddedCatalogVersion() == "" {
 		t.Error("no catalog version")
+	}
+}
+
+// TestCompare_extraElements: a fifth version element orders releases
+// (emergency builds such as 17.0.21.0.2); a missing element counts as 0.
+func TestCompare_extraElements(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want int
+	}{
+		{"17.0.21", "17.0.21.0.2", -1},
+		{"17.0.21.0.3", "17.0.21.0.2", 1},
+		{"17.0.21.0.2", "17.0.21.0.2", 0},
+		{"17.0.21.0.0", "17.0.21", 0},
+		{"17.0.22", "17.0.21.0.3", 1},
+		{"11.0.32.1", "11.0.32.1.0", 0},
+	}
+	for _, c := range cases {
+		a, ok1 := ParseUpstream(c.a)
+		b, ok2 := ParseUpstream(c.b)
+		if !ok1 || !ok2 || compare(a, b) != c.want {
+			t.Errorf("compare(%s, %s) = %d, want %d", c.a, c.b, compare(a, b), c.want)
+		}
 	}
 }

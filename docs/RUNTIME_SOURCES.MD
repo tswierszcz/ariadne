@@ -74,7 +74,27 @@ terms were read; nothing from them is in the repository.)
    (true only when the page says "… and earlier") and the line marks — and
    try it: `ariadne … -runtime-file temurin.yaml -openjdk-catalog /tmp/catalog.yaml`.
 4. Copy it to `internal/runtimevuln/openjdk_advisories.yaml`, bump
-   `version`, commit. Quarterly (January, April, July, October).
+   `version`, commit. Check the index after every quarterly release
+   (January, April, July, October) **and** in between: 2026 had
+   out-of-band advisories too (08-18, 10-21, 10-24, 11-17).
+
+### Catalog state
+
+Version 1 (2026-11-20): the eight advisories from 2026-01-20 to
+2026-11-17, checked against the saved pages with an independent HTML parser
+(CVE ids, components, CVSS, line marks, last affected releases, "and
+earlier": 0 differences). Advisories before 2026 are not curated; a runtime
+older than the oldest advisory's last affected release for its line gets a
+note that earlier advisories are not included.
+
+What the real pages showed (the converter had only seen a synthetic one):
+the CVSS score and vector share one cell (`7.5<br>NLNNUNNH`), and
+emergency releases name versions with a fifth element (`17.0.21.0.2`,
+`21.0.13.0.3`). JEP 322 leaves the fifth and later elements to
+implementors; `runtimeinfo.Release.Extra` keeps them and the comparison
+orders by them (a missing element counts as 0), so `17.0.21.0.3` is later
+than `17.0.21.0.2` and `17.0.21` is earlier. The version parser used to cut
+these at four elements and read the rest as a feature line "2".
 
 ## How a runtime is assessed (`internal/runtimevuln`)
 
