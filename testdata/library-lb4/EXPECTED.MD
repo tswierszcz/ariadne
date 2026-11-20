@@ -145,7 +145,17 @@ two runs). Jars from `work/libs` (`scripts/library-measure.sh`); no network.
    which Jetty's `EatWhatYouKill` runs — a task passed as a return value.
    Reported paths are unchanged (66 of 408 fully executed): BFS keeps the
    shorter CHA route. `exposed_api` 200 → 203 (`SelectorManager#accept`,
-   `#acceptor`, server side). Verdicts unchanged.)*
+   `#acceptor`, server side). Verdicts unchanged.)* *(2026-11-20, `a3-4`:
+   a task a method returns is followed to the code running it —
+   `EatWhatYouKill#runTask`/`#execute` and `Invocable#invokeNonBlocking` →
+   `ChannelEndPoint$1/$2/$3#run`, gated on `ChannelEndPoint#onSelected`.
+   Over real edges 36 of the 103 entries now reach `convertContentLength`
+   (3 before), `HttpClient#GET` through the selector, the strategy and
+   `_runFillable` to `onFillable` and the parser. Reported paths now take
+   that mechanism (via `runTask`; this run used `execute`): fully executed
+   by methods 66 → 40 of 408, real edge by edge 18 → 18 — the 26 lost
+   matched by method only, over CHA hops Jetty does not take. Verdicts and
+   `exposed_api` unchanged.)*
 2. **Public is not intended API.** jetty-client's shortest finding path starts
    at `HttpReceiverOverHTTP#receive`, public in a public package, which no user
    calls. `-api-exclude` helps only when internals live in separate packages.

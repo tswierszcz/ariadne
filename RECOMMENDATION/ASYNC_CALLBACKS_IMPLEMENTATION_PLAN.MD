@@ -53,6 +53,13 @@ przez załącznik klucza NIO (`register(…, att)`/`attach` → pętla selektora
 `testdata/async-handoff` z wyrocznią JVM; wyrocznia krawędzi `scripts/MethodEdgeTrace.java`; pomiar:
 jetty-client.
 
+**Wycinek 4 (`a3-4`, 2026-11-20):** zadania zwracane z metody — miejsce `Runnable#run`/`Callable#call` albo
+rejestracji A2, którego zadanie pochodzi z wartości zwracanej (wywołanie dokładne albo implementacje
+wywołania wirtualnego z typem odbiorcy zawężonym przez pole/parametr, pola final/static, `new`/lambda);
+krawędź „może wykonać” z warunkiem `produced`, bramkowana (creator gate) najgłębszą metodą zwracającą
+zadanie; fixture `testdata/async-returned` z wyrocznią JVM; pomiar: jetty-client (`EatWhatYouKill` →
+`ChannelEndPoint$1#run`).
+
 ## A4. Weryfikacja i kwalifikacja
 
 - Fixtures: direct executor, thread override, task object, lambda, constructor, dwa tasks, rejection, future success/failure, listener i wybrany reactive pipeline.

@@ -421,7 +421,7 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 			st.push(valueflow.CallResult(valueflow.CallResultRef{Owner: op.CallOwner, Name: op.CallName, Desc: op.CallDesc, Site: it.site(op.PC, bytecodeir.OpCall)}), op.Width)
 			return ""
 		}
-		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && (isServiceLoaderTraceOwner(op.CallOwner) || isClassLoaderTraceCall(op.CallOwner, op.CallName, op.CallDesc) || IsCollectionRetrieval(op.CallOwner, op.CallName, op.CallDesc)) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
+		if op.CallHasReceiver && isReferenceReturn(op.CallDesc) && (isServiceLoaderTraceOwner(op.CallOwner) || isClassLoaderTraceCall(op.CallOwner, op.CallName, op.CallDesc) || IsCollectionRetrieval(op.CallOwner, op.CallName, op.CallDesc) || IsTaskReturn(op.CallDesc)) && (op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface) {
 			receiver := entries[0].v
 			if valueflow.CallTraceDepth(receiver) < valueflow.MaxCallTraceDepth {
 				st.push(valueflow.TracedCall(valueflow.CallTraceValue{
@@ -504,6 +504,14 @@ func init() {
 	} {
 		jdkCollections[c] = true
 	}
+}
+
+// IsTaskReturn: an instance call declared to return a task (Runnable,
+// Callable) — its result is traced so ASYNC_CALLBACKS a3-4 can follow a
+// task a method returns (Jetty's Selectable#onSelected) to its
+// implementations' return values.
+func IsTaskReturn(desc string) bool {
+	return strings.HasSuffix(desc, ")Ljava/lang/Runnable;") || strings.HasSuffix(desc, ")Ljava/util/concurrent/Callable;")
 }
 
 func isServiceLoaderTraceOwner(owner string) bool {

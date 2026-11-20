@@ -7,7 +7,8 @@ GRAPH is an ariadne -graph-out file, RESULTS.json the -json-format v2 file of
 the same run, EDGES the caller<TAB>callee pairs a JVM run recorded
 (java scripts/MethodEdgeTrace.java CP MAIN edges.txt 'pkg.*'), ran.txt the
 methods that ran (MethodBreakTrace). An edge counts when the JVM took it, or
-when it is a modeled cross-thread edge (basis callback: A2, a3-2, a3-3)
+when it is a modeled cross-thread edge (basis callback: A2, a3-2, a3-3,
+a3-4; basis sam: a lambda handed to an executor, DYNAMIC_LINKAGE L1)
 whose two ends both ran — a hand-off never shows as caller and callee on
 one stack. Per REACHABLE finding: how many exposed-API entries that ran
 reach the vulnerable method over such edges. Unlike path-divergence.py,
@@ -30,7 +31,7 @@ def main():
         if p[0] != "edge":
             continue
         a, b, basis = p[1], p[2], p[4]
-        if (a, b) in real or (basis == "callback" and a in ran and b in ran):
+        if (a, b) in real or (basis in ("callback", "sam") and a in ran and b in ran):
             adj[a].add(b)
             kind.setdefault((a, b), "real" if (a, b) in real else basis)
 
