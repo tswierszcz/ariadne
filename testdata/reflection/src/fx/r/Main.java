@@ -74,7 +74,34 @@ public final class Main {
         Target.class.getMethod(name).invoke(new Target());
     }
 
+    // Positive (R4 r4-1): forName(String) initializes the class — its
+    // static initializer runs, and nothing else in the program touches it.
+    static void forNameInit() throws Exception {
+        Class.forName("fx.r.Inited");
+    }
+
+    // Negative (R4 r4-1): initialize=false loads without initializing.
+    static void forNameNoInit() throws Exception {
+        Class.forName("fx.r.NotInited", false, Main.class.getClassLoader());
+    }
+
+    // Positive (R4 r4-1): a class with no initializer of its own — the JVM
+    // initializes its superclass first, so InitedBase's runs.
+    static void forNameSuper() throws Exception {
+        Class.forName("fx.r.InitedSub");
+    }
+
+    // Positive (R4 r4-1): initialize is not a constant (true here at run
+    // time) — the class may be initialized.
+    static void forNameMaybe(boolean init) throws Exception {
+        Class.forName("fx.r.MaybeInited", init, Main.class.getClassLoader());
+    }
+
     public static void main(String[] args) throws Exception {
+        forNameInit();
+        forNameNoInit();
+        forNameSuper();
+        forNameMaybe(args.length == 0);
         literal();
         supertypeLookup();
         staticWithNull();

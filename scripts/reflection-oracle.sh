@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# REFLECTION R0–R2 oracle (ROADMAP B4). Compiles testdata/reflection/src
+# REFLECTION R0–R2 and R4 r4-1 (Class.forName initialization) oracle (ROADMAP B4). Compiles testdata/reflection/src
 # into testdata/reflection/app.jar and runs fx.r.Main on the real JVM; every
 # case method records the bodies that ran (fx.trace.Ran). Writes
 # testdata/reflection/observed.txt. The jar and the file are committed, and
