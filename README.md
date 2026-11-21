@@ -2797,7 +2797,18 @@ report:
   access-check bypass/`setAccessible`, `Constructor#newInstance` through
   parameters (no such site measured), and any runtime-computed
   class/method name remain unmodeled, so the rest of this limitation still
-  stands.
+  stands. A sixth slice, REFLECTION R4 (`r4-1`, 2026-11-21):
+  `Class.forName` with a literal name initializes the class — `forName(String)`
+  always, `forName(String, boolean, ClassLoader)` unless the boolean is a
+  constant `false` (a non-constant one gives a "may run" edge) — so the call
+  gets a `BasisReflection` class-initialization edge to the class's
+  `<clinit>`, or to its nearest superclass's when it has none (the JVM
+  initializes the superclass first). Log line "Class.forName call sites".
+  Real-JVM oracle: `testdata/reflection` (direct, through the superclass,
+  non-constant, and `initialize=false` with no edge). Measured: 22 / 27 / 8
+  edges on petclinic / WebGoat / JPetStore; v1 results byte-identical with
+  and without them in all 12 configurations (`-roots profile`/`all` ×
+  CHA/RTA).
 - **Seven profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus`, `stripes` and `generic`** — every framework PLAN.md section 4
   originally named for Phase 7, the `spring`/`generic` pair from the base
