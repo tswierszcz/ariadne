@@ -21,6 +21,12 @@ po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## L2. Podstawowe MethodHandle
 
+**Pomiar 2026-11-21 — dalsza rozbudowa nie podjęta (decyzja użytkownika):** rozwiązane 0 z 10 miejsc
+`invoke`/`invokeExact` na petclinic i 2 z 46 na WebGoat (głównie JRuby); pola instancyjne i wyniki
+wywołań statycznych są już obsługiwane, reszta to kombinatory (L3), pola z nieznanym zapisem, nazwy
+z czasu wykonania. `MethodHandle` to 2 z 611 istotnych miejsc luk petclinic (`b0-5`) — pełne L2/L3 nie
+zmieniłoby żadnego oznaczenia. Zob. IMPLEMENTATION_STATUS.
+
 - Obsłużyć stałe uchwyty i mały katalog `Lookup.findStatic/findVirtual/findConstructor`; korzystać ze wspólnej analizy nazw i typów, zamiast duplikować refleksję.
 - Dla `invokeExact` sprawdzać znany MethodType, a dla `invoke` wdrożyć zadeklarowany zakres adaptacji. Nierozstrzygnięta zgodność typu jest warunkiem.
 - Powiązać wywołanie uchwytu z rzeczywistym receiverem, typami argumentów i inicjalizacją. Sam lookup nie wywołuje ciała celu.
