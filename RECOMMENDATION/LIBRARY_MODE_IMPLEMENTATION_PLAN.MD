@@ -137,8 +137,10 @@ callbacki — jetty-client 9.4.36) z ręcznie sprawdzonymi werdyktami
 `REACHABLE` nie stracony), README „Library mode in a library's CI”, SUPPORT.MD ze zmierzonymi
 ograniczeniami. Wyrocznia startera mybatis (2026-11-19, `testdata/library-starter`): z 26 `REACHABLE` 5 wykonuje się w najmniejszej aplikacji, 7 więcej (snakeyaml) przez sam Boot przy `application.yml`, 14 nigdy; niewykonane wychodzą z biblioteki wywołaniem na obiekcie z kontenera (`ObjectProvider`, `BeanFactory`) — argument za LB2 „wywołania na typach zależności”. **`lb4-2` DONE (2026-11-19):** wyrocznie JVM dla commons-configuration2, jackson-dataformat-yaml,
 jjwt-jackson (`scripts/library-lb4-jvm-oracle.sh`): 2/2, 15/17, 14/15 `REACHABLE` wykonane, 0
-`NOT_REACHABLE` wykonanych. Zostaje z LB4: powiązanie z planem CI floty (przesunięte na połowę
-grudnia 2026), krawędź przekazania asynchronicznego.
+`NOT_REACHABLE` wykonanych. **Krawędź przekazania asynchronicznego — zamknięta (pomiar
+2026-11-21):** na `main` po `lb2-9` graf jetty-client ma prawdziwą ścieżkę `HttpClient#GET` → selektor
+NIO → `ReadCallback#succeeded` → parser (krawędzie `a3-2`–`a3-4`), CHA i RTA; zob. IMPLEMENTATION_STATUS.
+Zostaje z LB4: powiązanie z planem CI floty (przesunięte na połowę grudnia 2026).
 
 ## Kolejność i szacunek
 
