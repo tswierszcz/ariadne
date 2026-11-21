@@ -1069,6 +1069,22 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("reflection: %d Constructor#newInstance call sites found, %d resolved identities modeled as call-graph targets (%d edges added)",
 		len(reflectNewInstanceSites), len(reflectNewInstanceEdgeTargets), reflectNewInstanceEdgesAdded)
 
+	// REFLECTION R4 (r4-1): Class.forName of a literal name initializes
+	// the class (unless initialize is a constant false) — an edge to its
+	// <clinit>, or its nearest superclass's, like `new` (JVM_GRAPH G3).
+	forNameInits, forNameStats, forNameWarnings := reflectinvoke.FindForNameInits(h)
+	warnings = append(warnings, forNameWarnings...)
+	var forNameGraphEdges []callgraph.ReflectClassInitEdge
+	for _, e := range forNameInits {
+		forNameGraphEdges = append(forNameGraphEdges, callgraph.ReflectClassInitEdge{
+			CallerFQCN: e.CallerFQCN, CallerName: e.CallerName, CallerDesc: e.CallerDesc, PC: e.PC, InitFQCN: e.InitFQCN,
+		})
+	}
+	forNameEdgesAdded := callgraph.ApplyReflectClassInitEdges(g, forNameGraphEdges)
+	log("reflection: %d Class.forName call sites found, %d with a literal name (%d initialize=false, %d outside the input, %d with no initializer), %d initializing a class of the input (%d with a non-constant initialize) (REFLECTION R4 r4-1, %d edges added)",
+		forNameStats.Sites, forNameStats.Literal, forNameStats.NoInit, forNameStats.Outside, forNameStats.NoInitializer,
+		forNameStats.Inits, forNameStats.MaybeInit, forNameEdgesAdded)
+
 	// DESERIALIZATION Z1: every Java serialization entry
 	// (ObjectInputStream#readObject/readUnshared, ObjectInput#readObject)
 	// gets a "may run" edge to every callback serialization may run on

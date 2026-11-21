@@ -50,3 +50,35 @@ func ApplyReflectNewInstanceEdges(g *Graph, edges []ReflectNewInstanceEdge) int 
 	}
 	return added
 }
+
+// ReflectClassInitEdge is one REFLECTION R4 (r4-1) edge to add: a
+// Class.forName call site that initializes InitFQCN, connected to that
+// class's own "<clinit>()V".
+type ReflectClassInitEdge struct {
+	CallerFQCN, CallerName, CallerDesc string
+	PC                                 int
+	InitFQCN                           string
+}
+
+// ApplyReflectClassInitEdges adds, for every edge, a BasisReflection
+// CallInit edge from its caller to InitFQCN's "<clinit>()V" — the
+// initialization Class.forName performs, the same Kind/Basis pair
+// ApplyReflectNewInstanceEdges gives a constructed class's <clinit>.
+// Missing nodes are skipped. Returns how many distinct edges were added.
+func ApplyReflectClassInitEdges(g *Graph, edges []ReflectClassInitEdge) int {
+	added := 0
+	for _, e := range edges {
+		fromID, ok := g.ID(e.CallerFQCN, e.CallerName, e.CallerDesc)
+		if !ok {
+			continue
+		}
+		clinitID, ok := g.ID(e.InitFQCN, "<clinit>", "()V")
+		if !ok || hasEdge(g, fromID, clinitID, classfile.CallInit, BasisReflection) {
+			continue
+		}
+		if g.addEdge(fromID, clinitID, classfile.CallInit, BasisReflection, &CallSite{PC: e.PC}) {
+			added++
+		}
+	}
+	return added
+}

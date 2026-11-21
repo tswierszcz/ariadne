@@ -14,16 +14,17 @@ import (
 
 const reflectionFixture = "../../testdata/reflection/"
 
-// TestReflectionOracle (REFLECTION R0–R2, ROADMAP B4): testdata/reflection
+// TestReflectionOracle (REFLECTION R0–R2, R4 r4-1, ROADMAP B4): testdata/reflection
 // (scripts/reflection-oracle.sh) runs one case per method on the real JVM
 // and records the bodies that ran. Positive cases — forName and getMethod
 // literals, a lookup on a supertype with the target allocated as the
 // subtype, a static method with a null target, getDeclaredMethod of a
-// private method, a Method cached in a static field, Constructor#newInstance
-// — must be reachable from main through reflection edges to exactly the
+// private method, a Method cached in a static field, Constructor#newInstance,
+// Class.forName initializing a class (directly, through its superclass, with
+// a non-constant initialize) — must be reachable from main through reflection edges to exactly the
 // bodies the JVM ran. Negative cases — a proven argument-count mismatch
-// (the JVM throws), and the supertype body the JVM did not select — must
-// have no reflection edge. The unresolved case (a method name from the
+// (the JVM throws), the supertype body the JVM did not select, and
+// Class.forName with initialize=false — must have no reflection edge. The unresolved case (a method name from the
 // input) must be reported as a gap and have no invented target; it is the
 // only body the JVM ran that the graph does not reach.
 func TestReflectionOracle(t *testing.T) {
@@ -48,7 +49,7 @@ func TestReflectionOracle(t *testing.T) {
 	const unresolved = "fx.r.Target#chosenAtRunTime()V"
 	reach := reachableFrom(ex, "fx.r.Main#main([Ljava/lang/String;)V")
 	obs := (benchFixture{observed: reflectionFixture + "observed.txt", bodyColumn: 0}).observedBodies(t)
-	if len(obs) != 8 || !obs[unresolved] {
+	if len(obs) != 11 || !obs[unresolved] {
 		t.Fatalf("observed.txt has %d bodies (%v); regenerate with scripts/reflection-oracle.sh", len(obs), obs)
 	}
 	for b := range obs {
@@ -71,6 +72,9 @@ func TestReflectionOracle(t *testing.T) {
 		"fx.r.Main#cachedInField()V -> fx.r.Target#viaField()V",
 		"fx.r.Main#constructor()V -> fx.r.Made#<init>()V",
 		"fx.r.Main#declaredPrivate()V -> fx.r.Target#secret()V",
+		"fx.r.Main#forNameInit()V -> fx.r.Inited#<clinit>()V",
+		"fx.r.Main#forNameMaybe(Z)V -> fx.r.MaybeInited#<clinit>()V",
+		"fx.r.Main#forNameSuper()V -> fx.r.InitedBase#<clinit>()V",
 		"fx.r.Main#literal()V -> fx.r.Target#hello()V",
 		"fx.r.Main#staticWithNull()V -> fx.r.Target#stat(Ljava/lang/String;)Ljava/lang/String;",
 		"fx.r.Main#supertypeLookup()V -> fx.r.Sub#greet()V",
@@ -82,6 +86,11 @@ func TestReflectionOracle(t *testing.T) {
 		if to := e[strings.Index(e, " -> ")+4:]; !obs[to] {
 			t.Errorf("reflection edge to a body the JVM never ran: %s", e)
 		}
+	}
+
+	// R4 r4-1: initialize=false loads the class without initializing it.
+	if notInit := "fx.r.NotInited#<clinit>()V"; reach[notInit] || obs[notInit] {
+		t.Errorf("%s: reached %v, ran %v — want neither (Class.forName with initialize=false)", notInit, reach[notInit], obs[notInit])
 	}
 
 	// The two cases without an edge are reported, each with its reason.
