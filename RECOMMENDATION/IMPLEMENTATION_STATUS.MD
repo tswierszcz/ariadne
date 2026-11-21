@@ -31,6 +31,14 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### LIBRARY_MODE:LB2 — wartości dostarczone przekazane do metod zależności (pomiar) — DONE dla pomiaru (2026-11-21); model NIE budowany (decyzja użytkownika)
+
+- **Pytanie:** czy rozszerzyć `lb2-7` o wartość dostarczoną przez wywołującego, przekazaną jako argument do metody zależności i wywoływaną tam (oraz zapisaną w polu obiektu zależności — przypadek (cc) `testdata/library-supplied`), i co by to zmieniło.
+- **Metoda (test roboczy, niecommitowany):** dla każdego korzenia `-roots api` parametry typu zależności (spoza biblioteki i JDK, interfejs lub klasa nie-`final`) śledzone przez argumenty wywołań do metod zależności (`ResolveExact`, do 4 poziomów, `dataflow.AnalyzeWithParameterRefs`); liczone wywołania wirtualne/interfejsowe na tej wartości w zależności i zapisy jej do pól instancyjnych.
+- **Wynik (miejsca wywołań / zapisy do pól):** commons-configuration2 0/0, jjwt-jackson 0/0, starter mybatis 2/1 (`SqlSessionTemplate#<init>` → `SqlSessionFactory#getConfiguration`), jetty-client 1/6, jackson-dataformat-yaml 107 (61 korzeni, głównie `JsonGenerator#_copyCurrentContents`)/37, fixture `library-supplied` 0/1 ((cc), `StringSubstitutor#setVariableResolver`).
+- **Wpływ:** jedyni kandydaci to dwa niewykonane `REACHABLE` jackson-yaml (`lb4-2`): CVE-2026-68494, CVE-2026-89425 — po 53 wejścia, **wszystkie korzenie odziedziczone** z jackson-core/databind: 13 z parametrem `JsonParser` (wartość dostarczona, ale wprost na korzeniu odziedziczonym — `lb2-7` analizuje tylko klasy biblioteki; osobna luka), 3 `JsonParser#readValueAs*` (`this` przekazany jako argument — pozostałość `lb2-4`), 37 tworzy parser sam przez fabrykę z pola `_jsonFactory` (nic dostarczonego). Model nie dałby więc `SUPPLIED_DISPATCH_ONLY` żadnemu ustaleniu — tylko znaczniki części wejść. `-callgraph-mode pta` (i RTA) na jackson-yaml: oba nadal `REACHABLE`, 53 wejścia; werdykty 17/9 jak CHA.
+- **Decyzja (2026-11-21):** nie budować (jak warunki `@ConditionalOn…`) — bez biblioteki, na której zmienia ustalenie. Kod bez zmian.
+
 ### LIBRARY_MODE:LB4 — krawędź przekazania asynchronicznego w jetty-client (pomiar) — DONE, ograniczenie zamknięte (2026-11-21)
 
 - **Pytanie:** czy ograniczenie (1) z `lb4-1` — brak krawędzi od selektora NIO do `ReadCallback#succeeded`, werdykt tylko przez obcą drogę CHA — nadal obowiązuje po wycinkach ASYNC_CALLBACKS `a3-2`–`a4-1`, `b3-4` i `lb2-9`.
