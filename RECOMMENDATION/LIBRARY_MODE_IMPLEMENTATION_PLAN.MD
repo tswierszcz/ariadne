@@ -80,7 +80,7 @@ dostępu (producenci, obserwatorzy, `@Inject`, `@PostConstruct`…); fixture `te
 z wyrocznią Weld SE 5.1.2. **`lb2-7` DONE (2026-11-19):** wywołania na obiektach typu zależności dostarczonych przez
 wywołującego (parametr korzenia, pole ustawiane tylko przez korzenie spoza biblioteki) są luką
 `client_code` ze znacznikiem `supplied_dispatch`; werdykty bez zmian. Zostaje z LB2: ścieżki warunkowe po powrocie z kodu klienta (do
-zdefiniowania), wartości dostarczone przekazane do metod zależności, Micronaut — **`lb2-9` DONE (2026-11-20):** definicje beanów z listy `BeanDefinitionReference` są ogłoszeniami, a to, co ich wygenerowany kod woła wprost, korzeniami (fixture `testdata/library-micronaut` z wyrocznią JVM; prywatne metody beanów przez refleksję — nie znajdowane; 4.x niesprawdzony), warunki `@ConditionalOn…` (pomiar 2026-11-20 na starterze mybatis: 0 z 26 ustaleń zależy od warunku — modelu nie budujemy bez biblioteki, na której to coś zmienia).
+zdefiniowania), wartości dostarczone przekazane do metod zależności — **zmierzone 2026-11-21, nie budowane** (5 bibliotek: 0–107 miejsc, żaden werdykt ani powód by się nie zmienił; zob. IMPLEMENTATION_STATUS), Micronaut — **`lb2-9` DONE (2026-11-20):** definicje beanów z listy `BeanDefinitionReference` są ogłoszeniami, a to, co ich wygenerowany kod woła wprost, korzeniami (fixture `testdata/library-micronaut` z wyrocznią JVM; prywatne metody beanów przez refleksję — nie znajdowane; 4.x niesprawdzony), warunki `@ConditionalOn…` (pomiar 2026-11-20 na starterze mybatis: 0 z 26 ustaleń zależy od warunku — modelu nie budujemy bez biblioteki, na której to coś zmienia).
 
 Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).
 

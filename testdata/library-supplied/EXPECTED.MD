@@ -20,7 +20,7 @@ supplies the object, not by the library.
 | (z) | `sp.supplied.Holder#get(String)`, field set only by `setLookup(StringLookup)`, which the library never calls | a field written only from the parameter of an API method no library code calls | yes |
 | (aa) | `sp.api.Constants#constant(String)` | `StringLookupFactory.INSTANCE.constantStringLookup()` — the library's own | no |
 | (bb) | `sp.api.Mixed#get(String)`, field set by `Mixed(StringLookup)` and by `Mixed()` to the library's default | a field also written with the library's own value | no |
-| (cc) | `sp.api.Registrar#expand(StringLookup, String)` → `new StringSubstitutor(lookup).replace(…)` | the dependency's own field, holding the caller's value | no — **limit**: a value stored inside a dependency object is not followed |
+| (cc) | `sp.api.Registrar#expand(StringLookup, String)` → `new StringSubstitutor(lookup).replace(…)` | the dependency's own field, holding the caller's value | no — **limit**: a value stored inside a dependency object is not followed (measured 2026-11-21 on the qualification set: following it would change no finding; not built) |
 | (dd) | `sp.api.Wrapper#wrap(String)` → `new Resolver().resolve(<the library's constant lookup>, key)` | (y)'s parameter, but filled by the library, not a caller | no — (y)'s parameter is caller-supplied only on a path that enters at (y) |
 
 (dd) was added after the first implementation (and fields now count only when the roots writing
