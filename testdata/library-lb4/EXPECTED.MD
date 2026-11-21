@@ -155,7 +155,15 @@ two runs). Jars from `work/libs` (`scripts/library-measure.sh`); no network.
    that mechanism (via `runTask`; this run used `execute`): fully executed
    by methods 66 → 40 of 408, real edge by edge 18 → 18 — the 26 lost
    matched by method only, over CHA hops Jetty does not take. Verdicts and
-   `exposed_api` unchanged.)*
+   `exposed_api` unchanged.)* *(2026-11-21, re-measured on `main` after
+   `a4-1`, `b3-4`, `lb2-9`, CHA and RTA: the graph holds the full real path
+   `HttpClient#GET` → … → `Connect#update` → `processSelected` →
+   `EatWhatYouKill` → `ChannelEndPoint$1#run` → `FillInterest#fillable` →
+   `ReadCallback#succeeded` → `onFillable` → `convertContentLength`; counts
+   unchanged (36 and 43 of 103). The `FillInterest` → `ReadCallback` hop
+   (callback held in an `AtomicReference`) is a CHA edge over Jetty's
+   `Callback`. The hand-off limit is closed for the graph; what remains is
+   that the reported path is the shortest one, not the executed one.)*
 2. **Public is not intended API.** jetty-client's shortest finding path starts
    at `HttpReceiverOverHTTP#receive`, public in a public package, which no user
    calls. `-api-exclude` helps only when internals live in separate packages.
