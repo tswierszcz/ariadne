@@ -2209,7 +2209,14 @@ models and gates through the `models` configuration with their versions, the one
 passes — base callback rules `callback.resolver`, `methodhandle.edges`,
 `reflection.invoke` — and `jdk.api`, `gaps.rules` as algorithm versions);
 `TestAlgorithmVersions_everyEdgeBasis` reads every edge basis `internal/callgraph`
-declares and fails until a new one is mapped to a version. The comparison is per run,
+declares and fails until a new one is mapped to a version. Roots are not edges, so the
+rules that turn a profile into roots and framework facts have their own entries
+(FRAMEWORKS F5 `f5-1`, 2026-11-22): `profile.rules` (root kinds, `roots.beans`, `web.xml`
+and Spring XML roots, entry catalog, injection points, `@Value` facts) and
+`profile.builtin` (a digest of the built-in profile YAMLs, so a YAML change needs no bump;
+a `-profile-file` is hashed as an input as before). `TestRulesVersion_tracksRuleSource`
+hashes that rule code without comments and fails until `profile.rules` is bumped.
+The comparison is per run,
 not per model: a version change invalidates every advisory, not only those whose paths
 use the changed edges.
 

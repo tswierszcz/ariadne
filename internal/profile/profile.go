@@ -213,7 +213,7 @@ func (c *Catalog) put(p Profile) {
 // it is auto-detection's fallback when nothing else matches.
 func LoadDefaultCatalog() (Catalog, error) {
 	var c Catalog
-	for _, raw := range [][]byte{springYAML, servletYAML, jakartaYAML, micronautYAML, quarkusYAML, stripesYAML, genericYAML} {
+	for _, raw := range builtinYAMLs() {
 		p, err := parseProfile(raw)
 		if err != nil {
 			return Catalog{}, fmt.Errorf("parsing embedded profile: %w", err)
