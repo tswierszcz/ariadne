@@ -698,7 +698,11 @@ above) are not. `internal/profile` implements section 4 as described:
   `@PostConstruct`/`@PreDestroy`, `@Bean` init/destroy — after the real-JVM oracle
   `testdata/di` measured all of them unreachable; since `b4-8` also Spring XML `<bean>`
   definitions from the class path and a WAR's `WEB-INF/*.xml` — constructors by argument
-  count, property setters, init/destroy methods, `testdata/xmlbeans`), embedded via
+  count, property setters, init/destroy methods, `testdata/xmlbeans`; FRAMEWORKS F5 `f5-2`,
+  2026-11-22: Spring MVC's `@ExceptionHandler`/`@ModelAttribute`/`@InitBinder`,
+  `WebMvcConfigurer` and `HandlerInterceptor` methods, and `roots.web_bodies` — Jackson's
+  getters/constructor/setters of handler bodies — after the real-JVM oracle `testdata/mvc`
+  measured 14 of 26 bodies unreachable), embedded via
   `//go:embed`, overridable/extendable with `-profile-file` (`Catalog.AddFile`, which loads
   one profile and replaces any existing one of the same name — not a partial per-field
   merge, matching how `-vuln-methods` already overrides a whole table rather than patching

@@ -284,6 +284,18 @@ that one piece.
   CVE-2020-26945 and CVE-2022-41853 become `REACHABLE` under
   `-roots profile` (as under `-roots all`), and v1 under `-roots all` and
   on petclinic/WebGoat is byte-identical.
+- **Spring MVC's calls around a controller are roots** (2026-11-22,
+  FRAMEWORKS F5 `f5-2`). Mapped handlers were always roots, but Spring MVC
+  also calls `@ExceptionHandler`, `@ModelAttribute` and `@InitBinder`
+  methods, the `WebMvcConfigurer` callbacks, the registered interceptors,
+  and — through Jackson — the getters of a returned object and the
+  constructor and setters of a `@RequestBody` type, all by reflection. A
+  real-JVM oracle (`testdata/mvc`: an embedded Tomcat with a
+  `DispatcherServlet` answering real HTTP requests) found 14 of 26 such
+  bodies unreachable. They are roots now; the Jackson part matters because
+  deserialization gadgets run through exactly those setters. No verdict
+  changed on petclinic, WebGoat or JPetStore; a few example paths now start
+  at the real entry (an `@InitBinder` method for the `DataBinder` CVEs).
 - **Spring beans' constructors and `@PostConstruct` are roots** (2026-11-15,
   `roots.beans` in the `spring` profile). Spring creates a bean through
   `Constructor#newInstance` and calls `@Autowired` setters, `@PostConstruct`/

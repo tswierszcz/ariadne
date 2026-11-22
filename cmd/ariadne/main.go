@@ -1439,6 +1439,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		roots, beanRootCount = appendNewRoots(roots, profile.BeanLifecycleAppRoots(g, beanRoots))
 		log("spring bean lifecycle roots: %d methods (%s), %d new roots", len(beanRoots), beanRootSummary(beanRoots), beanRootCount)
 	}
+	// FRAMEWORKS F5 f5-2: the JSON bodies Spring MVC hands to Jackson, which
+	// calls the application's getters, constructors and setters reflectively.
+	if prof.Roots.WebBodies {
+		bodyRoots := profile.WebBodyRoots(h)
+		var added int
+		roots, added = appendNewRoots(roots, profile.WebBodyAppRoots(g, bodyRoots))
+		log("spring web body roots: %d methods (%s), %d new roots", len(bodyRoots), webBodySummary(bodyRoots), added)
+	}
 	var modelGapReasons []string
 	registry := models.NewRegistry()
 	serviceload.RegisterModel(registry)
@@ -2389,6 +2397,19 @@ func servletRegistrationSummary(regs []servletdispatch.Registration) string {
 
 // appendNewRoots appends to roots the extra roots not already in it, in
 // their order, and returns the result with how many were new.
+// webBodySummary counts web body roots per kind, in a fixed order.
+func webBodySummary(roots []profile.WebBodyRoot) string {
+	n := map[profile.WebBodyKind]int{}
+	for _, r := range roots {
+		n[r.Kind]++
+	}
+	var parts []string
+	for _, k := range []profile.WebBodyKind{profile.WebBodyGetter, profile.WebBodyConstructor, profile.WebBodySetter} {
+		parts = append(parts, fmt.Sprintf("%s %d", k, n[k]))
+	}
+	return strings.Join(parts, ", ")
+}
+
 // beanRootSummary counts bean lifecycle roots per kind, in a fixed order.
 func beanRootSummary(roots []profile.BeanRoot) string {
 	n := map[profile.BeanRootKind]int{}

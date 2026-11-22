@@ -2872,10 +2872,32 @@ report:
   (`<jdbc:…>`, `<tx:…>`, `<mybatis:scan>`, `<context:component-scan>`),
   `<import>`ed files outside those places, and XML outside `WEB-INF/` and
   the class path are not read.
+  Since FRAMEWORKS F5 `f5-2` (2026-11-22) the `spring` profile also roots
+  what **Spring MVC** calls around a controller: `@ExceptionHandler`,
+  `@ModelAttribute` and `@InitBinder` methods, every `WebMvcConfigurer`
+  callback an application class overrides (`addInterceptors`,
+  `addFormatters`, …) and `HandlerInterceptor`'s `preHandle`/`postHandle`/
+  `afterCompletion` (`roots.overrides`; an interceptor nothing registers is
+  still a root), and — new `roots.web_bodies` — the JSON bodies Jackson
+  handles: the getters of a `@ResponseBody`/`@RestController` handler's
+  return type and the no-argument constructor and setters of a
+  `@RequestBody` parameter's type, recursively over application types
+  (generic element types such as `List<Item>`, field access, builders and
+  mix-ins are not modeled). Log line `spring web body roots: N methods (…)`.
+  Real-JVM oracle `testdata/mvc` (`scripts/mvc-oracle.sh`, `TestMVCOracle`):
+  an embedded Tomcat 9.0.45 runs a `DispatcherServlet` and real HTTP
+  requests reach the controllers — before, 14 of the 26 application bodies
+  the JVM ran were unreached, now all 26; an unmapped public method stays
+  unreached, while a controller outside the component scan is reached (the
+  profile does not read the scan). Reference apps: no verdict changed in
+  12 configurations; under `-roots profile` 3 petclinic paths now start at
+  the `@InitBinder` method and 2 WebGoat paths at
+  `MvcConfiguration#addViewControllers` (petclinic 1, WebGoat 35 web body
+  roots); `-roots all` byte-identical.
   The profile system itself (auto-detection and merging, `-roots profile`,
   synthetic edges, the conditional jackson-databind rule,
   `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`/
-  `roots.handlers`/`roots.beans`,
+  `roots.handlers`/`roots.beans`/`roots.web_bodies`,
   including CDI's `@Observes`) is implemented (see step 7 above); there is
   no `--max-dep-depth`. See [PLAN.md](PLAN.md)'s Phase 7 for what's left.
 - **An EAR's own top-level modules are never read as app code**, only as
