@@ -35,6 +35,7 @@ import (
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/methodhandle"
+	"ariadne/internal/profile"
 	"ariadne/internal/proxycatalog"
 	"ariadne/internal/pta"
 	"ariadne/internal/reach"
@@ -99,6 +100,10 @@ func algorithmVersions(mode string) map[string]string {
 		"jpa.objects": jpadispatch.Version,
 		// Framework proxies: creator-gated edges in every mode.
 		"framework.proxies": proxycatalog.Version,
+		// FRAMEWORKS F5 f5-1: the rules that turn a profile into roots and
+		// framework facts, and the built-in profiles' own content.
+		"profile.rules":   profile.RulesVersion,
+		"profile.builtin": profile.BuiltinDigest(),
 		// Spring application events: creator-gated edges in every mode.
 		"spring.events": springevents.Version,
 		// Spring AOP advice: creator-gated edges in every mode.
