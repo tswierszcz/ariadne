@@ -24,6 +24,12 @@ roots:
     - org.springframework.scheduling.annotation.Schedules
     - org.springframework.context.event.EventListener
     - org.springframework.context.annotation.Bean
+    # Spring MVC calls these around a controller's handlers through
+    # InvocableHandlerMethod → Method#invoke (FRAMEWORKS F5 f5-2,
+    # testdata/mvc): an exception handler, model attributes, binder setup.
+    - org.springframework.web.bind.annotation.ExceptionHandler
+    - org.springframework.web.bind.annotation.ModelAttribute
+    - org.springframework.web.bind.annotation.InitBinder
     # Message listeners: the broker's listener container calls them
     # (through MessagingMessageListenerAdapter → InvocableHandlerMethod →
     # Method#invoke) — entry points like an HTTP mapping. A class-level
@@ -38,12 +44,43 @@ roots:
     - org.springframework.amqp.rabbit.annotation.RabbitListener
     - org.springframework.amqp.rabbit.annotation.RabbitListeners
     - org.springframework.amqp.rabbit.annotation.RabbitHandler
-  overrides: []
+  # Spring MVC's configuration calls every WebMvcConfigurer bean's
+  # callbacks (DelegatingWebMvcConfiguration, also under Spring Boot), and
+  # the DispatcherServlet calls registered interceptors around each handler
+  # (FRAMEWORKS F5 f5-2, testdata/mvc). An interceptor class nothing
+  # registers is still a root — a stated over-approximation.
+  overrides:
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configurePathMatch
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configureContentNegotiation
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configureAsyncSupport
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configureDefaultServletHandling
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addFormatters
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addInterceptors
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addResourceHandlers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addCorsMappings
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addViewControllers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configureViewResolvers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addArgumentResolvers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addReturnValueHandlers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configureMessageConverters
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#extendMessageConverters
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#configureHandlerExceptionResolvers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#extendHandlerExceptionResolvers
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#getValidator
+    - org.springframework.web.servlet.config.annotation.WebMvcConfigurer#getMessageCodesResolver
+    - org.springframework.web.servlet.HandlerInterceptor#preHandle
+    - org.springframework.web.servlet.HandlerInterceptor#postHandle
+    - org.springframework.web.servlet.HandlerInterceptor#afterCompletion
+    - org.springframework.web.servlet.AsyncHandlerInterceptor#afterConcurrentHandlingStarted
   main: true
   # The container's reflective calls into its beans: the constructor it
   # picks, injection methods, @PostConstruct/@PreDestroy, a @Bean's
   # initMethod/destroyMethod (ROADMAP B4 b4-7, testdata/di).
   beans: true
+  # The JSON bodies Jackson reads and writes for Spring MVC handlers:
+  # getters of a @ResponseBody return type, constructor and setters of a
+  # @RequestBody parameter type (FRAMEWORKS F5 f5-2, testdata/mvc).
+  web_bodies: true
 framework_packages:
   - org.apache.tomcat.embed:*
   - org.springframework:spring-web

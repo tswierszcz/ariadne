@@ -137,6 +137,11 @@ type Roots struct {
 	// initMethod/destroyMethod — are roots, in both -roots scenarios. See
 	// BeanLifecycleRoots.
 	Beans bool `yaml:"beans"`
+	// WebBodies: the JSON bodies Spring MVC reads and writes through Jackson
+	// — getters of what a @ResponseBody handler returns, the constructor and
+	// setters of a @RequestBody parameter's type — are roots, in both -roots
+	// scenarios (FRAMEWORKS F5 f5-2). See WebBodyRoots.
+	WebBodies bool `yaml:"web_bodies"`
 }
 
 // Handler is one convention: in an app class that is Implements or one of
