@@ -132,7 +132,7 @@ func ResolveThroughParameters(h *hierarchy.Hierarchy, idx *dataflow.CallerIndex,
 		}
 		for _, t := range targets {
 			r := base
-			r.OwnerFQCN, r.MethodName, r.ParamTypes = t.OwnerFQCN, t.Name, t.ParamTypes
+			r.OwnerFQCN, r.MethodName, r.ParamTypes, r.Declared = t.OwnerFQCN, t.Name, t.ParamTypes, t.Declared
 			out = append(out, r)
 			stats.Targets++
 		}

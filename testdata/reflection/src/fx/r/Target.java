@@ -9,4 +9,7 @@ public class Target {
     public void viaField() { Ran.here(); }
     public void twoArgs(String a, String b) { Ran.here(); }
     public void chosenAtRunTime() { Ran.here(); }
+    public void lookedUp() { Ran.here(); }
+    void packagePrivate() { Ran.here(); }
+    private void locked() { Ran.here(); }
 }

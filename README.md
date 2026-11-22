@@ -2809,6 +2809,16 @@ report:
   edges on petclinic / WebGoat / JPetStore; v1 results byte-identical with
   and without them in all 12 configurations (`-roots profile`/`all` ×
   CHA/RTA).
+  A seventh slice, REFLECTION R4 (`r4-2`, 2026-11-22): a lookup the JVM
+  itself rejects with `NoSuchMethodException` — `getMethod` of a
+  non-public method, `getDeclaredMethod` of an inherited one,
+  `getConstructor` of a non-public constructor — is checked on the class
+  the lookup was made on and gives a `reflection` gap instead of an edge
+  (it gave a false edge before). `setAccessible` is not tracked, so a
+  private method invoked without it keeps its edge (an extra edge, never a
+  missed one). The real-JVM oracle adds these cases and a lookup with no
+  `invoke`; on petclinic / WebGoat / JPetStore no edge changes and v1
+  results are byte-identical in all 12 configurations.
 - **Seven profiles exist: `spring`, `servlet`, `jakarta`, `micronaut`,
   `quarkus`, `stripes` and `generic`** — every framework PLAN.md section 4
   originally named for Phase 7, the `spring`/`generic` pair from the base

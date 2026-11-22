@@ -100,6 +100,16 @@ func (h *Hierarchy) ResolveByParams(fqcn, name string, paramDescs []string) (dec
 	})
 }
 
+// ResolvePublicByParams is ResolveByParams restricted to public methods:
+// the classes and interfaces `Class#getMethod` searches, skipping a
+// non-public method with the same name and parameters (REFLECTION R4).
+func (h *Hierarchy) ResolvePublicByParams(fqcn, name string, paramDescs []string) (declaringClass string, found bool) {
+	return h.resolveBy(fqcn, func(ci *ClassInfo) bool {
+		m, ok := ci.MethodByNameAndParams(name, paramDescs)
+		return ok && m.IsPublic()
+	})
+}
+
 // ResolveField finds which class/interface actually declares a field
 // with this exact name and descriptor, following the JVM's own field
 // resolution order (JVMS 5.4.3.2) — deliberately *not* the same order as

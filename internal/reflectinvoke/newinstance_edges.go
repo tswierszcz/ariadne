@@ -72,6 +72,10 @@ func FindNewInstanceEdges(h *hierarchy.Hierarchy, resolved []ResolvedNewInstance
 		if !found {
 			r.Gap = fmt.Sprintf("%s does not declare a constructor with %d parameter(s) matching these types",
 				ri.OwnerFQCN, len(paramDescs))
+		} else if !ri.Declared && !ctor.IsPublic() {
+			// getConstructor sees public constructors only: the JVM throws
+			// NoSuchMethodException and newInstance never runs (REFLECTION R4).
+			r.Gap = fmt.Sprintf("getConstructor finds public constructors only; %s's matching constructor is not public", ri.OwnerFQCN)
 		} else {
 			r.TargetDesc = ctor.Descriptor
 		}

@@ -82,6 +82,12 @@ func FindInvokeEdges(h *hierarchy.Hierarchy, resolved []ResolvedInvoke) []Invoke
 			continue
 		}
 
+		if gap := lookupRejected(h, ri, paramDescs); gap != "" {
+			r.Gap = gap
+			out = append(out, r)
+			continue
+		}
+
 		dispatchRoot := ri.OwnerFQCN
 		if ri.ObjType != "" {
 			dispatchRoot = ri.ObjType
@@ -96,6 +102,33 @@ func FindInvokeEdges(h *hierarchy.Hierarchy, resolved []ResolvedInvoke) []Invoke
 		out = append(out, r)
 	}
 	return out
+}
+
+// lookupRejected reports why the JVM's own lookup — getMethod or
+// getDeclaredMethod on OwnerFQCN — throws NoSuchMethodException for this
+// name and parameter types, or "" when it succeeds or cannot be decided
+// (REFLECTION R4). The lookup is checked on the class it was performed on,
+// before dispatch: getDeclaredMethod sees only the methods OwnerFQCN
+// declares itself, getMethod only public ones (inherited included). Only
+// a proven rejection counts: when OwnerFQCN's hierarchy does not declare
+// the method anywhere the analysis can see (a class outside the analyzed
+// universe), the lookup is left to dispatch as before.
+func lookupRejected(h *hierarchy.Hierarchy, ri ResolvedInvoke, paramDescs []string) string {
+	declaring, found := h.ResolveByParams(ri.OwnerFQCN, ri.MethodName, paramDescs)
+	if !found {
+		return ""
+	}
+	if ri.Declared {
+		if declaring != ri.OwnerFQCN {
+			return fmt.Sprintf("getDeclaredMethod sees only methods %s declares itself; %q is inherited from %s",
+				ri.OwnerFQCN, ri.MethodName, declaring)
+		}
+		return ""
+	}
+	if _, ok := h.ResolvePublicByParams(ri.OwnerFQCN, ri.MethodName, paramDescs); !ok {
+		return fmt.Sprintf("getMethod finds public methods only; %s's %q is not public", declaring, ri.MethodName)
+	}
+	return ""
 }
 
 // InvokeEdge is one (invoke call site, target method name) pair
@@ -133,7 +166,10 @@ func EdgeTargets(results []InvokeEdgeResult) []InvokeEdge {
 
 // Version names the base reflection rules (REFLECTION R0–R2:
 // Method#invoke and Class/Constructor#newInstance edges; R4 r4-1:
-// Class.forName initialization edges); the R3 steps carry their own
+// Class.forName initialization edges; R4 r4-2: lookups the JVM rejects
+// with NoSuchMethodException — getMethod of a non-public method,
+// getDeclaredMethod of an inherited one, getConstructor of a non-public
+// constructor — give a gap, not an edge); the R3 steps carry their own
 // versions. A snapshot records it (ROADMAP B3 b3-4); bump it with any
 // change to these rules.
-const Version = "r4-1"
+const Version = "r4-2"
