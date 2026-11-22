@@ -284,6 +284,14 @@ that one piece.
   CVE-2020-26945 and CVE-2022-41853 become `REACHABLE` under
   `-roots profile` (as under `-roots all`), and v1 under `-roots all` and
   on petclinic/WebGoat is byte-identical.
+- **`@Profile("eu & cloud")` and qualifiers by default name work**
+  (2026-11-22, FRAMEWORKS F5 `f5-3`). Running the DI oracle a second time
+  with profiles active showed two beans the container created but the
+  analysis thought inactive: their `@Profile` used Spring 5.1's expression
+  syntax (`&`, `|`), which was read as one profile name. The same oracle
+  showed the report naming the wrong injected bean for a `@Qualifier` that
+  matches a bean's default name or a `@Qualifier` on the bean class. Both
+  are fixed; no reference app uses either, so nothing changed there.
 - **Spring MVC's calls around a controller are roots** (2026-11-22,
   FRAMEWORKS F5 `f5-2`). Mapped handlers were always roots, but Spring MVC
   also calls `@ExceptionHandler`, `@ModelAttribute` and `@InitBinder`

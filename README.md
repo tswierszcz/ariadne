@@ -2893,7 +2893,12 @@ report:
   12 configurations; under `-roots profile` 3 petclinic paths now start at
   the `@InitBinder` method and 2 WebGoat paths at
   `MvcConfiguration#addViewControllers` (petclinic 1, WebGoat 35 web body
-  roots); `-roots all` byte-identical.
+  roots); `-roots all` byte-identical. Since `f5-3` a `@Profile` value is
+  evaluated as a Spring 5.1+ profile expression (`!`, `&`, `|`,
+  parentheses), and the report's DI resolution matches a `@Qualifier`
+  against a bean's explicit or default name and its own `@Qualifier` (no
+  match: unresolved instead of the `@Primary` bean); the DI oracle runs in
+  two profile scenarios and checks every injected bean against the JVM.
   The profile system itself (auto-detection and merging, `-roots profile`,
   synthetic edges, the conditional jackson-databind rule,
   `roots.overrides`/`roots.annotations`/`roots.parameter_annotations`/

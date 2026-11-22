@@ -17,7 +17,7 @@ import (
 // rulesSourceDigest is ruleSourceDigest's value for RulesVersion. A change
 // to the rule code (comments aside) changes it: bump RulesVersion, then
 // update this value to the one the failure prints.
-const rulesSourceDigest = "398baee861dd5605"
+const rulesSourceDigest = "f66d40c6b8e8ba1c"
 
 // ruleSourceDigest hashes the non-test Go files of the packages whose rules
 // RulesVersion names, parsed without comments and printed back, so a

@@ -166,7 +166,33 @@ type BeanName struct {
 	// here, since that derivation needs no annotation value at all).
 	Name    string
 	Primary bool
+	// Qualifier is the class-level @Qualifier value of a stereotype bean
+	// (or a @Bean method's own @Qualifier), "" when none: Spring matches
+	// an injection point's @Qualifier against it as well as against the
+	// bean's name (FRAMEWORKS F5 f5-3).
+	Qualifier string
 }
+
+// EffectiveName is the bean's name in the container: the explicit Name,
+// else the stereotype default Spring's AnnotationBeanNameGenerator derives
+// — the simple class name, decapitalized as java.beans.Introspector does
+// (unchanged when its first two letters are both upper case).
+func (b BeanName) EffectiveName() string {
+	if b.Name != "" {
+		return b.Name
+	}
+	short := b.FQCN[strings.LastIndexByte(b.FQCN, '.')+1:]
+	short = strings.ReplaceAll(short, "$", ".")
+	if short == "" {
+		return ""
+	}
+	if len(short) > 1 && isUpper(short[0]) && isUpper(short[1]) {
+		return short
+	}
+	return strings.ToLower(short[:1]) + short[1:]
+}
+
+func isUpper(c byte) bool { return c >= 'A' && c <= 'Z' }
 
 // BeanNames finds every @Component-family stereotype on h's
 // application classes, with its own declared name (if any) and
@@ -195,9 +221,10 @@ func BeanNames(h *hierarchy.Hierarchy) []BeanName {
 			continue
 		}
 		out = append(out, BeanName{
-			FQCN:    fqcn,
-			Name:    name,
-			Primary: hasAny(ci.Annotations, []string{"org.springframework.context.annotation.Primary"}),
+			FQCN:      fqcn,
+			Name:      name,
+			Primary:   hasAny(ci.Annotations, []string{"org.springframework.context.annotation.Primary"}),
+			Qualifier: qualifierValue(ci.AnnotationDetails),
 		})
 	}
 	return out
@@ -288,9 +315,10 @@ func BeanMethods(h *hierarchy.Hierarchy) []BeanName {
 				name = names[0]
 			}
 			out = append(out, BeanName{
-				FQCN:    retType,
-				Name:    name,
-				Primary: hasAnnotationType(m.AnnotationDetails, "org.springframework.context.annotation.Primary"),
+				FQCN:      retType,
+				Name:      name,
+				Primary:   hasAnnotationType(m.AnnotationDetails, "org.springframework.context.annotation.Primary"),
+				Qualifier: qualifierValue(m.AnnotationDetails),
 			})
 		}
 	}
@@ -373,13 +401,14 @@ func profileCondition(anns []classfile.Annotation, active map[string]bool, fqcn,
 		if active != nil {
 			cond = ConditionFalse
 			for _, n := range names {
-				neg := strings.HasPrefix(n, "!")
-				bare := strings.TrimPrefix(n, "!")
-				if neg && !active[bare] {
-					cond = ConditionTrue
+				v, ok := evalProfileExpression(n, active)
+				if !ok {
+					// Spring rejects a malformed expression at startup; never
+					// guess which way it goes.
+					cond = ConditionUnknown
 					break
 				}
-				if !neg && active[bare] {
+				if v {
 					cond = ConditionTrue
 					break
 				}
@@ -388,6 +417,88 @@ func profileCondition(anns []classfile.Annotation, active map[string]bool, fqcn,
 		return ProfileCondition{FQCN: fqcn, Method: method, Names: names, Active: cond}, true
 	}
 	return ProfileCondition{}, false
+}
+
+// evalProfileExpression evaluates one @Profile value the way Spring 5.1+'s
+// Profiles.of does (FRAMEWORKS F5 f5-3): a profile name, "!" negation, "&"
+// and "|" with parentheses — "eu & cloud", "eu | us", "!(eu & legacy)". As
+// in Spring, "&" and "|" may not be mixed without parentheses. ok is false
+// for an expression Spring would reject.
+func evalProfileExpression(expr string, active map[string]bool) (v, ok bool) {
+	var toks []string
+	cur := ""
+	flush := func() {
+		if cur != "" {
+			toks = append(toks, cur)
+			cur = ""
+		}
+	}
+	for _, r := range expr {
+		switch {
+		case r == '(' || r == ')' || r == '&' || r == '|' || r == '!':
+			flush()
+			toks = append(toks, string(r))
+		case r == ' ' || r == '\t':
+			flush()
+		default:
+			cur += string(r)
+		}
+	}
+	flush()
+	pos := 0
+	var parseExpr func() (bool, bool)
+	var parseTerm func() (bool, bool)
+	parseTerm = func() (bool, bool) {
+		if pos >= len(toks) {
+			return false, false
+		}
+		t := toks[pos]
+		pos++
+		switch t {
+		case "!":
+			v, ok := parseTerm()
+			return !v, ok
+		case "(":
+			v, ok := parseExpr()
+			if !ok || pos >= len(toks) || toks[pos] != ")" {
+				return false, false
+			}
+			pos++
+			return v, true
+		case ")", "&", "|":
+			return false, false
+		}
+		return active[t], true
+	}
+	parseExpr = func() (bool, bool) {
+		v, ok := parseTerm()
+		if !ok {
+			return false, false
+		}
+		op := ""
+		for pos < len(toks) && (toks[pos] == "&" || toks[pos] == "|") {
+			if op != "" && toks[pos] != op {
+				return false, false
+			}
+			op = toks[pos]
+			pos++
+			w, ok := parseTerm()
+			if !ok {
+				return false, false
+			}
+			if op == "&" {
+				v = v && w
+			} else {
+				v = v || w
+			}
+		}
+		return v, true
+	}
+	v, ok = parseExpr()
+	if !ok || pos != len(toks) {
+		return false, false
+	}
+	return v, true
 }
 
 // annValue is Annotation.Value without the ok bool, for a call site
