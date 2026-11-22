@@ -275,19 +275,26 @@ func ResolveInjections(h *hierarchy.Hierarchy, points []InjectionPoint, beans []
 	return out
 }
 
-// disambiguate picks the one candidate a @Qualifier match or a unique
-// @Primary settles on, or reports why neither did.
+// disambiguate picks the one candidate Spring settles on: with a
+// @Qualifier, the candidates whose name (explicit or default) or own
+// @Qualifier equals it — none means Spring fails to start, so nothing is
+// picked (FRAMEWORKS F5 f5-3: falling back to @Primary there named a bean
+// the container never injects); then a unique @Primary.
 func disambiguate(candidates []string, byFQCN map[string]BeanName, qualifier string) (resolved, reason string) {
 	if qualifier != "" {
 		var matches []string
 		for _, c := range candidates {
-			if byFQCN[c].Name == qualifier {
+			if b := byFQCN[c]; b.EffectiveName() == qualifier || b.Qualifier == qualifier {
 				matches = append(matches, c)
 			}
 		}
-		if len(matches) == 1 {
+		switch len(matches) {
+		case 0:
+			return "", fmt.Sprintf("%d candidates, none named or qualified %q", len(candidates), qualifier)
+		case 1:
 			return matches[0], ""
 		}
+		candidates = matches
 	}
 	var primaries []string
 	for _, c := range candidates {

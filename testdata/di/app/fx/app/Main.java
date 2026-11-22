@@ -12,11 +12,17 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
  * constructors, injection methods, lifecycle annotations and callback
  * interfaces through reflection or its own interfaces; each of those bodies
  * records the whole stack. scripts/di-oracle.sh writes the record,
- * cmd/ariadne TestDIOracle compares the graph with it.
+ * cmd/ariadne TestDIOracle compares the graph with it. The arguments, if
+ * any, are the active profiles (FRAMEWORKS F5 f5-3: a second scenario).
  */
 public final class Main {
     public static void main(String[] args) {
-        AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(AppConfig.class);
+        AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
+        if (args.length > 0) {
+            ctx.getEnvironment().setActiveProfiles(args);
+        }
+        ctx.register(AppConfig.class);
+        ctx.refresh();
         String greeting = ctx.getBean(Greeter.class).greet();
         ctx.publishEvent(new Tick());
         ctx.close();
