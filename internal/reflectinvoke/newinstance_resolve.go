@@ -25,6 +25,9 @@ type ResolvedNewInstance struct {
 	// OwnerFQCN/ParamTypes are ReflectiveConstructorValue's own fields.
 	OwnerFQCN  string
 	ParamTypes []string
+	// Declared: getDeclaredConstructor (true) or getConstructor (false,
+	// public constructors only — REFLECTION R4).
+	Declared bool
 	// ArgCount/ArgCountKnown report the literal `Object[]` argument
 	// array's own length when REFLECTION R1's same KindArray literal-
 	// construction tracking proves it (or 0/true for a null args
@@ -125,6 +128,7 @@ func resolveOneNewInstance(h *hierarchy.Hierarchy, fqcn string, s NewInstanceSit
 	case valueflow.KindReflectiveConstructor:
 		ri.OwnerFQCN = val.ReflectiveConstructor.OwnerFQCN
 		ri.ParamTypes = val.ReflectiveConstructor.ParamTypes
+		ri.Declared = val.ReflectiveConstructor.Declared
 	case valueflow.KindUnknown:
 		ri.UnresolvedReason = "the receiver is unknown: " + val.Reason
 		return ri, warnings

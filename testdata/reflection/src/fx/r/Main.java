@@ -4,7 +4,7 @@ import fx.trace.Ran;
 import java.lang.reflect.Method;
 
 /**
- * REFLECTION R0–R2 oracle (ROADMAP B4): each case is one method, run on
+ * REFLECTION R0–R2 and R4 oracle (ROADMAP B4): each case is one method, run on
  * the real JVM by main; scripts/reflection-oracle.sh records which bodies
  * ran, and cmd/ariadne TestReflectionOracle compares the call graph with
  * that record.
@@ -97,6 +97,53 @@ public final class Main {
         Class.forName("fx.r.MaybeInited", init, Main.class.getClassLoader());
     }
 
+    // Negative (R4): the lookup alone — possession of a Method is not
+    // invocation; lookedUp never runs.
+    static void lookupOnly() throws Exception {
+        Target.class.getMethod("lookedUp");
+    }
+
+    // Negative (R4): getMethod sees public methods only — the JVM throws
+    // NoSuchMethodException and packagePrivate never runs.
+    static void getMethodNotPublic() throws Exception {
+        try {
+            Target.class.getMethod("packagePrivate").invoke(new Target());
+        } catch (NoSuchMethodException expected) {
+            // the lookup failed
+        }
+    }
+
+    // Negative (R4): getDeclaredMethod sees only what Sub declares itself;
+    // baseOnly is inherited, so the JVM throws NoSuchMethodException.
+    static void declaredInherited() throws Exception {
+        try {
+            Sub.class.getDeclaredMethod("baseOnly").invoke(new Sub());
+        } catch (NoSuchMethodException expected) {
+            // the lookup failed
+        }
+    }
+
+    // Negative (R4): getConstructor sees public constructors only.
+    static void constructorNotPublic() throws Exception {
+        try {
+            Hidden.class.getConstructor().newInstance();
+        } catch (NoSuchMethodException expected) {
+            // the lookup failed
+        }
+    }
+
+    // Accepted over-approximation (R4): a private method found by
+    // getDeclaredMethod but invoked without setAccessible(true) — the JVM
+    // throws IllegalAccessException. The model does not track setAccessible
+    // and keeps the edge: an extra edge, never a missed one.
+    static void privateWithoutAccess() throws Exception {
+        try {
+            Target.class.getDeclaredMethod("locked").invoke(new Target());
+        } catch (IllegalAccessException expected) {
+            // the access check failed
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         forNameInit();
         forNameNoInit();
@@ -109,6 +156,11 @@ public final class Main {
         cachedInField();
         constructor();
         wrongArity();
+        lookupOnly();
+        getMethodNotPublic();
+        declaredInherited();
+        constructorNotPublic();
+        privateWithoutAccess();
         nameFromInput(args.length > 0 ? args[0] : "chosenAtRunTime");
         System.out.println("# method bodies that ran on the real JVM (owner#name+desc)");
         for (String b : Ran.bodies) {

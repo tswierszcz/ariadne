@@ -23,6 +23,11 @@ type ResolvedInvoke struct {
 	// RequestedOwner).
 	OwnerFQCN, MethodName string
 	ParamTypes            []string
+	// Declared is ReflectiveMethodValue's own Declared: the Method came
+	// from getDeclaredMethod (true) or getMethod (false). FindInvokeEdges
+	// uses it to drop a lookup the JVM itself would reject with
+	// NoSuchMethodException (REFLECTION R4).
+	Declared bool
 	// ObjType is the invocation target's own concrete allocation type
 	// (valueflow.KindAlloc's Type) when provable — real dispatch should
 	// resolve against this, not blindly against OwnerFQCN, which may
@@ -152,6 +157,7 @@ func resolveOne(h *hierarchy.Hierarchy, fqcn string, s InvokeSite, facts *datafl
 		ri.OwnerFQCN = val.ReflectiveMethod.OwnerFQCN
 		ri.MethodName = val.ReflectiveMethod.Name
 		ri.ParamTypes = val.ReflectiveMethod.ParamTypes
+		ri.Declared = val.ReflectiveMethod.Declared
 	case valueflow.KindUnknown:
 		ri.UnresolvedReason = "the receiver is unknown: " + val.Reason
 		return ri, warnings

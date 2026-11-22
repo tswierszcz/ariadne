@@ -41,13 +41,6 @@ Zależności: DATA_FLOW D3, FRAMEWORK F1 dla scenariuszy konfiguracji; MODULE da
 
 Gotowe: aktywny profil, dwie nazwy i odmowa dostępu nie są mylone ze stałą jednego celu.
 
-## R4. Kwalifikacja i integracja
-
-**Ocena 2026-11-21:** integracja z `internal/reach` (B0 `b0-1`…`b0-5`), wersje w snapshotach (`b3-4`) i wyrocznia JVM (`b4-1`) już są; zostaje `Class.forName` → `<clinit>` (inicjalizacja przez refleksję niemodelowana) i przypadki fixtures: `initialize` true/false, samo wyszukanie, niedostępna metoda. Selektywność reguły luk (29/29 `NOT_REACHABLE` oznaczonych na petclinic) nie zależy od R4. Zob. IMPLEMENTATION_STATUS. **`r4-1` DONE (2026-11-21):** `Class.forName` → `<clinit>` z przypadkami true/false/nadklasa/niestały w wyroczni JVM; zostają przypadki fixtures: samo wyszukanie, niedostępna metoda.
-
-- Fixtures obejmują inicjalizację true/false, samo wyszukanie, invoke, konstruktor, dziedziczenie, overload, factory, nieznany parametr i niedostępną metodę.
-- W `internal/reach` i raporcie przenieść wpływ unresolved sites zgodnie z B0; nie globalnie wyciszać wszystkich CVE ani udawać, że luka jest nieistotna.
-- Wersjonować modele i dołączyć ich wejścia do snapshotów CVE F3.
-- Wykonać kontrole B4 i udokumentować pokrycie według API/wersji; pomiary jakości przed rozszerzaniem heurystyk.
+## R4. Kwalifikacja i integracja — DONE (2026-11-22, `r4-1`, `r4-2`; [zarchiwizowane](../archive/2026-11-22/reflection/REFLECTION_R4.md))
 
 Poza pierwszym zakresem: dowolne runtime-computed nazwy, pełna logika security/loaderów oraz utożsamianie obserwacji z deklaracją. MethodHandle ma własny plan DYNAMIC_LINKAGE, korzystający z tych samych wartości.
