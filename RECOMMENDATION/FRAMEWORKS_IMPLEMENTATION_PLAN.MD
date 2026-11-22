@@ -62,6 +62,8 @@ Gotowe: lista wspieranych wejść jest wersjonowana; nowe wejścia nie zmieniaj�
 
 ## F5. Kwalifikacja
 
+**Ocena 2026-11-22:** z 11 przypadków fixtures 5 pokrytych wyroczniami B4, 3 częściowo, 3 bez pokrycia (`testdata/di`, `xmlbeans`, `aop`, `tx`, `jpa`, `springdata`, `mybatis`, `servletdispatch`); brakuje kontrolera za `DispatcherServlet`, konsumenta wiadomości, qualifier/`@Primary`, dwóch scenariuszy profili i priorytetów konfiguracji; reguły korzeni/profili nie mają wersji w snapshotcie. Proponowane przyrosty `f5-1`…`f5-3` — zob. IMPLEMENTATION_STATUS.
+
 - Fixtures: adnotacje z wartościami i defaults, złożony marker, parametry, XML, priorytety configu, qualifier, dwa profile, proxy, self-invocation, kontener przed kontrolerem i konsument wiadomości.
 - Porównać w kontrolowanym uruchomieniu rzeczywiste beany/endpointy z modelem na kilku scenariuszach; nie przenosić wniosków między wersjami bez sprawdzenia.
 - Raportować liczbę reguł, wiązań, nieznanych warunków i nierozstrzygniętych wejść. Zapis scenariusza i modeli w snapshotcie jest obowiązkowy.
