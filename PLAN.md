@@ -1349,7 +1349,7 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
    actually matters in practice (the Phase 8 `-framework-check` run against petclinic
    already surfaced one concrete candidate: the `StandardHost`/`StandardPipeline`/
    `LifecycleBase` CHA artifact). **Superseded in detail by
-   [RECOMMENDATION/GRAPH_PRECISION.MD](RECOMMENDATION/GRAPH_PRECISION.MD)** (tracks P0–P4,
+   [RECOMMENDATION/GRAPH_PRECISION.MD](archive/2026-11-23/graph_precision/GRAPH_PRECISION.MD)** (tracks P0–P4,
    including the allocation-driven version of this same idea) — start new work there.
 5. **JDK-itself CVEs, not just Maven-dependency CVEs.** OSV's Maven ecosystem covers
    libraries resolved via GAV; it does not cover CVEs in the JDK's own classes
