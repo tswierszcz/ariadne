@@ -68,6 +68,10 @@ type Document struct {
 	// deployed on, as described by -jdk-home/-runtime-file, and whether
 	// its own advisories were assessed.
 	TargetRuntime *TargetRuntime `json:"target_runtime,omitempty"`
+	// Frameworks (additive): the profile's framework facts — beans,
+	// @Profile conditions, injection points, entry points, framework
+	// roots. Never part of reachability.
+	Frameworks *Frameworks `json:"frameworks,omitempty"`
 }
 
 // Runtime assessment states.

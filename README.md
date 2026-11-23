@@ -2081,7 +2081,7 @@ Flags:
 | `-taint` | no | DATA_FLOW D4 taint pilot (opt-in, default off, report-only): assess whether request data (Spring MVC / JAX-RS handler parameters, `ServletRequest` accessors) reaches the data each deserialization entry reads — see "Request data reaching the entries". Never changes a verdict. |
 | `-out` | yes | `report.md` output path. |
 | `-json` | yes | `results.json` output path. |
-| `-json-format` | no | `v1` (default: one row per advisory) or `v2` (CVE:F1c: components, one finding per advisory × component instance, coverage, inputs reference — schema in [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §5). |
+| `-json-format` | no | `v1` (default: one row per advisory) or `v2` (CVE:F1c: components, one finding per advisory × component instance, coverage, inputs reference — schema in [docs/RESULTS_CONTRACT.MD](docs/RESULTS_CONTRACT.MD) §5). Since 2026-11-23 v2 also carries `frameworks`: the profile's beans, `@Profile` conditions, injection points and their resolution, entry points and framework roots (facts only, never part of reachability). |
 | `-cache-dir` | no | Disk cache directory for OSV/GitHub HTTP responses (default `.cache`). |
 | `-offline` | no | Serve only from the cache; a miss is a clear, immediate error. Old data is used with a warning (see `-max-data-age`). |
 | `-data-ttl` | no | How long an OSV/advisory response counts as fresh before it is fetched again (default `24h`). |

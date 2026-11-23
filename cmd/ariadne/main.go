@@ -1441,8 +1441,9 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	// FRAMEWORKS F5 f5-2: the JSON bodies Spring MVC hands to Jackson, which
 	// calls the application's getters, constructors and setters reflectively.
+	var bodyRoots []profile.WebBodyRoot
 	if prof.Roots.WebBodies {
-		bodyRoots := profile.WebBodyRoots(h)
+		bodyRoots = profile.WebBodyRoots(h)
 		var added int
 		roots, added = appendNewRoots(roots, profile.WebBodyAppRoots(g, bodyRoots))
 		log("spring web body roots: %d methods (%s), %d new roots", len(bodyRoots), webBodySummary(bodyRoots), added)
@@ -2001,6 +2002,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
 	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
+	doc.Frameworks = resultsv2.BuildFrameworks(resultsv2.FrameworksInputs{
+		Profile: prof.Name, ActiveProfiles: activeProfiles,
+		Stereotypes: springBeanNames, BeanMethods: springBeanMethods, Repositories: springRepositoryBeans,
+		Conditions: springProfileConditions, Injections: resolvedInjections, Entries: externalEntries,
+		LifecycleRoots: beanRoots, WebBodyRoots: bodyRoots,
+	})
 	doc.Coverage.Gaps = runGapList
 	doc.Coverage.GapProbe = gapProbe
 	doc.Coverage.UnboundedSites = unboundedSummary
