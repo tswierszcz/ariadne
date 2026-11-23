@@ -31,6 +31,15 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### FRAMEWORKS — fakty frameworka w v2 JSON (`frameworks`) — DONE (2026-11-23)
+
+- **Zakres:** luka odnotowana w ocenie F5 — fakty profilu były tylko w logu i `report.md`. Nowa addytywna sekcja v2 `frameworks` (`internal/resultsv2/frameworks.go`, `resultsv2.BuildFrameworks`): `profile`, `rules_version`, `active_profiles`; `beans[]` (nazwa w kontenerze — jawna albo domyślna, źródło `stereotype`/`bean_method`/`repository`, `primary`, `qualifier`), `conditions[]` (`@Profile` i stan), `injections[]` (punkt, typ, qualifier, `@Value`, `resolved`, kandydaci, powód), `entries[]` (wejścia zewnętrzne), `roots[]` (korzenie cyklu życia beanów, XML i ciał Spring MVC z pochodzeniem), `summary`. Listy sortowane; `schema_version` bez zmian (jak `deserialization`, `callgraph`, `target_runtime`). Nigdy część `reachability` ani wiersza v1.
+- **Test:** `TestV2Frameworks` — przebieg `-json-format v2` na `testdata/di`: 4 wstrzyknięcia `Shop` zgodne z tym, co wstrzyknął JVM (wyrocznia `f5-3`), stany `@Profile` przy `-active-profiles default`, bean z nazwą domyślną, liczniki, dwa przebiegi bajtowo identyczne w sekcji.
+- **Aplikacje referencyjne (`main` vs gałąź, `-roots profile`, v2):** dokument poza `frameworks` (i `analysis_id`/`tool`) identyczny na wszystkich trzech. Sekcja: petclinic 9,6 KB (12 beanów, 8/8 wstrzyknięć, 17 mapowań HTTP, 9 korzeni), WebGoat 116 KB (172 beany, 118 punktów: 93 rozwiązane, 19 `@Value`, 6 nierozstrzygniętych; 159 mapowań; 199 korzeni), JPetStore 5 KB (3 beany, 8 punktów nierozstrzygniętych — beany z XML nie są w katalogu wstrzyknięć; 6 wejść `web.xml`, 8 korzeni).
+- **Weryfikacja:** `go test ./...`, `go vet ./...`. Dokumentacja: `docs/RESULTS_CONTRACT.MD` (wiersz `frameworks`), README (`-json-format`), SUPPORT.MD („Profiles and selected roots”).
+- **Ograniczenia:** beany z XML Springa nie biorą udziału w rozwiązywaniu wstrzyknięć (JPetStore: 8 nierozstrzygniętych); kandydaci niefiltrowani przez `@Profile`; sekcja nie zależy od `-roots` (te same fakty w obu scenariuszach).
+- **Następny krok:** raport zbiorczy floty (`ariadne-fleet`, plan CI — grudzień) może czytać `frameworks.summary`.
+
 ### ROADMAP:B1 i B2 — ocena (2026-11-23) — oba spełnione przez istniejący kod
 
 - **B2 (wspólna reprezentacja kodu i wartości) → DONE**, wykonany przez DATA_FLOW D0–D5 (zamknięty 2026-11-07):
