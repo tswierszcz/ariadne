@@ -53,7 +53,10 @@ const runtimeNotDescribed = "no target runtime described (-jdk-home or -runtime-
 // assessTargetRuntime runs the runtime advisory provider (CVE:F8b); nil
 // without a runtime.
 // A catalogFile replaces the embedded catalog; its version is returned.
-func assessTargetRuntime(r *runtimeinfo.Runtime, catalogFile string) (*runtimevuln.Assessment, string, error) {
+// now dates the catalog-age note: the wall clock, or a replayed snapshot's
+// creation time, so a replay gives the recorded run's content (CVE:F9 for
+// F8, task 5).
+func assessTargetRuntime(r *runtimeinfo.Runtime, catalogFile string, now time.Time) (*runtimevuln.Assessment, string, error) {
 	p, err := runtimevuln.NewOpenJDK()
 	if err != nil {
 		return nil, "", err
@@ -70,7 +73,7 @@ func assessTargetRuntime(r *runtimeinfo.Runtime, catalogFile string) (*runtimevu
 	if r == nil {
 		return nil, p.C.Version, nil
 	}
-	a := p.Assess(*r, time.Now())
+	a := p.Assess(*r, now)
 	return &a, p.C.Version, nil
 }
 

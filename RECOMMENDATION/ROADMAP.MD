@@ -6,7 +6,7 @@ Status: propozycja architektury i kolejności prac. Indeks: [README.MD](README.M
 
 Rozszerzać pokrycie mechanizmów JVM, zachowując pochodzenie każdego ustalenia, precyzję tożsamości komponentu i jawną informację o brakach. Poszczególne mechanizmy korzystają ze wspólnego grafu i wspólnej analizy wartości; nie tworzą jedenastu niezależnych silników.
 
-Tor [CVE](CVE_IMPLEMENTATION_PLAN.MD) odpowiada za to, co jest podatne. Pozostałe tory opisują, jak kod może zostać wywołany, jakie dane mogą do niego dotrzeć i co rzeczywiście zaobserwowano.
+Tor [CVE](../archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD) odpowiada za to, co jest podatne. Pozostałe tory opisują, jak kod może zostać wywołany, jakie dane mogą do niego dotrzeć i co rzeczywiście zaobserwowano.
 
 ## 2. Wspólne kontrakty — B0–B4
 

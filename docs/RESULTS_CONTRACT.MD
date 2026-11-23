@@ -1,6 +1,6 @@
 # Results contract (CVE:F0)
 
-Status: **contract** — CVE:F0 of [RECOMMENDATION/CVE_IMPLEMENTATION_PLAN.MD](../RECOMMENDATION/CVE_IMPLEMENTATION_PLAN.MD),
+Status: **contract** — CVE:F0 of [archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD](../archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD),
 shared with ROADMAP B0. It fixes what results *mean* before CVE:F1 changes how they are
 computed. Nothing here is a new user-visible feature: today's `results.json` (v1) and
 report are described as they are, and every planned change is marked **(F1)**. What the

@@ -2,7 +2,7 @@
 
 Status: plan, implementacja nie została rozpoczęta w ramach tego dokumentu.
 
-Wymagania funkcjonalne: [CVE.MD](CVE.MD). Szersze rekomendacje rozwoju JVM: [MD](MD).
+Wymagania funkcjonalne: [CVE.MD](CVE.MD). Szersze rekomendacje rozwoju JVM: [MD](../../../RECOMMENDATION/MD).
 
 ## 1. Zasady realizacji
 
@@ -263,19 +263,19 @@ Dopasowywać znany komponent po zmianie nazw jego klas i odwołań.
 - Błędna mapa, kolizja pakietów, niezgodny hash i niejednoznaczna wersja nie dają potwierdzonego mapowania.
 - Zakres wydania wyraźnie obejmuje jawną relokację, a nie wszystkie możliwe shaded JAR-y.
 
-## F8. Docelowy runtime i pierwszy dostawca JDK — DONE (F8a, F8b 2026-11-13/20; F8c zamknięte bez budowy 2026-11-23; [zarchiwizowane](../archive/2026-11-23/cve/CVE_F8.md))
+## F8. Docelowy runtime i pierwszy dostawca JDK — DONE (F8a, F8b 2026-11-13/20; F8c zamknięte bez budowy 2026-11-23; [zarchiwizowane](CVE_F8.md))
 
 ## F10. Pokrycie mapowań bez commita poprawki — DONE (zarchiwizowane 2026-11-13)
 
 Pull requesty, inicjalizatory pól, źródło `release-diff` (PR #48) i 22 ręczne mapowania z diffów
 wydań (PR #49); zobacz
-[archive/2026-11-13/cve/CVE_F10.md](../archive/2026-11-13/cve/CVE_F10.md) po pełny zapis i
+[archive/2026-11-13/cve/CVE_F10.md](../../2026-11-13/cve/CVE_F10.md) po pełny zapis i
 `docs/SUPPORT.MD` po bieżący opis zachowania.
 Kontynuacja 2026-11-16 (redukcja `UNKNOWN`, PR #84–#87: 39 ręcznych mapowań, `NOT_CODE_MAPPABLE`,
 `MAPPED_CODE_ABSENT`; `UNKNOWN` 27/26/5 → 1/0/0):
-[archive/2026-11-16/cve/CVE_F10_UNKNOWN_REDUCTION.md](../archive/2026-11-16/cve/CVE_F10_UNKNOWN_REDUCTION.md).
+[archive/2026-11-16/cve/CVE_F10_UNKNOWN_REDUCTION.md](../../2026-11-16/cve/CVE_F10_UNKNOWN_REDUCTION.md).
 
-## F9. Integracja, migracja i kwalifikacja wydania — DONE dla przyrostów pierwszego i drugiego, F0–F7 (F9a 2026-11-06: zadania 4, 5, 8, 9; F9b 2026-11-06: 3, 6, 7, 8 — rate limit; 1–2 zrealizowane w F1–F7); przy trzecim przyroście (F8) zadania F9 trzeba powtórzyć; zob. IMPLEMENTATION_STATUS
+## F9. Integracja, migracja i kwalifikacja wydania — DONE dla przyrostów pierwszego i drugiego, F0–F7 (F9a 2026-11-06: zadania 4, 5, 8, 9; F9b 2026-11-06: 3, 6, 7, 8 — rate limit; 1–2 zrealizowane w F1–F7); F9 dla trzeciego przyrostu (F8) DONE 2026-11-23 (zadania 1, 2, 4–9; 3 nie dotyczy); zob. IMPLEMENTATION_STATUS
 
 ### Cel
 

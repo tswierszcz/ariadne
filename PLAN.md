@@ -1357,7 +1357,7 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
    reach and record calls into. Would need a separate CVE source for the JDK itself and
    matching by the target JDK/bytecode version rather than by GAV — a bigger, separate
    piece of work, not a one-line addition like 1–3 above. Related to
-   [RECOMMENDATION/CVE_IMPLEMENTATION_PLAN.MD](RECOMMENDATION/CVE_IMPLEMENTATION_PLAN.MD)'s
+   [archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD](archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD)'s
    runtime-CVE track (F8), which also treats the target JDK as a CVE-relevant input rather
    than just a bytecode-version number.
 
