@@ -23,6 +23,8 @@ Gotowe, gdy ta sama luka nie jest różnie interpretowana przez dwa analizatory,
 
 ### B1. Identyfikatory i dowody krawędzi
 
+**Stan 2026-11-23: DONE for this scope** — `EdgeID` z podstawą i `path_edges` z dowodami wszystkich krawędzi kroku (`b0-1`); kontekst ładowania w tożsamości metody należy do RUNTIME N1–N2. Zob. IMPLEMENTATION_STATUS.
+
 - Tożsamość metody: pochodzenie klasy/wybrany kontekst ładowania, nazwa klasy, nazwa metody, deskryptor.
 - Miejsce wywołania: stabilna metoda + offset bytecode + rodzaj operacji. Numery linii służą prezentacji, nie identyfikacji.
 - Rozdzielić graf wywołań od relacji takich jak rejestracja callbacka, utworzenie obiektu, inicjalizacja czy przepływ danych.
@@ -33,6 +35,8 @@ Gotowe, gdy ta sama luka nie jest różnie interpretowana przez dwa analizatory,
 Gotowe, gdy dwa powody utworzenia tej samej krawędzi są zachowane i można odtworzyć je z raportowanej ścieżki.
 
 ### B2. Wspólna reprezentacja kodu i wartości
+
+**Stan 2026-11-23: DONE** — wykonany przez DATA_FLOW D0–D5; fakty `internal/dataflow` współdzieli 20 pakietów, bajtkod dekoduje tylko `internal/classfile`. Zob. IMPLEMENTATION_STATUS.
 
 - Implementację wykonują DATA_FLOW D0–D2: instrukcje, CFG, obsługa wyjątków, stos, zmienne lokalne, identyfikatory obiektów oraz wartości abstrakcyjne.
 - Obecny `parseCodeAttribute` pomija tabelę wyjątków; przyszła analiza musi ją zachować. Uzupełnienie wykonuje DATA_FLOW D1 wspólnie z parserem, bez równoległego drugiego formatu.
