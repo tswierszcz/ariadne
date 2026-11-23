@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Control pom for LIBRARY_MODE LB3 lb3-2 (testdata/library-altversions/EXPECTED.MD),
+     read with -library-pom next to testdata/library-deps/lib.jar. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>fx</groupId>
+  <artifactId>library-altversions</artifactId>
+  <version>1.0</version>
+  <dependencies>
+    <!-- (u) the user brings commons-text; its version list is not in the fixture's cache -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>[1.6,1.10.0)</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- (v) the library accepts commons-lang3 up to, not including, 3.18.0 (the fix of CVE-2025-48924) -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>[3.11,3.18.0)</version>
+    </dependency>
+  </dependencies>
+</project>

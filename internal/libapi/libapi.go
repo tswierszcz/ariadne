@@ -82,10 +82,14 @@ type Coverage struct {
 	// Dependencies (lb3-1) are the library pom's declarations, matched to
 	// the input's instances.
 	Dependencies *component.LibraryDependencies `json:"dependencies,omitempty"`
-	Providers    int                            `json:"providers"`
-	Excluded     []string                       `json:"excluded_packages,omitempty"`
-	JPMS         string                         `json:"jpms"` // "exports" or "classpath"
-	Exports      []string                       `json:"exports,omitempty"`
+	// AlternateVersions (LB3 lb3-2, -alt-versions): other versions of the
+	// dependencies a user can get and their advisories, assessed apart from
+	// the findings.
+	AlternateVersions *AlternateVersions `json:"alternate_versions,omitempty"`
+	Providers         int                `json:"providers"`
+	Excluded          []string           `json:"excluded_packages,omitempty"`
+	JPMS              string             `json:"jpms"` // "exports" or "classpath"
+	Exports           []string           `json:"exports,omitempty"`
 }
 
 // Module reads the library's module-info (root or a multi-release
@@ -415,4 +419,14 @@ func ClientSites(h *hierarchy.Hierarchy, mod *classfile.ModuleInfo, opt Options)
 		}
 	}
 	return out
+}
+
+// AlternateVersions is the -alt-versions assessment (LIBRARY_MODE LB3
+// lb3-2): the selection strategy, the assessment mode, the selection rules'
+// version and one set per dependency with an identified instance.
+type AlternateVersions struct {
+	Strategy string                    `json:"strategy"`
+	Mode     string                    `json:"mode"`
+	Rules    string                    `json:"rules_version"`
+	Sets     []component.AltVersionSet `json:"dependencies"`
 }

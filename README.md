@@ -1103,9 +1103,33 @@ identified, and the starter has 39 findings instead of 19 — 20 new on
 spring-boot/-autoconfigure/-beans/-context/-core/-expression, all supplied
 by the library, 13 `REACHABLE` from the API under CHA (11 under RTA),
 among them CVE-2022-22965 (spring-beans) and 8 SpEL advisories; the other
-three libraries are unchanged. Not yet:
-advisories for the other versions a user can get (the declared range).
-`-roots all` and `profile` results are unchanged.
+three libraries are unchanged. `-roots all` and `profile` results are
+unchanged.
+
+**Other versions a user can get (`lb3-2`, 2026-11-23).** With
+`-alt-versions newest` the library run also assesses, per dependency with
+an identified instance, the highest published version inside a declared
+range (`range_max`) and the newest published version of the analyzed
+version's major.minor line (`line_latest`) — from `maven-metadata.xml`
+through the cache. `-alt-versions-mode approx` (the only mode so far)
+asks OSV about that version and picks its mapping variant, but computes
+reachability on the code of the analyzed version (its jar is the input's),
+so the result is approximate and says so (`basis`); a mapping without a
+variant for that version gives `MAPPING_VERSION_UNCOVERED`. Results are
+in v2 `coverage.api.alternate_versions` only — never in the findings, the
+v1 rows or a verdict. A version list that cannot be read is a note on its
+dependency; advisories or mappings that cannot be read mark the chosen
+version `not_assessed` and the run still succeeds. A second graph run with
+the other version's jar (`-alt-versions-mode rerun`) and other selection
+strategies are reserved, not built. Verified on
+`testdata/library-altversions` ([EXPECTED.MD](testdata/library-altversions/EXPECTED.MD),
+`TestLibraryAltVersions`): commons-lang3 `[3.11,3.18.0)` with 3.11 in the
+input gives 3.17.0, CVE-2025-48924 `REACHABLE`. On the five LB4 libraries
+(one online pass for the version lists, no HTTP 429): no library declares a
+range, so every choice is `line_latest`; e.g. jjwt-jackson's
+jackson-databind 2.9.10.4 → 2.9.10.8 drops 22 of its 32 advisories and 10
+remain (all `REACHABLE` on the 2.9.10.4 code); no newer version brought an
+advisory the analyzed one did not have.
 
 **JDBC drivers (`jdbc:drivers`, `internal/jdbcurl`, version `u1`,
 2026-11-16).** `DriverManager#getConnection(url)` offers the URL to every
@@ -2063,6 +2087,8 @@ Flags:
 | `-profile` | no | `auto` (default, auto-detect and merge), `generic`, `spring`, `servlet`, `jakarta`, `micronaut`, `quarkus`, `stripes`, or a name from `-profile-file`. |
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners), `profile` (the active profile's own entry points, plus the same `web.xml` methods) or `api` (library mode, below: the `-app` jar is a library and its public API is the roots). |
+| `-alt-versions` | no | With `-roots api`: `off` (default) or `newest` — also assess other versions of the library's dependencies a user can get (LIBRARY_MODE LB3 `lb3-2`): the highest published version in a declared range and the newest of the analyzed version's major.minor line. v2 `coverage.api.alternate_versions` only. |
+| `-alt-versions-mode` | no | How `-alt-versions` assesses a version: `approx` (default and only mode: its advisories and mapping variant, reachability on the analyzed version's code). `rerun` (a second graph run with that version's jar) is reserved. |
 | `-library-pom` | no | With `-roots api`: the library's `pom.xml`, read for its dependency declarations (LIBRARY_MODE LB3) — for a library jar that embeds none (e.g. a Gradle build); default: the pom in the jar's `META-INF/maven/`. |
 | `-api-exclude` | no | With `-roots api`: comma-separated package prefixes left out of the API (`com.example.internal`). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |

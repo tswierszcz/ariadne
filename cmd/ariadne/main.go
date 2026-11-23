@@ -103,17 +103,20 @@ type config struct {
 	jpmsScenario   string
 	apiExclude     string
 	libraryPOM     string
-	jpmsModulePath string
-	taint          bool
-	callgraphMode  string
-	graphOut       string
-	graphCompare   string
-	runtimeTrace   string
-	jdkHome        string
-	runtimeFile    string
-	openjdkCatalog string
-	runtimeFilter  string
-	runtimeStatus  string
+	// LIBRARY_MODE LB3 lb3-2: other versions of the library's dependencies.
+	altVersions     string
+	altVersionsMode string
+	jpmsModulePath  string
+	taint           bool
+	callgraphMode   string
+	graphOut        string
+	graphCompare    string
+	runtimeTrace    string
+	jdkHome         string
+	runtimeFile     string
+	openjdkCatalog  string
+	runtimeFilter   string
+	runtimeStatus   string
 
 	llm        bool
 	llmModel   string
@@ -148,6 +151,8 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 	fs.StringVar(&cfg.sbom, "sbom", "", "CycloneDX JSON SBOM (spec 1.4-1.6): components nested in a component whose SHA-256 is an analyzed dependency jar's become embedded-component candidates of that jar, verified by their classes (CVE:F6b); nothing else from the SBOM is used")
 	fs.StringVar(&cfg.profileFile, "profile-file", "", "load/override one profile from a YAML file (same shape as the embedded defaults), in addition to ariadne's own spring/generic")
 	fs.StringVar(&cfg.roots, "roots", "all", `BFS roots: "all" (every application method, the default), "profile" (only the active profile's entry points: annotated methods/classes, main) or "api" (library mode: the -app jar is a library, its public API — what a user can call or override — is the roots, and findings list the exposed API methods)`)
+	fs.StringVar(&cfg.altVersions, "alt-versions", "off", `with -roots api: also assess other versions of the library's dependencies that a user can get (LIBRARY_MODE LB3): "off", or "newest" (the highest published version in a declared range and the newest of the analyzed version's major.minor line); reported in v2 coverage.api.alternate_versions, never in the verdicts`)
+	fs.StringVar(&cfg.altVersionsMode, "alt-versions-mode", "approx", `how -alt-versions assesses a version: "approx" (its advisories and mapping variant, reachability on the analyzed version's code)`)
 	fs.StringVar(&cfg.libraryPOM, "library-pom", "", "with -roots api: the library's pom.xml, read for its dependency declarations (LIBRARY_MODE LB3); default: the pom embedded in the library jar (META-INF/maven/<group>/<artifact>/pom.xml)")
 	fs.StringVar(&cfg.apiExclude, "api-exclude", "", `with -roots api: comma-separated package prefixes left out of the API (e.g. "com.example.internal")`)
 	fs.IntVar(&cfg.targetJava, "target-java", 0, "Java feature version (e.g. 11, 17) to resolve multi-release JAR variants against; unset falls back to every jar's base classes, not the highest bytecode version seen (JVM_GRAPH G4)")
@@ -257,6 +262,9 @@ func validate(cfg config) error {
 	}
 	if cfg.libraryPOM != "" && cfg.roots != "api" {
 		return fmt.Errorf("-library-pom needs -roots api")
+	}
+	if err := validateAltVersions(cfg); err != nil {
+		return err
 	}
 	for _, s := range strings.Split(cfg.runtimeStatus, ",") {
 		switch reach.Status(strings.TrimSpace(s)) {
@@ -1742,6 +1750,17 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	engine.SetWebAssetPackages(webAssets)
 	results := engine.Analyze(cveList, vm)
+	// LIBRARY_MODE LB3 lb3-2: other versions of the library's dependencies,
+	// assessed apart from the run's findings.
+	if altVersionsOn(cfg) && libDeps != nil && apiCoverage != nil {
+		sets, err := assessAltVersions(ctx, altVersionDeps{inv: components, libDeps: libDeps, fetch: centralFetch, base: cfg.centralURL,
+			osv: cves.NewClient(cache), resolver: resolver, vm: vm, engine: engine, mode: cfg.altVersionsMode, strategy: cfg.altVersions})
+		if err != nil {
+			return err
+		}
+		apiCoverage.AlternateVersions = &libapi.AlternateVersions{Strategy: cfg.altVersions, Mode: cfg.altVersionsMode, Rules: component.AltVersionsVersion, Sets: sets}
+		log("other dependency versions (LIBRARY_MODE LB3 %s, -alt-versions %s, mode %s): %s", component.AltVersionsVersion, cfg.altVersions, cfg.altVersionsMode, altVersionsLine(sets))
+	}
 
 	// ROADMAP B0 b0-4: measure, report-only, which NOT_REACHABLE findings
 	// a narrower (instance-scoped) or wider (lambda, skipped-receiver)

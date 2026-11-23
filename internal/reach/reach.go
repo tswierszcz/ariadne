@@ -194,6 +194,16 @@ type Engine struct {
 // SetComponents enables per-instance findings over inv.
 func (e *Engine) SetComponents(inv *component.Inventory) { e.components = inv }
 
+// WithComponents returns a copy of e that reports findings over inv
+// instead: the same graph, roots and BFS passes (LIBRARY_MODE LB3 lb3-2 —
+// an inventory in which one dependency instance has another version, its
+// code standing in for that version's). e itself is unchanged.
+func (e *Engine) WithComponents(inv *component.Inventory) *Engine {
+	cp := *e
+	cp.components = inv
+	return &cp
+}
+
 // SetWebAssetPackages marks dependencies ("group:artifact") that contain
 // only client-side web assets. A CVE whose every affected package is one
 // of them gets StatusNotApplicable.
