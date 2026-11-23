@@ -30,6 +30,11 @@ zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 co dostarczono w każdej fazie, kwalifikacja F9, decyzja o F8c, jawne ograniczenia). Wiersze
 w `docs/SUPPORT.MD` pozostają `Partial` tam, gdzie były.
 
+**Tryb biblioteki — DONE (2026-11-23), wszystkie fazy LB0–LB4** (LB2–LB4 dla swojego zakresu).
+Dawne `LIBRARY_MODE.MD`/`LIBRARY_MODE_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-23/library_mode/`](../archive/2026-11-23/library_mode/COMPLETION.md). Na przyszłość:
+tryb `rerun` dla `-alt-versions`, inne strategie wyboru wersji.
+
 **Precyzja grafu — DONE (2026-11-23), wszystkie fazy P0–P4** (P3 dla swojego zakresu). Dawne
 `GRAPH_PRECISION.MD`/`GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
 [`archive/2026-11-23/graph_precision/`](../archive/2026-11-23/graph_precision/COMPLETION.md). Domyślny
@@ -80,7 +85,6 @@ pozostaje `Partial`.
 |---|---|---|
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 | Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
-| Tryb biblioteki: korzenie z publicznego API, narażone metody API (2026-11-16) | [LIBRARY_MODE.MD](LIBRARY_MODE.MD) | [LIBRARY_MODE_IMPLEMENTATION_PLAN.MD](LIBRARY_MODE_IMPLEMENTATION_PLAN.MD) |
 
 ## Pokrycie pierwotnych rekomendacji
 

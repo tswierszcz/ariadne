@@ -1,6 +1,6 @@
 # Tryb biblioteki — fazy LB0–LB4
 
-Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie; lb2-6 2026-11-18: archiwa beanów CDI jako korzenie; lb2-7 2026-11-19: obiekty dostarczane przez wywołującego jako luka; lb2-8 2026-11-19: biblioteki ogłaszające klasy Springowi — pakiety Springa jako framework); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 w toku (lb4-1 2026-11-19: zestaw kwalifikacyjny 5 bibliotek, wyrocznia JVM jetty-client, użycie w CI; lb4-2: wyrocznie JVM pozostałych bibliotek); zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
+Status: LB0 DONE (2026-11-16: kontrakt `docs/RESULTS_CONTRACT.MD` §8, biblioteka kontrolna `testdata/library` z wyrocznią JVM); LB1 DONE (2026-11-16: `-roots api`, `internal/libapi`, `exposed_api`); LB2 w toku (lb2-1 2026-11-17: luka `client_code`, `client_dispatch`; lb2-3/lb2-4: metody odziedziczone jako API, specjalizowane do odbiorcy; lb2-5: ogłoszenia Spring jako korzenie; lb2-6 2026-11-18: archiwa beanów CDI jako korzenie; lb2-7 2026-11-19: obiekty dostarczane przez wywołującego jako luka; lb2-8 2026-11-19: biblioteki ogłaszające klasy Springowi — pakiety Springa jako framework); LB3 w toku (lb3-1 2026-11-18: deklaracje zależności z pomu biblioteki, `supplied_by`); LB4 w toku (lb4-1 2026-11-19: zestaw kwalifikacyjny 5 bibliotek, wyrocznia JVM jetty-client, użycie w CI; lb4-2: wyrocznie JVM pozostałych bibliotek); zob. IMPLEMENTATION_STATUS. Wymagania: [LIBRARY_MODE.MD](LIBRARY_MODE.MD). Zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD) (kontrakt wyniku B0, dowody krawędzi B1, weryfikacja B4).
 
 Oznaczenia faz `LB` (litera `L` należy do DYNAMIC_LINKAGE).
 
@@ -55,9 +55,11 @@ Zależności: LB0.
 Gotowe: tryb działa end-to-end na fixture i prawdziwej bibliotece; v1 aplikacji bajtowo
 bez zmian (12 konfiguracji referencyjnych).
 
-## LB2. Kod klienta i wejścia frameworka — DONE for this scope (2026-11-23; [zarchiwizowane](../archive/2026-11-23/library_mode/LIBRARY_MODE_LB2.md))
+## LB2. Kod klienta i wejścia frameworka — DONE for this scope (2026-11-23; [zarchiwizowane](LIBRARY_MODE_LB2.md))
 
-## LB3. Wersje zależności
+## LB3. Wersje zależności — DONE for this scope (2026-11-23)
+
+**Zamknięcie 2026-11-23 (decyzja użytkownika):** kryterium gotowości spełnione przez `lb3-1` (kto dostarcza każdą zależność i której wersji dotyczy ustalenie), opcjonalna ocena innych wersji — `lb3-2` (`-alt-versions newest`, `-alt-versions-mode approx`). Odłożone na przyszłość: tryb `rerun` (drugi przebieg grafu z jarem innej wersji — flaga już zarezerwowana) i inne strategie wyboru (granice zakresu, wszystkie wersje).
 
 **`lb3-2` DONE (2026-11-23):** inne wersje zależności, które użytkownik może dostać — `-alt-versions newest` (najwyższa w zadeklarowanym zakresie, najnowsza w linii major.minor) i `-alt-versions-mode approx` (OSV i wariant mapowania tej wersji, osiągalność na kodzie analizowanej); v2 `coverage.api.alternate_versions`. Na przyszłość: tryb `rerun` (drugi przebieg grafu z jarem tej wersji) i inne strategie. Zob. IMPLEMENTATION_STATUS.
 
@@ -80,7 +82,7 @@ Zależności: LB1, CVE F4 (wersjonowane mapowania).
 
 Gotowe: wynik mówi, której wersji zależności dotyczy każde ustalenie i kto ją dostarcza.
 
-## LB4. Kwalifikacja i użycie w CI — DONE for this scope (2026-11-23; powiązanie z CI floty → `FLEET_CI_PLAN.MD`; [zarchiwizowane](../archive/2026-11-23/library_mode/LIBRARY_MODE_LB4.md))
+## LB4. Kwalifikacja i użycie w CI — DONE for this scope (2026-11-23; powiązanie z CI floty → `FLEET_CI_PLAN.MD`; [zarchiwizowane](LIBRARY_MODE_LB4.md))
 
 ## Kolejność i szacunek
 

@@ -226,7 +226,7 @@ adds the version span; it does **not** change their role or coverage (`sink`/`en
 
 A library jar answers a different question than an application: whether anyone using its
 public API can reach mapped vulnerable code in its dependencies, and through which API
-methods ([RECOMMENDATION/LIBRARY_MODE.MD](../RECOMMENDATION/LIBRARY_MODE.MD)). This
+methods ([RECOMMENDATION/LIBRARY_MODE.MD](../archive/2026-11-23/library_mode/LIBRARY_MODE.MD)). This
 section fixed the contract before the implementation (LB0); LB1 implements it (`-roots
 api`, `internal/libapi` version `lb1-1`, `-api-exclude`); LB2 (`lb2-1`, `lb2-2`, 2026-11-17) the `client_code` gap; LB3 (`lb3-1`, 2026-11-18) the dependency declarations; `lb2-6` (2026-11-18) CDI bean archives; `lb2-7` (2026-11-19) caller-supplied objects; `lb2-8` (2026-11-19) Spring-announcing libraries are framework-mediated.
 Member-class accessibility follows the class's own access flag and its enclosing classes
