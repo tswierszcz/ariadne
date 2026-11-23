@@ -305,7 +305,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return err
 	}
 	sr.config["target-runtime"] = targetRuntimeKey(targetRuntime)
-	runtimeAssessment, catalogVersion, err := assessTargetRuntime(targetRuntime, cfg.openjdkCatalog)
+	assessedAt := time.Now()
+	if sr.replay != nil {
+		assessedAt = sr.replay.CreatedAt
+	}
+	runtimeAssessment, catalogVersion, err := assessTargetRuntime(targetRuntime, cfg.openjdkCatalog, assessedAt)
 	if err != nil {
 		return err
 	}

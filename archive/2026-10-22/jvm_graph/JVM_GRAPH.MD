@@ -35,7 +35,7 @@ Reguły klas należy oprzeć na specyfikacji JVM; nie zastępować ich wyszukiwa
 
 ## Zależności i gotowość
 
-Wspólne części tożsamości klas i dokładnych metod z [CVE F1/F4](CVE_IMPLEMENTATION_PLAN.MD) realizuje się jeden raz. Ta sama informacja o target feature version służy do wyboru klas; nie jest identyfikatorem poziomu poprawek JDK.
+Wspólne części tożsamości klas i dokładnych metod z [CVE F1/F4](../../2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD) realizuje się jeden raz. Ta sama informacja o target feature version służy do wyboru klas; nie jest identyfikatorem poziomu poprawek JDK.
 
 Gotowość: stabilny wybór klas, poprawne ścieżki dziedziczenia i inicjalizacji oraz fixtures z pozytywnymi i negatywnymi przypadkami wariantów JAR. Zmiany liczby CVE muszą wynikać z wyjaśnionej zmiany grafu.
 

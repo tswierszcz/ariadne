@@ -2183,7 +2183,7 @@ The manifest records the outcome of every cache lookup (hits, misses, errors suc
 alias's 404), the input artifacts' SHA-256 by stable location, the configuration, the tool
 version, Go version, binary hash, algorithm versions, a **derivation key** per advisory
 (advisory content, affected instances, mapping, the hashes of the fix commits/LLM answer it
-came from, resolver/prompt versions), and the v1 verdicts. Its `data_set_id` hashes the
+came from, resolver/prompt versions), and the v1 verdicts. With a target runtime it also records the runtime's identity (configuration `target-runtime`) and a `-openjdk-catalog` file's content (input `openjdk-catalog`); a replay dates the catalog-age note by the snapshot, not the clock. Its `data_set_id` hashes the
 observations, not the time, so it names the logical data set.
 
 `-snapshot-in` answers every lookup from the snapshot: no cache directory, no network (the

@@ -229,7 +229,7 @@ func snapshotInputs(cfg config, inv *component.Inventory) ([]snapshot.Input, err
 	for _, a := range inv.Artifacts {
 		out = append(out, snapshot.Input{Role: string(a.Role), Location: a.Location, SHA256: a.SHA256})
 	}
-	for _, f := range []struct{ role, path string }{{"deps-list", cfg.depsList}, {"vuln-methods", cfg.vulnMethods}, {"profile-file", cfg.profileFile}, {"embedded-components", cfg.embeddedComps}, {"sbom", cfg.sbom}, {"runtime-trace", cfg.runtimeTrace}} {
+	for _, f := range []struct{ role, path string }{{"deps-list", cfg.depsList}, {"vuln-methods", cfg.vulnMethods}, {"profile-file", cfg.profileFile}, {"embedded-components", cfg.embeddedComps}, {"sbom", cfg.sbom}, {"runtime-trace", cfg.runtimeTrace}, {"openjdk-catalog", cfg.openjdkCatalog}} {
 		if f.path == "" {
 			continue
 		}

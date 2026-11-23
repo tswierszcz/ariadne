@@ -2,7 +2,7 @@
 
 Status wszystkich nowych obszarów: plan, bez implementacji w ramach przygotowania tych dokumentów.
 
-Punkt wyjścia: [oryginalne rekomendacje](MD). Wspólne zależności, zasady i kolejność: [ROADMAP.MD](ROADMAP.MD). Istniejący zakres rozpoznawania CVE pozostaje w osobnej parze dokumentów.
+Punkt wyjścia: [oryginalne rekomendacje](MD). Wspólne zależności, zasady i kolejność: [ROADMAP.MD](ROADMAP.MD). Rozpoznawanie CVE (dawna osobna para dokumentów) jest zamknięte i zarchiwizowane — zob. niżej.
 
 `PLAN.md`'s Phase 9/12/13 (z sesji 2026-10-14, przed powstaniem tego folderu) zawierają wcześniejsze, lżejsze notatki o części tego samego zakresu — ServiceLoader, refleksja, proxy/frameworki, Go, RTA. Ten folder jest ich bardziej rygorystycznym rozwinięciem, nie konkurencyjnym planem; nowa praca nad tymi tematami powinna zaczynać się tutaj, nie w `PLAN.md`.
 
@@ -23,6 +23,12 @@ DONE (2026-10-22), wszystkie fazy G0–G5.** Dawne `JVM_GRAPH.MD`/
 (`COMPLETION.md` tam ma pełne podsumowanie: co dostarczono, jak zweryfikowano,
 jedno wciąż otwarte ograniczenie czekające na JDK). Szczegółowe wpisy per-fazowe
 zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
+
+**Rozpoznawanie podatności — DONE (2026-11-23), wszystkie fazy F0–F10.** Dawne
+`CVE.MD`/`CVE_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-23/cve/`](../archive/2026-11-23/cve/COMPLETION.md) (`COMPLETION.md` tam:
+co dostarczono w każdej fazie, kwalifikacja F9, decyzja o F8c, jawne ograniczenia). Wiersze
+w `docs/SUPPORT.MD` pozostają `Partial` tam, gdzie były.
 
 **ServiceLoader i moduły JPMS — DONE (2026-11-05), wszystkie fazy S0–S4.** Dawne
 `SERVICE_LOADING.MD`/`SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
@@ -60,7 +66,6 @@ pozostaje `Partial`.
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 | Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
 | Tryb biblioteki: korzenie z publicznego API, narażone metody API (2026-11-16) | [LIBRARY_MODE.MD](LIBRARY_MODE.MD) | [LIBRARY_MODE_IMPLEMENTATION_PLAN.MD](LIBRARY_MODE_IMPLEMENTATION_PLAN.MD) |
-| Rozpoznawanie podatności: wersje, poprawki, shading, cache, JDK | [CVE.MD](CVE.MD) | [CVE_IMPLEMENTATION_PLAN.MD](CVE_IMPLEMENTATION_PLAN.MD) |
 
 ## Pokrycie pierwotnych rekomendacji
 
@@ -79,7 +84,7 @@ pozostaje `Partial`.
 | RTA i analiza możliwych obiektów | GRAPH_PRECISION |
 | Taint analysis | DATA_FLOW — **DONE, zarchiwizowane** (D0–D5); pilotaż `-taint` opt-in, kwalifikacja w `docs/TAINT_QUALIFICATION.MD` |
 | Obserwacja działającej aplikacji | RUNTIME_NATIVE |
-| Rozpoznawanie samych podatności — pięć punktów | Istniejące CVE i CVE_IMPLEMENTATION_PLAN |
+| Rozpoznawanie samych podatności — pięć punktów | CVE — **DONE, zarchiwizowane** (F0–F10) |
 | Inne języki, w szczególności Go | ECOSYSTEMS |
 | Pomiar skuteczności i kolejność realizacji | ROADMAP i kryteria poszczególnych faz |
 
