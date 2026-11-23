@@ -94,6 +94,8 @@ func algorithmVersions(mode string) map[string]string {
 		"jdbc.drivers": jdbcurl.Version,
 		// Library mode's API definition (-roots api).
 		"library.api": libapi.Version,
+		// LIBRARY_MODE LB3 lb3-2: how other dependency versions are chosen.
+		"library.alt_versions": component.AltVersionsVersion,
 		// REFLECTION R3: Method receivers resolved through parameters.
 		"reflection.parameters": reflectinvoke.ThroughParametersVersion,
 		// JPA objects: creator-gated edges in every mode.
@@ -170,7 +172,7 @@ func analysisConfig(cfg config) map[string]string {
 		"profile": cfg.profile, "roots": cfg.roots, "target-java": strconv.Itoa(cfg.targetJava),
 		"active-profiles": cfg.activeProfiles, "jpms-scenario": cfg.jpmsScenario, "jpms-module-path": cfg.jpmsModulePath,
 		"release-diff": strconv.FormatBool(cfg.releaseDiff), "llm": strconv.FormatBool(cfg.llm), "llm-model": cfg.llmConfig.Model, "llm-reask-changed": strconv.FormatBool(cfg.llmReaskChanged),
-		"exploit-check": strconv.FormatBool(cfg.exploitCheck), "framework-check": strconv.FormatBool(cfg.frameworkCheck),
+		"exploit-check": strconv.FormatBool(cfg.exploitCheck), "alt-versions": cfg.altVersions, "alt-versions-mode": cfg.altVersionsMode, "framework-check": strconv.FormatBool(cfg.frameworkCheck),
 		"data-ttl": cfg.dataTTL.String(), "max-data-age": cfg.maxDataAge.String(),
 		"refresh": strconv.FormatBool(cfg.refresh), "taint": strconv.FormatBool(cfg.taint), "callgraph-mode": cfg.callgraphMode, "allow-stale": strconv.FormatBool(cfg.allowStale),
 	}

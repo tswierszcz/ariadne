@@ -1,0 +1,12 @@
+{
+  "key": "8b779f1009e9514f89756ea4e3a4946596408e46267d3a299302a9f8bb6b5a54",
+  "kind": "mutable",
+  "method": "GET",
+  "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/maven-metadata.xml",
+  "fetched_at": "2026-11-10T14:20:23.516887861Z",
+  "validated_at": "2026-11-10T14:20:23.516887861Z",
+  "sha256": "f9eb651b28423ff404e5c843275f9c7365b0bcaef0b2e03576aa6b5394147cc8",
+  "bytes": 1134,
+  "etag": "W/\"0489eef0ca505c6f4f837a6869395fa1\"",
+  "last_modified": "Tue, 29 Sep 2026 18:08:43 GMT"
+}

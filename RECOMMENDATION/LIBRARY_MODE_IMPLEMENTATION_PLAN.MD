@@ -59,6 +59,8 @@ bez zmian (12 konfiguracji referencyjnych).
 
 ## LB3. Wersje zależności
 
+**`lb3-2` DONE (2026-11-23):** inne wersje zależności, które użytkownik może dostać — `-alt-versions newest` (najwyższa w zadeklarowanym zakresie, najnowsza w linii major.minor) i `-alt-versions-mode approx` (OSV i wariant mapowania tej wersji, osiągalność na kodzie analizowanej); v2 `coverage.api.alternate_versions`. Na przyszłość: tryb `rerun` (drugi przebieg grafu z jarem tej wersji) i inne strategie. Zob. IMPLEMENTATION_STATUS.
+
 Postęp: **lb3-1 DONE (2026-11-18)** — pom biblioteki (wbudowany albo `-library-pom`) z rodzicami
 i importowanymi BOM-ami; drzewo konsumenta jak w Mavenie (`compile`/`runtime` bez `optional`,
 przechodnio, najbliższy wygrywa, `exclusions`); `supplied_by` (`library`/`user`/`undeclared`) i
