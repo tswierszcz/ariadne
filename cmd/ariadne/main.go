@@ -44,6 +44,7 @@ import (
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/methodhandle"
 	"ariadne/internal/models"
+	"ariadne/internal/nativebound"
 	"ariadne/internal/profile"
 	"ariadne/internal/proxycatalog"
 	"ariadne/internal/pta"
@@ -1720,7 +1721,16 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	gapSites = append(gapSites, clientGapSites(clientSites)...)
 	gapSites = append(gapSites, suppliedGapSites(suppliedSites)...)
+	// RUNTIME_NATIVE N5 n5-1: native methods are unbounded gaps; library
+	// loads are boundary facts for the report.
+	nativeMethods := nativebound.Methods(h)
+	nativeLoads, nativeWarnings := nativebound.Loads(h)
+	warnings = append(warnings, nativeWarnings...)
+	gapSites = append(gapSites, nativeGapSites(nativeMethods)...)
 	engine.SetGaps(gapSites) // CVE:F1b: model-gap rule, docs/RESULTS_CONTRACT.MD §4
+	nativeSummary := nativebound.Summarize(nativeMethods, nativeLoads, engine.MethodReachable)
+	log("native boundaries (RUNTIME_NATIVE N5 %s): %d native methods in the input, %d reachable (model gaps, mechanism native); %d native library loads, %d reachable",
+		nativebound.Version, nativeSummary.Methods, len(nativeSummary.Reachable), len(nativeSummary.Loads), nativeSummary.ReachableLoads())
 	reachableGaps, unboundedGaps := engine.ReachableGaps()
 	log("model gaps: %d unresolved dynamic sites, %d reachable from the roots (%d with no bounded candidate set)", len(gapSites), reachableGaps, unboundedGaps)
 	// REFLECTION R3 slice 3: where the receivers of the reachable
@@ -2025,6 +2035,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
 	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
+	doc.Coverage.Native = &nativeSummary
 	doc.Frameworks = resultsv2.BuildFrameworks(resultsv2.FrameworksInputs{
 		Profile: prof.Name, ActiveProfiles: activeProfiles,
 		Stereotypes: springBeanNames, BeanMethods: springBeanMethods, Repositories: springRepositoryBeans,
@@ -2053,6 +2064,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("rendering results JSON: %w", err)
 	}
+	data.NativeMethods, data.NativeReachable, data.NativeLoads = nativeReportRows(nativeSummary)
 	data.AnalysisID = doc.AnalysisID
 	// DESERIALIZATION Z4: the advisory row names the catalog chains
 	// linked to its findings (same advisory, same instance).

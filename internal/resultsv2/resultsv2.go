@@ -27,6 +27,7 @@ import (
 	"ariadne/internal/httpcache"
 	"ariadne/internal/libapi"
 	"ariadne/internal/mavenversion"
+	"ariadne/internal/nativebound"
 	"ariadne/internal/pta"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
@@ -411,6 +412,10 @@ type Coverage struct {
 	ReflectionCensus *reflectinvoke.ProvenanceSummary `json:"reflection_census,omitempty"`
 	// API (LIBRARY_MODE LB1, -roots api): what the API selection counted.
 	API *libapi.Coverage `json:"api,omitempty"`
+	// Native (RUNTIME_NATIVE N5 n5-1, additive): native methods of the
+	// input, the reachable ones (model gaps, mechanism native), and the
+	// native library loads.
+	Native *nativebound.Summary `json:"native,omitempty"`
 	// UnidentifiedComponents are instances without a GAV: no advisory can
 	// be looked up for them, so they have no findings.
 	UnidentifiedComponents []string `json:"unidentified_components,omitempty"`

@@ -69,6 +69,18 @@ The runtime's own advisories (CVE:F8b, OpenJDK Vulnerability Group, curated cata
 |---|---|---|---|---|---|---|
 {{range .RuntimeAdvisories}}| {{.CVE}} | [{{.Advisory}}]({{.URL}}) | {{.Component}} | {{.CVSS}} | {{.Applicability}} | {{.LastAffected}} | {{.Reason}} |
 {{end}}
+{{end}}{{if or .NativeReachable .NativeLoads}}## Native code boundaries
+
+RUNTIME_NATIVE N5: where the analyzed Java code meets native code, which the analysis does not see. A reachable native method is a model gap (mechanism `native`, unbounded): its native body may call any Java method through JNI, so under the model-gap rule (docs/RESULTS_CONTRACT.MD §4) a `NOT_REACHABLE` finding keeps its verdict and adds `MODEL_INCOMPLETE` with the count in `model_gaps`. {{.NativeMethods}} native methods in the input, {{len .NativeReachable}} reachable.
+{{if .NativeReachable}}
+| Reachable native method | Where |
+|---|---|
+{{range .NativeReachable}}| `{{.Method}}` | {{.Where}} |
+{{end}}{{end}}{{if .NativeLoads}}
+| Native library load | API | Library | Reachable |
+|---|---|---|---|
+{{range .NativeLoads}}| `{{.Caller}}` | {{.API}} | {{if .Library}}`{{.Library}}`{{else}}(not a literal){{end}} | {{if .Reachable}}yes{{else}}no{{end}} |
+{{end}}{{end}}
 {{end}}## CVEs
 
 | CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source | Reasons |

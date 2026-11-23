@@ -35,6 +35,7 @@ import (
 	"ariadne/internal/log4jconfig"
 	"ariadne/internal/logbackconfig"
 	"ariadne/internal/methodhandle"
+	"ariadne/internal/nativebound"
 	"ariadne/internal/profile"
 	"ariadne/internal/proxycatalog"
 	"ariadne/internal/pta"
@@ -96,6 +97,8 @@ func algorithmVersions(mode string) map[string]string {
 		"library.api": libapi.Version,
 		// LIBRARY_MODE LB3 lb3-2: how other dependency versions are chosen.
 		"library.alt_versions": component.AltVersionsVersion,
+		// RUNTIME_NATIVE N5 n5-1: native methods as gap sites.
+		"native.boundaries": nativebound.Version,
 		// REFLECTION R3: Method receivers resolved through parameters.
 		"reflection.parameters": reflectinvoke.ThroughParametersVersion,
 		// JPA objects: creator-gated edges in every mode.

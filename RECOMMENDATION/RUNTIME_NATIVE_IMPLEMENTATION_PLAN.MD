@@ -50,6 +50,8 @@ Gotowe: dwa zadania i dwa proxy nie mieszają dowodów; brak korelacji skutkuje 
 
 ## N5. Native/JNI i kwalifikacja
 
+**Wycinek `n5-1` DONE (2026-11-23):** inwentaryzacja granic — metody `native` z wejścia jako nieograniczone luki `native` (reguła B0), wywołania `loadLibrary`/`load` z nazwą biblioteki, gdy literał; report.md „Native code boundaries”, v2 `coverage.native`. Petclinic 72/361 osiągalnych, WebGoat 108/206, JPetStore 0/3; 0 zmian werdyktów. Streszczenia Java ↔ natywne — odłożone. Zob. IMPLEMENTATION_STATUS.
+
 - W parserze i hierarchii rozpoznać native methods; rejestrować `load`/`loadLibrary` jako informacje o bibliotece, z rozróżnieniem próby i powodzenia, jeśli dane to umożliwiają.
 - Zaprojektować jawne streszczenia Java ↔ native: sygnatury, identyfikator biblioteki/builda, przepływ argumentów i callbacki Java. Nie zakładać, że nazwa eksportu identyfikuje wszystkie dynamiczne `RegisterNatives`.
 - Bez streszczenia wskazać nieprześledzoną granicę i wpływ na wynik. Analiza C/C++, JVMTI lub Foreign Function & Memory wymaga osobnego zakresu i nie jest ukrytym elementem agenta Java.
