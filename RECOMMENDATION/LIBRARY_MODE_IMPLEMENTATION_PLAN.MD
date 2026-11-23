@@ -57,6 +57,8 @@ bez zmian (12 konfiguracji referencyjnych).
 
 ## LB2. Kod klienta i wejścia frameworka
 
+**Ocena 2026-11-23:** kryterium gotowości spełnione (`lb2-1`…`lb2-9`); otwarte tylko ścieżki warunkowe po kodzie klienta (semantyka do zdefiniowania, brak zmierzonego przypadku). Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
+
 Postęp: **lb2-1 DONE (2026-11-17)** — miejsca kodu klienta (`libapi.ClientSites`), luka
 `client_code` (pusty zbiór kandydatów, bez `MODEL_INCOMPLETE`), `exposed_api[].client_dispatch`
 dla metod sięgających kodu tylko przez wysyłkę do klasy, której wejście nie tworzy; przypadek (d)
@@ -119,6 +121,8 @@ Zależności: LB1, CVE F4 (wersjonowane mapowania).
 Gotowe: wynik mówi, której wersji zależności dotyczy każde ustalenie i kto ją dostarcza.
 
 ## LB4. Kwalifikacja i użycie w CI
+
+**Ocena 2026-11-23:** kryterium gotowości spełnione (`lb4-1`, `lb4-2`); powiązanie z CI floty należy do `FLEET_CI_PLAN.MD` (grudzień). Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
 
 Zależności: LB1–LB3, ROADMAP B4.
 
