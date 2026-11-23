@@ -291,6 +291,8 @@ Rozpoznawać podatności konkretnej dystrybucji i wydania runtime’u bez wniosk
 
 ### F8c. Osiągalność kodu JDK — dalszy przyrost
 
+**Ocena 2026-11-23:** werdykt metodowy niewykonalny — katalog podaje tylko komponent, publicznego powiązania CVE → błąd JDK → commit brak; diff wydań CPU dałby metody per komponent, nie per CVE. Zmierzona alternatywa: raportowa ekspozycja API komponentu (petclinic/WebGoat/JPetStore: API nieużywane przez osiągalny kod dla 3/9/30 z 88 CVE). Do decyzji: `f8c-1` (sygnał raportowy, `reachability` dalej `not_assessed`) albo zamknięcie F8c. Zob. IMPLEMENTATION_STATUS.
+
 1. Tylko dla przypadków z wiarygodnym mapowaniem na kod zaprojektować odczyt właściwych klas runtime’u i model granic analizy.
 2. Nie znosić globalnie ograniczeń CHA dla `java.*`; wymagałoby to osobnej oceny rozmiaru grafu i liczby fałszywych ścieżek.
 3. Podatności JIT, VM i kodu natywnego pozostawić bez werdyktu metodowego, jeśli model analizy ich nie obejmuje.
