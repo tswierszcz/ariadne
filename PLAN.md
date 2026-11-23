@@ -1176,7 +1176,7 @@ not covered by RECOMMENDATION and remain this file's own backlog.
 
 ### Phase 9 (optional, future) — Closing known blind spots
 **Superseded in detail by [archive/2026-11-05/service_loading/SERVICE_LOADING.MD](archive/2026-11-05/service_loading/SERVICE_LOADING.MD),
-[REFLECTION.MD](RECOMMENDATION/REFLECTION.MD) and [FRAMEWORKS.MD](RECOMMENDATION/FRAMEWORKS.MD)** —
+[REFLECTION.MD](archive/2026-11-23/reflection/REFLECTION.MD) and [FRAMEWORKS.MD](RECOMMENDATION/FRAMEWORKS.MD)** —
 kept here for history; start new work in those documents instead.
 
 Section 3 point 8 lists several blind spots that are structural, not bugs: reflection,

@@ -1,6 +1,6 @@
 # Refleksja — fazy R0–R4
 
-Status: plan. Wymagania: [REFLECTION.MD](REFLECTION.MD). Zasady B0–B4: [ROADMAP.MD](ROADMAP.MD).
+Status: plan. Wymagania: [REFLECTION.MD](REFLECTION.MD). Zasady B0–B4: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## R0. Zakres API i obiekty refleksji
 
@@ -30,7 +30,9 @@ Gotowe: literalna nazwa i nazwa przez zmienną dają ten sam wynik; samo wyszuka
 
 Gotowe: pozytywna ścieżka, dwa obiekty Method, overload i błędne argumenty mają odrębne wyniki. R0–R2 stanowią pierwsze wydanie.
 
-## R3. Przepływ między metodami, konfiguracja i dostęp
+## R3. Przepływ między metodami, konfiguracja i dostęp — DONE for this scope (2026-11-23)
+
+**Zamknięcie 2026-11-23 (decyzja użytkownika):** przenoszenie przez argumenty — wycinek 3 (`r3-3`, 2026-11-15: rozwiązywanie przez wywołujących, spis pochodzenia); konfiguracja, `setAccessible`/`trySetAccessible`, `Constructor` przez parametr — niebudowane: dwa pomiary (2026-11-05, 2026-11-09) dały zerowy zysk, spis `r3-3` znalazł 2 miejsca w trzech aplikacjach, a `setAccessible` pozostaje jawną nadaproksymacją (R4 `r4-2`). Kryterium „odmowa dostępu nie jest mylona ze stałą” — spełnione przez lukę zamiast krawędzi dla odrzuconych lookupów (`r4-2`).
 
 Zależności: DATA_FLOW D3, FRAMEWORK F1 dla scenariuszy konfiguracji; MODULE dane SERVICE S3 tam, gdzie potrzebne.
 
@@ -41,6 +43,6 @@ Zależności: DATA_FLOW D3, FRAMEWORK F1 dla scenariuszy konfiguracji; MODULE da
 
 Gotowe: aktywny profil, dwie nazwy i odmowa dostępu nie są mylone ze stałą jednego celu.
 
-## R4. Kwalifikacja i integracja — DONE (2026-11-22, `r4-1`, `r4-2`; [zarchiwizowane](../archive/2026-11-22/reflection/REFLECTION_R4.md))
+## R4. Kwalifikacja i integracja — DONE (2026-11-22, `r4-1`, `r4-2`; [zarchiwizowane](../../2026-11-22/reflection/REFLECTION_R4.md))
 
 Poza pierwszym zakresem: dowolne runtime-computed nazwy, pełna logika security/loaderów oraz utożsamianie obserwacji z deklaracją. MethodHandle ma własny plan DYNAMIC_LINKAGE, korzystający z tych samych wartości.

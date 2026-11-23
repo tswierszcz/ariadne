@@ -30,6 +30,11 @@ zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 co dostarczono w każdej fazie, kwalifikacja F9, decyzja o F8c, jawne ograniczenia). Wiersze
 w `docs/SUPPORT.MD` pozostają `Partial` tam, gdzie były.
 
+**Refleksja — DONE (2026-11-23), wszystkie fazy R0–R4** (R3 dla swojego zakresu). Dawne
+`REFLECTION.MD`/`REFLECTION_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-23/reflection/`](../archive/2026-11-23/reflection/COMPLETION.md). Wiersz w
+`docs/SUPPORT.MD` pozostaje `Partial`.
+
 **ServiceLoader i moduły JPMS — DONE (2026-11-05), wszystkie fazy S0–S4.** Dawne
 `SERVICE_LOADING.MD`/`SERVICE_LOADING_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
 [`archive/2026-11-05/service_loading/`](../archive/2026-11-05/service_loading/COMPLETION.md)
@@ -59,7 +64,6 @@ pozostaje `Partial`.
 
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
-| Refleksja i rozpoznawanie nazw klas/metod | [REFLECTION.MD](REFLECTION.MD) | [REFLECTION_IMPLEMENTATION_PLAN.MD](REFLECTION_IMPLEMENTATION_PLAN.MD) |
 | Frameworki: proxy, AOP, DI, konfiguracja i zewnętrzne wejścia | [FRAMEWORKS.MD](FRAMEWORKS.MD) | [FRAMEWORKS_IMPLEMENTATION_PLAN.MD](FRAMEWORKS_IMPLEMENTATION_PLAN.MD) |
 | MethodHandle, invokedynamic i dynamiczne stałe | [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD) | [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) |
 | Precyzja grafu: RTA i analiza możliwych obiektów | [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD) | [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) |
@@ -74,7 +78,7 @@ pozostaje `Partial`.
 | Inicjalizacja klas `<clinit>` | JVM_GRAPH — **DONE, zarchiwizowane** (G3) |
 | Wywołania odziedziczonych metod | JVM_GRAPH — **DONE, zarchiwizowane** (G2); wspólna realizacja z CVE F4 nie została naruszona (F4 samo nieodnotowane) |
 | ServiceLoader i JPMS | SERVICE_LOADING — **DONE, zarchiwizowane** (S0–S4) |
-| Refleksja przez literały, zmienne i konfigurację | REFLECTION; wartości dostarcza DATA_FLOW, konfigurację FRAMEWORKS |
+| Refleksja przez literały, zmienne i konfigurację | REFLECTION — **DONE, zarchiwizowane** (R0–R4); wartości dostarcza DATA_FLOW, konfigurację FRAMEWORKS |
 | Proxy, AOP i dependency injection | FRAMEWORKS |
 | Callbacki i kod asynchroniczny | ASYNC_CALLBACKS — **DONE, zarchiwizowane** (A0–A4) |
 | MethodHandle i pozostałe invokedynamic | DYNAMIC_LINKAGE |
