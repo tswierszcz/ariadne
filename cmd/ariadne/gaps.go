@@ -6,6 +6,7 @@ import (
 
 	"ariadne/internal/alloc"
 	"ariadne/internal/callback"
+	"ariadne/internal/component"
 	"ariadne/internal/deserialize"
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/libapi"
@@ -183,4 +184,70 @@ func nativeReportRows(s nativebound.Summary) (int, []report.NativeRow, []report.
 		loads = append(loads, report.NativeLoadRow{Caller: l.CallerFQCN + "#" + l.CallerName + l.CallerDesc, API: l.API, Library: l.Library, Reachable: l.Reachable})
 	}
 	return s.Methods, rows, loads
+}
+
+// maxShadowRows bounds the report's table of components defining the same
+// classes (v2 components[].shadowed keeps the per-instance counts).
+const maxShadowRows = 30
+
+// shadowReportRows groups the run's class-name collisions by the pair of
+// components: kept copy, shadowed copy (JVM_GRAPH G1, CVE:F1). Rows with
+// differing content come first.
+func shadowReportRows(inv *component.Inventory) (total, differing int, rows []report.ShadowRow) {
+	if inv == nil {
+		return 0, 0, nil
+	}
+	label := map[string]string{}
+	for _, in := range inv.Instances {
+		l := in.Label()
+		if l == "" {
+			l = inv.InstanceLocation(in.ID)
+		}
+		label[in.ID] = l
+	}
+	type key struct{ kept, shadowed string }
+	byPair := map[key]*report.ShadowRow{}
+	var order []key
+	for _, c := range inv.Conflicts {
+		total++
+		k := key{c.KeptInstance, c.ShadowedInstance}
+		r := byPair[k]
+		if r == nil {
+			r = &report.ShadowRow{Kept: orDash(label[c.KeptInstance]), Shadowed: orDash(label[c.ShadowedInstance]), Example: c.FQCN}
+			byPair[k] = r
+			order = append(order, k)
+		}
+		r.Classes++
+		if !c.SameContent {
+			r.Differing++
+			differing++
+			if r.Differing == 1 {
+				r.Example = c.FQCN
+			}
+		}
+	}
+	for _, k := range order {
+		rows = append(rows, *byPair[k])
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].Differing != rows[j].Differing {
+			return rows[i].Differing > rows[j].Differing
+		}
+		if rows[i].Classes != rows[j].Classes {
+			return rows[i].Classes > rows[j].Classes
+		}
+		return rows[i].Kept+rows[i].Shadowed < rows[j].Kept+rows[j].Shadowed
+	})
+	if len(rows) > maxShadowRows {
+		rest := len(rows) - maxShadowRows
+		rows = append(rows[:maxShadowRows], report.ShadowRow{Kept: fmt.Sprintf("… %d more pairs (v2 components[].shadowed)", rest)})
+	}
+	return total, differing, rows
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
 }

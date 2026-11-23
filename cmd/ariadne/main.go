@@ -2065,6 +2065,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("rendering results JSON: %w", err)
 	}
 	data.NativeMethods, data.NativeReachable, data.NativeLoads = nativeReportRows(nativeSummary)
+	data.ShadowedClasses, data.ShadowedDiffering, data.ShadowRows = shadowReportRows(components)
+	if components != nil {
+		data.ClasspathOrder = components.ClasspathOrder
+	}
 	data.AnalysisID = doc.AnalysisID
 	// DESERIALIZATION Z4: the advisory row names the catalog chains
 	// linked to its findings (same advisory, same instance).

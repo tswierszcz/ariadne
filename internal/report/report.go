@@ -88,8 +88,14 @@ type Header struct {
 	NativeMethods   int
 	NativeReachable []NativeRow
 	NativeLoads     []NativeLoadRow
-	UnresolvedDyn   int
-	UnresolvedOwner int
+	// Classes in several copies (JVM_GRAPH G1, CVE:F1): the classpath
+	// order kept the first copy; one row per pair of components.
+	ShadowedClasses   int
+	ShadowedDiffering int
+	ClasspathOrder    string
+	ShadowRows        []ShadowRow
+	UnresolvedDyn     int
+	UnresolvedOwner   int
 	// Model gaps (contract §4): unresolved dynamic sites, those reachable
 	// from the roots, and those of them with no bounded candidate set.
 	GapSites, GapsReachable, GapsUnbounded int
@@ -810,4 +816,12 @@ type NativeRow struct{ Method, Where string }
 type NativeLoadRow struct {
 	Caller, API, Library string
 	Reachable            bool
+}
+
+// ShadowRow is one pair of components that define the same classes: the
+// copy the analysis kept and the one it shadowed.
+type ShadowRow struct {
+	Kept, Shadowed     string
+	Classes, Differing int
+	Example            string
 }
