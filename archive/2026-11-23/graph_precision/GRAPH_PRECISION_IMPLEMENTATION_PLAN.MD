@@ -1,20 +1,20 @@
 # Precyzja grafu — fazy P0–P4
 
-Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md); katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md); opt-in `-callgraph-mode rta`, punkt stały `p2-1`, fallback nieznanych alokacji, wyrocznia JVM `testdata/rta`); P4 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md); benchmark `scripts/graph-benchmark.sh` + `TestGraphBenchmarkFixtures`, kwalifikacja w `testdata/graphbench/RESULTS.MD`, domyślny tryb pozostaje CHA); P3 nierozpoczęte (nieuzasadnione wynikami P4); zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](ROADMAP.MD).
+Status: P0 DONE (2026-11-07, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P0.md); strategia, ustawienia grafu, `-graph-out`/`-graph-compare`, wyrocznia znanych celów, polityka nieznanych alokacji); P1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P1.md); katalog `internal/alloc` `p1-1`, luki, wyrocznia JVM; tylko raport); P2 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P2.md); opt-in `-callgraph-mode rta`, punkt stały `p2-1`, fallback nieznanych alokacji, wyrocznia JVM `testdata/rta`); P4 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P4.md); benchmark `scripts/graph-benchmark.sh` + `TestGraphBenchmarkFixtures`, kwalifikacja w `testdata/graphbench/RESULTS.MD`, domyślny tryb pozostaje CHA); P3 nierozpoczęte (nieuzasadnione wynikami P4); zob. IMPLEMENTATION_STATUS. Wymagania: [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD). Wspólna kolejność: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## P0. Uczciwy baseline i tryby porównania — DONE (zarchiwizowane 2026-11-08)
 
 Strategia dispatch oddzielona od budowy grafu (`-callgraph-mode cha`), ustawienia grafu w
 metadanych, `-graph-out`/`-graph-compare`, wyrocznia znanych celów na prawdziwym JVM, polityka
 nieznanych alokacji dla RTA; zobacz
-[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)
+[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P0.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P0.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## P1. Katalog typów tworzonych jawnie i pośrednio — DONE (zarchiwizowane 2026-11-08)
 
 Katalog `internal/alloc` (`p1-1`, tylko raport): klasy tworzone z pochodzeniem i miejscami,
 luki dla niemodelowanych mechanizmów, wyrocznia JVM `testdata/alloc`; zobacz
-[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)
+[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P1.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P1.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## P2. RTA i punkt stały — DONE (zarchiwizowane 2026-11-08)
@@ -22,10 +22,12 @@ po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 Opt-in `-callgraph-mode rta`: punkt stały na katalogu P1 zawęża krawędzie CHA do klas
 tworzonych przez osiągalny kod, z fallbackiem nieznanych alokacji i jawnymi lukami; wyrocznia
 JVM `testdata/rta`; zobacz
-[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)
+[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P2.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P2.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
-## P3. Ograniczona analiza points-to
+## P3. Ograniczona analiza points-to — DONE for this scope (2026-11-23)
+
+**Zamknięcie 2026-11-23:** kryterium gotowości spełnione przez wycinek `p3-1` — wyrocznia `testdata/pta` (dwa odbiorniki, pole `final`, fabryka, parametr, tablica i pole niefinalne z uzasadnionym brakiem zawężenia) i metryki kosztu/jakości (1–3,4 % krawędzi CHA ponad RTA, 0 zmian werdyktów, 2,7–3,7× czasu RTA). Większa czułość (kontekst wywołań, pola niefinalne, zawartość tablic) nie jest budowana — reguła stopu z pomiaru. Tryb `-callgraph-mode pta` pozostaje eksperymentalny; domyślny tryb to CHA.
 
 **Stan (2026-11-15):** wycinek 1 (`p3-1`) DONE for this scope — zawężanie odbiorników według alokacji jako eksperymentalny tryb `-callgraph-mode pta` (`internal/pta`); wyrocznia `testdata/pta`; pomiar w `testdata/graphbench/RESULTS.MD`. Większa czułość (kontekst wywołań, pola niefinalne, zawartość tablic) nieuzasadniona pomiarem.
 
@@ -44,5 +46,5 @@ Gotowe: dwa receivery, alias pól, tablica i fabryka dają uzasadnione różnice
 Benchmark CHA vs RTA (`scripts/graph-benchmark.sh`, `TestGraphBenchmarkFixtures`), ręczna
 kwalifikacja każdej zmiany werdyktu, decyzja: domyślnie CHA; ponowna ocena po modelu dispatchu
 kontenera servletów; zobacz
-[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md](../archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)
+[archive/2026-11-08/graph_precision/GRAPH_PRECISION_P4.md](../../2026-11-08/graph_precision/GRAPH_PRECISION_P4.md)
 po pełny zapis i `testdata/graphbench/RESULTS.MD` po bieżące wyniki.

@@ -30,6 +30,11 @@ zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 co dostarczono w każdej fazie, kwalifikacja F9, decyzja o F8c, jawne ograniczenia). Wiersze
 w `docs/SUPPORT.MD` pozostają `Partial` tam, gdzie były.
 
+**Precyzja grafu — DONE (2026-11-23), wszystkie fazy P0–P4** (P3 dla swojego zakresu). Dawne
+`GRAPH_PRECISION.MD`/`GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-23/graph_precision/`](../archive/2026-11-23/graph_precision/COMPLETION.md). Domyślny
+tryb grafu pozostaje CHA.
+
 **Wiązanie dynamiczne — DONE (2026-11-23), wszystkie fazy L0–L4** (L2–L4 dla swojego zakresu, L3
 niebudowane po pomiarze). Dawne `DYNAMIC_LINKAGE.MD`/`DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD` są
 zarchiwizowane w [`archive/2026-11-23/dynamic_linkage/`](../archive/2026-11-23/dynamic_linkage/COMPLETION.md).
@@ -73,7 +78,6 @@ pozostaje `Partial`.
 
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
-| Precyzja grafu: RTA i analiza możliwych obiektów | [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD) | [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 | Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
 | Tryb biblioteki: korzenie z publicznego API, narażone metody API (2026-11-16) | [LIBRARY_MODE.MD](LIBRARY_MODE.MD) | [LIBRARY_MODE_IMPLEMENTATION_PLAN.MD](LIBRARY_MODE_IMPLEMENTATION_PLAN.MD) |
@@ -92,7 +96,7 @@ pozostaje `Partial`.
 | Deserializacja | DESERIALIZATION — **DONE, zarchiwizowane** (Z0–Z4); dopływ danych z DATA_FLOW D4 |
 | Konfiguracja i wejścia frameworka | FRAMEWORKS — **DONE, zarchiwizowane** (F0–F5) |
 | Dynamiczne ładowanie klas i JNI | RUNTIME_NATIVE; statyczne nazwy klas obsługuje również REFLECTION |
-| RTA i analiza możliwych obiektów | GRAPH_PRECISION |
+| RTA i analiza możliwych obiektów | GRAPH_PRECISION — **DONE, zarchiwizowane** (P0–P4) |
 | Taint analysis | DATA_FLOW — **DONE, zarchiwizowane** (D0–D5); pilotaż `-taint` opt-in, kwalifikacja w `docs/TAINT_QUALIFICATION.MD` |
 | Obserwacja działającej aplikacji | RUNTIME_NATIVE |
 | Rozpoznawanie samych podatności — pięć punktów | CVE — **DONE, zarchiwizowane** (F0–F10) |
