@@ -14,6 +14,8 @@ po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## N2. Dodatkowe klasy i kontekst ładowania
 
+**Ocena 2026-11-23:** nie zaczęty; po stronie śladu kontrakt N0/N1 już rozróżnia loadery i definicje klas, po stronie statycznej jest jedna mapa FQCN. Żaden cel (aplikacje referencyjne, flota bibliotek) nie ma kilku kontekstów ładowania — odłożony do pierwszego takiego celu. Zob. IMPLEMENTATION_STATUS.
+
 Zależności: N1, JVM G1/G4, CVE F1/F6 dla pochodzenia komponentów.
 
 - Wprowadzić jawne dołączenie plugin JAR-ów i deklaracji kontekstu loadera. Obecna mapa FQCN pozostaje adapterem scenariusza jednego kontekstu, nie uniwersalną tożsamością.
