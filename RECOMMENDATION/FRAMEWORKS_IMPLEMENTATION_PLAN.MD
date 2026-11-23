@@ -39,29 +39,8 @@ Gotowe: jeden bean/qualifier, konflikt, nieznany profil i kontroler z helperem m
 
 Wycinek „dispatch kontenera servletów” (2026-11-08): model B3 `servlet-container:dispatch` (`internal/servletdispatch`, wersja `s1`) — ograniczony wyjątek od pominięcia odbiorców `javax.`/`jakarta.` w CHA dla `Servlet#service`, `Filter#doFilter` i wewnętrznego dispatchu szablonowego `HttpServlet` (`service(HttpServletRequest, …)`, `doGet`/`doPost`/…, tylko gdy wołającym jest sam `HttpServlet`). Cele: wyłącznie servlety i filtry zarejestrowane przez aplikację (web.xml, `@WebServlet`/`@WebFilter`, w aplikacji Spring Boot beany będące servletem/filtrem oraz katalog autokonfiguracji Boot sprawdzony w jej źródłach, z warunkami `@ConditionalOnClass` i `exclude`), metoda wybrana przez JVM na zarejestrowanej klasie; krawędzie z podstawą `model`, rejestracje z własną podstawą w logu; rejestracja nieznanej klasy (`FilterRegistrationBean` itp.) to niekompletny fakt modelu, nie zgadywanie. Wyrocznia JVM `testdata/servletdispatch` (`scripts/servletdispatch-oracle.sh`). Szczegóły i wpływ na petclinic/WebGoat: IMPLEMENTATION_STATUS, wpis FRAMEWORKS:F2 (dispatch kontenera servletów), oraz `testdata/graphbench/RESULTS.MD`.
 
-## F3. Proxy i ograniczony model AOP
+## F3. Proxy i ograniczony model AOP — DONE for this scope (2026-11-23; odłożone: ogólny JDK Proxy; [zarchiwizowane](../archive/2026-11-23/frameworks/FRAMEWORKS_F3.md))
 
-**Ocena 2026-11-23:** punkty 1–5 zrobione wycinkami (`internal/aop`, `framework:proxies` `x1`–`x3`, `spring:aop` `a1`/`a2`, katalog P1); otwarty tylko ogólny JDK Proxy (wycinek 2, zmierzony 0/12, reguła stopu). Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
-
-Zależności: F2, DATA_FLOW D3 dla bardziej złożonych powiązań, REFLECTION R2 i JVM G2 w używanych przypadkach.
-
-- Wprowadzić model tożsamości proxy, targetu oraz interceptora; dla ogólnego JDK Proxy powiązać handler i argument `Method` z właściwym wywołaniem interfejsu.
-- Zachować różnice JDK/CGLIB, final/private i self-invocation. Nie tworzyć całego advice chain dla zwykłego bezpośredniego wywołania targetu.
-- Dodać ograniczoną semantykę wybranych pointcutów i advice. Nieznane wyrażenia pozostają oznaczone; `around` może warunkować przekazanie dalej.
-- Migrować Spring Data bridge do katalogu modeli z deskryptorami, powiązaniem receivera i wersji; zachować oryginalną regułę jako jawny fallback przybliżony.
-- Udostępnić katalog typów tworzonych przez DI/proxy dla GRAPH_PRECISION; generowany typ wirtualny musi być oznaczony, nie udawać znalezionej klasy.
-
-Gotowe: proxy/target/self-invocation, dwa handlery, warunkowe advice i generowany typ nie mieszają się w jedną ścieżkę.
-
-## F4. Rozszerzanie wejść i frameworków
-
-**Ocena 2026-11-23:** zdarzenia i `@Scheduled` (`ev1`), profile innych frameworków z aplikacjami kontrolnymi, wersjonowana lista wejść (`f5-1`); odłożone: model listenerów wiadomości, SpEL/programowalne rejestracje, osobny tryb klasyfikacji. Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
-
-- Dodać osobne modele schedulerów i event/message listeners, współdzieląc mechanikę wywołania callbacków z ASYNC.
-- Kolejne Servlet/Jakarta/Micronaut/Quarkus modele wdrażać na podstawie ich rzeczywistych artefaktów i wersji; sam wygenerowany bytecode nie dowodzi, że każda ścieżka konfiguracji została odtworzona.
-- Programowalne rejestracje, dynamiczne profile, SpEL i inne złożone wyrażenia obejmować dopiero w jawnym zakresie; nie wykonywać aplikacji podczas analizy statycznej.
-- Opracować zmianę `reach/bfs.go`/klasyfikacji dla modelowanych wejść jako osobny tryb, z zachowaniem wyjaśnienia granic frameworka i eksportu legacy.
-
-Gotowe: lista wspieranych wejść jest wersjonowana; nowe wejścia nie zmieniają niejawnie znaczenia wszystkich istniejących wyników.
+## F4. Rozszerzanie wejść i frameworków — DONE for this scope (2026-11-23; odłożone: listenery wiadomości, SpEL, osobny tryb klasyfikacji; [zarchiwizowane](../archive/2026-11-23/frameworks/FRAMEWORKS_F4.md))
 
 ## F5. Kwalifikacja — DONE for this scope (2026-11-23, `f5-1`…`f5-3`; odłożone: konsumenci wiadomości, priorytety konfiguracji; [zarchiwizowane](../archive/2026-11-23/frameworks/FRAMEWORKS_F5.md))

@@ -55,49 +55,7 @@ Zależności: LB0.
 Gotowe: tryb działa end-to-end na fixture i prawdziwej bibliotece; v1 aplikacji bajtowo
 bez zmian (12 konfiguracji referencyjnych).
 
-## LB2. Kod klienta i wejścia frameworka
-
-**Ocena 2026-11-23:** kryterium gotowości spełnione (`lb2-1`…`lb2-9`); otwarte tylko ścieżki warunkowe po kodzie klienta (semantyka do zdefiniowania, brak zmierzonego przypadku). Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
-
-Postęp: **lb2-1 DONE (2026-11-17)** — miejsca kodu klienta (`libapi.ClientSites`), luka
-`client_code` (pusty zbiór kandydatów, bez `MODEL_INCOMPLETE`), `exposed_api[].client_dispatch`
-dla metod sięgających kodu tylko przez wysyłkę do klasy, której wejście nie tworzy; przypadek (d)
-fixture. Zostaje: ścieżki warunkowe po powrocie z kodu klienta, wywołania na typach zależności,
-autokonfiguracja jako korzenie, wyrocznia z przykładowym klientem dla (d) poza `observed.txt`.
-Pomiar 2026-11-17 (3 biblioteki, `scripts/library-measure.sh`): werdykty jak `-roots all`;
-poprawka `lb2-2` (klasy konstruowalne przez klienta nie są zastępstwem); `lb2-3` (decyzja
-użytkownika): metody odziedziczone z nadtypów zależności są API (jackson-yaml: 1 → 17
-`REACHABLE`); `lb2-4`: korzeń odziedziczony to kopia per klasa API, wywołania na `this`
-rozwiązywane od tej klasy (jackson-yaml: −1007 krawędzi CHA, `exposed_api` CVE-2025-49128
-101 → 87, werdykty bez zmian). Zostaje dla odziedziczonych: odbiorca w parametrze (`this`
-przekazany jako argument); odbiorca w polu nie jest tu nadmiarem — `ObjectMapper#_jsonFactory`
-to w JVM także `MappingJsonFactory` (`new YAMLMapper(null)`, sprawdzone 2026-11-18), więc reguła
-typu pola z konstruktorów nie dałaby na jackson zysku (punkt odłożony). **`lb2-5` DONE (2026-11-17):**
-klasy ogłaszane przez bibliotekę w `META-INF/spring.factories` i `META-INF/spring/*.imports`
-(z klasami zagnieżdżonymi `@Configuration` i `@Import`) są korzeniami z pochodzeniem
-(`exposed_api[].announced_by`), niezależnie od dostępu; fixture `testdata/library-autoconfig`
-z wyrocznią Spring Boot 2.4.5. **`lb2-6` DONE (2026-11-18):** beany archiwum CDI
-(`META-INF/beans.xml` albo indeks Jandex — Quarkus) są korzeniami z pochodzeniem, niezależnie od
-dostępu (producenci, obserwatorzy, `@Inject`, `@PostConstruct`…); fixture `testdata/library-cdi`
-z wyrocznią Weld SE 5.1.2. **`lb2-7` DONE (2026-11-19):** wywołania na obiektach typu zależności dostarczonych przez
-wywołującego (parametr korzenia, pole ustawiane tylko przez korzenie spoza biblioteki) są luką
-`client_code` ze znacznikiem `supplied_dispatch`; werdykty bez zmian. Zostaje z LB2: ścieżki warunkowe po powrocie z kodu klienta (do
-zdefiniowania), wartości dostarczone przekazane do metod zależności — **zmierzone 2026-11-21, nie budowane** (5 bibliotek: 0–107 miejsc, żaden werdykt ani powód by się nie zmienił; zob. IMPLEMENTATION_STATUS), Micronaut — **`lb2-9` DONE (2026-11-20):** definicje beanów z listy `BeanDefinitionReference` są ogłoszeniami, a to, co ich wygenerowany kod woła wprost, korzeniami (fixture `testdata/library-micronaut` z wyrocznią JVM; prywatne metody beanów przez refleksję — nie znajdowane; 4.x niesprawdzony), warunki `@ConditionalOn…` (pomiar 2026-11-20 na starterze mybatis: 0 z 26 ustaleń zależy od warunku — modelu nie budujemy bez biblioteki, na której to coś zmienia).
-
-Zależności: LB1, ASYNC_CALLBACKS (rejestracje callbacków), FRAMEWORKS (konfiguracja).
-
-- Miejsca, gdzie biblioteka woła metodę, którą może dostarczyć klient: wywołania
-  interfejsów i metod abstrakcyjnych bez implementacji w wejściu, wywołania nadpisywalnych
-  metod (publiczne/chronione, nie `final`, w klasie nie `final`) na obiektach, które
-  klient może podać. Luka „kod klienta” (relevant per B0), bez wymyślonych krawędzi.
-- Ścieżki warunkowe: podatny kod osiągalny dopiero po powrocie z kodu klienta — oznaczone
-  w dowodzie, nie mieszane ze ścieżkami bezwarunkowymi.
-- Wejścia z autokonfiguracji frameworków ogłaszanej przez bibliotekę (Spring Boot
-  `spring.factories`/`AutoConfiguration.imports`, inne katalogi profili) jako korzenie
-  z pochodzeniem.
-- Weryfikacja: przypadek (d) fixture; wyrocznia z przykładowym klientem.
-
-Gotowe: callback klienta jest jawną luką, autokonfiguracja biblioteki — korzeniem.
+## LB2. Kod klienta i wejścia frameworka — DONE for this scope (2026-11-23; [zarchiwizowane](../archive/2026-11-23/library_mode/LIBRARY_MODE_LB2.md))
 
 ## LB3. Wersje zależności
 
@@ -120,31 +78,7 @@ Zależności: LB1, CVE F4 (wersjonowane mapowania).
 
 Gotowe: wynik mówi, której wersji zależności dotyczy każde ustalenie i kto ją dostarcza.
 
-## LB4. Kwalifikacja i użycie w CI
-
-**Ocena 2026-11-23:** kryterium gotowości spełnione (`lb4-1`, `lb4-2`); powiązanie z CI floty należy do `FLEET_CI_PLAN.MD` (grudzień). Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
-
-Zależności: LB1–LB3, ROADMAP B4.
-
-- Zestaw prawdziwych bibliotek (różne style API: fasada, builder, SPI, callbacki) z
-  ręcznie sprawdzonymi oczekiwaniami; pomiar nadmiarowych `REACHABLE` vs `-roots all`.
-- Dokumentacja użycia: uruchomienie na artefakcie biblioteki w jej CI, interpretacja
-  `exposed_api`, granice (tryb nie ocenia konkretnej aplikacji).
-- Powiązanie z planem CI floty (`FLEET_CI_PLAN.MD`), jeśli flota obejmie biblioteki.
-
-Gotowe: SUPPORT.MD opisuje tryb ze stanem `Partial` i zmierzonymi ograniczeniami.
-
-**`lb4-1` DONE (2026-11-19):** zestaw pięciu bibliotek (fasada, fabryka/podklasa, SPI, starter,
-callbacki — jetty-client 9.4.36) z ręcznie sprawdzonymi werdyktami
-(`testdata/library-lb4/EXPECTED.MD`), wyrocznia JVM dla jetty-client
-(`scripts/library-lb4-oracle.sh`, `TestLibraryJetty`), `-roots api` vs `-roots all` (żaden
-`REACHABLE` nie stracony), README „Library mode in a library's CI”, SUPPORT.MD ze zmierzonymi
-ograniczeniami. Wyrocznia startera mybatis (2026-11-19, `testdata/library-starter`): z 26 `REACHABLE` 5 wykonuje się w najmniejszej aplikacji, 7 więcej (snakeyaml) przez sam Boot przy `application.yml`, 14 nigdy; niewykonane wychodzą z biblioteki wywołaniem na obiekcie z kontenera (`ObjectProvider`, `BeanFactory`) — argument za LB2 „wywołania na typach zależności”. **`lb4-2` DONE (2026-11-19):** wyrocznie JVM dla commons-configuration2, jackson-dataformat-yaml,
-jjwt-jackson (`scripts/library-lb4-jvm-oracle.sh`): 2/2, 15/17, 14/15 `REACHABLE` wykonane, 0
-`NOT_REACHABLE` wykonanych. **Krawędź przekazania asynchronicznego — zamknięta (pomiar
-2026-11-21):** na `main` po `lb2-9` graf jetty-client ma prawdziwą ścieżkę `HttpClient#GET` → selektor
-NIO → `ReadCallback#succeeded` → parser (krawędzie `a3-2`–`a3-4`), CHA i RTA; zob. IMPLEMENTATION_STATUS.
-Zostaje z LB4: powiązanie z planem CI floty (przesunięte na połowę grudnia 2026).
+## LB4. Kwalifikacja i użycie w CI — DONE for this scope (2026-11-23; powiązanie z CI floty → `FLEET_CI_PLAN.MD`; [zarchiwizowane](../archive/2026-11-23/library_mode/LIBRARY_MODE_LB4.md))
 
 ## Kolejność i szacunek
 
