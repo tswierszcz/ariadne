@@ -60,11 +60,4 @@ Gotowe: proxy/target/self-invocation, dwa handlery, warunkowe advice i generowan
 
 Gotowe: lista wspieranych wejść jest wersjonowana; nowe wejścia nie zmieniają niejawnie znaczenia wszystkich istniejących wyników.
 
-## F5. Kwalifikacja
-
-**Ocena 2026-11-22:** z 11 przypadków fixtures 5 pokrytych wyroczniami B4, 3 częściowo, 3 bez pokrycia (`testdata/di`, `xmlbeans`, `aop`, `tx`, `jpa`, `springdata`, `mybatis`, `servletdispatch`); brakuje kontrolera za `DispatcherServlet`, konsumenta wiadomości, qualifier/`@Primary`, dwóch scenariuszy profili i priorytetów konfiguracji; reguły korzeni/profili nie mają wersji w snapshotcie. Proponowane przyrosty `f5-1`…`f5-3` — zob. IMPLEMENTATION_STATUS. **`f5-1` DONE (2026-11-22):** `profile.rules` i `profile.builtin` w snapshotcie, test wymusza podbicie wersji. **`f5-2` DONE (2026-11-22):** wyrocznia Spring MVC (Tomcat → `DispatcherServlet` → kontroler) — 14 z 26 ciał nieosiągalnych, naprawione (`roots.web_bodies`, korzenie MVC); „kontener przed kontrolerem” pokryty. **`f5-3` DONE (2026-11-22):** qualifier/`@Primary` i dwa scenariusze profili w wyroczni DI — naprawione wyrażenia `@Profile` i dopasowanie qualifierów; pokryte 8 z 11 przypadków, odłożone: konsumenci wiadomości, priorytety konfiguracji.
-
-- Fixtures: adnotacje z wartościami i defaults, złożony marker, parametry, XML, priorytety configu, qualifier, dwa profile, proxy, self-invocation, kontener przed kontrolerem i konsument wiadomości.
-- Porównać w kontrolowanym uruchomieniu rzeczywiste beany/endpointy z modelem na kilku scenariuszach; nie przenosić wniosków między wersjami bez sprawdzenia.
-- Raportować liczbę reguł, wiązań, nieznanych warunków i nierozstrzygniętych wejść. Zapis scenariusza i modeli w snapshotcie jest obowiązkowy.
-- Wykonać B4 i migrację dokumentacji. Brak wsparcia fragmentu konfiguracji ogranicza wniosek negatywny, nie zamienia go w „bean nie istnieje”.
+## F5. Kwalifikacja — DONE for this scope (2026-11-23, `f5-1`…`f5-3`; odłożone: konsumenci wiadomości, priorytety konfiguracji; [zarchiwizowane](../archive/2026-11-23/frameworks/FRAMEWORKS_F5.md))
