@@ -30,6 +30,10 @@ zostają w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
 co dostarczono w każdej fazie, kwalifikacja F9, decyzja o F8c, jawne ograniczenia). Wiersze
 w `docs/SUPPORT.MD` pozostają `Partial` tam, gdzie były.
 
+**Wiązanie dynamiczne — DONE (2026-11-23), wszystkie fazy L0–L4** (L2–L4 dla swojego zakresu, L3
+niebudowane po pomiarze). Dawne `DYNAMIC_LINKAGE.MD`/`DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD` są
+zarchiwizowane w [`archive/2026-11-23/dynamic_linkage/`](../archive/2026-11-23/dynamic_linkage/COMPLETION.md).
+
 **Frameworki — DONE (2026-11-23), wszystkie fazy F0–F5** (F2–F5 dla swojego zakresu). Dawne
 `FRAMEWORKS.MD`/`FRAMEWORKS_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
 [`archive/2026-11-23/frameworks/`](../archive/2026-11-23/frameworks/COMPLETION.md) (`COMPLETION.md`
@@ -69,7 +73,6 @@ pozostaje `Partial`.
 
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
-| MethodHandle, invokedynamic i dynamiczne stałe | [DYNAMIC_LINKAGE.MD](DYNAMIC_LINKAGE.MD) | [DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD](DYNAMIC_LINKAGE_IMPLEMENTATION_PLAN.MD) |
 | Precyzja grafu: RTA i analiza możliwych obiektów | [GRAPH_PRECISION.MD](GRAPH_PRECISION.MD) | [GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD](GRAPH_PRECISION_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 | Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
@@ -85,7 +88,7 @@ pozostaje `Partial`.
 | Refleksja przez literały, zmienne i konfigurację | REFLECTION — **DONE, zarchiwizowane** (R0–R4); wartości dostarcza DATA_FLOW, konfigurację FRAMEWORKS (**DONE, zarchiwizowane**) |
 | Proxy, AOP i dependency injection | FRAMEWORKS — **DONE, zarchiwizowane** (F0–F5) |
 | Callbacki i kod asynchroniczny | ASYNC_CALLBACKS — **DONE, zarchiwizowane** (A0–A4) |
-| MethodHandle i pozostałe invokedynamic | DYNAMIC_LINKAGE |
+| MethodHandle i pozostałe invokedynamic | DYNAMIC_LINKAGE — **DONE, zarchiwizowane** (L0–L4; L3 niebudowane po pomiarze) |
 | Deserializacja | DESERIALIZATION — **DONE, zarchiwizowane** (Z0–Z4); dopływ danych z DATA_FLOW D4 |
 | Konfiguracja i wejścia frameworka | FRAMEWORKS — **DONE, zarchiwizowane** (F0–F5) |
 | Dynamiczne ładowanie klas i JNI | RUNTIME_NATIVE; statyczne nazwy klas obsługuje również REFLECTION |
