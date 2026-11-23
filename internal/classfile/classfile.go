@@ -17,6 +17,7 @@ const (
 	AccStatic    = 0x0008
 	AccFinal     = 0x0010
 	AccInterface = 0x0200
+	AccNative    = 0x0100
 	AccAbstract  = 0x0400
 )
 
@@ -81,6 +82,10 @@ type Method struct {
 func (m Method) IsStatic() bool   { return m.AccessFlags&AccStatic != 0 }
 func (m Method) IsPublic() bool   { return m.AccessFlags&AccPublic != 0 }
 func (m Method) IsAbstract() bool { return m.AccessFlags&AccAbstract != 0 }
+
+// IsNative reports a native method: no bytecode, its body is native code
+// (RUNTIME_NATIVE N5).
+func (m Method) IsNative() bool { return m.AccessFlags&AccNative != 0 }
 
 // Field is one field_info entry.
 type Field struct {

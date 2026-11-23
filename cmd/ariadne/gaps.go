@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 
 	"ariadne/internal/alloc"
@@ -9,8 +10,10 @@ import (
 	"ariadne/internal/hierarchy"
 	"ariadne/internal/libapi"
 	"ariadne/internal/methodhandle"
+	"ariadne/internal/nativebound"
 	"ariadne/internal/reach"
 	"ariadne/internal/reflectinvoke"
+	"ariadne/internal/report"
 	"ariadne/internal/serviceload"
 )
 
@@ -143,4 +146,41 @@ func objectsExist(c alloc.Catalog, constructible func(string) bool) func(string)
 		}
 	}
 	return func(fqcn string) bool { return made[fqcn] || (constructible != nil && constructible(fqcn)) }
+}
+
+// nativeGapSites turns the input's native methods into gap sites of kind
+// "native" (RUNTIME_NATIVE N5 n5-1): the method itself is the site — its
+// body is native code, which may call any Java method through JNI — so the
+// candidate set is unbounded. Only the reachable ones take part in the
+// model-gap rule.
+func nativeGapSites(ms []nativebound.Method) []reach.GapSite {
+	out := make([]reach.GapSite, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, reach.GapSite{Kind: "native", CallerFQCN: m.FQCN, CallerName: m.Name, CallerDesc: m.Desc})
+	}
+	return out
+}
+
+// maxNativeRows bounds the report's native-method table (v2 keeps all).
+const maxNativeRows = 50
+
+// nativeReportRows renders the native summary for report.md.
+func nativeReportRows(s nativebound.Summary) (int, []report.NativeRow, []report.NativeLoadRow) {
+	var rows []report.NativeRow
+	for i, m := range s.Reachable {
+		if i == maxNativeRows {
+			rows = append(rows, report.NativeRow{Method: fmt.Sprintf("… %d more (v2 coverage.native)", len(s.Reachable)-maxNativeRows)})
+			break
+		}
+		where := "dependency"
+		if m.App {
+			where = "application"
+		}
+		rows = append(rows, report.NativeRow{Method: m.FQCN + "#" + m.Name + m.Desc, Where: where})
+	}
+	var loads []report.NativeLoadRow
+	for _, l := range s.Loads {
+		loads = append(loads, report.NativeLoadRow{Caller: l.CallerFQCN + "#" + l.CallerName + l.CallerDesc, API: l.API, Library: l.Library, Reachable: l.Reachable})
+	}
+	return s.Methods, rows, loads
 }

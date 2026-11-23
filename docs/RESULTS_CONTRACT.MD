@@ -98,6 +98,10 @@ its own axis.
   `classes_absent`, `no_entry`) are report-only evidence of kind `chain-candidate`: they
   neither close nor narrow that gap and never change a verdict — a blocked chain rules
   out only that chain, not the advisory.
+- Since RUNTIME_NATIVE N5 `n5-1` (2026-11-23) every **native method** of the input is a gap site
+  of kind `native`, unbounded: it has no bytecode, and its native body may call any Java
+  method through JNI. v2 `coverage.native` lists the reachable ones and the native library
+  loads (`System`/`Runtime` `loadLibrary`/`load`, with the library name when it is a literal).
 - A gap is **relevant** to a finding when the unresolved site is in a method that is
   **reachable from the roots** *and* its possible targets could include the affected
   component (its candidate owners lie in the affected artifact, or the site has no
@@ -426,6 +430,7 @@ on Weld SE 5.1.2 (`scripts/library-cdi-oracle.sh`), the non-bean never.
 | `unknown_allocation` | an object created where the type is unknown (Unsafe, constructor handles) | site/`allocation`, allocation/`unsafe-allocation` |
 | `external_input` | `-roots all`: a root's parameters may be any subtype | allocation/`external-input` |
 | `client_code` | `-roots api`: a library call a client can implement or override | site/`client`, site/`supplied` |
+| `native` | a native method: its body is native code, which may call any Java method through JNI | site/`native` |
 | `lambda` | a functional-interface call whose lambda / method reference is unresolved | lambda/`bootstrap`, lambda/`budget`, lambda/`call-result`, lambda/`depth`, lambda/`field`, lambda/`instance-call`, lambda/`parameter`, lambda/`sam-argument`, lambda/`unknown-value`, runtime/`invokedynamic`, runtime/`sam-call` |
 | `skipped_receiver` | a call on `java.`/`javax.`/`jdk.`/`sun.` types, never CHA-expanded | runtime/`skipped-receiver` |
 | `virtual_dispatch` | a virtual call target the graph has no edge for (RTA pruning, inherited bodies) | runtime/`dispatch-missing`, runtime/`inherited-impl`, runtime/`rta-pruned` |

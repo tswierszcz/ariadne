@@ -83,8 +83,13 @@ type Header struct {
 	// RuntimeAdvisories (CVE:F8b): the runtime\'s affected and undetermined
 	// advisories (not_affected ones are only counted).
 	RuntimeAdvisories []RuntimeAdvisory
-	UnresolvedDyn     int
-	UnresolvedOwner   int
+	// Native boundaries (RUNTIME_NATIVE N5 n5-1): how many native methods
+	// the input has, the reachable ones and the native library loads.
+	NativeMethods   int
+	NativeReachable []NativeRow
+	NativeLoads     []NativeLoadRow
+	UnresolvedDyn   int
+	UnresolvedOwner int
 	// Model gaps (contract §4): unresolved dynamic sites, those reachable
 	// from the roots, and those of them with no bounded candidate set.
 	GapSites, GapsReachable, GapsUnbounded int
@@ -796,4 +801,13 @@ func (r Runtime) MultiDefinedText() string {
 type RuntimeAdvisory struct {
 	CVE, Advisory, URL, Component, Applicability, LastAffected, Reason string
 	CVSS                                                               float64
+}
+
+// NativeRow is one reachable native method.
+type NativeRow struct{ Method, Where string }
+
+// NativeLoadRow is one native library load.
+type NativeLoadRow struct {
+	Caller, API, Library string
+	Reachable            bool
 }

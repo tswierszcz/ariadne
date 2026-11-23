@@ -2000,6 +2000,19 @@ gaps by mechanism" table and v2 `coverage.gaps`/`findings[].gaps` use it.
 It is a reading aid: only the `site` gaps take part in the model-gap rule,
 and no verdict or reason code changes (v1 is byte-identical).
 
+**Native code boundaries (RUNTIME_NATIVE N5 `n5-1`, 2026-11-23).** A native method has no
+bytecode, so a path used to end at it silently. Now every native method of the input is a gap
+site of kind `native` (mechanism `native`, unbounded: its native body may call any Java method
+through JNI); under the model-gap rule a `NOT_REACHABLE` finding with a reachable one keeps its
+verdict and adds the count to `model_gaps`. Calls to `System`/`Runtime` `loadLibrary`/`load`
+are listed with the library name when it is a literal. report.md "Native code boundaries" lists
+the reachable native methods (at most 50; all in v2 `coverage.native`) and the loads; log line
+`native boundaries (RUNTIME_NATIVE N5 n5-1): …`. Fixture `testdata/native`
+(`scripts/native-fixture.sh`, `TestNativeBoundaries`). Measured: petclinic 72 of 361 native
+methods reachable (Tomcat's APR/OpenSSL bindings), WebGoat 108 of 206 (jffi), JPetStore 0 of 3;
+no verdict or reason code changed in 6 configurations — 26 and 21 findings already
+`MODEL_INCOMPLETE` gain `native` in `model_gaps`. What native code does is not modeled.
+
 **Gap-rule probe (ROADMAP B0 b0-4).** Every run also measures, report-only,
 which `NOT_REACHABLE` findings a narrower or wider model-gap rule would mark:
 only gaps bounded to the instance (`scoped`), plus unresolved lambda calls
