@@ -1,0 +1,6 @@
+{"schema_version":"2","tool":{"version":"v0.9.0"},
+ "advisories":[{"id":"CVE-F","severity":"HIGH"}],
+ "findings":[{"advisory_id":"CVE-F","component_instance_id":"z","reachability":"NOT_REACHABLE","supplied_by":"library"}],
+ "callgraph":{"roots":"api"},
+ "coverage":{"data_freshness":{"kinds":[{"kind":"osv","oldest_validated_at":"2026-11-20T08:00:00Z"},{"kind":"pinned","oldest_validated_at":"0001-01-01T00:00:00Z"}]},
+  "api":{"alternate_versions":{"dependencies":[{"instance":"z","versions":[{"version":"2.0","not_assessed":"advisories unavailable: offline","findings":[]}]}]}}}}

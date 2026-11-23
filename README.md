@@ -1106,6 +1106,13 @@ among them CVE-2022-22965 (spring-beans) and 8 SpEL advisories; the other
 three libraries are unchanged. `-roots all` and `profile` results are
 unchanged.
 
+**Fleet report (prototype, 2026-11-23).** `go run ./cmd/ariadne-fleet -in <dir> -out fleet.md`
+merges the v2 results of many artifacts (one subdirectory each, with an optional `meta.json`)
+into one Markdown report — libraries and applications in separate tables, REACHABLE
+advisories across the fleet, failed analyses, tool versions and OSV data dates. Part of
+[RECOMMENDATION/FLEET_CI_PLAN.MD](RECOMMENDATION/FLEET_CI_PLAN.MD) (awaiting approval); the CI step
+itself is not built.
+
 **Other versions a user can get (`lb3-2`, 2026-11-23).** With
 `-alt-versions newest` the library run also assesses, per dependency with
 an identified instance, the highest published version inside a declared

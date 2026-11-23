@@ -1,0 +1,8 @@
+{"schema_version":"2","tool":{"version":"v1.0.0"},
+ "advisories":[{"id":"CVE-A","severity":"HIGH"},{"id":"CVE-D","severity":"MODERATE"}],
+ "findings":[
+  {"advisory_id":"CVE-A","component_instance_id":"x","reachability":"REACHABLE"},
+  {"advisory_id":"CVE-D","component_instance_id":"y","reachability":"FRAMEWORK"},
+  {"advisory_id":"CVE-E","component_instance_id":"y","reachability":"UNKNOWN"}],
+ "callgraph":{"roots":"all"},
+ "coverage":{"data_freshness":{"kinds":[{"kind":"osv","oldest_validated_at":"2026-11-22T09:00:00Z"}]}}}
