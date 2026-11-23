@@ -1,6 +1,6 @@
 # Tryb biblioteki — rekomendacja funkcjonalna
 
-Status: plan (2026-11-16), bez implementacji. Fazy: [LIBRARY_MODE_IMPLEMENTATION_PLAN.MD](LIBRARY_MODE_IMPLEMENTATION_PLAN.MD). Zasady wspólne: [ROADMAP.MD](ROADMAP.MD).
+Status: plan (2026-11-16), bez implementacji. Fazy: [LIBRARY_MODE_IMPLEMENTATION_PLAN.MD](LIBRARY_MODE_IMPLEMENTATION_PLAN.MD). Zasady wspólne: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## Cel
 
