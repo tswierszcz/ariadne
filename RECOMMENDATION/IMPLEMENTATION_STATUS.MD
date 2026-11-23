@@ -31,6 +31,14 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### Plan CI floty — aktualizacja i prototyp raportu zbiorczego (`cmd/ariadne-fleet`) (2026-11-23)
+
+- **Kontekst:** plan [FLEET_CI_PLAN.MD](FLEET_CI_PLAN.MD) (propozycja od 2026-11-15, dotąd niezacommitowana) czeka na decyzję menedżera w połowie grudnia; na prośbę użytkownika zaktualizowany i zacommitowany, z prototypem raportu zbiorczego.
+- **Aktualizacja planu:** sekcja „Stan narzędzia (2026-11-23)” (zamknięte obszary; tryb biblioteki, `-alt-versions`, v2 `frameworks`, ocena runtime'u, snapshoty); decyzja 3 uzupełniona o ruch do Central przy `-alt-versions` (4–24 pobrań `maven-metadata.xml` na bibliotekę — włączać tylko przy proxy); nowa decyzja 4 — opis runtime'u aplikacji (`-runtime-file` z pliku w repozytorium, bo JDK runnera to nie JDK wdrożenia); krok CI zapisuje `ariadne-results/meta.json` (`artifact`, `commit`, `branch`, `status`, `reason`); usunięta nieaktualna uwaga o `FRAMEWORKS:F3`.
+- **Prototyp `cmd/ariadne-fleet`** (`-in <katalog> [-out fleet.md]`): podkatalog na artefakt z wynikiem v2 (`results.json` albo plik JSON z `schema_version` `2`) i opcjonalnym `meta.json`; tryb biblioteka/aplikacja z `callgraph.roots`. Raport: osobne tabele bibliotek (liczby werdyktów, `REACHABLE` z `supplied_by: library` vs reszta, `SUPPLIED_DISPATCH_ONLY`, maks. narażonych metod API, pakiety Springa jako framework, advisories usuwane przez najnowszą wersję w linii) i aplikacji; lista `REACHABLE` po liczbie artefaktów i ważności; nieudane analizy z powodem; wersje narzędzia i daty danych OSV z ostrzeżeniem przy różnicach; blok interpretacji werdyktów.
+- **Testy:** `TestFleetReport` na syntetycznych wynikach `testdata/fleet` (biblioteka, aplikacja, nieudana analiza, inna wersja narzędzia, wersja nieoceniona, zerowa data OSV). Smoke test na prawdziwych wynikach v2 (5 bibliotek LB4 z `-alt-versions newest`, petclinic/WebGoat/JPetStore): wyłapał błąd (pole `callgraph.roots`, nie `callgraph.config.roots` — biblioteki wychodziły jako aplikacje) i zerową datę OSV, oba poprawione; liczby zgodne z pomiarami (configuration2: 778 metod API; jjwt-jackson: 22 advisories usuwane w linii). `go test ./...`, `go vet ./...`.
+- **Nie zrobione (czeka na decyzje planu):** `scripts/ci-scan.sh`, dystrybucja binarki, powiązanie biblioteka × aplikacje floty, sekcja README „Uruchomienie w CI dla wielu aplikacji”.
+
 ### LIBRARY_MODE:LB3 — zamknięcie (2026-11-23); obszar LIBRARY_MODE DONE i zarchiwizowany
 
 - **Decyzja użytkownika (2026-11-23):** zamknąć LIBRARY_MODE po `lb3-2`.

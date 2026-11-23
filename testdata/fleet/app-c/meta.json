@@ -1,0 +1,1 @@
+{"artifact":"com.example:app-c","status":"failed","reason":"mvn dependency:copy-dependencies failed (exit 1)"}

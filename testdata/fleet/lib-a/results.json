@@ -1,0 +1,10 @@
+{"schema_version":"2","tool":{"version":"v1.0.0"},
+ "advisories":[{"id":"CVE-A","severity":"HIGH"},{"id":"CVE-B","severity":"CRITICAL"},{"id":"CVE-C","severity":"LOW"}],
+ "findings":[
+  {"advisory_id":"CVE-A","component_instance_id":"c1","reachability":"REACHABLE","supplied_by":"library","exposed_api":[{},{},{}]},
+  {"advisory_id":"CVE-B","component_instance_id":"c1","reachability":"REACHABLE","supplied_by":"user","reason_codes":["SUPPLIED_DISPATCH_ONLY"],"exposed_api":[{}]},
+  {"advisory_id":"CVE-C","component_instance_id":"c2","reachability":"NOT_REACHABLE","supplied_by":"library"}],
+ "callgraph":{"roots":"api"},
+ "coverage":{"data_freshness":{"kinds":[{"kind":"osv","oldest_validated_at":"2026-11-20T10:00:00Z"}]},
+  "api":{"framework_packages_added":["org.springframework.*"],
+   "alternate_versions":{"dependencies":[{"instance":"c1","versions":[{"version":"1.2","findings":[{"advisory":"CVE-A"}]}]}]}}}}
