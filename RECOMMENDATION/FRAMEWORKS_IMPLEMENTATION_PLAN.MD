@@ -41,6 +41,8 @@ Wycinek „dispatch kontenera servletów” (2026-11-08): model B3 `servlet-cont
 
 ## F3. Proxy i ograniczony model AOP
 
+**Ocena 2026-11-23:** punkty 1–5 zrobione wycinkami (`internal/aop`, `framework:proxies` `x1`–`x3`, `spring:aop` `a1`/`a2`, katalog P1); otwarty tylko ogólny JDK Proxy (wycinek 2, zmierzony 0/12, reguła stopu). Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
+
 Zależności: F2, DATA_FLOW D3 dla bardziej złożonych powiązań, REFLECTION R2 i JVM G2 w używanych przypadkach.
 
 - Wprowadzić model tożsamości proxy, targetu oraz interceptora; dla ogólnego JDK Proxy powiązać handler i argument `Method` z właściwym wywołaniem interfejsu.
@@ -52,6 +54,8 @@ Zależności: F2, DATA_FLOW D3 dla bardziej złożonych powiązań, REFLECTION R
 Gotowe: proxy/target/self-invocation, dwa handlery, warunkowe advice i generowany typ nie mieszają się w jedną ścieżkę.
 
 ## F4. Rozszerzanie wejść i frameworków
+
+**Ocena 2026-11-23:** zdarzenia i `@Scheduled` (`ev1`), profile innych frameworków z aplikacjami kontrolnymi, wersjonowana lista wejść (`f5-1`); odłożone: model listenerów wiadomości, SpEL/programowalne rejestracje, osobny tryb klasyfikacji. Rekomendacja: zamknąć jako DONE for this scope. Zob. IMPLEMENTATION_STATUS.
 
 - Dodać osobne modele schedulerów i event/message listeners, współdzieląc mechanikę wywołania callbacków z ASYNC.
 - Kolejne Servlet/Jakarta/Micronaut/Quarkus modele wdrażać na podstawie ich rzeczywistych artefaktów i wersji; sam wygenerowany bytecode nie dowodzi, że każda ścieżka konfiguracji została odtworzona.
