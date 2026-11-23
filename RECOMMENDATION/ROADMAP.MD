@@ -12,6 +12,8 @@ Tor [CVE](../archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD) odpowiada za to,
 
 ### B0. Wyniki, dowody i pokrycie
 
+**Stan 2026-11-23: DONE for this scope** — `b0-1`…`b0-5`: dowód kroku ścieżki i charakter ustalenia, ścieżka bez kroków tylko-CHA, wspólny słownik luk, pomiar wariantów reguły luk (reguła bez zmian), spis nieograniczonych miejsc; decyzja 2026-11-20: bez heurystyki ścieżek przykładowych. Zob. IMPLEMENTATION_STATUS.
+
 - Wykorzystać i uzgodnić model z CVE F0–F1. Jeden schemat wersjonowanego wyniku, instancji komponentu i dowodu.
 - Oddzielić: tożsamość artefaktu, jakość mapowania CVE, możliwość wywołania, pochodzenie danych i obserwację wykonania.
 - Rejestrować kod powodu, miejsce w bytecode/konfiguracji, wersję modelu, warunki, źródła i granice zastosowania.
@@ -48,6 +50,8 @@ Gotowe, gdy dwa konsumenty, np. refleksja i callbacki, mogą użyć tych samych 
 
 ### B3. Modele bibliotek i iteracja analizy
 
+**Stan 2026-11-23: DONE for this scope** — `b3-1`…`b3-4`: rejestr modeli i koordynator, wspólny punkt stały z raportowanym budżetem, wybór uczestników z profilu, wersja reguł każdego rodzaju krawędzi w snapshotcie. Świadomie niebudowane: iteracja jednorazowych przebiegów (ich wejście to fakty przepływu wartości, nie graf) i unieważnianie per model. Zob. IMPLEMENTATION_STATUS.
+
 - Wprowadzić rejestr modeli z identyfikatorem, obsługiwanymi sygnaturami, zakresem wersji i źródłem semantyki. Nowy profil może dostarczać dane, nie wykonywalny kod z YAML.
 - Obsługę znanego API przypinać do konkretnego wywołania/obiektu, nie do wszystkich metod o tej samej nazwie w całej aplikacji.
 - Graf, odkryte alokacje i streszczenia wartości wpływają na siebie. Używać kolejki pracy i kontrolowanego punktu stałego; pojedyncze uruchomienie modelu przed BFS nie wystarczy.
@@ -59,6 +63,8 @@ Proponowany podział implementacyjny: `internal/analysis` koordynuje iterację, 
 Gotowe, gdy model usługi może wprowadzić typ, który uruchamia kolejne poprawne rozwinięcie grafu, a limit zatrzymania jest widoczny.
 
 ### B4. Weryfikacja i kwalifikacja przyrostów
+
+**Stan 2026-11-23: DONE** — każdy obszar macierzy ma przypadki i wyrocznię JVM albo jawne „nie dotyczy” (tabela kwalifikacji w IMPLEMENTATION_STATUS, `b4-1`…`b4-8`, `f5-2`, `f5-3`).
 
 - Każdy obszar ma małe przypadki dodatnie, ujemne i nierozstrzygnięte. W miarę możliwości założenia modelu potwierdzać oddzielnym kontrolowanym uruchomieniem JVM; brak obserwacji nie dowodzi nieosiągalności.
 - Stosować źródła i gotowe JAR-y fixtures, aby zwykłe testy silnika Go nie wymagały JDK ani sieci. Regeneracja fixtures i integracje agenta wymagają jawnie przygotowanego JDK.
