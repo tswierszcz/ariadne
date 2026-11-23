@@ -1,6 +1,6 @@
 # Frameworki, proxy i konfiguracja — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [FRAMEWORKS_IMPLEMENTATION_PLAN.MD](FRAMEWORKS_IMPLEMENTATION_PLAN.MD). Wspólne zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: plan. Fazy: [FRAMEWORKS_IMPLEMENTATION_PLAN.MD](FRAMEWORKS_IMPLEMENTATION_PLAN.MD). Wspólne zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## Cel i stan obecny
 
