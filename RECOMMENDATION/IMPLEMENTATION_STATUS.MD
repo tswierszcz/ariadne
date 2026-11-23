@@ -31,6 +31,12 @@ Po pierwszej sesji wpisz poniżej konkretne identyfikatory faz i ich stan. Ogól
 
 ## Rejestr faz
 
+### Raport: klasy w kilku kopiach (sekcja report.md) — DONE (2026-11-23)
+
+- **Zakres:** dane o przesłoniętych klasach były tylko w v2 (`components[].shadowed`, `shadowed_differing`); report.md dostaje sekcję „Classes in several copies”: liczba klas zdefiniowanych przez więcej niż jeden komponent, ile z inną treścią, kolejność classpath (`ClasspathOrder`) i tabela par komponentów (kopia wzięta, kopia przesłonięta, klasy, z inną treścią, przykład), pary z różną treścią najpierw, ≤ 30 wierszy (`shadowReportRows`, `cmd/ariadne/gaps.go`).
+- **Test:** `TestShadowedClassesReport` — commons-lang3 3.11 trzy razy (jar, identyczna kopia, jar z `Validate` o zmienionej stałej): dwa wiersze, najpierw para z różną treścią. `go test ./...`, `go vet ./...`.
+- **Zmiana tylko w report.md:** v1 i v2 bez zmian. Pomiar na aplikacjach referencyjnych nie został dokończony w tej sesji (limit użycia).
+
 ### RUNTIME_NATIVE:N5 — wycinek `n5-1`: granice natywne (metody `native`, ładowanie bibliotek) — DONE for this scope (2026-11-23)
 
 - **Zakres (zatwierdzony 2026-11-23: „N5 minimalne”):** jawna inwentaryzacja granic Java ↔ natywne, bez modelu kodu natywnego (plan N5: „pierwszy tor JNI może zakończyć się na jawnej inwentaryzacji granic”).

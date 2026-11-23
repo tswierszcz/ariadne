@@ -81,6 +81,14 @@ RUNTIME_NATIVE N5: where the analyzed Java code meets native code, which the ana
 |---|---|---|---|
 {{range .NativeLoads}}| `{{.Caller}}` | {{.API}} | {{if .Library}}`{{.Library}}`{{else}}(not a literal){{end}} | {{if .Reachable}}yes{{else}}no{{end}} |
 {{end}}{{end}}
+{{end}}{{if .ShadowRows}}## Classes in several copies
+
+{{.ShadowedClasses}} classes are defined by more than one component, {{.ShadowedDiffering}} of them with different content (different versions of the same code). The analysis keeps one copy of each class — {{.ClasspathOrder}} — and does not see the others; at run time the class loader may pick another one. Rows with different content deserve a look: a vulnerable method may be present in the shadowed copy only.
+
+| Kept copy | Shadowed copy | Classes | With different content | Example |
+|---|---|---|---|---|
+{{range .ShadowRows}}| {{.Kept}} | {{.Shadowed}} | {{.Classes}} | {{.Differing}} | `{{.Example}}` |
+{{end}}
 {{end}}## CVEs
 
 | CVE | Package | Version | Severity | Status | Vulnerable method(s) | Source | Reasons |
