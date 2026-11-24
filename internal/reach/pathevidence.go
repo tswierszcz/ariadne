@@ -180,3 +180,8 @@ func joinUnique(xs []string) string {
 	}
 	return strings.Join(out, ", ")
 }
+
+// BasisCharacter is an edge basis's evidence character (jvm_rule,
+// library_model, input_declaration, heuristic, unclassified) — the
+// research interface's edge character (RESEARCH_INTERFACE RI2).
+func BasisCharacter(b callgraph.EdgeBasis) string { return basisCharacter(b) }

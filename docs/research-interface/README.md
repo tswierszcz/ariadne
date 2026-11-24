@@ -1,6 +1,6 @@
 # Ariadne research interface
 
-Contract revision **1.0.0-draft.1**, documented 2026-11-24. The CLI described here is planned. The schemas, example bundle, conformance cases and documentation validator are available as a design package.
+Contract revision **1.0.0-draft.1**, documented 2026-11-24. The schemas, example bundle, conformance cases and documentation validator form the design package (RI0). A first implementation of `ariadne research index` and `ariadne research query` is available (RI1–RI3, 2026-11-24); its scope and known deviations are listed under [Implementation](#implementation) below.
 
 This interface lets [Tekmerion](https://github.com/tswierszcz/tekmerion) discover JVM API entries and call sites, then ask whether selected methods can be reached in a frozen analysis. Targets may belong to the input library or its dependencies and can be assessed without an advisory.
 
@@ -29,4 +29,30 @@ The shipped fixture has three method nodes. Public `extract` calls private `writ
 
 The complete suite also includes an [error envelope](v1/fixtures/error-response.json) and rejected examples for unknown fields, conflicting selectors, contradictory target/path states, broken path shape and an analysis-identity mismatch.
 
-The [implementation plan](../../RECOMMENDATION/RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD) records phases RI0–RI6. This design package delivers the specification portion of RI0. Runtime producer and consumer acceptance remain implementation work in the respective repositories.
+The [implementation plan](../../RECOMMENDATION/RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD) records phases RI0–RI6. This design package delivers the specification portion of RI0. Consumer acceptance (TM0) remains work in Tekmerion.
+
+## Implementation
+
+```sh
+go build -o bin/ariadne ./cmd/ariadne
+bin/ariadne research index -app library.jar -deps deps/ -deps-list deps.txt -roots api -profile generic -out bundle
+bin/ariadne research query -bundle bundle -request request.json -out response.json
+node scripts/research-check.mjs bundle response.json   # schema check of a real bundle and responses
+```
+
+`research index` accepts the static flags of the CVE scan (`-app`, `-deps`, `-deps-list`, `-roots` — required —, `-profile`, `-profile-file`, `-target-java`, `-active-profiles`, `-jpms-scenario`, `-jpms-module-path`, `-api-exclude`, `-library-pom`, `-callgraph-mode`, `-embedded-components`, `-sbom`, `-cache-dir`) and rejects every other flag. It runs the same pipeline as the CVE scan up to the point where advisories would be read, always offline: Maven Central reference data (embedded components, the library's pom) comes only from `-cache-dir` and `ARIADNE_MAVEN_LOCAL`. Diagnostics go to stderr. The bundle is published atomically; an existing destination is refused.
+
+`research query` reads one request and writes one response (or an error envelope) atomically. It reads and verifies in full — hash, record count, strict record shape, references — the datasets its operation needs, and checks the others for presence and size only.
+
+Rules implemented: `research-paths-1` (app-only pass before the full pass, framework instances listed in the identity setting `framework_instance_ids`; within a pass a path without CHA-only steps first; shortest; ties by id), `research-relevance-1`, `research-work-1` (one shared forward search from the query roots, charged to the first matched target, then one reverse search per target and variant over the nodes the roots reach), `research-dispatch-1` (client dispatch by library mode's LB2 edge rule; supplied dispatch for caller-supplied field values).
+
+Known deviations from the draft, also listed in each bundle's `coverage.limits`:
+
+- Gap sites are anchored at their calling method (`pc` 0, kind `implicit`): Ariadne's gap rule records the method of an unresolved site, not its offset.
+- `supplied_dispatch` is not set for a caller-supplied parameter of the entry method itself (lb2-7 marks those only on paths that start there).
+- Source locations are LineNumberTable ranges with `path = null`; no source file is bound.
+- Root `basis` is the selection mode (`public_api`, `inherited_api`, `announced_api`, `profile_entry`, `application_method`); web.xml and bean-lifecycle roots are not told apart.
+- A bundle has one dataset per record type; there is no streaming reader, so a query holds the datasets it needs in memory.
+
+Measured on 2026-11-24 (16 cores; see the plan's RI1–RI3 status for the full table): Petclinic `-roots profile` indexes in 61 s (peak 2.4 GB) into an 851 MB bundle of 257,640 nodes, 1,027,757 edges and 821,366 calls; WebGoat in 92 s (3.7 GB, 1.2 GB bundle), JPetStore in 15 s (199 MB). On Petclinic a discovery query takes about 3 s and a reachability query of 100 targets about 15 s, most of it loading.
+

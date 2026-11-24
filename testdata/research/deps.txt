@@ -1,0 +1,2 @@
+fx.test:fx-dep:jar:1.0:compile
+fx.test:fx-dep:jar:2.0:compile

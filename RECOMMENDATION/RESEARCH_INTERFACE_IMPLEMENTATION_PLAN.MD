@@ -1,6 +1,6 @@
 # Interfejs badawczy Ariadne dla Tekmerion
 
-Data planu 2026-11-23. Aktualizacja 2026-11-24. Stan RI0 — specyfikacja i pakiet danych kontraktu przygotowane, akceptacja producenta i konsumenta pozostaje do wykonania. RI1–RI6 PLANOWANE. Kontrakt opisuje [dokumentacja interfejsu badawczego](../docs/research-interface/README.md).
+Data planu 2026-11-23. Aktualizacja 2026-11-24. Stan RI0 — specyfikacja i pakiet danych kontraktu przygotowane, akceptacja konsumenta (TM0) pozostaje do wykonania. RI1–RI3 IN_PROGRESS — pierwszy działający przekrój `research index`/`research query` (status poniżej, w sekcji 6). RI4–RI6 PLANOWANE. Kontrakt opisuje [dokumentacja interfejsu badawczego](../docs/research-interface/README.md).
 
 ## 1. Cel i podział odpowiedzialności
 
@@ -172,6 +172,8 @@ Późniejszy przyrost `trace-config` przyjmie dowolne rozstrzygnięte cele i wyg
 
 ### RI1 — wspólne przygotowanie grafu
 
+**Status 2026-11-24: IN_PROGRESS.** Etap CVE (OSV, mapowanie) przeniesiony za statyczny pipeline w `analyze`; `research index` publikuje stan w tym punkcie (`researchState` w [research.go](../cmd/ariadne/research.go)). Funkcja `Prepare` jako osobna granica nie została wydzielona. Skan CVE bez zmian na Petclinic (all/profile/RTA), WebGoat, JPetStore i fixture biblioteki (`scripts/pipeline-compare.sh`). `proxycatalog.Find`: 2m12s → 0,96 s na Petclinic przy identycznych krawędziach.
+
 - Wydzielić z `cmd/ariadne/main.go` granicę pipeline'u zwracającą inwentarz, hierarchię, finalny graf, korzenie, fakty frameworków, diagnostykę oraz funkcję cleanup.
 - Zastosować tę samą ścieżkę przygotowania w dotychczasowej analizie CVE i `research index`.
 - Zachować wszystkie modele, bramki twórców, źródła korzeni, warianty JVM i strategie grafu wymagane przez konfigurację.
@@ -181,6 +183,8 @@ Późniejszy przyrost `trace-config` przyjmie dowolne rozstrzygnięte cele i wyg
 
 ### RI2 — trwały indeks
 
+**Status 2026-11-24: IN_PROGRESS.** Bundle `ariadne-research-bundle-1` z siedmioma zbiorami (po jednym na typ rekordu), atomowa publikacja, weryfikujący czytnik, deterministyczny `analysis_id`. Brak macierzy kompatybilności poza dokładną rewizją draftu; brak czytnika strumieniowego.
+
 - Wprowadzić rekordy wymiany dla danych wymaganych przez query, bez serializacji funkcji ani prywatnego układu struktur Go.
 - Zapisać i odtworzyć pełne miejsca krawędzi z warunkami i specjalizacjami. Czytnik sprawdza odnośniki do metod, korzeni i instancji.
 - Wprowadzić katalog wywołań obejmujący również API zewnętrzne, którego ciała nie weszły do grafu.
@@ -188,6 +192,8 @@ Późniejszy przyrost `trace-config` przyjmie dowolne rozstrzygnięte cele i wyg
 - Zapewnić deterministyczny zapis, integralność i atomową publikację.
 
 ### RI3 — dowolne cele
+
+**Status 2026-11-24: IN_PROGRESS.** Zapytania o cele w [internal/research](../internal/research/query.go) na rekordach bundle'a (nie na `reach.Engine`): te same przebiegi app_only/full, preferencja ścieżek bez kroków CHA, reguła client dispatch silnika zapisana na krawędziach. Zgodność z silnikiem sprawdzona na 256 wywołujących luk (Petclinic). Odstępstwa: [README](../docs/research-interface/README.md#implementation).
 
 - Wydzielić z `internal/reach` rozwiązywanie celów i ścieżek niezależne od advisory. Analiza CVE nadal korzysta ze swoich reguł mapowania i agregacji.
 - Wykorzystać istniejące BFS, specjalizacje, ekspozycję API i dowody ścieżek.
