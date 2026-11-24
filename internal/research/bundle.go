@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // Resource limits a reader applies before reading (CONTRACT.md §4).
@@ -435,100 +436,156 @@ var required = map[string][]string{
 	TypeCall:      {"record_type", "call_id", "site", "declared_class", "declared_name", "declared_descriptor", "target_node_ids", "body_in_input"},
 }
 
-// readDataset checks a dataset's presence and size, and — when its record
-// type is one the operation reads, or its type is not known from its
-// first record yet — its hash, record count and records.
+// readDataset checks a dataset's presence and size and, unless the
+// operation does not read it, streams it: hash, record count and every
+// record decoded and validated in parallel, without holding the file in
+// memory. A dataset is skipped (presence and size only) when it is one of
+// the per-type files this producer writes (datasetFiles), its first record
+// has that type, and the operation does not read the type.
 func (b *Bundle) readDataset(ds Dataset) error {
 	path, err := safeMember(b.Dir, ds.Path)
 	if err != nil {
 		return err
 	}
-	fi, err := os.Stat(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return corrupt("dataset %s: %v", ds.Path, err)
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return &Error{Code: "IO_ERROR", Message: err.Error()}
 	}
 	if fi.Size() != ds.SizeBytes {
 		return corrupt("dataset %s is %d bytes, the identity declares %d", ds.Path, fi.Size(), ds.SizeBytes)
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return &Error{Code: "IO_ERROR", Message: err.Error()}
-	}
-	lines, err := splitJSONL(data)
-	if err != nil {
-		return corrupt("dataset %s: %v", ds.Path, err)
-	}
-	if len(lines) != ds.RecordCount {
-		return corrupt("dataset %s has %d records, the identity declares %d", ds.Path, len(lines), ds.RecordCount)
-	}
-	// The record type of a dataset is its first record's: a producer may
-	// mix types, so a mixed dataset is read whenever any type is needed.
-	types := map[string]bool{}
-	for _, l := range lines {
-		types[recordTypeOf(l)] = true
-		if len(types) > 1 {
-			break
+	h := sha256.New()
+	r := bufio.NewReaderSize(io.TeeReader(f, h), 1<<20)
+	if first, err := r.Peek(min(4096, int(ds.SizeBytes))); err == nil || len(first) > 0 {
+		if nl := bytes.IndexByte(first, '\n'); nl > 0 {
+			t := recordTypeOf(first[:nl])
+			for _, df := range datasetFiles {
+				if df.path == ds.Path && df.recordType == t && !b.loaded[t] {
+					b.mu.Lock()
+					b.skipped = append(b.skipped, ds.Path)
+					b.mu.Unlock()
+					return nil
+				}
+			}
 		}
 	}
-	needed := false
-	for t := range types {
-		needed = needed || b.loaded[t] || required[t] == nil
+
+	// Batches of lines go to workers; results are reassembled in order.
+	const batchSize = 4096
+	type batch struct {
+		idx   int
+		first int // line number of the first line, 1-based
+		lines [][]byte
 	}
-	if !needed {
-		b.mu.Lock()
-		b.skipped = append(b.skipped, ds.Path)
-		b.mu.Unlock()
-		return nil
+	type result struct {
+		recs []any
+		err  error
 	}
-	if got := "sha256:" + fmt.Sprintf("%x", sha256.Sum256(data)); got != ds.SHA256 {
+	workers := runtime.GOMAXPROCS(0)
+	in := make(chan batch, workers*2)
+	var mu sync.Mutex
+	results := map[int]result{}
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for bt := range in {
+				recs := make([]any, len(bt.lines))
+				var err error
+				for i, l := range bt.lines {
+					if recs[i], err = decodeRecord(l); err != nil {
+						err = fmt.Errorf("line %d: %v", bt.first+i, err)
+						break
+					}
+				}
+				mu.Lock()
+				results[bt.idx] = result{recs, err}
+				mu.Unlock()
+			}
+		}()
+	}
+	n, nb := 0, 0
+	cur := batch{first: 1}
+	var readErr error
+	for {
+		line, err := r.ReadBytes('\n')
+		if err == io.EOF {
+			if len(line) > 0 {
+				readErr = corrupt("dataset %s does not end with LF", ds.Path)
+			}
+			break
+		}
+		if err != nil {
+			readErr = &Error{Code: "IO_ERROR", Message: err.Error()}
+			break
+		}
+		n++
+		line = line[:len(line)-1]
+		if len(line) == 0 {
+			readErr = corrupt("dataset %s line %d is empty", ds.Path, n)
+			break
+		}
+		if len(line) > maxLineBytes {
+			readErr = corrupt("dataset %s line %d is over the reader's limit", ds.Path, n)
+			break
+		}
+		cur.lines = append(cur.lines, line)
+		if len(cur.lines) == batchSize {
+			cur.idx = nb
+			in <- cur
+			nb++
+			cur = batch{first: n + 1}
+		}
+	}
+	if readErr == nil && len(cur.lines) > 0 {
+		cur.idx = nb
+		in <- cur
+		nb++
+	}
+	close(in)
+	wg.Wait()
+	if readErr != nil {
+		return readErr
+	}
+	if got := "sha256:" + hex.EncodeToString(h.Sum(nil)); got != ds.SHA256 {
 		return corrupt("dataset %s hash %s does not match the identity's %s", ds.Path, got, ds.SHA256)
 	}
-	recs, err := decodeLines(lines)
-	if err != nil {
-		return corrupt("dataset %s %v", ds.Path, err)
+	if n != ds.RecordCount {
+		return corrupt("dataset %s has %d records, the identity declares %d", ds.Path, n, ds.RecordCount)
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for _, r := range recs {
-		switch r := r.(type) {
-		case Component:
-			b.Components = append(b.Components, r)
-		case Class:
-			b.Classes = append(b.Classes, r)
-		case Node:
-			b.Nodes = append(b.Nodes, r)
-		case Edge:
-			b.Edges = append(b.Edges, r)
-		case Root:
-			b.Roots = append(b.Roots, r)
-		case Gap:
-			b.Gaps = append(b.Gaps, r)
-		case Call:
-			b.Calls = append(b.Calls, r)
+	for i := 0; i < nb; i++ {
+		res := results[i]
+		if res.err != nil {
+			return corrupt("dataset %s %v", ds.Path, res.err)
+		}
+		for _, rec := range res.recs {
+			switch r := rec.(type) {
+			case Component:
+				b.Components = append(b.Components, r)
+			case Class:
+				b.Classes = append(b.Classes, r)
+			case Node:
+				b.Nodes = append(b.Nodes, r)
+			case Edge:
+				b.Edges = append(b.Edges, r)
+			case Root:
+				b.Roots = append(b.Roots, r)
+			case Gap:
+				b.Gaps = append(b.Gaps, r)
+			case Call:
+				b.Calls = append(b.Calls, r)
+			}
 		}
 	}
 	return nil
-}
-
-// splitJSONL splits a JSONL file: one nonempty record per line, ending
-// with LF.
-func splitJSONL(data []byte) ([][]byte, error) {
-	if len(data) == 0 {
-		return nil, nil
-	}
-	if data[len(data)-1] != '\n' {
-		return nil, fmt.Errorf("does not end with LF")
-	}
-	lines := bytes.Split(data[:len(data)-1], []byte{'\n'})
-	for i, l := range lines {
-		if len(l) == 0 {
-			return nil, fmt.Errorf("line %d is empty", i+1)
-		}
-		if len(l) > maxLineBytes {
-			return nil, fmt.Errorf("line %d is over the reader's limit", i+1)
-		}
-	}
-	return lines, nil
 }
 
 // recordTypeOf is a cheap look at a line's record_type ("" if none).
@@ -545,86 +602,45 @@ func recordTypeOf(line []byte) string {
 	return string(rest[:j])
 }
 
-// decodeLines decodes records in parallel, keeping their order.
-func decodeLines(lines [][]byte) ([]any, error) {
-	out := make([]any, len(lines))
-	workers := runtime.GOMAXPROCS(0)
-	if workers > len(lines) {
-		workers = len(lines)
-	}
-	var wg sync.WaitGroup
-	var firstErr error
-	var errLine int
-	var mu sync.Mutex
-	chunk := (len(lines) + workers - 1) / max(workers, 1)
-	for w := 0; w < workers; w++ {
-		lo, hi := w*chunk, min((w+1)*chunk, len(lines))
-		if lo >= hi {
-			break
-		}
-		wg.Add(1)
-		go func(lo, hi int) {
-			defer wg.Done()
-			for i := lo; i < hi; i++ {
-				r, err := decodeRecord(lines[i])
-				if err != nil {
-					mu.Lock()
-					if firstErr == nil || i < errLine {
-						firstErr, errLine = err, i
-					}
-					mu.Unlock()
-					return
-				}
-				out[i] = r
-			}
-		}(lo, hi)
-	}
-	wg.Wait()
-	if firstErr != nil {
-		return nil, fmt.Errorf("line %d: %v", errLine+1, firstErr)
-	}
-	return out, nil
-}
-
-// decodeRecord: one validating pass (duplicates, UTF-8, the top-level
-// members and record_type), then a strict decode of the typed record.
+// decodeRecord validates one record's members on the raw bytes — valid
+// UTF-8, and for the record and each nested object exactly the members the
+// schema defines (every one of them is required, nullable ones included):
+// no duplicate, unknown or missing member — then decodes it.
 func decodeRecord(line []byte) (any, error) {
-	top, typ, err := scanObject(line)
-	if err != nil {
-		return nil, err
-	}
-	req, ok := required[typ]
-	if !ok {
+	typ := recordTypeOf(line)
+	if _, ok := required[typ]; !ok {
 		return nil, fmt.Errorf("unknown record_type %q", typ)
 	}
-	for _, n := range req {
-		if !top[n] {
-			return nil, fmt.Errorf("missing required field %q", n)
-		}
+	if !utf8.Valid(line) {
+		return nil, fmt.Errorf("record is not valid UTF-8")
 	}
+	if err := checkMembers(line, typ); err != nil {
+		return nil, err
+	}
+	var err error
 	var v any
 	switch typ {
 	case TypeComponent:
 		var r Component
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	case TypeClass:
 		var r Class
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	case TypeNode:
 		var r Node
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	case TypeEdge:
 		var r Edge
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	case TypeRoot:
 		var r Root
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	case TypeGap:
 		var r Gap
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	case TypeCall:
 		var r Call
-		err, v = strictInto(line, &r), &r
+		err, v = json.Unmarshal(line, &r), &r
 	}
 	if err != nil {
 		return nil, err
@@ -645,11 +661,220 @@ func decodeRecord(line []byte) (any, error) {
 	case *Call:
 		return *r, nil
 	}
-	return nil, fmt.Errorf("unhandled record type %q", typ)
+	return nil, fmt.Errorf("record_type %q does not match its record", typ)
 }
 
-func strictInto(line []byte, v any) error {
-	dec := json.NewDecoder(bytes.NewReader(line))
-	dec.DisallowUnknownFields()
-	return dec.Decode(v)
+// nestedRequired lists the members required in a record's nested objects,
+// by the top-level member holding them (an array holds objects of that
+// shape).
+var nestedRequired = map[string]map[string][]string{
+	TypeNode: {"method": {"method_id", "instance_id", "class_sha256", "class", "name", "descriptor"},
+		"source": {"path", "line_start", "line_end", "source_sha256", "binding"}},
+	TypeEdge: {"sites": siteMembers},
+	TypeGap:  {"site": siteMembers},
+	TypeCall: {"site": siteMembers},
+}
+
+var siteMembers = []string{"caller_node_id", "pc", "kind", "condition"}
+
+// member is one object member: its key as written and its raw value.
+type member struct{ key, val []byte }
+
+// checkMembers verifies the member sets by scanning the raw bytes.
+func checkMembers(line []byte, typ string) error {
+	var buf [16]member
+	top, err := objectMembers(line, buf[:0])
+	if err != nil {
+		return err
+	}
+	if err := exactMembers(top, required[typ], ""); err != nil {
+		return err
+	}
+	if v := find(top, "record_type"); len(v) != len(typ)+2 || string(v[1:len(v)-1]) != typ {
+		return fmt.Errorf("record_type member does not match %q", typ)
+	}
+	var nbuf [8]member
+	for name, want := range nestedRequired[typ] {
+		raw := find(top, name)
+		if len(raw) == 0 || raw[0] == 'n' { // null: allowed where nullable; the decode checks the type
+			continue
+		}
+		objs := [][]byte{raw}
+		if raw[0] == '[' {
+			if objs, err = arrayElements(raw); err != nil {
+				return err
+			}
+		}
+		for _, o := range objs {
+			m, err := objectMembers(o, nbuf[:0])
+			if err != nil {
+				return err
+			}
+			if err := exactMembers(m, want, "/"+name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func find(ms []member, name string) []byte {
+	for _, m := range ms {
+		if string(m.key) == name {
+			return m.val
+		}
+	}
+	return nil
+}
+
+// exactMembers: ms has exactly the members names, each once (duplicates
+// were rejected by objectMembers).
+func exactMembers(ms []member, names []string, at string) error {
+	for _, n := range names {
+		if find(ms, n) == nil {
+			return fmt.Errorf("missing required field %q at %s", n, pointerOrRoot(at))
+		}
+	}
+	if len(ms) != len(names) {
+		for _, m := range ms {
+			if !contains(names, string(m.key)) {
+				return fmt.Errorf("unknown field %q at %s", m.key, pointerOrRoot(at))
+			}
+		}
+	}
+	return nil
+}
+
+// objectMembers splits a JSON object into its members, appended to out,
+// rejecting a repeated member; it checks structure only as far as needed
+// to find them (the decode validates the rest). Keys are compared as
+// written: a key with an escape sequence never equals a schema name.
+func objectMembers(b []byte, out []member) ([]member, error) {
+	b = bytes.TrimSpace(b)
+	if len(b) < 2 || b[0] != '{' {
+		return nil, fmt.Errorf("not a JSON object")
+	}
+	i := skipWS(b, 1)
+	if i < len(b) && b[i] == '}' {
+		return out, nil
+	}
+	for i < len(b) {
+		if b[i] != '"' {
+			return nil, fmt.Errorf("malformed object")
+		}
+		end, err := skipString(b, i)
+		if err != nil {
+			return nil, err
+		}
+		key := b[i+1 : end-1]
+		for _, m := range out {
+			if bytes.Equal(m.key, key) {
+				return nil, fmt.Errorf("duplicate member %q", key)
+			}
+		}
+		i = skipWS(b, end)
+		if i >= len(b) || b[i] != ':' {
+			return nil, fmt.Errorf("malformed object")
+		}
+		i = skipWS(b, i+1)
+		vend, err := skipValue(b, i)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, member{key, b[i:vend]})
+		i = skipWS(b, vend)
+		if i < len(b) && b[i] == ',' {
+			i = skipWS(b, i+1)
+			continue
+		}
+		if i < len(b) && b[i] == '}' {
+			return out, nil
+		}
+		return nil, fmt.Errorf("malformed object")
+	}
+	return nil, fmt.Errorf("unterminated object")
+}
+
+func arrayElements(b []byte) ([][]byte, error) {
+	var out [][]byte
+	i := skipWS(b, 1)
+	if i < len(b) && b[i] == ']' {
+		return out, nil
+	}
+	for i < len(b) {
+		end, err := skipValue(b, i)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, b[i:end])
+		i = skipWS(b, end)
+		if i < len(b) && b[i] == ',' {
+			i = skipWS(b, i+1)
+			continue
+		}
+		if i < len(b) && b[i] == ']' {
+			return out, nil
+		}
+		return nil, fmt.Errorf("malformed array")
+	}
+	return nil, fmt.Errorf("unterminated array")
+}
+
+func skipWS(b []byte, i int) int {
+	for i < len(b) && (b[i] == ' ' || b[i] == '\t' || b[i] == '\n' || b[i] == '\r') {
+		i++
+	}
+	return i
+}
+
+// skipString returns the index after the string starting at b[i] == '"'.
+func skipString(b []byte, i int) (int, error) {
+	for j := i + 1; j < len(b); j++ {
+		switch b[j] {
+		case '\\':
+			j++
+		case '"':
+			return j + 1, nil
+		}
+	}
+	return 0, fmt.Errorf("unterminated string")
+}
+
+// skipValue returns the index after the JSON value starting at b[i].
+func skipValue(b []byte, i int) (int, error) {
+	if i >= len(b) {
+		return 0, fmt.Errorf("missing value")
+	}
+	switch b[i] {
+	case '"':
+		return skipString(b, i)
+	case '{', '[':
+		depth := 0
+		for j := i; j < len(b); j++ {
+			switch b[j] {
+			case '"':
+				end, err := skipString(b, j)
+				if err != nil {
+					return 0, err
+				}
+				j = end - 1
+			case '{', '[':
+				depth++
+			case '}', ']':
+				depth--
+				if depth == 0 {
+					return j + 1, nil
+				}
+			}
+		}
+		return 0, fmt.Errorf("unterminated value")
+	}
+	j := i
+	for j < len(b) && b[j] != ',' && b[j] != '}' && b[j] != ']' && b[j] != ' ' && b[j] != '\n' {
+		j++
+	}
+	if j == i {
+		return 0, fmt.Errorf("missing value")
+	}
+	return j, nil
 }
