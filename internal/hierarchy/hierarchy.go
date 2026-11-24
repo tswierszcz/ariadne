@@ -70,6 +70,8 @@ type ClassInfo struct {
 	// multi-release version N SourceEntry was selected from (JVM_GRAPH
 	// G4).
 	VariantVersion int
+	// SourceFile is the class file's SourceFile attribute ("" if absent).
+	SourceFile string
 	// GAV is the resolved Maven coordinate of SourceJar, or nil if it
 	// came from the app, or from a dependency jar ResolveDepJars could
 	// not identify.

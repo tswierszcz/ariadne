@@ -176,6 +176,10 @@ type ClassFile struct {
 	// Module is the decoded Module attribute (SERVICE_LOADING S3), set
 	// only on a module-info.class (IsModule); nil for every ordinary class.
 	Module *ModuleInfo
+	// SourceFile is the SourceFile attribute (the source file's name, no
+	// directory: "Extractor.java"; a nested class names its outer file),
+	// "" when the class was compiled without it.
+	SourceFile string
 
 	pool pool // kept only so resolveInvokeDynamic (calls.go) can look up the CONSTANT_InvokeDynamic entry for each invokedynamic instruction
 }
@@ -247,6 +251,7 @@ func Parse(r io.Reader) (*ClassFile, error) {
 	var classAnnotations []Annotation
 	var bootstrap []BootstrapMethod
 	var module *ModuleInfo
+	var sourceFile string
 	classAttrCount := rd.u2()
 	for i := uint16(0); i < classAttrCount && rd.err == nil; i++ {
 		name, data, err := readAttribute(rd, p)
@@ -269,6 +274,12 @@ func Parse(r io.Reader) (*ClassFile, error) {
 			module, err = parseModuleAttribute(data, p)
 			if err != nil {
 				return nil, fmt.Errorf("Module: %w", err)
+			}
+		case "SourceFile":
+			if len(data) == 2 {
+				if sf, err := p.utf8(uint16(data[0])<<8 | uint16(data[1])); err == nil {
+					sourceFile = sf
+				}
 			}
 		}
 	}
@@ -302,6 +313,7 @@ func Parse(r io.Reader) (*ClassFile, error) {
 		AnnotationDetails: classAnnotations,
 		Bootstrap:         bootstrap,
 		Module:            module,
+		SourceFile:        sourceFile,
 		pool:              p,
 	}, nil
 }
