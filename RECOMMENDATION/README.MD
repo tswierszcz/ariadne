@@ -83,6 +83,7 @@ pozostaje `Partial`.
 
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
+| Interfejs badawczy dla Tekmerion — kontrakt draft.1, CLI planowane | [Specyfikacja, schemat i przykłady](../docs/research-interface/README.md) | [RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD](RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 | Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
 

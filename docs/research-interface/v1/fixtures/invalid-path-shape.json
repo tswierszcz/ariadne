@@ -1,0 +1,221 @@
+{
+  "schema_version": "ariadne-research-response-1",
+  "contract_revision": "1.0.0-draft.1",
+  "status": "ok",
+  "analysis_id": "sha256:3c1aba28a034be50d626df77e1ff2f1ee61310029a51c0da7ac3524424601363",
+  "request_id": "path-found",
+  "operation": "reachability",
+  "provenance": {
+    "kind": "fixture",
+    "producer": "ariadne-contract-authors",
+    "revision": "ri0-fixture-1"
+  },
+  "effective_limits": {
+    "max_records": 100,
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_work_units": 1000000
+  },
+  "warnings": [],
+  "results": [
+    {
+      "target_id": "candidate-001",
+      "resolution": "matched",
+      "matched_node_ids": [
+        "n-write"
+      ],
+      "search": {
+        "state": "found",
+        "work_complete": true,
+        "work_units": 3,
+        "reason": null
+      },
+      "model": {
+        "state": "incomplete",
+        "relevant_gap_ids": [
+          "g-reflection"
+        ],
+        "global_gap_count": 1,
+        "relevance_rule_version": "research-relevance-1",
+        "scope_uncertain": true
+      },
+      "entries": [
+        {
+          "root_node_id": "n-extract",
+          "pass": "app_only",
+          "path": {
+            "node_ids": [
+              "n-extract",
+              "n-write"
+            ],
+            "edge_ids": [],
+            "truncated": false,
+            "full_node_count": 2
+          },
+          "character": [
+            "jvm_rule"
+          ],
+          "client_dispatch": false,
+          "supplied_dispatch": false
+        }
+      ],
+      "total_entry_count": 1,
+      "entries_truncated": false,
+      "root_basis": "indexed_graph"
+    }
+  ],
+  "evidence": [
+    {
+      "record_type": "call",
+      "call_id": "s-extract-write",
+      "site": {
+        "caller_node_id": "n-extract",
+        "pc": 4,
+        "kind": "special",
+        "condition": null
+      },
+      "declared_class": "example.archive.Extractor",
+      "declared_name": "writeEntry",
+      "declared_descriptor": "(Ljava/lang/String;)V",
+      "target_node_ids": [
+        "n-write"
+      ],
+      "body_in_input": true
+    },
+    {
+      "record_type": "class",
+      "class_id": "k-extractor",
+      "instance_id": "c-library",
+      "class": "example.archive.Extractor",
+      "class_sha256": "sha256:dfc157320b6b1806140957a0a86cd5dbba12c3b126ca0b983c533428674f18bb",
+      "selected": true,
+      "selected_class_id": "k-extractor",
+      "variant_java": 0
+    },
+    {
+      "record_type": "component",
+      "instance_id": "c-library",
+      "role": "library",
+      "identity": "identified",
+      "gav": "example:archive:1.0",
+      "artifact_sha256": "sha256:c87f29c94f51dfd2bf7d5d5e9524cdb21889dce1f0d64c308601816765cf04af",
+      "location": "library.jar"
+    },
+    {
+      "record_type": "edge",
+      "edge_id": "e-extract-write",
+      "from": "n-extract",
+      "to": "n-write",
+      "kind": "special",
+      "basis": "direct",
+      "character": "jvm_rule",
+      "rule": "bytecode:fixture-1",
+      "sites": [
+        {
+          "caller_node_id": "n-extract",
+          "pc": 4,
+          "kind": "special",
+          "condition": null
+        }
+      ],
+      "client_dispatch": false,
+      "supplied_dispatch": false
+    },
+    {
+      "record_type": "gap",
+      "gap_id": "g-reflection",
+      "mechanism": "reflection",
+      "reason": "Method receiver is unknown in this declared fixture model.",
+      "site": {
+        "caller_node_id": "n-extract",
+        "pc": 9,
+        "kind": "virtual",
+        "condition": null
+      },
+      "reachable_from_indexed_roots": true,
+      "candidate_method_ids": null,
+      "candidate_instance_ids": null,
+      "rule": "reflection:fixture-1"
+    },
+    {
+      "record_type": "node",
+      "node_id": "n-extract",
+      "node_kind": "method",
+      "method": {
+        "method_id": "m-extract",
+        "instance_id": "c-library",
+        "class_sha256": "sha256:dfc157320b6b1806140957a0a86cd5dbba12c3b126ca0b983c533428674f18bb",
+        "class": "example.archive.Extractor",
+        "name": "extract",
+        "descriptor": "(Ljava/lang/String;)V"
+      },
+      "canonical_node_id": "n-extract",
+      "receiver_type": null,
+      "body": "bytecode",
+      "access_flags": 1,
+      "source": {
+        "path": "src/main/java/example/archive/Extractor.java",
+        "line_start": 10,
+        "line_end": 14,
+        "source_sha256": "sha256:6e51f33be275d92b87083c4224a96496f4f7234f726377dfcdd5c40964c5f1e1",
+        "binding": "declared"
+      }
+    },
+    {
+      "record_type": "node",
+      "node_id": "n-unused",
+      "node_kind": "method",
+      "method": {
+        "method_id": "m-unused",
+        "instance_id": "c-library",
+        "class_sha256": "sha256:dfc157320b6b1806140957a0a86cd5dbba12c3b126ca0b983c533428674f18bb",
+        "class": "example.archive.Extractor",
+        "name": "unused",
+        "descriptor": "(Ljava/lang/String;)V"
+      },
+      "canonical_node_id": "n-unused",
+      "receiver_type": null,
+      "body": "bytecode",
+      "access_flags": 2,
+      "source": {
+        "path": "src/main/java/example/archive/Extractor.java",
+        "line_start": 10,
+        "line_end": 14,
+        "source_sha256": "sha256:6e51f33be275d92b87083c4224a96496f4f7234f726377dfcdd5c40964c5f1e1",
+        "binding": "declared"
+      }
+    },
+    {
+      "record_type": "node",
+      "node_id": "n-write",
+      "node_kind": "method",
+      "method": {
+        "method_id": "m-write",
+        "instance_id": "c-library",
+        "class_sha256": "sha256:dfc157320b6b1806140957a0a86cd5dbba12c3b126ca0b983c533428674f18bb",
+        "class": "example.archive.Extractor",
+        "name": "writeEntry",
+        "descriptor": "(Ljava/lang/String;)V"
+      },
+      "canonical_node_id": "n-write",
+      "receiver_type": null,
+      "body": "bytecode",
+      "access_flags": 2,
+      "source": {
+        "path": "src/main/java/example/archive/Extractor.java",
+        "line_start": 10,
+        "line_end": 14,
+        "source_sha256": "sha256:6e51f33be275d92b87083c4224a96496f4f7234f726377dfcdd5c40964c5f1e1",
+        "binding": "declared"
+      }
+    },
+    {
+      "record_type": "root",
+      "root_id": "r-extract",
+      "node_id": "n-extract",
+      "basis": "public_api",
+      "inherited_by": [],
+      "announced_by": []
+    }
+  ]
+}

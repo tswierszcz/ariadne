@@ -1,0 +1,1852 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ariadne:research:contract:1",
+  "title": "Ariadne research interface 1.0.0-draft.1",
+  "description": "Contract design and fixtures. CLI implementation is planned.",
+  "$defs": {
+    "Hash": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,159}$"
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "fixture",
+            "analysis"
+          ]
+        },
+        "producer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "producer",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "Source": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "line_start": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "line_end": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "binding": {
+          "enum": [
+            "build_verified",
+            "declared",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "line_start",
+        "line_end",
+        "source_sha256",
+        "binding"
+      ],
+      "additionalProperties": false
+    },
+    "Method": {
+      "type": "object",
+      "properties": {
+        "method_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "instance_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "class_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptor": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\(.*\\).+$"
+        }
+      },
+      "required": [
+        "method_id",
+        "instance_id",
+        "class_sha256",
+        "class",
+        "name",
+        "descriptor"
+      ],
+      "additionalProperties": false
+    },
+    "Site": {
+      "type": "object",
+      "properties": {
+        "caller_node_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "pc": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "enum": [
+            "static",
+            "special",
+            "virtual",
+            "interface",
+            "dynamic",
+            "implicit",
+            "model"
+          ]
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "caller_node_id",
+        "pc",
+        "kind",
+        "condition"
+      ],
+      "additionalProperties": false
+    },
+    "Component": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "component"
+        },
+        "instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "role": {
+          "enum": [
+            "library",
+            "dependency",
+            "application"
+          ]
+        },
+        "identity": {
+          "enum": [
+            "identified",
+            "unidentified",
+            "conflict",
+            "version_candidates"
+          ]
+        },
+        "gav": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "record_type",
+        "instance_id",
+        "role",
+        "identity",
+        "gav",
+        "artifact_sha256",
+        "location"
+      ],
+      "additionalProperties": false
+    },
+    "Class": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "class"
+        },
+        "class_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "class_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "selected_class_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "variant_java": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "record_type",
+        "class_id",
+        "instance_id",
+        "class",
+        "class_sha256",
+        "selected",
+        "selected_class_id",
+        "variant_java"
+      ],
+      "additionalProperties": false
+    },
+    "Node": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "node"
+        },
+        "node_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "node_kind": {
+          "enum": [
+            "method",
+            "receiver_specialization",
+            "synthetic_event"
+          ]
+        },
+        "method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Method"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "canonical_node_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "receiver_type": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "body": {
+          "enum": [
+            "bytecode",
+            "native",
+            "abstract",
+            "external",
+            "synthetic"
+          ]
+        },
+        "access_flags": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        }
+      },
+      "required": [
+        "record_type",
+        "node_id",
+        "node_kind",
+        "method",
+        "canonical_node_id",
+        "receiver_type",
+        "body",
+        "access_flags",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "Edge": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "edge"
+        },
+        "edge_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "from": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "to": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "enum": [
+            "direct",
+            "init",
+            "cha",
+            "synthetic",
+            "serviceloader",
+            "callback",
+            "methodhandle",
+            "reflection",
+            "deserialization",
+            "sam",
+            "model"
+          ]
+        },
+        "character": {
+          "enum": [
+            "jvm_rule",
+            "library_model",
+            "input_declaration",
+            "heuristic",
+            "unclassified"
+          ]
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Site"
+          }
+        },
+        "client_dispatch": {
+          "type": "boolean"
+        },
+        "supplied_dispatch": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "record_type",
+        "edge_id",
+        "from",
+        "to",
+        "kind",
+        "basis",
+        "character",
+        "rule",
+        "sites",
+        "client_dispatch",
+        "supplied_dispatch"
+      ],
+      "additionalProperties": false
+    },
+    "Root": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "root"
+        },
+        "root_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "node_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inherited_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "announced_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "record_type",
+        "root_id",
+        "node_id",
+        "basis",
+        "inherited_by",
+        "announced_by"
+      ],
+      "additionalProperties": false
+    },
+    "Gap": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "gap"
+        },
+        "gap_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "mechanism": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "site": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Site"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reachable_from_indexed_roots": {
+          "type": "boolean"
+        },
+        "candidate_method_ids": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_instance_ids": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "record_type",
+        "gap_id",
+        "mechanism",
+        "reason",
+        "site",
+        "reachable_from_indexed_roots",
+        "candidate_method_ids",
+        "candidate_instance_ids",
+        "rule"
+      ],
+      "additionalProperties": false
+    },
+    "Call": {
+      "type": "object",
+      "properties": {
+        "record_type": {
+          "const": "call"
+        },
+        "call_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "site": {
+          "$ref": "#/$defs/Site"
+        },
+        "declared_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_descriptor": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\(.*\\).+$"
+        },
+        "target_node_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true
+        },
+        "body_in_input": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "record_type",
+        "call_id",
+        "site",
+        "declared_class",
+        "declared_name",
+        "declared_descriptor",
+        "target_node_ids",
+        "body_in_input"
+      ],
+      "additionalProperties": false
+    },
+    "Record": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Component"
+        },
+        {
+          "$ref": "#/$defs/Class"
+        },
+        {
+          "$ref": "#/$defs/Node"
+        },
+        {
+          "$ref": "#/$defs/Edge"
+        },
+        {
+          "$ref": "#/$defs/Root"
+        },
+        {
+          "$ref": "#/$defs/Gap"
+        },
+        {
+          "$ref": "#/$defs/Call"
+        }
+      ]
+    },
+    "Tool": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "ariadne"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "binary_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "algorithms": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "binary_sha256",
+        "algorithms"
+      ],
+      "additionalProperties": false
+    },
+    "Configuration": {
+      "type": "object",
+      "properties": {
+        "roots_mode": {
+          "enum": [
+            "all",
+            "profile",
+            "api"
+          ]
+        },
+        "graph_mode": {
+          "enum": [
+            "cha",
+            "rta",
+            "pta"
+          ]
+        },
+        "target_java": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "active_profiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "jpms_scenario": {
+          "enum": [
+            "classpath",
+            "module-path",
+            "mixed"
+          ]
+        },
+        "api_exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "roots_mode",
+        "graph_mode",
+        "target_java",
+        "profile",
+        "active_profiles",
+        "jpms_scenario",
+        "api_exclude",
+        "settings"
+      ],
+      "additionalProperties": false
+    },
+    "Input": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logical_location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "logical_location",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "Dataset": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[A-Za-z0-9_./-]+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "encoding": {
+          "const": "jsonl-utf8"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "record_count",
+        "encoding"
+      ],
+      "additionalProperties": false
+    },
+    "Identity": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-identity-1"
+        },
+        "contract_revision": {
+          "const": "1.0.0-draft.1"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "tool": {
+          "$ref": "#/$defs/Tool"
+        },
+        "configuration": {
+          "$ref": "#/$defs/Configuration"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Input"
+          },
+          "minItems": 1
+        },
+        "classpath_order": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true
+        },
+        "datasets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Dataset"
+          },
+          "minItems": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "entries",
+              "methods",
+              "calls",
+              "callers",
+              "callees",
+              "reachability"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "fixed_point": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "enum": [
+                "converged",
+                "incomplete"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "state",
+            "reasons"
+          ],
+          "additionalProperties": false
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "limits": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "disabled_participants": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "limits",
+            "disabled_participants"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "contract_revision",
+        "provenance",
+        "tool",
+        "configuration",
+        "inputs",
+        "classpath_order",
+        "datasets",
+        "capabilities",
+        "fixed_point",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "Manifest": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-bundle-1"
+        },
+        "contract_revision": {
+          "const": "1.0.0-draft.1"
+        },
+        "analysis_id": {
+          "$ref": "#/$defs/Hash"
+        },
+        "identity_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[A-Za-z0-9_./-]+$"
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "contract_revision",
+        "analysis_id",
+        "identity_path",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Selector": {
+      "type": "object",
+      "properties": {
+        "instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptor": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\(.*\\).+$"
+        }
+      },
+      "required": [
+        "instance_id",
+        "class",
+        "name",
+        "descriptor"
+      ],
+      "additionalProperties": false
+    },
+    "Target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "method_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "id",
+            "method_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "selector": {
+              "$ref": "#/$defs/Selector"
+            }
+          },
+          "required": [
+            "id",
+            "selector"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Roots": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "selection": {
+              "const": "indexed"
+            }
+          },
+          "required": [
+            "selection"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "selection": {
+              "const": "subset"
+            },
+            "node_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "selection",
+            "node_ids"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Limits": {
+      "type": "object",
+      "properties": {
+        "max_records": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_entries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_path_nodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "max_work_units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "EffectiveLimits": {
+      "type": "object",
+      "properties": {
+        "max_records": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_entries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_path_nodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "max_work_units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        }
+      },
+      "required": [
+        "max_records",
+        "max_entries",
+        "max_path_nodes",
+        "max_work_units"
+      ],
+      "additionalProperties": false
+    },
+    "Filters": {
+      "type": "object",
+      "properties": {
+        "instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "class_prefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptor": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\(.*\\).+$"
+        },
+        "node_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "declared_class_prefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reachable_only": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ReachabilityRequest": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-query-1"
+        },
+        "analysis_id": {
+          "$ref": "#/$defs/Hash"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "operation": {
+          "const": "reachability"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Target"
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "roots": {
+          "$ref": "#/$defs/Roots"
+        }
+      },
+      "required": [
+        "schema_version",
+        "analysis_id",
+        "request_id",
+        "operation",
+        "targets",
+        "roots"
+      ],
+      "additionalProperties": false
+    },
+    "DiscoveryRequest": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-query-1"
+        },
+        "analysis_id": {
+          "$ref": "#/$defs/Hash"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "operation": {
+          "enum": [
+            "entries",
+            "methods",
+            "calls"
+          ]
+        },
+        "filters": {
+          "$ref": "#/$defs/Filters"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "analysis_id",
+        "request_id",
+        "operation"
+      ],
+      "additionalProperties": false
+    },
+    "NeighborhoodRequest": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-query-1"
+        },
+        "analysis_id": {
+          "$ref": "#/$defs/Hash"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "operation": {
+          "enum": [
+            "callers",
+            "callees"
+          ]
+        },
+        "node_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "analysis_id",
+        "request_id",
+        "operation",
+        "node_id"
+      ],
+      "additionalProperties": false
+    },
+    "Request": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ReachabilityRequest"
+        },
+        {
+          "$ref": "#/$defs/DiscoveryRequest"
+        },
+        {
+          "$ref": "#/$defs/NeighborhoodRequest"
+        }
+      ]
+    },
+    "Path": {
+      "type": "object",
+      "properties": {
+        "node_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "edge_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "full_node_count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "node_ids",
+        "edge_ids",
+        "truncated",
+        "full_node_count"
+      ],
+      "additionalProperties": false
+    },
+    "EntryEvidence": {
+      "type": "object",
+      "properties": {
+        "root_node_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "pass": {
+          "enum": [
+            "app_only",
+            "full"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "character": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "jvm_rule",
+              "library_model",
+              "input_declaration",
+              "heuristic",
+              "unclassified"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "client_dispatch": {
+          "type": "boolean"
+        },
+        "supplied_dispatch": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "root_node_id",
+        "pass",
+        "path",
+        "character",
+        "client_dispatch",
+        "supplied_dispatch"
+      ],
+      "additionalProperties": false
+    },
+    "ModelAssessment": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "complete_under_declared_model",
+            "incomplete",
+            "undetermined"
+          ]
+        },
+        "relevant_gap_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true
+        },
+        "global_gap_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "relevance_rule_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope_uncertain": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "state",
+        "relevant_gap_ids",
+        "global_gap_count",
+        "relevance_rule_version",
+        "scope_uncertain"
+      ],
+      "additionalProperties": false
+    },
+    "TargetResult": {
+      "type": "object",
+      "properties": {
+        "target_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "resolution": {
+          "enum": [
+            "matched",
+            "missing",
+            "ambiguous",
+            "shadowed"
+          ]
+        },
+        "matched_node_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true
+        },
+        "search": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "enum": [
+                "found",
+                "not_found",
+                "not_evaluated",
+                "incomplete"
+              ]
+            },
+            "work_complete": {
+              "type": "boolean"
+            },
+            "work_units": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "work_complete",
+            "work_units",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "model": {
+          "$ref": "#/$defs/ModelAssessment"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EntryEvidence"
+          }
+        },
+        "total_entry_count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entries_truncated": {
+          "type": "boolean"
+        },
+        "root_basis": {
+          "enum": [
+            "indexed_graph",
+            "subset_on_indexed_graph"
+          ]
+        }
+      },
+      "required": [
+        "target_id",
+        "resolution",
+        "matched_node_ids",
+        "search",
+        "model",
+        "entries",
+        "total_entry_count",
+        "entries_truncated",
+        "root_basis"
+      ],
+      "additionalProperties": false
+    },
+    "Page": {
+      "type": "object",
+      "properties": {
+        "returned_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "work_complete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "returned_count",
+        "total_count",
+        "next_cursor",
+        "truncated",
+        "work_complete"
+      ],
+      "additionalProperties": false
+    },
+    "ReachabilityResponse": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-response-1"
+        },
+        "contract_revision": {
+          "const": "1.0.0-draft.1"
+        },
+        "status": {
+          "const": "ok"
+        },
+        "analysis_id": {
+          "$ref": "#/$defs/Hash"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "effective_limits": {
+          "$ref": "#/$defs/EffectiveLimits"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "operation": {
+          "const": "reachability"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TargetResult"
+          },
+          "minItems": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Record"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "contract_revision",
+        "status",
+        "analysis_id",
+        "request_id",
+        "provenance",
+        "effective_limits",
+        "warnings",
+        "operation",
+        "results",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "DiscoveryResponse": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-response-1"
+        },
+        "contract_revision": {
+          "const": "1.0.0-draft.1"
+        },
+        "status": {
+          "const": "ok"
+        },
+        "analysis_id": {
+          "$ref": "#/$defs/Hash"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "effective_limits": {
+          "$ref": "#/$defs/EffectiveLimits"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "operation": {
+          "enum": [
+            "entries",
+            "methods",
+            "calls",
+            "callers",
+            "callees"
+          ]
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Record"
+          }
+        },
+        "page": {
+          "$ref": "#/$defs/Page"
+        }
+      },
+      "required": [
+        "schema_version",
+        "contract_revision",
+        "status",
+        "analysis_id",
+        "request_id",
+        "provenance",
+        "effective_limits",
+        "warnings",
+        "operation",
+        "records",
+        "page"
+      ],
+      "additionalProperties": false
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "ariadne-research-response-1"
+        },
+        "contract_revision": {
+          "const": "1.0.0-draft.1"
+        },
+        "status": {
+          "const": "error"
+        },
+        "analysis_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "INVALID_REQUEST",
+                "UNSUPPORTED_SCHEMA",
+                "UNSUPPORTED_OPERATION",
+                "UNSUPPORTED_FILTER",
+                "ANALYSIS_MISMATCH",
+                "INVALID_CURSOR",
+                "ROOTS_OUTSIDE_INDEX",
+                "BUNDLE_CORRUPT",
+                "INCOMPATIBLE_BUNDLE",
+                "IO_ERROR",
+                "INTERNAL_ERROR",
+                "CANCELLED"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "details": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "location",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "retryable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "details",
+            "retryable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "contract_revision",
+        "status",
+        "analysis_id",
+        "request_id",
+        "operation",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "Response": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ReachabilityResponse"
+        },
+        {
+          "$ref": "#/$defs/DiscoveryResponse"
+        },
+        {
+          "$ref": "#/$defs/ErrorResponse"
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Manifest"
+    },
+    {
+      "$ref": "#/$defs/Identity"
+    },
+    {
+      "$ref": "#/$defs/Request"
+    },
+    {
+      "$ref": "#/$defs/Response"
+    },
+    {
+      "$ref": "#/$defs/Record"
+    }
+  ]
+}

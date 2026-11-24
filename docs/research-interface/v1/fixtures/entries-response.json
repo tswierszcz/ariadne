@@ -1,0 +1,37 @@
+{
+  "schema_version": "ariadne-research-response-1",
+  "contract_revision": "1.0.0-draft.1",
+  "status": "ok",
+  "analysis_id": "sha256:3c1aba28a034be50d626df77e1ff2f1ee61310029a51c0da7ac3524424601363",
+  "request_id": "api-catalog",
+  "operation": "entries",
+  "provenance": {
+    "kind": "fixture",
+    "producer": "ariadne-contract-authors",
+    "revision": "ri0-fixture-1"
+  },
+  "effective_limits": {
+    "max_records": 1,
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_work_units": 1000000
+  },
+  "warnings": [],
+  "records": [
+    {
+      "record_type": "root",
+      "root_id": "r-extract",
+      "node_id": "n-extract",
+      "basis": "public_api",
+      "inherited_by": [],
+      "announced_by": []
+    }
+  ],
+  "page": {
+    "returned_count": 1,
+    "total_count": 1,
+    "next_cursor": null,
+    "truncated": false,
+    "work_complete": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": "ariadne-research-response-1",
+  "contract_revision": "1.0.0-draft.1",
+  "status": "error",
+  "analysis_id": "sha256:3c1aba28a034be50d626df77e1ff2f1ee61310029a51c0da7ac3524424601363",
+  "request_id": "path-found",
+  "operation": "reachability",
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "Target contains mutually exclusive selectors.",
+    "details": [
+      {
+        "location": "/targets/0",
+        "reason": "Choose method_id or selector."
+      }
+    ],
+    "retryable": false
+  }
+}

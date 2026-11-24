@@ -17,6 +17,10 @@ See [supported capabilities and limitations](docs/SUPPORT.MD) for the current
 scope and evidence behind support claims. Future implementation plans are
 listed separately in [RECOMMENDATION](RECOMMENDATION/README.MD).
 
+The [research interface draft](docs/research-interface/README.md) specifies the
+planned advisory-independent integration with Tekmerion, with JSON Schema and
+validated contract examples.
+
 See [PLAN.md](PLAN.md) for the full design rationale, phase-by-phase
 history, and every finding made while building this (including two real
 bugs found by running the tool end-to-end, with before/after numbers).

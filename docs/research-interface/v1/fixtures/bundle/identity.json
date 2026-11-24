@@ -1,0 +1,67 @@
+{
+  "schema_version": "ariadne-research-identity-1",
+  "contract_revision": "1.0.0-draft.1",
+  "provenance": {
+    "kind": "fixture",
+    "producer": "ariadne-contract-authors",
+    "revision": "ri0-fixture-1"
+  },
+  "tool": {
+    "name": "ariadne",
+    "version": "fixture-only",
+    "binary_sha256": null,
+    "algorithms": {
+      "research.paths": "research-paths-1",
+      "research.relevance": "research-relevance-1",
+      "research.work": "research-work-1"
+    }
+  },
+  "configuration": {
+    "roots_mode": "api",
+    "graph_mode": "cha",
+    "target_java": 17,
+    "profile": "generic",
+    "active_profiles": [],
+    "jpms_scenario": "classpath",
+    "api_exclude": [],
+    "settings": {}
+  },
+  "inputs": [
+    {
+      "id": "input-library",
+      "role": "library",
+      "logical_location": "library.jar",
+      "sha256": "sha256:c87f29c94f51dfd2bf7d5d5e9524cdb21889dce1f0d64c308601816765cf04af"
+    }
+  ],
+  "classpath_order": [
+    "input-library"
+  ],
+  "datasets": [
+    {
+      "path": "records.jsonl",
+      "sha256": "sha256:bd9a73c895191b7be6d056d323b9d87b6988fca82f5a030f34082f2648e9e1cd",
+      "size_bytes": 3371,
+      "record_count": 9,
+      "encoding": "jsonl-utf8"
+    }
+  ],
+  "capabilities": [
+    "entries",
+    "methods",
+    "calls",
+    "callers",
+    "callees",
+    "reachability"
+  ],
+  "fixed_point": {
+    "state": "converged",
+    "reasons": []
+  },
+  "coverage": {
+    "limits": [
+      "Fixture metadata only. No executable JAR or source tree is shipped."
+    ],
+    "disabled_participants": []
+  }
+}
