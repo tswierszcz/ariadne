@@ -1,0 +1,18 @@
+{
+  "schema_version": "ariadne-research-query-1",
+  "analysis_id": "sha256:3c1aba28a034be50d626df77e1ff2f1ee61310029a51c0da7ac3524424601363",
+  "request_id": "root-subset",
+  "operation": "reachability",
+  "targets": [
+    {
+      "id": "candidate-001",
+      "method_id": "m-write"
+    }
+  ],
+  "roots": {
+    "selection": "subset",
+    "node_ids": [
+      "n-unused"
+    ]
+  }
+}

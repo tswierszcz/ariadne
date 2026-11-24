@@ -2,6 +2,13 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Interfejs badawczy RI0 — dokumentacja kontraktu (2026-11-24)
+
+- Stan IN_PROGRESS dla RI0. Przygotowano specyfikację `1.0.0-draft.1`, JSON Schema, hash-weryfikowalny bundle danych kontrolnych, przykłady żądań/odpowiedzi i walidator dokumentacji w [docs/research-interface](../docs/research-interface/README.md).
+- Kontrakt obejmuje katalogi API/metod/wywołań, sąsiedztwo grafu, paczkową osiągalność, tożsamości, dowody ścieżek, warunki krawędzi, luki, limity, błędy i wersjonowanie. Tekmerion otrzymuje kopię pakietu z pinem hashy i instrukcją konsumenta.
+- Weryfikacja dotyczy schematów, integralności danych, odwołań i semantyki przypadków kontrolnych. Implementacja CLI RI1–RI6 i akceptacja wykonującego klienta TM0 pozostają planowane.
+- Następny przyrost obejmuje akceptację kontraktu w adapterze TM0 i wydzielenie pipeline'u RI1, zgodnie z [planem](RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD).
+
 ## Stan początkowy
 
 Przygotowano plany, prompt i skill. W ramach ich tworzenia nie rozpoczęto implementacji nowych faz. Istniejący kod może spełniać część kryteriów; każda kolejna sesja ma to zweryfikować zamiast zakładać, że wszystko trzeba napisać od początku.

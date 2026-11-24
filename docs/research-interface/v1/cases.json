@@ -1,0 +1,213 @@
+{
+  "contract_revision": "1.0.0-draft.1",
+  "cases": [
+    {
+      "id": "path-found-request",
+      "path": "fixtures/path-found-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "path-found-response",
+      "path": "fixtures/path-found-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/path-found-request.json"
+    },
+    {
+      "id": "no-path-request",
+      "path": "fixtures/no-path-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "no-path-response",
+      "path": "fixtures/no-path-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/no-path-request.json"
+    },
+    {
+      "id": "target-missing-request",
+      "path": "fixtures/target-missing-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "target-missing-response",
+      "path": "fixtures/target-missing-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/target-missing-request.json"
+    },
+    {
+      "id": "budget-exhausted-request",
+      "path": "fixtures/budget-exhausted-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "budget-exhausted-response",
+      "path": "fixtures/budget-exhausted-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/budget-exhausted-request.json"
+    },
+    {
+      "id": "entries-request",
+      "path": "fixtures/entries-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "entries-response",
+      "path": "fixtures/entries-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/entries-request.json"
+    },
+    {
+      "id": "invalid-unknown-field",
+      "path": "fixtures/invalid-unknown-field.json",
+      "definition": "Request",
+      "schema_valid": false,
+      "semantic_valid": false
+    },
+    {
+      "id": "invalid-double-target",
+      "path": "fixtures/invalid-double-target.json",
+      "definition": "Request",
+      "schema_valid": false,
+      "semantic_valid": false
+    },
+    {
+      "id": "invalid-missing-with-path",
+      "path": "fixtures/invalid-missing-with-path.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": false,
+      "request": "fixtures/path-found-request.json"
+    },
+    {
+      "id": "invalid-path-shape",
+      "path": "fixtures/invalid-path-shape.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": false,
+      "request": "fixtures/path-found-request.json"
+    },
+    {
+      "id": "invalid-analysis-binding",
+      "path": "fixtures/invalid-analysis-binding.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": false,
+      "request": "fixtures/path-found-request.json"
+    },
+    {
+      "id": "error-response",
+      "path": "fixtures/error-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "root-is-target-request",
+      "path": "fixtures/root-is-target-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "root-is-target-response",
+      "path": "fixtures/root-is-target-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/root-is-target-request.json"
+    },
+    {
+      "id": "path-prefix-request",
+      "path": "fixtures/path-prefix-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "path-prefix-response",
+      "path": "fixtures/path-prefix-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/path-prefix-request.json"
+    },
+    {
+      "id": "found-partial-search-request",
+      "path": "fixtures/found-partial-search-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "found-partial-search-response",
+      "path": "fixtures/found-partial-search-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/found-partial-search-request.json"
+    },
+    {
+      "id": "root-subset-request",
+      "path": "fixtures/root-subset-request.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": true
+    },
+    {
+      "id": "root-subset-response",
+      "path": "fixtures/root-subset-response.json",
+      "definition": "Response",
+      "schema_valid": true,
+      "semantic_valid": true,
+      "request": "fixtures/root-subset-request.json"
+    },
+    {
+      "id": "invalid-duplicate-target-id",
+      "path": "fixtures/invalid-duplicate-target-id.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": false
+    },
+    {
+      "id": "invalid-root-outside-index",
+      "path": "fixtures/invalid-root-outside-index.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": false
+    },
+    {
+      "id": "invalid-operation-filter",
+      "path": "fixtures/invalid-operation-filter.json",
+      "definition": "Request",
+      "schema_valid": true,
+      "semantic_valid": false
+    },
+    {
+      "id": "invalid-schema-version",
+      "path": "fixtures/invalid-schema-version.json",
+      "definition": "Request",
+      "schema_valid": false,
+      "semantic_valid": false
+    }
+  ]
+}
