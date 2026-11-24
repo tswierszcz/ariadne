@@ -390,6 +390,45 @@ func transactionalEdges(h *hierarchy.Hierarchy, creators map[string][]callgraph.
 		}
 	}
 
+	// callTx: per called owner#name+desc, whether the owner's method is
+	// transactional, and up to two concrete subtypes whose method is — a
+	// call is transactional when the owner's is, or a concrete subtype's
+	// other than the calling class (a self-call does not pass the proxy).
+	// Two witnesses decide that for every caller, so the subtypes are
+	// walked once per called method, not once per call site.
+	type txCall struct {
+		owner bool
+		subs  []string
+	}
+	callMemo := map[string]txCall{}
+	callTx := func(owner, name, desc, caller string) bool {
+		key := owner + "#" + name + desc
+		t, ok := callMemo[key]
+		if !ok {
+			t.owner = transactional(owner, name, desc)
+			if !t.owner {
+				for _, sub := range h.Subtypes(owner) {
+					if sc, ok := h.Lookup(sub); ok && sc.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) == 0 && transactional(sub, name, desc) {
+						t.subs = append(t.subs, sub)
+						if len(t.subs) == 2 {
+							break
+						}
+					}
+				}
+			}
+			callMemo[key] = t
+		}
+		if t.owner {
+			return true
+		}
+		for _, sub := range t.subs {
+			if sub != caller {
+				return true
+			}
+		}
+		return false
+	}
+
 	var out []callgraph.SAMEdge
 	for _, fqcn := range h.SortedFQCNs() {
 		ci, _ := h.Lookup(fqcn)
@@ -398,16 +437,7 @@ func transactionalEdges(h *hierarchy.Hierarchy, creators map[string][]callgraph.
 				if (c.Kind != classfile.CallInterface && c.Kind != classfile.CallVirtual) || !relevant[c.Owner] || c.Owner == fqcn {
 					continue
 				}
-				tx := transactional(c.Owner, c.Name, c.Desc)
-				for _, sub := range h.Subtypes(c.Owner) {
-					if tx {
-						break
-					}
-					if sc, ok := h.Lookup(sub); ok && sub != fqcn && sc.AccessFlags&(classfile.AccInterface|classfile.AccAbstract) == 0 {
-						tx = transactional(sub, c.Name, c.Desc)
-					}
-				}
-				if !tx {
+				if !callTx(c.Owner, c.Name, c.Desc, fqcn) {
 					continue
 				}
 				out = append(out, callgraph.SAMEdge{

@@ -17,9 +17,10 @@ See [supported capabilities and limitations](docs/SUPPORT.MD) for the current
 scope and evidence behind support claims. Future implementation plans are
 listed separately in [RECOMMENDATION](RECOMMENDATION/README.MD).
 
-The [research interface draft](docs/research-interface/README.md) specifies the
-planned advisory-independent integration with Tekmerion, with JSON Schema and
-validated contract examples.
+The [research interface](docs/research-interface/README.md) answers questions
+about arbitrary methods without any advisory (`ariadne research index` /
+`research query`, experimental): the contract with Tekmerion, its JSON Schema,
+validated examples and the first implementation.
 
 See [PLAN.md](PLAN.md) for the full design rationale, phase-by-phase
 history, and every finding made while building this (including two real
@@ -2093,6 +2094,11 @@ bin/ariadne -app target/classes -deps target/dependency -deps-list deps.txt \
 
 # Straight from a Spring Boot fat jar (no -deps needed):
 bin/ariadne -app target/myapp-1.0.0.jar -out report.md -json results.json
+
+# Without advisories (RESEARCH_INTERFACE): index the graph once, then ask
+# about any method — see docs/research-interface/README.md:
+bin/ariadne research index -app library.jar -deps deps/ -roots api -profile generic -out bundle
+bin/ariadne research query -bundle bundle -request request.json -out response.json
 
 # Re-run against a warm cache only, never touching the network:
 bin/ariadne -app ... -deps ... -out report.md -json results.json -offline

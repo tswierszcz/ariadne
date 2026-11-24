@@ -1,6 +1,6 @@
 # Producer and consumer integration guide
 
-Contract revision 1.0.0-draft.1. The contract package is implemented as documentation, schema and fixture data. Commands in this guide describe the planned CLI.
+Contract revision 1.0.0-draft.1. The contract package is documentation, schema and fixture data. The commands in this guide are implemented since RI1–RI3 (2026-11-24), with the deviations listed in the [README](README.md#implementation). `scripts/research-check.mjs` checks a real bundle and its responses against the schema.
 
 ## 1. Files and source of truth
 
@@ -53,7 +53,7 @@ The validator checks expected schema and semantic outcomes from `cases.json`. Ca
 | Pilot | Completed RI4–RI5 | TM6 real library | Reproducible manifest, all candidate outcomes and cost |
 | Runtime extension | RI6 trace filter and correlation | Follow-up TM4–TM5 | Observations tied to target hashes and experiment identity |
 
-The contract specification portion of RI0 is delivered by this package. Runtime CLI support, producer regression checks and TM0's executable client/ledger remain planned. A completed documentation package alone does not satisfy runtime milestones.
+The contract specification portion of RI0 is delivered by this package. A first producer (RI1–RI3: `research index`/`query`, the shared pipeline and its CVE-regression check) exists; TM0's executable client/ledger remains planned in Tekmerion. A completed documentation package alone does not satisfy runtime milestones.
 
 ## 5. Producer implementation review
 

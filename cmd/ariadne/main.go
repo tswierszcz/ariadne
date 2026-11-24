@@ -126,6 +126,11 @@ type config struct {
 
 	exploitCheck   bool
 	frameworkCheck bool
+
+	// research is set by `ariadne research index` (RESEARCH_INTERFACE
+	// RI1): analyze publishes the static pipeline's state as a research
+	// bundle and stops before the CVE stage.
+	research *researchOut
 }
 
 // moduleLabel names a PreparedApp.WebXMLs key for an error message —
@@ -139,6 +144,9 @@ func moduleLabel(module string) string {
 }
 
 func run(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
+	if len(args) > 0 && args[0] == "research" {
+		return researchMain(args[1:], stdout, stderr, getenv)
+	}
 	fs := flag.NewFlagSet("ariadne", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -1238,83 +1246,6 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("deserialization chains (DESERIALIZATION Z3, catalog %s, %d chains): %s; %s",
 		deserialize.ChainCatalogVersion, len(deserialize.ChainCatalog), report.GapCounts(deserialize.ChainStateCounts(deserChains)), chainFlow)
 
-	var gavs []input.GAV
-	seenGAV := map[input.GAV]bool{}
-	for _, dj := range depJars {
-		if dj.GAV != nil && !seenGAV[*dj.GAV] {
-			seenGAV[*dj.GAV] = true
-			gavs = append(gavs, *dj.GAV)
-		}
-	}
-	for _, g := range components.ConfirmedEmbeddedGAVs() {
-		if !seenGAV[g] {
-			seenGAV[g] = true
-			gavs = append(gavs, g)
-		}
-	}
-	log("querying OSV for %d resolved dependencies", len(gavs))
-	resolution, err := cves.NewClient(cache).ResolveAll(ctx, gavs)
-	if err != nil {
-		return fmt.Errorf("resolving CVEs: %w", err)
-	}
-	cveList := resolution.CVEs
-	log("found %d CVEs (%d withdrawn advisories not analyzed)", len(cveList), len(resolution.Withdrawn))
-
-	manual, err := vulnmap.LoadManual(cfg.vulnMethods)
-	if err != nil {
-		return fmt.Errorf("loading vuln_methods.yaml: %w", err)
-	}
-	resolver := vulnmap.NewResolver(manual, cache)
-	resolver.GithubToken = cfg.githubToken
-	resolver.ReleaseDiff = cfg.releaseDiff
-	resolver.Bytecode = declaredOverloads(h)
-	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
-		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)
-	}
-	var llmSrc *vulnmap.LLMSource
-	if cfg.llm {
-		llmCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "llm"), cfg.offline)
-		if err != nil {
-			return fmt.Errorf("opening LLM cache dir: %w", err)
-		}
-		sr.attach(llmCache, "llm")
-		llmSrc = vulnmap.NewLLMSource(cfg.llmConfig, llmCache, nil)
-		llmSrc.ReaskChanged = cfg.llmReaskChanged
-		resolver.LLM = llmSrc
-		resolver.MethodExists = methodExists(h)
-		log("LLM source enabled: model %s", cfg.llmConfig.Model)
-	}
-	vm, err := resolver.ResolveAll(ctx, cveList)
-	if err != nil {
-		return fmt.Errorf("mapping CVEs to vulnerable methods: %w", err)
-	}
-	bySource := map[string]int{}
-	mapped, newSideOnly := 0, 0
-	for _, e := range vm {
-		if e.NotCode != "" {
-			bySource["not_code"]++
-			continue
-		}
-		if !e.Mapped() {
-			bySource["unavailable"]++
-			continue
-		}
-		mapped++
-		bySource[e.Source]++
-		if e.Source == vulnmap.SourceDiff && e.NewSideOnly() {
-			newSideOnly++
-		}
-	}
-	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d; diff read on the post-fix side only=%d; fix commits unreadable=%d; no JVM code=%d)",
-		mapped, len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM], newSideOnly, bySource["unavailable"], bySource["not_code"])
-	log("fix commits vs the analyzed release (CVE:F5c): %s", releaseLineSummary(vm))
-	if llmSrc != nil {
-		st := llmSrc.Stats()
-		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode, %d previous answers reused for changed advisories",
-			st.Mapped, st.Empty, st.Skipped, st.Invalid, st.Dropped, st.Reused)
-		warnings = append(warnings, llmSrc.Warnings()...)
-	}
-
 	log("analyzing reachability")
 	framework := reach.NewFrameworkMatcher(prof.ResolvePatterns(h))
 	var roots []uint32
@@ -1759,6 +1690,97 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 	}
 	engine.SetWebAssetPackages(webAssets)
+	// RESEARCH_INTERFACE RI1: everything above is the static pipeline, which
+	// needs no advisory; the CVE stage (OSV, mapping) starts here. A research
+	// index publishes that state instead.
+	if cfg.research != nil {
+		id, err := writeResearchBundle(researchState{cfg: cfg, h: h, g: g, roots: roots, inv: components,
+			apiInherited: apiInherited, apiAnnounced: apiAnnounced,
+			gapSites: gapSites, reachable: engine.MethodReachable, dispatch: engine.DispatchFlags, framework: framework, profile: prof.Name,
+			activeProfs: activeProfiles, fixedPoint: modelResult, disabled: analysis.Labels(disabledParts)}, log)
+		if err != nil {
+			return fmt.Errorf("research bundle: %w", err)
+		}
+		cfg.research.analysisID = id
+		return nil
+	}
+	var gavs []input.GAV
+	seenGAV := map[input.GAV]bool{}
+	for _, dj := range depJars {
+		if dj.GAV != nil && !seenGAV[*dj.GAV] {
+			seenGAV[*dj.GAV] = true
+			gavs = append(gavs, *dj.GAV)
+		}
+	}
+	for _, g := range components.ConfirmedEmbeddedGAVs() {
+		if !seenGAV[g] {
+			seenGAV[g] = true
+			gavs = append(gavs, g)
+		}
+	}
+	log("querying OSV for %d resolved dependencies", len(gavs))
+	resolution, err := cves.NewClient(cache).ResolveAll(ctx, gavs)
+	if err != nil {
+		return fmt.Errorf("resolving CVEs: %w", err)
+	}
+	cveList := resolution.CVEs
+	log("found %d CVEs (%d withdrawn advisories not analyzed)", len(cveList), len(resolution.Withdrawn))
+
+	manual, err := vulnmap.LoadManual(cfg.vulnMethods)
+	if err != nil {
+		return fmt.Errorf("loading vuln_methods.yaml: %w", err)
+	}
+	resolver := vulnmap.NewResolver(manual, cache)
+	resolver.GithubToken = cfg.githubToken
+	resolver.ReleaseDiff = cfg.releaseDiff
+	resolver.Bytecode = declaredOverloads(h)
+	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
+		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)
+	}
+	var llmSrc *vulnmap.LLMSource
+	if cfg.llm {
+		llmCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "llm"), cfg.offline)
+		if err != nil {
+			return fmt.Errorf("opening LLM cache dir: %w", err)
+		}
+		sr.attach(llmCache, "llm")
+		llmSrc = vulnmap.NewLLMSource(cfg.llmConfig, llmCache, nil)
+		llmSrc.ReaskChanged = cfg.llmReaskChanged
+		resolver.LLM = llmSrc
+		resolver.MethodExists = methodExists(h)
+		log("LLM source enabled: model %s", cfg.llmConfig.Model)
+	}
+	vm, err := resolver.ResolveAll(ctx, cveList)
+	if err != nil {
+		return fmt.Errorf("mapping CVEs to vulnerable methods: %w", err)
+	}
+	bySource := map[string]int{}
+	mapped, newSideOnly := 0, 0
+	for _, e := range vm {
+		if e.NotCode != "" {
+			bySource["not_code"]++
+			continue
+		}
+		if !e.Mapped() {
+			bySource["unavailable"]++
+			continue
+		}
+		mapped++
+		bySource[e.Source]++
+		if e.Source == vulnmap.SourceDiff && e.NewSideOnly() {
+			newSideOnly++
+		}
+	}
+	log("mapped %d/%d CVEs to vulnerable methods (manual=%d diff=%d llm=%d; diff read on the post-fix side only=%d; fix commits unreadable=%d; no JVM code=%d)",
+		mapped, len(cveList), bySource[vulnmap.SourceManual], bySource[vulnmap.SourceDiff], bySource[vulnmap.SourceLLM], newSideOnly, bySource["unavailable"], bySource["not_code"])
+	log("fix commits vs the analyzed release (CVE:F5c): %s", releaseLineSummary(vm))
+	if llmSrc != nil {
+		st := llmSrc.Stats()
+		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode, %d previous answers reused for changed advisories",
+			st.Mapped, st.Empty, st.Skipped, st.Invalid, st.Dropped, st.Reused)
+		warnings = append(warnings, llmSrc.Warnings()...)
+	}
+
 	results := engine.Analyze(cveList, vm)
 	// LIBRARY_MODE LB3 lb3-2: other versions of the library's dependencies,
 	// assessed apart from the run's findings.

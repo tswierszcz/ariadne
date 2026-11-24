@@ -86,8 +86,10 @@ type exposure struct {
 	// when there are no supplied sites.
 	suppliedStrict, both [][]uint32
 	cache                map[string][]ExposedMethod
-	inherited            map[uint32][]string
-	announced            map[uint32][]string
+	// clientEdge is SetExposure's client-dispatch edge rule.
+	clientEdge func(uint32, callgraph.Edge) bool
+	inherited  map[uint32][]string
+	announced  map[uint32][]string
 }
 
 // SetExposure makes Analyze list, on every positive finding, the roots
@@ -162,6 +164,7 @@ func (e *Engine) SetExposure(client []ClientCall, supplied []SuppliedCall, made 
 			x.suppliedAt[id][c.PC] = x.suppliedAt[id][c.PC] || c.Field
 		}
 	}
+	x.clientEdge = dispatch
 	fromField := func(u uint32, ed callgraph.Edge) bool { return x.fromSupplied(u, ed, true) }
 	clientEdges, suppliedEdges, fieldEdges := 0, 0, 0
 	for u := 0; u < n; u++ {
@@ -208,6 +211,17 @@ func (e *Engine) SetExposure(client []ClientCall, supplied []SuppliedCall, made 
 	e.exposure = x
 	e.suppliedEdges = suppliedEdges
 	return clientEdges
+}
+
+// DispatchFlags reports whether edge ed of node u is a client-dispatch
+// edge (SetExposure's rule) and whether it is a supplied-dispatch edge on
+// every path (every site a caller-supplied field value); both false
+// without SetExposure (RESEARCH_INTERFACE research-dispatch-1).
+func (e *Engine) DispatchFlags(u uint32, ed callgraph.Edge) (client, suppliedField bool) {
+	if e.exposure == nil {
+		return false, false
+	}
+	return e.exposure.clientEdge(u, ed), e.exposure.fromSupplied(u, ed, true)
 }
 
 // fromSupplied: every site of the edge is a supplied site of u (fieldOnly:

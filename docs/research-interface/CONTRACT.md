@@ -1,6 +1,6 @@
 # Ariadne research interface contract
 
-Revision **1.0.0-draft.1**. Date 2026-11-24. Status **DRAFT — CLI IMPLEMENTATION PLANNED**.
+Revision **1.0.0-draft.1**. Date 2026-11-24. Status **DRAFT — FIRST IMPLEMENTATION AVAILABLE** (`research index` / `research query`, RI1–RI3; deviations in [README](README.md#implementation)).
 
 The words MUST, SHOULD and MAY express obligations of future conforming implementations. The schema and fixtures accompany this draft. Current product capabilities remain described in [SUPPORT.MD](../SUPPORT.MD).
 

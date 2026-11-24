@@ -1129,27 +1129,27 @@ rendering logic — easy to diff between runs or load into another tool.
 
 ## Can the call graph be saved/persisted anywhere?
 
-**No — it isn't saved anywhere today.** It only lives in the RAM of one
-`ariadne` run and is discarded when the process exits.
-`internal/callgraph` has no save/load function at all (no JSON tags, no
-`Save`/`Load`).
+**Yes, in two forms, both written on request.** A normal CVE scan keeps the
+graph only in memory and discards it when the process exits; what it saves
+is the result (`results.json`, `report.md`) and the HTTP response cache.
 
-What actually does get saved: only the final analysis result
-(`results.json` — status, methods, path per CVE) and the HTTP response
-cache for OSV/GitHub (`.cache/`). Neither of those is the graph itself.
+- `-graph-out FILE` writes the final graph as sorted text (every edge with a
+  stable identity and its call-site PCs, the graph's settings and the
+  findings' paths) — meant for `-graph-compare`, to see what a change of
+  strategy or model did to the graph and the verdicts.
+- `ariadne research index` (RESEARCH_INTERFACE, experimental) writes a
+  *research bundle*: the frozen graph of one built input — every node,
+  receiver-specialized copies included, every edge with its sites and
+  conditions, roots, model gaps, the classes with their hashes and every
+  bytecode call site — as hash-verified JSONL. `ariadne research query`
+  then answers questions about arbitrary methods (which API entries reach
+  this one, who calls it, what JDK operations the library calls) from the
+  bundle alone, without the JARs, an advisory or the network. The format is
+  the contract in [docs/research-interface](docs/research-interface/README.md);
+  Tekmerion is its first consumer.
 
-**Why nobody saves it:** the graph is deterministically reproducible
-from the same inputs, and building it takes about 2 seconds even for
-270K nodes and 1.2M edges (measured on petclinic) — like a compiler's
-intermediate representation: compute it, use it, forget it.
-
-**Could it be saved — technically, yes,** since `Graph` is plain data
-inside (a list of strings, a string→int map, an array of edge lists).
-Two options: `encoding/gob` (compact, binary, readable only by Go) or
-JSON (readable by a human/other tools, but at 1.2M edges the file would
-run tens to hundreds of MB). It would make sense if you needed to: (1)
-run several analyses against the same build without rebuilding the
-graph each time, (2) build a visualization of the graph in a separate
-tool (exporting to `.dot`), or (3) debug the graph itself without going
-through the whole pipeline. None of these have come up yet, so it hasn't
-been implemented.
+**Why the CVE scan itself does not reuse a saved graph:** the graph is
+deterministically reproducible from the same inputs, and every scan
+re-reads the inputs anyway. A bundle is for asking many questions about
+one build: indexing Petclinic takes about a minute and gives an 851 MB
+bundle; a query on it takes seconds.
