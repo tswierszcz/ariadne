@@ -84,8 +84,9 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 	fs.StringVar(&cfg.embeddedComps, "embedded-components", "", "declared embedded components (YAML)")
 	fs.StringVar(&cfg.sbom, "sbom", "", "CycloneDX JSON SBOM for embedded-component candidates")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "cache directory read for Maven Central reference data (never written from the network)")
-	var out, scope string
+	var out, scope, sources string
 	fs.StringVar(&out, "out", "", "bundle directory to publish; must not exist")
+	fs.StringVar(&sources, "sources", "", "optional source tree (directory) or sources jar of the input: each method's source file, found by its package path, gets its SHA-256 (binding stays declared)")
 	fs.StringVar(&scope, "scope", "all", `"all" (every graph node) or "reachable" (only what the roots and the input's own methods reach: the same reachability answers, a smaller bundle; other methods resolve as missing)`)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -120,7 +121,16 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 		fmt.Fprintln(stderr, "ariadne research index:", err)
 		return 2
 	}
-	cfg.research = &researchOut{dir: out, scope: scope}
+	cfg.research = &researchOut{dir: out, scope: scope, sourcesArg: sources}
+	if sources != "" {
+		t, err := openSources(sources)
+		if err != nil {
+			fmt.Fprintln(stderr, "ariadne research index:", err)
+			return 2
+		}
+		defer t.close()
+		cfg.research.sources = t
+	}
 	if err := analyze(context.Background(), cfg, stderr); err != nil {
 		fmt.Fprintln(stderr, "ariadne research index:", err)
 		return 1
@@ -214,6 +224,8 @@ func writeResponse(path string, v any) error {
 type researchOut struct {
 	dir        string
 	scope      string // "all" or "reachable"
+	sources    *sourceTree
+	sourcesArg string
 	analysisID string
 }
 
@@ -407,6 +419,8 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 			keep[i] = true
 		}
 	}
+	srcPaths, srcHashed := 0, 0
+	srcCache, srcUnmatched := map[string]string{}, map[string]bool{}
 	methodIDOf := map[string]string{} // key -> method id
 	for id := 0; id < n; id++ {
 		if !keep[id] {
@@ -452,6 +466,22 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 				}
 				break
 			}
+			// RI4: the source file the class declares, by package path;
+			// with -sources, the hash of that file.
+			if sp := sourcePath(fqcn, ci.SourceFile); sp != "" {
+				node.Source.Path = &sp
+				node.Source.Binding = "declared"
+				srcPaths++
+				if t := st.cfg.research.sources; t != nil {
+					if _, h, ok := t.lookup(sp, srcCache); ok {
+						hs := sha(h)
+						node.Source.SourceSHA256 = &hs
+						srcHashed++
+					} else {
+						srcUnmatched[sp] = true
+					}
+				}
+			}
 		}
 		inst := ""
 		if m.InstanceID != nil {
@@ -470,6 +500,14 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 			node.ReceiverType = &recv
 		}
 		recs.Nodes = append(recs.Nodes, node)
+	}
+
+	if t := st.cfg.research.sources; t != nil {
+		log("source files (RESEARCH_INTERFACE RI4): %d of %d nodes name a source file; %d hashed from -sources (%d files), %d source paths not found there or ambiguous",
+			srcPaths, len(recs.Nodes), srcHashed, t.files, len(srcUnmatched))
+		if len(srcUnmatched) > 0 {
+			limits = append(limits, fmt.Sprintf("-sources: %d source paths the classes declare are absent from the given sources or match more than one file; their methods have no source hash.", len(srcUnmatched)))
+		}
 	}
 
 	// Edges, with client/supplied dispatch by library mode's rules.
@@ -656,6 +694,9 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 		s := sha256.Sum256(b)
 		inputs = append(inputs, research.Input{ID: "in-" + f.role, Role: f.role, LogicalLocation: baseName(f.path), SHA256: sha(hex.EncodeToString(s[:]))})
 	}
+	if t := st.cfg.research.sources; t != nil {
+		inputs = append(inputs, research.Input{ID: "in-sources", Role: "sources", LogicalLocation: baseName(st.cfg.research.sourcesArg), SHA256: sha(t.digest)})
+	}
 	exe := (*string)(nil)
 	if p, err := os.Executable(); err == nil {
 		if b, err := os.ReadFile(p); err == nil {
@@ -683,7 +724,7 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 			"Calls list every bytecode call site of the analyzed methods; edges added by models, CHA and declarations are edges, not calls.",
 			"Roots carry their selection mode; under -roots all/profile, roots added from web.xml and bean lifecycles are not told apart.",
 			"Edges carry client_dispatch by library mode's LB2 rule and supplied_dispatch only for caller-supplied field values (on every path); a caller-supplied parameter of the entry method itself (lb2-7) is not yet reported per entry.",
-			"Source locations are LineNumberTable ranges only: no source file is bound (path null, binding declared).",
+			"Source locations: path is the package path of the file the class's SourceFile attribute names (a nested class names its outer file), lines the method's LineNumberTable range; with -sources, source_sha256 is the hash of the one file in the given sources that ends with that path. The binding stays declared: nothing ties the given sources to the analyzed build.",
 			"No advisory, CVE mapping or network lookup is part of the index; Maven Central reference data comes only from the cache and ARIADNE_MAVEN_LOCAL.",
 		}, limits...), DisabledParticipants: sortedUnique(st.disabled)},
 	}

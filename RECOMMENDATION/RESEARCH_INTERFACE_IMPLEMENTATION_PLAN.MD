@@ -203,6 +203,8 @@ Późniejszy przyrost `trace-config` przyjmie dowolne rozstrzygnięte cele i wyg
 
 ### RI4 — kontekst do badania
 
+**Status 2026-11-24: IN_PROGRESS.** Lokalizacje źródeł: `source.path` z atrybutu `SourceFile` i pakietu, linie z LineNumberTable, `-sources DIR|JAR` dodaje `source_sha256` (powiązanie `declared`). Filtrowanie i paginacja działają od RI3. Pozostają: ograniczone sąsiedztwo z głębokością i opublikowany opis adaptera (adapter Tekmerion istnieje: tswierszcz/tekmerion#1).
+
 - Udostępnić stabilne filtrowanie i paginację API, metod i miejsc wywołań.
 - Umożliwić związanie metody z liniami źródła i pochodzeniem klasy. Przy braku linii zwracać deskryptor i PC.
 - Zwracać ograniczone sąsiedztwo wywołań i diagnostykę, z jawnym kierunkiem oraz głębokością.

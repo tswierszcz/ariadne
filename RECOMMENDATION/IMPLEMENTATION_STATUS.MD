@@ -2,6 +2,13 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Interfejs badawczy RI4 — lokalizacje źródeł (2026-11-24)
+
+- Stan IN_PROGRESS dla RI4 (pierwsza część: lokalizacje źródeł). Parser klas czyta atrybut `SourceFile` (`ClassInfo.SourceFile`); węzeł bundle'a dostaje `source.path` = ścieżka pakietu + nazwa pliku (`fx/research/Extractor.java`, klasa zagnieżdżona wskazuje plik zewnętrzny) i zakres linii z LineNumberTable, `binding: declared`.
+- `research index -sources DIR|JAR`: indeks plików źródłowych po sufiksach ścieżki; `source_sha256` dla jedynego pliku kończącego się ścieżką pakietu (niejednoznaczne lub brakujące — bez hasha, liczone w `coverage.limits`). Wejście `in-sources` w tożsamości (hash po posortowanej liście ścieżek i hashy plików). `build_verified` nie jest nadawane — nic nie wiąże podanych źródeł z buildem.
+- Weryfikacja: `TestResearchSourceLocations` (katalog i jar źródeł: ścieżka, hash, zakres linii obejmuje ciało metody, klasa zależności bez hasha, węzły zewnętrzne bez ścieżki); `go test ./...`, `go vet ./...`. Petclinic (`-scope reachable`, `-sources src/main/java`): 127 913 z 134 784 węzłów ma ścieżkę, 108 metod aplikacji ma hash, 6 871 bez źródła (klasy bez SourceFile, JDK).
+- Pozostaje w RI4: ograniczone sąsiedztwo (głębokość) i paczka kontekstu dla LLM — po uzgodnieniu z TM2, czego Tekmerion faktycznie używa. Równolegle Tekmerion TM1 (manifest, build, indeks źródeł) w osobnej sesji.
+
 ## Interfejs badawczy RI2 — mniejszy bundle i szybszy odczyt (2026-11-24)
 
 - Stan IN_PROGRESS dla RI2 (kontynuacja po scaleniu #150 i #151). Dwie zmiany: `research index -scope reachable` oraz nowy czytnik bundle'a.

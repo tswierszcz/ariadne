@@ -68,6 +68,7 @@ func readJarClasses(jarPath string, gav *input.GAV, isApp bool, targetJava int) 
 			SourceJar:         jarPath,
 			SourceEntry:       sel.file.Name,
 			VariantVersion:    sel.variant,
+			SourceFile:        cf.SourceFile,
 			GAV:               gav,
 			IsApp:             isApp,
 		})

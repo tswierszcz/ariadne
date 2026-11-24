@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -272,4 +274,82 @@ func jsonSame(a, b any) bool {
 	x, _ := json.Marshal(a)
 	y, _ := json.Marshal(b)
 	return string(x) == string(y)
+}
+
+// RI4 source locations: the package path of the file the class names,
+// the method's line range, and with -sources (a directory or a jar) the
+// hash of that file; the binding stays declared.
+func TestResearchSourceLocations(t *testing.T) {
+	src := "../../testdata/research/lib"
+	jar := filepath.Join(t.TempDir(), "lib-sources.jar")
+	writeZipOf(t, src, jar)
+	for _, sources := range []string{src, jar} {
+		_, b := researchIndex(t, t.TempDir(), "-sources", sources)
+		want, _ := os.ReadFile(filepath.Join(src, "fx/research/Extractor.java"))
+		wantSHA := fmt.Sprintf("sha256:%x", sha256.Sum256(want))
+		found := false
+		for _, n := range b.Nodes {
+			m := n.Method
+			if m == nil {
+				continue
+			}
+			switch {
+			case m.Class == "fx.research.Extractor" && m.Name == "writeEntry":
+				found = true
+				s := n.Source
+				if s.Path == nil || *s.Path != "fx/research/Extractor.java" || s.Binding != "declared" || s.SourceSHA256 == nil || *s.SourceSHA256 != wantSHA {
+					t.Errorf("%s: writeEntry source %+v", sources, s)
+				}
+				lines := strings.Split(string(want), "\n")
+				if s.LineStart == nil || *s.LineStart < 1 || *s.LineEnd > len(lines) || !strings.Contains(strings.Join(lines[*s.LineStart-1:*s.LineEnd], "\n"), "Files.write") {
+					t.Errorf("%s: writeEntry lines %v-%v do not cover its body", sources, s.LineStart, s.LineEnd)
+				}
+			case m.Class == "fx.dep.Paths2":
+				// A dependency class: its path is declared, its file is not in these sources.
+				if n.Source.Path == nil || *n.Source.Path != "fx/dep/Paths2.java" || n.Source.SourceSHA256 != nil {
+					t.Errorf("%s: Paths2 source %+v", sources, n.Source)
+				}
+			case m.InstanceID == nil && n.Source.Path != nil:
+				t.Errorf("external node %s#%s has a source path", m.Class, m.Name)
+			}
+		}
+		if !found {
+			t.Fatal("writeEntry not in the bundle")
+		}
+		ok := false
+		for _, in := range b.Identity.Inputs {
+			ok = ok || (in.ID == "in-sources" && in.Role == "sources")
+		}
+		if !ok {
+			t.Errorf("%s: no sources input in the identity", sources)
+		}
+	}
+	// Without -sources: paths, no hashes.
+	_, b := researchIndex(t, t.TempDir())
+	for _, n := range b.Nodes {
+		if n.Source.SourceSHA256 != nil {
+			t.Fatalf("hash without -sources: %+v", n.Source)
+		}
+	}
+}
+
+func writeZipOf(t *testing.T, dir, out string) {
+	t.Helper()
+	f, err := os.Create(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, p)
+		w, _ := zw.Create(filepath.ToSlash(rel))
+		b, _ := os.ReadFile(p)
+		w.Write(b)
+		return nil
+	})
+	zw.Close()
+	f.Close()
 }
