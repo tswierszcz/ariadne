@@ -183,7 +183,7 @@ Późniejszy przyrost `trace-config` przyjmie dowolne rozstrzygnięte cele i wyg
 
 ### RI2 — trwały indeks
 
-**Status 2026-11-24: IN_PROGRESS.** Bundle `ariadne-research-bundle-1` z siedmioma zbiorami (po jednym na typ rekordu), atomowa publikacja, weryfikujący czytnik, deterministyczny `analysis_id`. Brak macierzy kompatybilności poza dokładną rewizją draftu; brak czytnika strumieniowego.
+**Status 2026-11-24: IN_PROGRESS.** Bundle `ariadne-research-bundle-1` z siedmioma zbiorami (po jednym na typ rekordu), atomowa publikacja, weryfikujący czytnik, deterministyczny `analysis_id`. Brak macierzy kompatybilności poza dokładną rewizją draftu. Uzupełnienie 2026-11-24: `-scope reachable` (Petclinic 525 MB zamiast 851 MB, te same odpowiedzi osiągalności) i strumieniowy czytnik (zapytanie 5,0 s / 1,6 GB zamiast 7,2 s / 2,8 GB).
 
 - Wprowadzić rekordy wymiany dla danych wymaganych przez query, bez serializacji funkcji ani prywatnego układu struktur Go.
 - Zapisać i odtworzyć pełne miejsca krawędzi z warunkami i specjalizacjami. Czytnik sprawdza odnośniki do metod, korzeni i instancji.

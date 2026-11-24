@@ -84,8 +84,9 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 	fs.StringVar(&cfg.embeddedComps, "embedded-components", "", "declared embedded components (YAML)")
 	fs.StringVar(&cfg.sbom, "sbom", "", "CycloneDX JSON SBOM for embedded-component candidates")
 	fs.StringVar(&cfg.cacheDir, "cache-dir", ".cache", "cache directory read for Maven Central reference data (never written from the network)")
-	var out string
+	var out, scope string
 	fs.StringVar(&out, "out", "", "bundle directory to publish; must not exist")
+	fs.StringVar(&scope, "scope", "all", `"all" (every graph node) or "reachable" (only what the roots and the input's own methods reach: the same reachability answers, a smaller bundle; other methods resolve as missing)`)
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -95,6 +96,10 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 	}
 	if out == "" || cfg.roots == "" {
 		fmt.Fprintln(stderr, "ariadne research index: -out and -roots are required")
+		return 2
+	}
+	if scope != "all" && scope != "reachable" {
+		fmt.Fprintf(stderr, "ariadne research index: -scope must be \"all\" or \"reachable\", got %q\n", scope)
 		return 2
 	}
 	if _, err := os.Lstat(out); err == nil {
@@ -115,7 +120,7 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 		fmt.Fprintln(stderr, "ariadne research index:", err)
 		return 2
 	}
-	cfg.research = &researchOut{dir: out}
+	cfg.research = &researchOut{dir: out, scope: scope}
 	if err := analyze(context.Background(), cfg, stderr); err != nil {
 		fmt.Fprintln(stderr, "ariadne research index:", err)
 		return 1
@@ -208,6 +213,7 @@ func writeResponse(path string, v any) error {
 // pipeline's state to writeResearchBundle instead of the CVE stage.
 type researchOut struct {
 	dir        string
+	scope      string // "all" or "reachable"
 	analysisID string
 }
 
@@ -359,8 +365,53 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 			nodeID[id] = rid("n-", key)
 		}
 	}
+	// -scope reachable: only the nodes the roots or the input's own
+	// methods reach (with the original method of every kept specialized
+	// copy). Every kept node keeps all its outgoing edges, so every path
+	// from a root is in the bundle and reachability answers are unchanged.
+	keep := make([]bool, n)
+	if st.cfg.research.scope == "reachable" {
+		var queue []uint32
+		push := func(id uint32) {
+			if !keep[id] {
+				keep[id] = true
+				queue = append(queue, id)
+			}
+		}
+		for _, r := range st.roots {
+			push(r)
+		}
+		for id := 0; id < n; id++ {
+			fqcn, _, _ := splitKey(g.Key(uint32(id)))
+			if ci, ok := h.Lookup(fqcn); ok && ci.IsApp {
+				push(uint32(id))
+			}
+		}
+		for len(queue) > 0 {
+			u := queue[0]
+			queue = queue[1:]
+			push(g.Origin(u))
+			for _, e := range g.Edges(u) {
+				push(e.To)
+			}
+		}
+		kept := 0
+		for _, k := range keep {
+			if k {
+				kept++
+			}
+		}
+		limits = append(limits, fmt.Sprintf("Scope reachable: %d of %d graph nodes, those the roots or the input's own methods reach, with all their edges and calls; a method outside the scope resolves as missing (index with -scope all to see it), and callers lists omit callers outside the scope.", kept, n))
+	} else {
+		for i := range keep {
+			keep[i] = true
+		}
+	}
 	methodIDOf := map[string]string{} // key -> method id
 	for id := 0; id < n; id++ {
+		if !keep[id] {
+			continue
+		}
 		key := g.Key(uint32(id))
 		fqcn, name, desc := splitKey(key)
 		if !research.ValidMethodDescriptor(desc) {
@@ -430,6 +481,9 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 	edgeAt := map[string]int{}
 	targetsAt := map[siteKey][]string{} // caller key + pc -> target node ids (canonical callers only)
 	for from := 0; from < n; from++ {
+		if !keep[from] {
+			continue
+		}
 		fromKey := g.Key(uint32(from))
 		canonical := g.Origin(uint32(from)) == uint32(from)
 		for _, e := range g.Edges(uint32(from)) {
@@ -486,6 +540,9 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 			unplaced++
 			continue
 		}
+		if !keep[caller] {
+			continue // outside the scope: the roots never reach it
+		}
 		var cands []string
 		reason := fmt.Sprintf("Unresolved %s site in %s#%s: no bounded set of targets.", s.Kind, s.CallerFQCN, s.CallerName)
 		if s.Owners != nil {
@@ -538,7 +595,7 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 		for _, hm := range ci.Methods {
 			key := fqcn + "#" + hm.Name + hm.Descriptor
 			caller, ok := g.IDOfKey(key)
-			if !ok {
+			if !ok || !keep[caller] {
 				continue
 			}
 			for _, c := range hm.Calls {
@@ -618,7 +675,7 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 		Configuration: research.Configuration{RootsMode: st.cfg.roots, GraphMode: gc.Mode, TargetJava: st.cfg.targetJava, Profile: st.profile,
 			ActiveProfiles: sortedUnique(st.activeProfs), JPMSScenario: st.cfg.jpmsScenario, APIExclude: sortedUnique(splitList(st.cfg.apiExclude)),
 			Settings: map[string]any{research.FrameworkSetting: strings.Join(fwIDs, ","), "participants": strings.Join(gc.Participants, ","),
-				"central_lookups": "offline: cache and ARIADNE_MAVEN_LOCAL only"}},
+				"central_lookups": "offline: cache and ARIADNE_MAVEN_LOCAL only", "scope": st.cfg.research.scope}},
 		Inputs: inputs, ClasspathOrder: order, Capabilities: research.Capabilities, FixedPoint: fp,
 		Coverage: research.Coverage{Limits: append([]string{
 			"Classes form one flat class path (" + inv.ClasspathOrder + "); class-loader isolation is not modeled.",

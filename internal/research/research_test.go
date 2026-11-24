@@ -332,3 +332,26 @@ func TestDescriptor(t *testing.T) {
 		}
 	}
 }
+
+// Records are rejected for a duplicate, unknown or missing member at any
+// level, invalid UTF-8 or a mismatched record_type.
+func TestRecordStrictness(t *testing.T) {
+	good := `{"basis":"direct","character":"jvm_rule","client_dispatch":false,"edge_id":"e-1","from":"n-a","kind":"static","record_type":"edge","rule":"r","sites":[{"caller_node_id":"n-a","condition":null,"kind":"static","pc":4}],"supplied_dispatch":false,"to":"n-b"}`
+	if _, err := decodeRecord([]byte(good)); err != nil {
+		t.Fatalf("good record rejected: %v", err)
+	}
+	for name, bad := range map[string]string{
+		"duplicate":      strings.Replace(good, `"kind":"static","record_type"`, `"kind":"static","kind":"static","record_type"`, 1),
+		"unknown":        strings.Replace(good, `"to":"n-b"}`, `"to":"n-b","extra":1}`, 1),
+		"missing":        strings.Replace(good, `"rule":"r",`, ``, 1),
+		"nested unknown": strings.Replace(good, `"pc":4}`, `"pc":4,"x":1}`, 1),
+		"nested missing": strings.Replace(good, `"condition":null,`, ``, 1),
+		"case":           strings.Replace(good, `"edge_id"`, `"Edge_id"`, 1),
+		"utf8":           strings.Replace(good, `"rule":"r"`, "\"rule\":\"\xff\"", 1),
+		"type":           strings.Replace(good, `"record_type":"edge"`, `"record_type":"node"`, 1),
+	} {
+		if _, err := decodeRecord([]byte(bad)); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}

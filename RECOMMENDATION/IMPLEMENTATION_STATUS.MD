@@ -2,6 +2,14 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Interfejs badawczy RI2 — mniejszy bundle i szybszy odczyt (2026-11-24)
+
+- Stan IN_PROGRESS dla RI2 (kontynuacja po scaleniu #150 i #151). Dwie zmiany: `research index -scope reachable` oraz nowy czytnik bundle'a.
+- `-scope reachable` (domyślnie `all`): tylko węzły osiągane z korzeni lub z metod samego wejścia, każdy ze wszystkimi krawędziami i wywołaniami. Petclinic: 525 MB zamiast 851 MB, 134 784 z 257 640 węzłów. Na 256 losowych celach: 140 odpowiedzi identycznych (ścieżki, wejścia, stan, istotne luki), 116 poza zakresem (`missing` z powodem wskazującym `-scope all`), wszystkie `not_found` w pełnym bundle'u. Różni się tylko `global_gap_count` (1239 → 640) i lista `callers` dla wywołujących spoza zakresu.
+- Czytnik: strumieniowy odczyt partiami z równoległym dekodowaniem; ścisłość (dokładny zestaw pól rekordu i obiektów zagnieżdżonych: bez duplikatów, nieznanych i brakujących, poprawny UTF-8) sprawdzana skanerem na surowych bajtach zamiast przejścia tokenami. Zapytanie na Petclinic: 7,2 s / 2,8 GB → 5,0 s / 1,6 GB (`all`), 2,8 s / 1,0 GB (`reachable`); `entries` 2,2 s → 1,3 s. Odpowiedzi identyczne. `encoding/json/v2` (Go 1.27) odrzucone: moduł deklaruje go 1.22.
+- Weryfikacja: `go test ./...`, `go vet ./...`; nowe `TestRecordStrictness`, `TestResearchScopeReachable` (rekordy zachowane bez zmian względem `-scope all`, odpowiedzi i powód `missing`).
+- Następny krok: TM0/TM1 w Tekmerion na prawdziwej binarce; potem RI4.
+
 ## Interfejs badawczy RI1–RI3 — pierwszy działający przekrój (2026-11-24)
 
 - Stan IN_PROGRESS dla RI1, RI2 i RI3 (pionowy przekrój; zgoda użytkownika na „rób wszystko”). `ariadne research index` i `ariadne research query` działają na kontrakcie `1.0.0-draft.1` bez advisory i bez sieci. Kod: [research.go](../cmd/ariadne/research.go), [internal/research](../internal/research/), opis i odstępstwa w [README interfejsu](../docs/research-interface/README.md#implementation).

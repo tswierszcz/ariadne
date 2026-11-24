@@ -216,3 +216,60 @@ func TestResearchIndexFlags(t *testing.T) {
 		}
 	}
 }
+
+// -scope reachable keeps every reachability answer of -scope all for the
+// methods it keeps, drops what nothing reaches, and says so on a miss.
+func TestResearchScopeReachable(t *testing.T) {
+	_, all := researchIndex(t, t.TempDir())
+	dir := t.TempDir()
+	bundle, b := researchIndex(t, dir, "-scope", "reachable")
+	if b.Identity.Configuration.Settings["scope"] != "reachable" || len(b.Nodes) >= len(all.Nodes) {
+		t.Fatalf("scope %v: %d nodes, all has %d", b.Identity.Configuration.Settings["scope"], len(b.Nodes), len(all.Nodes))
+	}
+	// Every node and edge kept is identical to its -scope all record.
+	allNodes := map[string]research.Node{}
+	for _, n := range all.Nodes {
+		allNodes[n.NodeID] = n
+	}
+	for _, n := range b.Nodes {
+		if !jsonSame(n, allNodes[n.NodeID]) {
+			t.Fatalf("node %s differs from -scope all", n.NodeID)
+		}
+	}
+	lib, v1 := instanceOf(b, "app:lib.jar"), instanceOf(b, "deps:fx-dep-1.0.jar")
+	const P = "Ljava/nio/file/Path;"
+	sel := func(inst, class, name, desc string) map[string]any {
+		return map[string]any{"instance_id": inst, "class": class, "name": name, "descriptor": desc}
+	}
+	_, doc := researchQuery(t, bundle, map[string]any{"schema_version": research.QuerySchema, "analysis_id": b.AnalysisID, "request_id": "s1",
+		"operation": "reachability", "roots": map[string]any{"selection": "indexed"}, "targets": []any{
+			map[string]any{"id": "write", "selector": sel(lib, "fx.research.Extractor", "writeEntry", "("+P+"[B)V")},
+			map[string]any{"id": "unused", "selector": sel(lib, "fx.research.Extractor", "unused", "("+P+")V")},
+			map[string]any{"id": "legacy", "selector": sel(v1, "fx.dep.Paths2", "legacyResolve", "("+P+"Ljava/lang/String;)"+P)},
+		}})
+	rs := doc["results"].([]any)
+	state := func(i int) (string, string) {
+		r := rs[i].(map[string]any)
+		return r["resolution"].(string), r["search"].(map[string]any)["state"].(string)
+	}
+	if res, st := state(0); res != "matched" || st != "found" {
+		t.Errorf("writeEntry %s %s", res, st)
+	}
+	// The library's own dead method stays (the input's methods are kept).
+	if res, st := state(1); res != "matched" || st != "not_found" {
+		t.Errorf("unused %s %s", res, st)
+	}
+	// A dependency method nothing reaches is outside the scope.
+	if res, _ := state(2); res != "missing" || !strings.Contains(rs[2].(map[string]any)["search"].(map[string]any)["reason"].(string), "-scope all") {
+		t.Errorf("legacyResolve %v", rs[2])
+	}
+	if code, _ := runWithEnv([]string{"research", "index", "-app", "x.jar", "-roots", "api", "-scope", "some", "-out", filepath.Join(dir, "z")}, nil); code != 2 {
+		t.Errorf("-scope some: exit %d", code)
+	}
+}
+
+func jsonSame(a, b any) bool {
+	x, _ := json.Marshal(a)
+	y, _ := json.Marshal(b)
+	return string(x) == string(y)
+}

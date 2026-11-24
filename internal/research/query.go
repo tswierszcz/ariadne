@@ -693,6 +693,14 @@ func (b *Bundle) forward(roots []int32, appOnly bool, charge func(int) bool) ([]
 	return vis, true
 }
 
+// scope is the bundle's index scope ("all" when not recorded).
+func (b *Bundle) scope() string {
+	if s, ok := b.Identity.Configuration.Settings["scope"].(string); ok && s != "" {
+		return s
+	}
+	return "all"
+}
+
 func (b *Bundle) frameworkNodes() []bool {
 	fw := make([]bool, len(b.Nodes))
 	s, _ := b.Identity.Configuration.Settings[FrameworkSetting].(string)
@@ -722,6 +730,9 @@ func (b *Bundle) resolve(t Target) (resolution string, nodes []int32, reason str
 	if t.MethodID != nil {
 		canon = b.idx.byMethodID[*t.MethodID]
 		if len(canon) == 0 {
+			if b.scope() == "reachable" {
+				return "missing", nil, "Target method id is absent from this bundle; in a -scope reachable bundle a method the roots and the input's own methods do not reach is not represented."
+			}
 			return "missing", nil, "Target method id is absent from this bundle."
 		}
 	} else {
@@ -751,6 +762,9 @@ func (b *Bundle) resolve(t Target) (resolution string, nodes []int32, reason str
 			}
 		}
 		if len(canon) == 0 {
+			if selectedHere && b.scope() == "reachable" {
+				return "missing", nil, "The class is in this bundle but the method is outside its scope: in a -scope reachable bundle, neither the roots nor the input's own methods reach it (or the class has no such method). Index with -scope all to resolve it."
+			}
 			return "missing", nil, "Target method is absent from this bundle."
 		}
 	}
