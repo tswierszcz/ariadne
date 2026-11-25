@@ -217,3 +217,73 @@ func TestGapClassifier(t *testing.T) {
 		}
 	}
 }
+
+// RUNTIME_NATIVE n4-1 on testdata/runtime-n4 (RESULTS.MD there; run.trace
+// recorded with JFR jdk.MethodTrace on JDK 25 and converted by
+// scripts/JfrToTrace.java): a traced stack is read whole, so the two proxy
+// calls from two lines of main are two relations into the lambda handler,
+// classified proxy; reflection keeps its target; an async execution gets
+// no relation from its registration site.
+func TestRuntimeN4Probe(t *testing.T) {
+	h, _, err := hierarchy.Build("../../testdata/runtime-n4/n4.jar", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile("../../testdata/runtime-n4/run.trace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	type rec struct {
+		Record, ID, Class, Name, Desc, Caller, Callee, Basis, Source string
+		Bci                                                         int
+	}
+	var recs []rec
+	classes, methods := map[string]string{}, map[string]string{}
+	for _, l := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var r rec
+		if err := json.Unmarshal([]byte(l), &r); err != nil {
+			t.Fatal(err)
+		}
+		recs = append(recs, r)
+	}
+	for _, r := range recs {
+		if r.Record == "class" {
+			classes[r.ID] = r.Name
+		}
+	}
+	for _, r := range recs {
+		if r.Record == "method" {
+			methods[r.ID] = classes[r.Class] + "#" + r.Name + r.Desc
+		}
+	}
+	classify := gapClassifier(h, "cha")
+	handlerSites := map[int]bool{}
+	reflection := false
+	for _, r := range recs {
+		if r.Record != "call" {
+			continue
+		}
+		caller, callee := methods[r.Caller], methods[r.Callee]
+		if strings.Contains(caller, "#submitA") || strings.Contains(caller, "#submitB") {
+			t.Errorf("an async relation from a registration site was recorded: %s -> %s", caller, callee)
+		}
+		if strings.HasPrefix(caller, "n4.Main#main(") && strings.Contains(callee, "#lambda$proxy$0(") && r.Source == "traced" {
+			handlerSites[r.Bci] = true
+			if cause, detail := classify(caller, callee, r.Bci, r.Basis); cause != runtimeevents.GapProxy || detail != "n4.Main$Svc" {
+				t.Errorf("main -> handler at bci %d: %s (%s), want proxy (n4.Main$Svc)", r.Bci, cause, detail)
+			}
+		}
+		if strings.HasPrefix(caller, "n4.Main#main(") && strings.HasPrefix(callee, "n4.Main#target(") {
+			reflection = true
+			if cause, _ := classify(caller, callee, r.Bci, r.Basis); cause != runtimeevents.GapReflection {
+				t.Errorf("main -> target: %s, want reflection", cause)
+			}
+		}
+	}
+	if len(handlerSites) != 2 {
+		t.Errorf("proxy call sites into the handler: %v, want two", handlerSites)
+	}
+	if !reflection {
+		t.Error("no main -> target relation")
+	}
+}

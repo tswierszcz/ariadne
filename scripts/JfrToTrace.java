@@ -16,7 +16,9 @@ import jdk.jfr.consumer.*;
  * filtered methods, with the caller's stack).
  *
  * Only classes found in the given artifacts are recorded (scope "artifacts"); JDK frames
- * between two recorded frames make a "stack-through-runtime" relation. JFR does not say
+ * between two recorded frames make a "stack-through-runtime" relation. A
+ * jdk.MethodTrace stack is read whole (n4-1): every pair of consecutive
+ * recorded frames is a traced relation, not only the traced method's caller. JFR does not say
  * where a class's bytes came from, so class hashes are a classpath lookup.
  *
  * Usage:
@@ -207,12 +209,21 @@ public final class JfrToTrace {
         if (st == null) return;
         if (st.isTruncated()) truncated++;
         List<RecordedFrame> fr = st.getFrames();
+        // RUNTIME_NATIVE n4-1: the whole stack, as for a sample. The traced
+        // method's caller is the nearest recorded frame; every further
+        // recorded frame calls the next one below it (directly, or through
+        // frames outside the recorded classes: reflection, a proxy class,
+        // the JDK), at its own bytecode index — so two proxy calls from two
+        // sites stay two relations. Only the traced method gets an exact
+        // entry; the frames above it are relations, not entries.
+        String callee = mk;
+        int below = -1; // index of the frame the callee is (-1: the traced method)
         for (int j = 0; j < fr.size(); j++) {
             String ck = fr.get(j).isJavaFrame() ? methodKey(fr.get(j).getMethod()) : null;
-            if (ck != null) {
-                addCall(ck, mk, j == 0 ? "stack-adjacent" : "stack-through-runtime", "traced", fr.get(j));
-                return;
-            }
+            if (ck == null) continue;
+            addCall(ck, callee, j == below + 1 ? "stack-adjacent" : "stack-through-runtime", "traced", fr.get(j));
+            callee = ck;
+            below = j;
         }
     }
 

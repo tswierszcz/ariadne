@@ -99,7 +99,7 @@ analysis missed for this run, worth investigating, never an error of the trace b
 Every `not_in_graph` call gets a cause decided from the caller's bytecode at the measured index
 (causes `g2`): `class-init` (an implicit `<clinit>`), `invokedynamic`, `reflection`
 (`Method#invoke`, `Constructor#newInstance`, `Class#newInstance`), `method-handle`, `proxy`
-(into an `InvocationHandler`), `async` (through a thread or executor), `sam-call` (a
+(into an `InvocationHandler`'s `invoke`, or — since `n4-1` — into a lambda or method reference the input creates for `InvocationHandler#invoke`), `async` (through a thread or executor), `sam-call` (a
 functional-interface call running the implementation of a lambda or method reference the input
 creates for that interface and method — since `g2`; `g1` also counted any callee named
 differently from the call, such as a JDK collection calling `equals`/`hashCode`), `skipped-receiver` (a
@@ -124,7 +124,7 @@ Tracing many hot methods slows the recorded run; narrow the verdicts if that mat
 JEP 520) into this format, recording only classes found in the artifacts it is given. JFR
 does not report where a class's bytes came from, so its classes have `source_basis`
 `classpath-lookup`. The `jdk.MethodTrace` filter the recording was made with is read from
-the recording itself into `scope.method_filters`. See the README for the commands.
+the recording itself into `scope.method_filters`. See the README for the commands. Since `n4-1` (2026-11-25) the whole stack of a `jdk.MethodTrace` event is read, as for a sample: every pair of consecutive recorded frames becomes a `traced` relation at the upper frame's bytecode index, not only the traced method's caller. Two proxy calls from two sites therefore stay two relations. Only the traced method gets an exact entry. A trace converted before `n4-1` (for example `testdata/runtime/run.trace`) has only the traced method's caller.
 
 A finding whose mapped method was covered by `scope.method_filters` and has no `traced`
 entry is reported as **traced, not entered in this run** (v2 `findings[].runtime_traced`

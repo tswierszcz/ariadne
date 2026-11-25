@@ -41,9 +41,9 @@ Gotowe: agent w kontrolowanej aplikacji rejestruje znane metody/wywołania w swo
 
 ## N4. Refleksja, proxy i asynchroniczna przyczynowość
 
-**Ocena 2026-11-25: refleksja pokryta, proxy częściowo, async odłożone.** Pomiar [testdata/runtime-n4](../testdata/runtime-n4/RESULTS.MD) na JDK 25:
+**Ocena 2026-11-25: refleksja pokryta, proxy pokryte od `n4-1`, async odłożone.** Pomiar [testdata/runtime-n4](../testdata/runtime-n4/RESULTS.MD) na JDK 25:
 - *Refleksja* — pokryta bez agenta: `main` (linia wywołania `invoke`) → rzeczywisty cel, `stack-through-runtime`, `traced`; przyczyna `reflection` w klasyfikacji luk `g2` już istnieje.
-- *Proxy* — handler → cel pokryty; miejsce wywołania proxy → handler ginie w konwerterze (dla zdarzeń `traced` bierze tylko najbliższą ramkę z zakresu), choć JFR ma pełny stos. To poprawka konwertera, nie agent: przejść cały stos zdarzenia `traced` jak przy próbkach (relacje między kolejnymi ramkami z zakresu, kluczowane bci/linią — dwa proxy z dwóch miejsc dają osobne relacje). Kandydat na wycinek `n4-1`.
+- *Proxy* — handler → cel pokryty; miejsce wywołania proxy → handler ginie w konwerterze (dla zdarzeń `traced` bierze tylko najbliższą ramkę z zakresu), choć JFR ma pełny stos. To poprawka konwertera, nie agent. **Wycinek `n4-1` DONE (2026-11-25):** `JfrToTrace` czyta cały stos zdarzenia `jdk.MethodTrace` (relacje `traced` między kolejnymi ramkami z zakresu, kluczowane bci/linią), a klasyfikator luk uznaje za `proxy` także handler-lambdę/referencję metody utworzoną dla `InvocationHandler#invoke`. Sonda: dwa wywołania proxy z linii 30 i 31 `main` to dwie relacje `proxy`; async bez wymyślonej relacji. `TestRuntimeN4Probe`.
 - *Async* — wykonanie jest widoczne (`Task#run` → `work`), rejestracja nie: stos wątku roboczego jej nie zawiera, JFR nie przenosi tokenu. Wymaga agenta (N3 (b)); statycznie async jest modelowane (ASYNC_CALLBACKS A0–A4, wyrocznie JVM), a lambda z osobnego miejsca ma własne ciało, więc niejednoznaczne jest tylko to samo zadanie zgłoszone z kilku miejsc. Odłożone do konkretnej potrzeby.
 - *Dopasowanie obserwacji do krawędzi* — istnieje od N1 (`not_in_graph` z przyczyną `g2`).
 
