@@ -82,6 +82,6 @@ tylko pull request, 5 commit z diffem bez metod.
 ### Kryteria ukończenia
 
 - Testy jednostkowe dla PR, inicjalizatorów i porównania wydań; walidacja precyzji źródła 3
-  ([testdata/cve-control/RELEASE_DIFF_VALIDATION.MD](../testdata/cve-control/RELEASE_DIFF_VALIDATION.MD)).
+  ([testdata/cve-control/RELEASE_DIFF_VALIDATION.MD](../../../testdata/cve-control/RELEASE_DIFF_VALIDATION.MD)).
 - Pomiar `UNKNOWN` i zmian werdyktów na aplikacjach referencyjnych, ręczna kontrola próby.
 - Odpowiedzialny ruch do Maven Central (szeregowanie, cache, User-Agent).

@@ -10,12 +10,12 @@ Two things changed on `main` between the run below and `2223947`, neither of the
 LLM source itself:
 
 1. Phase 7's profile fix added `spring-beans`/`spring-core`/`spring-expression`/`spring-aop`
-   to the `spring` profile's `framework_packages` (see [PLAN.md](../PLAN.md), Phase 5's
+   to the `spring` profile's `framework_packages` (see [PLAN.md](PLAN.md), Phase 5's
    follow-up note) — several paths that used to read as `REACHABLE` now correctly stop at
    `FRAMEWORK` instead, since they only get there by continuing through Spring Beans/SpEL
    internals.
 2. Source 2's file filter was widened from requiring a Maven `src/main/` layout to any
-   non-test `.java` file (see [PLAN.md](../PLAN.md)'s Phase 4 follow-up) — Tomcat's
+   non-test `.java` file (see [PLAN.md](PLAN.md)'s Phase 4 follow-up) — Tomcat's
    `java/org/apache/...` layout is now mapped by the diff source directly, so far fewer CVEs
    reach the LLM source at all.
 
@@ -135,7 +135,7 @@ jars are deliberately not treated this way: Spring4Shell (CVE-2022-22965) is fil
   - petclinic: 38 CVEs left UNKNOWN: 30 to FRAMEWORK and 7 to NOT_REACHABLE with diff
     evidence, 1 to FRAMEWORK on advisory evidence. 30 of the 31 new FRAMEWORK results are
     Tomcat CVEs, which source 2 cannot map because of its `src/main/` filter (see the
-    deferred follow-up in [PLAN.md](../PLAN.md)).
+    deferred follow-up in [PLAN.md](PLAN.md)).
   - WebGoat: 4 CVEs left UNKNOWN: 1 FRAMEWORK and 2 NOT_REACHABLE with diff evidence, 1
     REACHABLE on advisory evidence (CVE-2022-22978).
 

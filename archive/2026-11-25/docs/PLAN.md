@@ -445,7 +445,7 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
 - Not yet wired into a CLI/`vulnmap.json` output path (no `cmd/ariadne` flags exist yet);
   that happens with Phase 6.
 - **Source 3 (LLM), opt-in with `-llm`.** Design, exact prompt text and test plan:
-  [docs/phase4-llm.md](docs/phase4-llm.md). Files: `internal/vulnmap/llm.go` (config + HTTP
+  [docs/phase4-llm.md](../../../docs/phase4-llm.md). Files: `internal/vulnmap/llm.go` (config + HTTP
   client: retries, 401/403 fatal), `llmprompt.go` + `llm_system_prompt.txt` +
   `llm_user_prompt.tmpl` (the prompt; pinned by golden tests in `testdata/llm/`),
   `llmanswer.go` (schema validation + bytecode grounding), `llmsource.go` (cache in
@@ -471,7 +471,7 @@ methods, and the seed CVEs from the YAML show up in `vulnmap.json`.
     with a warning and nothing is cached). After the fix: valid reply, 189 completion tokens
     (25 reasoning), ~$0.0013, and `Request#parseParts` / `#getParts` / `#getPart` all passed
     bytecode grounding. Full runs with `-llm` on petclinic and WebGoat were done later
-    (2026-10-12) — see [docs/llm-test-report.md](docs/llm-test-report.md), including its
+    (2026-10-12) — see [docs/llm-test-report.md](llm-test-report.md), including its
     2026-10-14 re-run against the current baseline (petclinic: 91/148 already mapped by
     sources 1/2 by then, down from 56/148 at the time of this live check, after the source-2
     filter widening noted just below).
@@ -1165,7 +1165,7 @@ same question (is this REACHABLE result plausibly attacker-reachable) without ne
 live target. Left as a possible future addition, not a gap in this phase's own scope.
 
 **Note on Phases 9–13 below.** These are a lightweight backlog captured from a single
-discussion on 2026-10-14, before [RECOMMENDATION/](RECOMMENDATION/README.MD) existed.
+discussion on 2026-10-14, before [RECOMMENDATION/](../../../RECOMMENDATION/README.MD) existed.
 RECOMMENDATION (added 2026-10-15) is a far more rigorous, later plan for much of the same
 ground — ServiceLoader, reflection, proxies/frameworks, async callbacks, dynamic linkage,
 deserialization, RTA/points-to, data flow, runtime/native, and other ecosystems — with
@@ -1175,8 +1175,8 @@ for which RECOMMENDATION document supersedes it. Phases 10 and 11 (`-cves-file`,
 not covered by RECOMMENDATION and remain this file's own backlog.
 
 ### Phase 9 (optional, future) — Closing known blind spots
-**Superseded in detail by [archive/2026-11-05/service_loading/SERVICE_LOADING.MD](archive/2026-11-05/service_loading/SERVICE_LOADING.MD),
-[REFLECTION.MD](archive/2026-11-23/reflection/REFLECTION.MD) and [FRAMEWORKS.MD](archive/2026-11-23/frameworks/FRAMEWORKS.MD)** —
+**Superseded in detail by [archive/2026-11-05/service_loading/SERVICE_LOADING.MD](../../2026-11-05/service_loading/SERVICE_LOADING.MD),
+[REFLECTION.MD](../../2026-11-23/reflection/REFLECTION.MD) and [FRAMEWORKS.MD](../../2026-11-23/frameworks/FRAMEWORKS.MD)** —
 kept here for history; start new work in those documents instead.
 
 Section 3 point 8 lists several blind spots that are structural, not bugs: reflection,
@@ -1208,8 +1208,8 @@ captured after discussing ecosystem coverage gaps on 2026-10-14.
 
 **Update 2026-11-08: largely done, through the RECOMMENDATION areas that superseded this
 list** (the note above was not updated as they shipped). Per item — current behavior in
-[docs/SUPPORT.MD](docs/SUPPORT.MD), history in
-[RECOMMENDATION/IMPLEMENTATION_STATUS.MD](RECOMMENDATION/IMPLEMENTATION_STATUS.MD):
+[docs/SUPPORT.MD](../../../docs/SUPPORT.MD), history in
+[RECOMMENDATION/IMPLEMENTATION_STATUS.MD](../../../RECOMMENDATION/IMPLEMENTATION_STATUS.MD):
 1. **ServiceLoader — done.** SERVICE_LOADING S0–S4 (closed 2026-11-05, archived in
    `archive/2026-11-05/service_loading/`): `META-INF/services` and JPMS inventory, resolved
    `ServiceLoader.load` sites, provider edges through the B3 model coordinator. Since then
@@ -1295,7 +1295,7 @@ straight to code.
 ### Phase 12 (optional, future) — Go ecosystem support, as a separate command
 **Withdrawn (2026-11-25):** Go will not be part of ariadne; it gets a separate tool, AriadneGO.
 The detailed plan that superseded this phase (ECOSYSTEMS, tracks E0–E4, never started) is archived
-in [archive/2026-11-25/ecosystems/](archive/2026-11-25/ecosystems/WITHDRAWN.md). Kept here for history.
+in [archive/2026-11-25/ecosystems/](../ecosystems/WITHDRAWN.md). Kept here for history.
 
 Raised in discussion: extending ariadne beyond the JVM to cover Go. **Not just a change to
 graph building** — most of the bottom of the stack is JVM-specific and would need
@@ -1350,7 +1350,7 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
    actually matters in practice (the Phase 8 `-framework-check` run against petclinic
    already surfaced one concrete candidate: the `StandardHost`/`StandardPipeline`/
    `LifecycleBase` CHA artifact). **Superseded in detail by
-   [RECOMMENDATION/GRAPH_PRECISION.MD](archive/2026-11-23/graph_precision/GRAPH_PRECISION.MD)** (tracks P0–P4,
+   [RECOMMENDATION/GRAPH_PRECISION.MD](../../2026-11-23/graph_precision/GRAPH_PRECISION.MD)** (tracks P0–P4,
    including the allocation-driven version of this same idea) — start new work there.
 5. **JDK-itself CVEs, not just Maven-dependency CVEs.** OSV's Maven ecosystem covers
    libraries resolved via GAV; it does not cover CVEs in the JDK's own classes
@@ -1358,7 +1358,7 @@ they reuse data `internal/reach`/`internal/report` already compute vs. need new 
    reach and record calls into. Would need a separate CVE source for the JDK itself and
    matching by the target JDK/bytecode version rather than by GAV — a bigger, separate
    piece of work, not a one-line addition like 1–3 above. Related to
-   [archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD](archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD)'s
+   [archive/2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD](../../2026-11-23/cve/CVE_IMPLEMENTATION_PLAN.MD)'s
    runtime-CVE track (F8), which also treats the target JDK as a CVE-relevant input rather
    than just a bytecode-version number.
 

@@ -2,7 +2,7 @@
 
 Status wszystkich nowych obszarów: plan, bez implementacji w ramach przygotowania tych dokumentów.
 
-Punkt wyjścia: [oryginalne rekomendacje](MD). Wspólne zależności, zasady i kolejność: [ROADMAP.MD](ROADMAP.MD). Rozpoznawanie CVE (dawna osobna para dokumentów) jest zamknięte i zarchiwizowane — zob. niżej.
+Punkt wyjścia: [oryginalne rekomendacje](../archive/2026-11-25/docs/RECOMMENDATION-source.MD). Wspólne zależności, zasady i kolejność: [ROADMAP.MD](ROADMAP.MD). Rozpoznawanie CVE (dawna osobna para dokumentów) jest zamknięte i zarchiwizowane — zob. niżej.
 
 `PLAN.md`'s Phase 9/12/13 (z sesji 2026-10-14, przed powstaniem tego folderu) zawierają wcześniejsze, lżejsze notatki o części tego samego zakresu — ServiceLoader, refleksja, proxy/frameworki, Go, RTA. Ten folder jest ich bardziej rygorystycznym rozwinięciem, nie konkurencyjnym planem; nowa praca nad tymi tematami powinna zaczynać się tutaj, nie w `PLAN.md`.
 

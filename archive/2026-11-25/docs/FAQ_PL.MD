@@ -2,7 +2,7 @@
 
 Notatki wyjaśniające decyzje projektowe ariadne, spisane w trakcie pracy nad
 narzędziem. Uzupełnienie do [PLAN.md](PLAN.md) (historia faz) i
-[README.md](README.md) (jak działa pipeline) — tutaj trafia *dlaczego*,
+[README.md](../../../README.md) (jak działa pipeline) — tutaj trafia *dlaczego*,
 nie *co*.
 
 Wersja angielska tego pliku: [FAQ.md](FAQ.md).
@@ -365,7 +365,7 @@ przezroczyste), i zmienia nazwę metody na `<init>`, gdy ta zgadza się z
 nazwą otaczającej klasy (konstruktor).
 
 Źródło 3 to LLM czytający advisory + diff poprawki, włączany opcją
-`-llm` (projekt i dokładny prompt: [docs/phase4-llm.md](docs/phase4-llm.md),
+`-llm` (projekt i dokładny prompt: [docs/phase4-llm.md](../../../docs/phase4-llm.md),
 po angielsku). Uruchamia się tylko dla CVE, których źródła 1 i 2 nie
 zmapowały, a każda metoda, którą model wskaże, jest sprawdzana, czy
 istnieje w analizowanym bytecode. Gdy model widział tylko tekst advisory

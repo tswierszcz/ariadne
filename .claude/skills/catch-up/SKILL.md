@@ -6,92 +6,65 @@ description: Session primer for the ariadne repo (CVE-reachability-analysis tool
 # Catching up on ariadne
 
 Read these in order. Stop as soon as you have enough context for the task at
-hand — you don't need to read every file in full on every session, but know
-where each kind of answer lives.
+hand. You don't need to read every file in full on every session, but know
+where each kind of answer lives. (Documentation layout since 2026-11-25: the
+old `PLAN.md`, `FAQ.md`, `FAQ_PL.MD` and the long README are archived in
+`archive/2026-11-25/docs/`.)
 
-## 1. PLAN.md — the source of truth for "what's actually done"
+## 1. `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`: what happened last
 
-PLAN.md mixes two kinds of text and it is easy to confuse them:
+The log of work, newest entry first, with the overview table of every area
+and its state. The first few entries tell you what the last sessions did and
+what the next step is. `RECOMMENDATION/README.MD` lists the plans still open
+(today: the research interface RI*, the research harness RH-A*) and which
+areas are done and archived.
 
-- **The original plan bullets** (the text immediately under each `### Phase N`
-  heading) are the pre-implementation sketch, written before any code existed.
-  They describe intent, not reality, and are often stale or aspirational.
-- **The `**Status: ...**` note** that follows each phase's bullets is written
-  *after* the work happened, and is corrected/extended over time as later
-  sessions build on it. **This is ground truth.** When the two disagree,
-  believe the Status note.
+Areas done or withdrawn are archived under `archive/<date>/<area>/`, each
+with a `COMPLETION.md` (or `WITHDRAWN.md`) saying what shipped, how it was
+verified, and what would reopen it. Believe those over older plan text.
 
-PLAN.md has 8 phases (0–8), each with its own Status note, and they cover
-different ground — don't assume Phase 7 alone answers "what's implemented":
+## 2. `docs/SUPPORT.MD`: what is supported now
 
-| Phase | Covers |
-|---|---|
-| 0 | environment/toolchain setup |
-| 1 | target-app prep, `-app`/`-deps`/`-deps-list` input normalization |
-| 2 | OSV querying, CVE list |
-| 3 | bytecode parser, hierarchy, call graph, CHA |
-| 4 | CVE→method mapping: manual table, fix-commit diffs, the LLM source |
-| 5 | the reachability engine (BFS, statuses, paths) |
-| 6 | CLI + report rendering; two real bugs found running it end-to-end |
-| 7 | input formats beyond a plain jar (Gradle, WAR/EAR) and the profile
-    system (`spring`/`servlet`/`jakarta`/`micronaut`/`quarkus`/`generic`,
-    in `internal/profile/profiles/*.yaml`) |
-| 8 | optional exploitability check (not built) |
+The capability matrix: status, scope and conditions, limits and the evidence
+(tests, fixtures, measurements) for each claim. Use it for "does ariadne
+handle X".
 
-For a specific question, read that phase's Status note. For a broad "what's
-done / what's missing" question, skim every phase's Status note plus section
-8 ("Acceptance criteria"), which is a consolidated checklist across all of
-them. As of the last update, the only pieces deliberately left unimplemented
-are `--max-dep-depth` (Phase 7; RTA has since shipped as the opt-in
-`-callgraph-mode rta`, GRAPH_PRECISION P2) and an exploitability check (Phase
-8, always optional) — don't treat those as forgotten work needing a status
-check.
+## 3. `README.md` and `docs/HOW_IT_WORKS.md`: how to run it and how it works
 
-Each profile has a real, small, hand-written control app under
-`scripts/prepare-*-demo.sh` (petclinic, webgoat, petclinic-gradle,
-servlet-demo, jakarta-demo, micronaut-demo, quarkus-demo) used to verify it
-end-to-end against `bin/ariadne`, not just unit tests — if asked to extend or
-debug a profile, these are the right reference point and the right pattern
-to follow for a new one.
+- `README.md` is the usage reference: build, input preparation, every flag,
+  environment variables, network/cache, snapshots, library mode, runtime
+  evidence, the research commands, outputs and exit codes.
+- `docs/HOW_IT_WORKS.md` (English) and `docs/JAK_TO_DZIALA.md` (Polish) describe
+  the pipeline step by step and how to read the verdicts. **The two are kept in
+  sync**: a change to one is made to the other in the same commit.
 
-## 2. README.md — how the finished pipeline behaves today
+## 4. History, when needed
 
-This is the user-facing reference for current flags, the 8-step pipeline, and
-known limitations. Use it to answer "how do I run X" or "what does flag Y do"
-— it describes the present, not the history. If it disagrees with PLAN.md,
-that's a documentation bug worth flagging (it happened before this session
-and got fixed; it can happen again).
+`archive/2026-11-25/docs/` holds the original `PLAN.md` (phases 0–12 with their
+status notes), the FAQs, the full earlier README (every model described in
+detail, with measurements) and the old audit. They are read-only history:
+look things up there, don't update them.
 
-## 3. FAQ.md — the *why*, and a parallel step-by-step walkthrough
-
-Read this when the task is about explaining a design decision, or when you
-need the pipeline explained a different way than README's. It also has its
-own "what's supported, what's still missing" section, kept in sync with
-PLAN.md's Phase 7 status.
-
-**Do not touch `FAQ_PL.MD`** (the Polish FAQ) unless the user explicitly asks.
-It is deliberately left out of sync with the other three files — this is a
-standing decision, not an oversight to "fix" on sight.
-
-## 4. Check the repo's actual state, not just the docs
-
-Docs describe intent; `git` describes what's actually there right now:
+## 5. Check the repo's actual state, not just the docs
 
 ```bash
 git log --oneline -15
 git status
 ```
 
-Recent commit subjects are usually enough to tell whether docs and code are
-still in sync, and `git status` catches anything uncommitted from a prior
-session.
+Recent commit subjects tell you whether docs and code are in sync, and
+`git status` catches anything uncommitted from a prior session.
+
+Each profile and model has a small control application or fixture under
+`testdata/` (with an `EXPECTED.MD`, often a real-JVM oracle script in
+`scripts/`), and the reference apps are prepared by `scripts/prepare-*.sh`.
+They are the right reference point for extending or debugging behavior.
 
 ## What "done" looks like for a change in this repo
 
-Every substantive change in this project's history ships as: the code change
-+ a real verification (not just unit tests — run `bin/ariadne` against a real
-small app, often a new `scripts/prepare-*-demo.sh`) + an update to whichever
-of README.md/PLAN.md/FAQ.md the change affects, in the same commit. If you
-add or change a feature, match that pattern rather than leaving docs for
-later — "later" tends not to happen, and this repo has already had to spend
-a session re-auditing docs that drifted for exactly that reason.
+Every substantive change ships as: the code change, a real verification (not
+just unit tests: run `bin/ariadne` against a real small app or fixture, often
+with a JVM oracle), and an update to whatever it affects in the same commit:
+`README.md` (flags, usage), `docs/HOW_IT_WORKS.md` + `docs/JAK_TO_DZIALA.md`
+(behavior), `docs/SUPPORT.MD` (capability), and an entry in
+`RECOMMENDATION/IMPLEMENTATION_STATUS.MD`. "Later" tends not to happen.

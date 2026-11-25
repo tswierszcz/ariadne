@@ -1,6 +1,6 @@
 # Runtime i native — fazy N0–N5
 
-Status: **Obszar DONE for this scope (2026-11-25), zarchiwizowany** — zob. [COMPLETION.md](COMPLETION.md). Stan faz przed zamknięciem: N0, N1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../../../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md); kontrakt `ariadne-runtime-trace-1`, importer `internal/runtimeevents` `n1-1`, `-runtime-trace`, rejestrator z JFR bez agenta); N2 odłożony (2026-11-23), N3 i N4 ocenione 2026-11-25 (agent niebudowany — patrz niżej), N5 wycinek `n5-1`; zob. IMPLEMENTATION_STATUS. Wymagania: [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD). Zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
+Status: **Obszar DONE for this scope (2026-11-25), zarchiwizowany** — zob. [COMPLETION.md](COMPLETION.md). Stan faz przed zamknięciem: N0, N1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../../2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md); kontrakt `ariadne-runtime-trace-1`, importer `internal/runtimeevents` `n1-1`, `-runtime-trace`, rejestrator z JFR bez agenta); N2 odłożony (2026-11-23), N3 i N4 ocenione 2026-11-25 (agent niebudowany — patrz niżej), N5 wycinek `n5-1`; zob. IMPLEMENTATION_STATUS. Wymagania: [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD). Zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## N0. Kontrakt śladu i zakres dowodów — DONE (zarchiwizowane 2026-11-08)
 
@@ -9,7 +9,7 @@ Status: **Obszar DONE for this scope (2026-11-25), zarchiwizowany** — zob. [CO
 Kontrakt `ariadne-runtime-trace-1` (`docs/RUNTIME_TRACE.MD`), importer `internal/runtimeevents`
 (`-runtime-trace`), rejestrator z JFR bez agenta (`scripts/JfrToTrace.java`), a jako
 rozszerzenie N1 — `-runtime-filter-out` (ustawienia JFR śledzące podatne metody ustaleń);
-zobacz [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../../../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)
+zobacz [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../../2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## N2. Dodatkowe klasy i kontekst ładowania
