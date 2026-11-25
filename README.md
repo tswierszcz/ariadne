@@ -1114,9 +1114,10 @@ unchanged.
 **Fleet report (prototype, 2026-11-23).** `go run ./cmd/ariadne-fleet -in <dir> -out fleet.md`
 merges the v2 results of many artifacts (one subdirectory each, with an optional `meta.json`)
 into one Markdown report — libraries and applications in separate tables, REACHABLE
-advisories across the fleet, failed analyses, tool versions and OSV data dates. Part of
-[RECOMMENDATION/FLEET_CI_PLAN.MD](RECOMMENDATION/FLEET_CI_PLAN.MD) (awaiting approval); the CI step
-itself is not built.
+advisories across the fleet, failed analyses, tool versions and OSV data dates. It came with
+the fleet CI plan, withdrawn on 2026-11-25 because fleet CI will be run from Tekmerion
+([archive](archive/2026-11-25/fleet_ci/WITHDRAWN.md)); the prototype stays as it is, and the CI step
+itself is not built in ariadne.
 
 **Other versions a user can get (`lb3-2`, 2026-11-23).** With
 `-alt-versions newest` the library run also assesses, per dependency with

@@ -1,6 +1,6 @@
 # Inne ekosystemy i pilotaż Go — rekomendacja funkcjonalna
 
-Status: plan eksploracyjny. Fazy: [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD). Model wspólny: [ROADMAP.MD](ROADMAP.MD).
+Status: **WYCOFANY 2026-11-25** — Go dostanie oddzielne rozwiązanie AriadneGO; zob. [WITHDRAWN.md](WITHDRAWN.md). Dawniej: plan eksploracyjny. Fazy: [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD). Model wspólny: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## Cel i stan obecny
 

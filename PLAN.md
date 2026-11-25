@@ -1293,8 +1293,9 @@ this should get an explicit design/confirmation pass before implementation start
 straight to code.
 
 ### Phase 12 (optional, future) — Go ecosystem support, as a separate command
-**Superseded in detail by [RECOMMENDATION/ECOSYSTEMS.MD](RECOMMENDATION/ECOSYSTEMS.MD)**
-(tracks E0–E4) — kept here for history; start new work in that document instead.
+**Withdrawn (2026-11-25):** Go will not be part of ariadne; it gets a separate tool, AriadneGO.
+The detailed plan that superseded this phase (ECOSYSTEMS, tracks E0–E4, never started) is archived
+in [archive/2026-11-25/ecosystems/](archive/2026-11-25/ecosystems/WITHDRAWN.md). Kept here for history.
 
 Raised in discussion: extending ariadne beyond the JVM to cover Go. **Not just a change to
 graph building** — most of the bottom of the stack is JVM-specific and would need

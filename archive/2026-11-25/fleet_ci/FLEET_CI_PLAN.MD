@@ -1,16 +1,16 @@
 # Uruchomienie ariadne w CI dla kilkudziesięciu artefaktów (biblioteki i aplikacje) — plan
 
-Status: **propozycja, czeka na zatwierdzenie** (zapisana 2026-11-15; 2026-11-19
+Status: **WYCOFANY 2026-11-25** — CI floty będzie robione z poziomu Tekmerion; zob. [WITHDRAWN.md](WITHDRAWN.md). Dawniej: **propozycja, czeka na zatwierdzenie** (zapisana 2026-11-15; 2026-11-19
 uzupełniona o tryb biblioteki — flota to głównie biblioteki; 2026-11-23 zaktualizowana o stan
 narzędzia i prototyp raportu zbiorczego). Decyzja o starcie: połowa grudnia 2026 (menedżer).
-Nie jest fazą żadnego planu z [ROADMAP.MD](ROADMAP.MD); to narzędzia obok roadmapy, potrzebne
+Nie jest fazą żadnego planu z [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD); to narzędzia obok roadmapy, potrzebne
 do uruchomienia ariadne na firmowej flocie aplikacji.
 
 ## Stan narzędzia (2026-11-23)
 
 Wszystkie obszary planu rozwoju, które nie czekają na decyzje, są zamknięte i zarchiwizowane
-(zob. [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD)); otwarte zostały tylko
-RUNTIME_NATIVE N2–N5 (brak celu z wieloma kontekstami ładowania) i ECOSYSTEMS (inne języki).
+(zob. [IMPLEMENTATION_STATUS.MD](../../../RECOMMENDATION/IMPLEMENTATION_STATUS.MD)); otwarte zostały tylko
+RUNTIME_NATIVE N2–N5 (brak celu z wieloma kontekstami ładowania); ECOSYSTEMS wycofany 2026-11-25 (Go: oddzielne AriadneGO).
 Dla floty istotne od 2026-11-15:
 
 - **Tryb biblioteki kompletny** (LIBRARY_MODE LB0–LB4, zarchiwizowany): `-roots api`,
@@ -171,7 +171,7 @@ syntetycznych wynikach (`testdata/fleet`). Nie zrobione: powiązanie biblioteka 
   błędem analizy i dwie różne daty danych OSV).
 - `go test ./...`, `go vet ./...`.
 - Dokumentacja: nowa sekcja README „Uruchomienie w CI dla wielu
-  aplikacji”; wpis w [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD).
+  aplikacji”; wpis w [IMPLEMENTATION_STATUS.MD](../../../RECOMMENDATION/IMPLEMENTATION_STATUS.MD).
 
 ## Uwagi
 
