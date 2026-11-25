@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -198,5 +199,100 @@ func copyTree(t *testing.T, from, to string) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// RESEARCH_INTERFACE RI6 (experimental) on the pilot target: trace-config
+// derives the JFR filter from research targets; correlate attaches the
+// committed traces (scripts/pilot-runtime.sh, JDK 25 jdk.MethodTrace) to the
+// bundle by class content. The run tells the variants apart where the
+// static axis cannot: Store#write is entered 3 times with the defective
+// unpacker (the traversal entry is written) and twice with the fixed one;
+// the dead method and the reflective filter are traced, not entered. A trace
+// of one variant against the other's bundle attaches nothing to the class
+// whose bytes differ.
+func TestPilotRuntime(t *testing.T) {
+	index := func(v string) (string, *research.Bundle) {
+		dir := t.TempDir()
+		out := filepath.Join(dir, "bundle")
+		if code, msg := runWithEnv([]string{"research", "index", "-app", "../../testdata/pilot/" + v + ".jar", "-roots", "api", "-profile", "generic",
+			"-cache-dir", filepath.Join(dir, "empty-cache"), "-out", out}, nil); code != 0 {
+			t.Fatalf("%s: index: %d %s", v, code, msg)
+		}
+		b, err := research.Load(out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out, b
+	}
+	config := func(bundle string, b *research.Bundle, lib string) string {
+		dir := t.TempDir()
+		const P = "Ljava/nio/file/Path;"
+		sel := func(id, c, n, d string) map[string]any {
+			return map[string]any{"id": id, "selector": map[string]any{"instance_id": lib, "class": c, "name": n, "descriptor": d}}
+		}
+		raw, _ := json.Marshal(map[string]any{"schema_version": research.TraceRequestSchema, "analysis_id": b.AnalysisID, "request_id": "pilot-runtime",
+			"targets": []any{sel("write", "px.archive.internal.Store", "write", "("+P+"[B)V"), sel("target", "px.archive.Entries", "target", "("+P+"Ljava/lang/String;)"+P),
+				sel("dead", "px.archive.internal.Store", "overwrite", "("+P+"[B)V"), sel("filter", "px.archive.Unpacker", "filter", "(Ljava/lang/String;)Ljava/lang/Object;")}})
+		req := filepath.Join(dir, "req.json")
+		os.WriteFile(req, raw, 0o644)
+		cfg, jfc := filepath.Join(dir, "config.json"), filepath.Join(dir, "trace.jfc")
+		if code, msg := runWithEnv([]string{"research", "trace-config", "-bundle", bundle, "-request", req, "-out", cfg, "-jfc", jfc}, nil); code != 0 {
+			t.Fatalf("trace-config: %d %s", code, msg)
+		}
+		settings, _ := os.ReadFile(jfc)
+		if !strings.Contains(string(settings), "px.archive.Entries::target;px.archive.Unpacker::filter;px.archive.internal.Store::overwrite;px.archive.internal.Store::write") {
+			t.Errorf("JFR filter: %s", settings)
+		}
+		return cfg
+	}
+	correlate := func(bundle, cfg, v string) research.Correlation {
+		out := filepath.Join(t.TempDir(), "c.json")
+		if code, msg := runWithEnv([]string{"research", "correlate", "-bundle", bundle, "-trace", "../../testdata/pilot/runtime-" + v + ".trace", "-config", cfg, "-out", out}, nil); code != 0 {
+			t.Fatalf("correlate: %d %s", code, msg)
+		}
+		var c research.Correlation
+		raw, _ := os.ReadFile(out)
+		if err := json.Unmarshal(raw, &c); err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	byID := func(c research.Correlation) map[string]research.TargetObservation {
+		m := map[string]research.TargetObservation{}
+		for _, o := range c.Targets {
+			m[o.TargetID] = o
+		}
+		return m
+	}
+	bundles, cfgs := map[string]string{}, map[string]string{}
+	for _, v := range []string{"defective", "fixed"} {
+		bundle, b := index(v)
+		bundles[v], cfgs[v] = bundle, config(bundle, b, instanceOf(b, "app:"+v+".jar"))
+		c := correlate(bundle, cfgs[v], v)
+		o := byID(c)
+		wantWrites := map[string]int{"defective": 3, "fixed": 2}[v]
+		if w := o["write"]; w.Observation != "entered" || w.Entries.Traced != wantWrites || w.ClassIdentity != "matched" {
+			t.Errorf("%s: Store#write %+v, want entered %d times", v, w, wantWrites)
+		}
+		for _, cl := range o["write"].Callers {
+			if cl.EdgeID == nil {
+				t.Errorf("%s: measured call %s -> Store#write has no bundle edge", v, cl.CallerMethod)
+			}
+		}
+		for _, id := range []string{"dead", "filter"} {
+			if o[id].Observation != "traced_not_entered" {
+				t.Errorf("%s: %s %s, want traced_not_entered", v, id, o[id].Observation)
+			}
+		}
+		if c.Classes.HashDiffers != 0 || c.Calls["not_in_bundle"] != 0 {
+			t.Errorf("%s: classes %+v calls %v", v, c.Classes, c.Calls)
+		}
+	}
+	// The defective run against the fixed bundle: Entries has other bytes.
+	c := correlate(bundles["fixed"], cfgs["fixed"], "defective")
+	o := byID(c)
+	if o["target"].Observation != "class_differs" || o["target"].Entries.Traced != 0 || c.Classes.HashDiffers != 1 || len(c.Warnings) == 0 {
+		t.Errorf("cross-variant: Entries#target %+v, classes %+v, warnings %v", o["target"], c.Classes, c.Warnings)
 	}
 }

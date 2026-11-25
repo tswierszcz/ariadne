@@ -88,6 +88,8 @@ Rozszerzenie odbioru obejmuje dostarczoną binarkę z potwierdzonym i sprzecznym
 
 ### RH-A4 — obserwacje runtime
 
+**Status 2026-11-25: IN_PROGRESS (narzędzia producenta gotowe, eksperymentalne).** RI6 `research trace-config`/`correlate` ([RUNTIME.md](../docs/research-interface/RUNTIME.md)): filtr metod z celów Tekmerion, korelacja zachowuje hash klasy, instancję, rodzaj pomiaru (traced/sampled), kompletność i identyfikator przebiegu; identyfikator eksperymentu pozostaje po stronie Tekmerion. Sprawdzone na celu pilota (oba warianty). Wynik asercji bezpieczeństwa pozostaje po stronie Tekmerion.
+
 Realizować w ramach RI6 po działającym pilocie, gdy obserwacja wywołania rozstrzyga konkretny problem. Filtr metod obejmuje własne cele Tekmerion. Korelacja zachowuje loader, hashe klas, rodzaj pomiaru, jego kompletność oraz identyfikator eksperymentu. Wynik asercji bezpieczeństwa pozostaje po stronie Tekmerion.
 
 ## 4. Wspólna kolejność

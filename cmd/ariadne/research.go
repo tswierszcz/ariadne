@@ -36,6 +36,8 @@ const researchUsage = `usage:
                          [-profile NAME] [-target-java N] ... -out BUNDLE_DIR
   ariadne research query -bundle BUNDLE_DIR -request REQUEST.json -out RESPONSE.json [-verify operation|full]
   ariadne research check -bundle BUNDLE_DIR -request REQUEST.json -response RESPONSE.json [-replay]
+  ariadne research trace-config -bundle BUNDLE_DIR -request TARGETS.json -out CONFIG.json -jfc SETTINGS.jfc
+  ariadne research correlate -bundle BUNDLE_DIR -trace RUN.trace [-config CONFIG.json] -out CORRELATION.json
 
 index builds the call graph of the built input with every model the CVE scan
 uses, without advisories and without network access (Maven Central reference
@@ -50,7 +52,10 @@ check is the producer's verdict on a response (RESEARCH_HARNESS RH-A0): it
 writes {"valid", "violations", "replay"} to stdout; exit 0 valid, 1 a broken
 rule (or, with -replay, a response this producer would not give), 2 an
 invalid argument or an unreadable bundle.
-See docs/research-interface/README.md and ACCEPTANCE.md.
+trace-config and correlate (RI6, experimental, outside contract
+1.0.0-draft.1) turn targets into a JFR jdk.MethodTrace filter and attach an
+ariadne-runtime-trace-1 trace to the bundle by class content.
+See docs/research-interface/README.md, ACCEPTANCE.md and RUNTIME.md.
 `
 
 func researchMain(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -68,6 +73,10 @@ func researchMain(args []string, stdout, stderr io.Writer, getenv func(string) s
 		return researchQueryMain(args[1:], stderr)
 	case "check":
 		return researchCheckMain(args[1:], stdout, stderr)
+	case "trace-config":
+		return researchTraceConfigMain(args[1:], stderr)
+	case "correlate":
+		return researchCorrelateMain(args[1:], stderr)
 	}
 	fmt.Fprintf(stderr, "ariadne research: unknown command %q\n%s", args[0], researchUsage)
 	return 2
@@ -270,6 +279,101 @@ func researchCheckMain(args []string, stdout, stderr io.Writer) int {
 	if !verdict.Valid || verdict.Replay == "differs" {
 		return 1
 	}
+	return 0
+}
+
+// RI6 (experimental): docs/research-interface/RUNTIME.md.
+func researchTraceConfigMain(args []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("ariadne research trace-config", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var bundleDir, reqPath, out, jfc string
+	fs.StringVar(&bundleDir, "bundle", "", "research bundle directory")
+	fs.StringVar(&reqPath, "request", "", "trace request ("+research.TraceRequestSchema+")")
+	fs.StringVar(&out, "out", "", "trace configuration ("+research.TraceConfigSchema+")")
+	fs.StringVar(&jfc, "jfc", "", "JFR settings file to record with")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if bundleDir == "" || reqPath == "" || out == "" || jfc == "" || fs.NArg() > 0 {
+		fmt.Fprintln(stderr, "ariadne research trace-config: -bundle, -request, -out and -jfc are required")
+		return 2
+	}
+	raw, err := os.ReadFile(reqPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research trace-config:", err)
+		return 2
+	}
+	b, err := research.LoadFor(bundleDir, "reachability")
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research trace-config: bundle:", err)
+		return 1
+	}
+	req, qerr := research.ParseTraceRequest(b, raw)
+	if qerr != nil {
+		fmt.Fprintln(stderr, "ariadne research trace-config:", qerr.Error())
+		return 2
+	}
+	cfg := b.TraceConfigFor(req)
+	if err := writeResponse(out, cfg); err != nil {
+		fmt.Fprintln(stderr, "ariadne research trace-config:", err)
+		return 1
+	}
+	if err := os.WriteFile(jfc, cfg.JFC(), 0o644); err != nil {
+		fmt.Fprintln(stderr, "ariadne research trace-config:", err)
+		return 1
+	}
+	fmt.Fprintf(stderr, "trace configuration %s: %d filters for %d targets; record with -XX:StartFlightRecording=settings=profile,settings=%s (JDK 25+)\n", out, len(cfg.Filters), len(cfg.Targets), jfc)
+	return 0
+}
+
+func researchCorrelateMain(args []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("ariadne research correlate", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var bundleDir, tracePath, cfgPath, out string
+	fs.StringVar(&bundleDir, "bundle", "", "research bundle directory")
+	fs.StringVar(&tracePath, "trace", "", "runtime trace (ariadne-runtime-trace-1, docs/RUNTIME_TRACE.MD)")
+	fs.StringVar(&cfgPath, "config", "", "optional trace configuration naming the targets")
+	fs.StringVar(&out, "out", "", "correlation ("+research.CorrelationSchema+")")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if bundleDir == "" || tracePath == "" || out == "" || fs.NArg() > 0 {
+		fmt.Fprintln(stderr, "ariadne research correlate: -bundle, -trace and -out are required")
+		return 2
+	}
+	t, err := loadRuntimeTrace(tracePath)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research correlate:", err)
+		return 2
+	}
+	var cfg *research.TraceConfig
+	if cfgPath != "" {
+		raw, err := os.ReadFile(cfgPath)
+		if err == nil {
+			cfg = &research.TraceConfig{}
+			err = json.Unmarshal(raw, cfg)
+		}
+		if err != nil || cfg.SchemaVersion != research.TraceConfigSchema {
+			fmt.Fprintf(stderr, "ariadne research correlate: -config %s: not a %s document (%v)\n", cfgPath, research.TraceConfigSchema, err)
+			return 2
+		}
+	}
+	b, err := research.Load(bundleDir)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research correlate: bundle:", err)
+		return 1
+	}
+	c, qerr := b.Correlate(t, cfg)
+	if qerr != nil {
+		fmt.Fprintln(stderr, "ariadne research correlate:", qerr.Error())
+		return 2
+	}
+	if err := writeResponse(out, c); err != nil {
+		fmt.Fprintln(stderr, "ariadne research correlate:", err)
+		return 1
+	}
+	fmt.Fprintf(stderr, "correlation %s: classes matched %d, other bytes %d, not in the bundle %d; calls in the bundle %d, not %d, unmatched %d\n",
+		out, c.Classes.Matched, c.Classes.HashDiffers, c.Classes.NotInBundle, c.Calls["in_bundle"], c.Calls["not_in_bundle"], c.Calls["unmatched"])
 	return 0
 }
 

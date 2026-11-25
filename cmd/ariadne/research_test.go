@@ -543,3 +543,46 @@ func TestResearchSubsetPrunedWarning(t *testing.T) {
 		}
 	}
 }
+
+// RI6: JFR filters by method name, so a target with overloads names the
+// other overloads it traces too; an unresolved target gets no filter; a
+// request for another analysis is refused.
+func TestResearchTraceConfigOverloads(t *testing.T) {
+	dir := t.TempDir()
+	bundle, b := researchIndex(t, dir)
+	lib := instanceOf(b, "app:lib.jar")
+	write := func(analysis string) string {
+		raw, _ := json.Marshal(map[string]any{"schema_version": research.TraceRequestSchema, "analysis_id": analysis, "request_id": "o1",
+			"targets": []any{
+				map[string]any{"id": "save", "selector": map[string]any{"instance_id": lib, "class": "fx.research.Extractor", "name": "save", "descriptor": "([B)V"}},
+				map[string]any{"id": "absent", "selector": map[string]any{"instance_id": lib, "class": "fx.research.Extractor", "name": "absent", "descriptor": "()V"}}}})
+		p := filepath.Join(t.TempDir(), "req.json")
+		os.WriteFile(p, raw, 0o644)
+		return p
+	}
+	cfg, jfc := filepath.Join(dir, "cfg.json"), filepath.Join(dir, "t.jfc")
+	if code, msg := runWithEnv([]string{"research", "trace-config", "-bundle", bundle, "-request", write(b.AnalysisID), "-out", cfg, "-jfc", jfc}, nil); code != 0 {
+		t.Fatalf("trace-config: %d %s", code, msg)
+	}
+	var c research.TraceConfig
+	raw, _ := os.ReadFile(cfg)
+	json.Unmarshal(raw, &c)
+	if len(c.Filters) != 1 || c.Filters[0] != "fx.research.Extractor::save" {
+		t.Errorf("filters %v", c.Filters)
+	}
+	other := ""
+	for _, n := range b.Nodes {
+		if n.Method != nil && n.Method.Class == "fx.research.Extractor" && n.Method.Name == "save" && n.Method.Descriptor != "([B)V" && n.CanonicalNodeID == n.NodeID {
+			other = n.NodeID
+		}
+	}
+	if s := c.Targets[0]; len(s.AlsoTraced) != 1 || s.AlsoTraced[0] != other {
+		t.Errorf("save overloads traced too: %v, want [%s]", s.AlsoTraced, other)
+	}
+	if a := c.Targets[1]; a.Resolution != "missing" || a.Filter != nil {
+		t.Errorf("absent target %+v", a)
+	}
+	if code, _ := runWithEnv([]string{"research", "trace-config", "-bundle", bundle, "-request", write("sha256:" + strings.Repeat("0", 64)), "-out", cfg, "-jfc", jfc}, nil); code != 2 {
+		t.Errorf("another analysis: exit %d, want 2", code)
+	}
+}

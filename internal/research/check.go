@@ -63,7 +63,7 @@ type checker struct {
 	b      *Bundle
 	req    *Request
 	reqRaw []byte
-	out []Violation
+	out    []Violation
 	// originals: record type -> id -> the bundle record as a generic value
 	originals map[string]map[string]any
 }

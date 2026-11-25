@@ -2,6 +2,14 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## RESEARCH_INTERFACE RI6 / RESEARCH_HARNESS RH-A4 — dowody runtime dla celów (2026-11-25)
+
+- Stan IN_PROGRESS (eksperymentalne, poza kontraktem `1.0.0-draft.1`; CONTRACT.md §13 zapowiada `trace-config`/`correlate` jako późniejsze operacje). Opis: [docs/research-interface/RUNTIME.md](../docs/research-interface/RUNTIME.md).
+- `ariadne research trace-config`: żądanie `ariadne-research-trace-request-1` (cele jak w `reachability`, te same reguły rozwiązywania) → `ariadne-research-trace-config-1` (filtry `Class::method`, `also_traced_node_ids` dla przeciążeń — JFR filtruje po nazwie) i plik `.jfc` z `jdk.MethodTrace`.
+- `ariadne research correlate`: ślad `ariadne-runtime-trace-1` → `ariadne-research-correlation-1`: klasa przyłącza się tylko po nazwie i SHA-256 rekordu klasy bundle'a (inne bajty: `hash_differs`, ostrzeżenie, nic nie przyłączone); dowody na węźle kanonicznym, krawędzie ze specjalizacji liczone; relacje `in_bundle`/`not_in_bundle`/`unmatched`; dla celów `entered`/`sampled`/`traced_not_entered`/`not_seen`/`class_differs` z wywołującymi i `edge_id`.
+- Pilot: `scripts/pilot-runtime.sh` (JDK 25.0.5), zapisane `testdata/pilot/runtime-{defective,fixed}.trace`; `Store#write` 3 wejścia (wadliwy) vs 2 (poprawny, traversal odrzucony), każdy krok krawędzią bundle'a; martwa i refleksyjna `traced_not_entered`; ślad wadliwego przeciw bundle'owi poprawnego: `Entries#target` `class_differs`.
+- Weryfikacja: `TestPilotRuntime`, `TestResearchTraceConfigOverloads`; `go test ./...`, `go vet ./...`.
+
 ## RUNTIME_NATIVE — obszar zamknięty i zarchiwizowany (2026-11-25)
 
 - Obszar DONE for this scope (polecenie użytkownika „rób wszystko”): N0, N1, N4 (refleksja, proxy po `n4-1`), N5 `n5-1` zrobione; N2, agent N3 i async N4 oraz streszczenia Java ↔ native czekają na konkretny cel — warunki wznowienia w [`archive/2026-11-25/runtime_native/COMPLETION.md`](../archive/2026-11-25/runtime_native/COMPLETION.md). Plany przeniesione tam z `RECOMMENDATION/`, linki przepisane; README planów i ten wiersz zaktualizowane.

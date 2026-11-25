@@ -10,6 +10,7 @@ This interface lets [Tekmerion](https://github.com/tswierszcz/tekmerion) discove
 - [Example manifest](v1/fixtures/bundle/manifest.json), [identity](v1/fixtures/bundle/identity.json) and [graph records](v1/fixtures/bundle/records.jsonl) form a hash-verified data-only bundle.
 - [Conformance suite](v1/cases.json) identifies positive and deliberately invalid fixtures.
 - [Validator](v1/validate.mjs) checks schema conformance, bundle hashes, graph references and the documented fixture semantics.
+- [Runtime evidence for research targets](RUNTIME.md) (RI6, experimental, outside the contract revision, 2026-11-25): `research trace-config` (targets → JFR `jdk.MethodTrace` filter) and `research correlate` (an `ariadne-runtime-trace-1` trace attached to the bundle by class content).
 - [Producer acceptance](ACCEPTANCE.md) (RH-A0, 2026-11-25): real responses from the control library, mutated responses with the rule each breaks, `ariadne research check` (the producer's verdict) and `-verify full`.
 
 The validator uses Node.js with AJV 8 and `ajv-formats` available to CommonJS module resolution. Run it from any directory.
