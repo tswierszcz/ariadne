@@ -58,7 +58,7 @@ func (r RTA) DispatchTargets(h *hierarchy.Hierarchy, call classfile.Call) []stri
 func (r RTA) cha() CHA { return CHA{Skip: r.Skip, Exclude: r.Exclude, ExcludeRule: r.ExcludeRule} }
 
 // RTAVersion versions the fixed point and the fallback rules.
-const RTAVersion = "p2-1"
+const RTAVersion = "p2-2" // p2-2: synthetic members do not make a class nameable
 
 // Creation makes Classes live once Site (a method node) is reachable; a
 // creation with Always set is live from the start (container beans,

@@ -19,6 +19,7 @@ const (
 	AccInterface = 0x0200
 	AccNative    = 0x0100
 	AccAbstract  = 0x0400
+	AccSynthetic = 0x1000
 )
 
 // Method is one method_info entry, resolved enough to build a call graph
