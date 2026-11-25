@@ -2,6 +2,15 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## RESEARCH_HARNESS RH-A0 — akceptacja producenta (2026-11-25)
+
+- Stan IN_PROGRESS dla RH-A0: strona Ariadne zrobiona, strona Tekmerion (RH-T0) należy do Codex. Plan: [RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD](RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD), opis: [ACCEPTANCE.md](../docs/research-interface/ACCEPTANCE.md).
+- `internal/research/check.go`: `CheckResponse` (25 nazwanych reguł, które konsument z tym samym bundle'em może sam zastosować: kształt, wiązania, stany celów, liczniki z `null`, ciągłość i koniec ścieżki, charakter, pass, dispatch, oryginalność i kompletność dowodów) oraz `Replay` (bajtowa zgodność z odpowiedzią producenta). CLI `ariadne research check` (werdykt JSON, exit 0/1/2), `research query -verify full`.
+- Pakiet `docs/research-interface/acceptance/` (poza przypiętym `v1/`): generator `cmd/research-acceptance` + `scripts/research-acceptance.sh` (binarka z czystego drzewa), żądania w `testdata/research/acceptance/requests.json`. 17 odpowiedzi (przypadki a–i w obu zakresach, podzbiór korzeni, skrócone wpisy i ścieżki, budżet przed i po świadku, wszystkie operacje odkrywania z kursorem, dwa błędy), 132 mutacje — każda odrzucona z nazwaną regułą, inaczej generator przerywa.
+- Weryfikacja: `TestAcceptancePackage` (SHA256SUMS, werdykty, replay), `TestCheckContractCases` (werdykty semantyczne jak `validate.mjs` dla przypadków `v1/`), `TestResearchCheckAndVerify` (check na własnej i zepsutej odpowiedzi; uszkodzony `calls.jsonl` przechodzi domyślną weryfikację `entries`, a `-verify full` zwraca błąd bundle'a); `node scripts/research-check.mjs` — odpowiedzi pakietu zgodne ze schematem; `go test ./...`, `go vet ./...`.
+- Ustalenie: kontrakt dopuszcza w `evidence` rekordy, do których nic się nie odwołuje (fixture'y `v1/` je mają), więc to nie jest naruszenie; dokładny zbiór producenta przypina tylko replay.
+- Następny krok po stronie Ariadne: RH-A1 dopiero po pomiarze potrzeb klienta; przypadek z krawędzią client/supplied dispatch do pakietu, gdy biblioteka kontrolna go dostanie.
+
 ## Interfejs badawczy RI1 — wydzielona granica `prepare` (2026-11-25)
 
 - Stan IN_PROGRESS dla RI1. `analyze` (1 860 linii) rozcięta na `prepare` (statyczny pipeline, zwraca `staticRun`) i `scanCVEs` (etap CVE i raporty). `research index` woła `prepare` bezpośrednio zamiast przerywać `analyze` w środku; pole `researchOut.analysisID` usunięte. Cleanup przygotowanego wejścia: po błędzie w `prepare`, w pozostałych przypadkach na końcu wywołującego.

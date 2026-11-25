@@ -1,0 +1,399 @@
+{
+  "schema": "ariadne-research-acceptance-requests-1",
+  "cases": [
+    {
+      "id": "reach-cases",
+      "scopes": [
+        "all",
+        "reachable"
+      ],
+      "note": "EXPECTED.MD cases a-i; in the reachable bundle g-legacy (a dependency method nothing reaches) resolves as missing, b-unused stays (the input's own methods are in scope)",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-cases",
+        "operation": "reachability",
+        "roots": {
+          "selection": "indexed"
+        },
+        "targets": [
+          {
+            "id": "a-write",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "writeEntry",
+              "descriptor": "(Ljava/nio/file/Path;[B)V"
+            }
+          },
+          {
+            "id": "a-write-by-id",
+            "method_id": "m-10abdb8a73df52cf7851492e"
+          },
+          {
+            "id": "b-unused",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "unused",
+              "descriptor": "(Ljava/nio/file/Path;)V"
+            }
+          },
+          {
+            "id": "d-save-bytes",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "save",
+              "descriptor": "([B)V"
+            }
+          },
+          {
+            "id": "e-wipe",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.internal.Cleaner",
+              "name": "wipe",
+              "descriptor": "(Ljava/nio/file/Path;)V"
+            }
+          },
+          {
+            "id": "f-resolve",
+            "selector": {
+              "instance_id": "c-2e6c5aec0b4760bc",
+              "class": "fx.dep.Paths2",
+              "name": "resolve",
+              "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"
+            }
+          },
+          {
+            "id": "g-legacy",
+            "selector": {
+              "instance_id": "c-2e6c5aec0b4760bc",
+              "class": "fx.dep.Paths2",
+              "name": "legacyResolve",
+              "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"
+            }
+          },
+          {
+            "id": "h-safe-shadowed",
+            "selector": {
+              "instance_id": "c-3f12b7b765c8133e",
+              "class": "fx.dep.Paths2",
+              "name": "safeResolve",
+              "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"
+            }
+          },
+          {
+            "id": "i-absent",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "absent",
+              "descriptor": "()V"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "reach-subset",
+      "scopes": [
+        "all"
+      ],
+      "note": "roots limited to Extractor#extract",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-subset",
+        "operation": "reachability",
+        "roots": {
+          "selection": "subset",
+          "node_ids": [
+            "n-2489eca9d21aa72f67a1559a"
+          ]
+        },
+        "targets": [
+          {
+            "id": "a-write",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "writeEntry",
+              "descriptor": "(Ljava/nio/file/Path;[B)V"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "reach-truncated-entries",
+      "scopes": [
+        "all"
+      ],
+      "note": "shortened presentation: one entry of several shown, the total kept",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-truncated-entries",
+        "operation": "reachability",
+        "roots": {
+          "selection": "indexed"
+        },
+        "targets": [
+          {
+            "id": "a-write",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "writeEntry",
+              "descriptor": "(Ljava/nio/file/Path;[B)V"
+            }
+          },
+          {
+            "id": "e-wipe",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.internal.Cleaner",
+              "name": "wipe",
+              "descriptor": "(Ljava/nio/file/Path;)V"
+            }
+          }
+        ],
+        "limits": {
+          "max_entries": 1
+        }
+      }
+    },
+    {
+      "id": "reach-truncated-paths",
+      "scopes": [
+        "all"
+      ],
+      "note": "shortened paths: Cleaner#wipe's paths cut at two nodes, full_node_count kept",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-truncated-paths",
+        "operation": "reachability",
+        "roots": {
+          "selection": "indexed"
+        },
+        "targets": [
+          {
+            "id": "e-wipe",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.internal.Cleaner",
+              "name": "wipe",
+              "descriptor": "(Ljava/nio/file/Path;)V"
+            }
+          }
+        ],
+        "limits": {
+          "max_path_nodes": 2
+        }
+      }
+    },
+    {
+      "id": "reach-budget-before",
+      "scopes": [
+        "all"
+      ],
+      "note": "budget ends before any path: incomplete, total null",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-budget-before",
+        "operation": "reachability",
+        "roots": {
+          "selection": "indexed"
+        },
+        "targets": [
+          {
+            "id": "a-write",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "writeEntry",
+              "descriptor": "(Ljava/nio/file/Path;[B)V"
+            }
+          }
+        ],
+        "limits": {
+          "max_work_units": 1
+        }
+      }
+    },
+    {
+      "id": "reach-budget-after",
+      "scopes": [
+        "all"
+      ],
+      "note": "budget ends after a witness: found with an incomplete search (smallest budget that gives it)",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-budget-after",
+        "operation": "reachability",
+        "roots": {
+          "selection": "indexed"
+        },
+        "targets": [
+          {
+            "id": "a-write",
+            "selector": {
+              "instance_id": "c-647467be3ca085f1",
+              "class": "fx.research.Extractor",
+              "name": "writeEntry",
+              "descriptor": "(Ljava/nio/file/Path;[B)V"
+            }
+          }
+        ],
+        "limits": {
+          "max_work_units": "@FOUND_INCOMPLETE@"
+        }
+      }
+    },
+    {
+      "id": "entries",
+      "scopes": [
+        "all",
+        "reachable"
+      ],
+      "note": "every indexed root",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "entries",
+        "operation": "entries"
+      }
+    },
+    {
+      "id": "entries-filtered",
+      "scopes": [
+        "all"
+      ],
+      "note": "class_prefix filter",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "entries-filtered",
+        "operation": "entries",
+        "filters": {
+          "class_prefix": "fx.research.internal."
+        }
+      }
+    },
+    {
+      "id": "methods-page1",
+      "scopes": [
+        "all"
+      ],
+      "note": "first page, truncated, with a cursor",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "methods-page1",
+        "operation": "methods",
+        "filters": {
+          "class_prefix": "fx."
+        },
+        "limits": {
+          "max_records": 5
+        }
+      }
+    },
+    {
+      "id": "methods-page2",
+      "scopes": [
+        "all"
+      ],
+      "note": "second page through the cursor",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "methods-page2",
+        "operation": "methods",
+        "filters": {
+          "class_prefix": "fx."
+        },
+        "limits": {
+          "max_records": 5
+        },
+        "cursor": "@CURSOR:methods-page1@"
+      }
+    },
+    {
+      "id": "calls-files",
+      "scopes": [
+        "all"
+      ],
+      "note": "JDK operations the library calls",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "calls-files",
+        "operation": "calls",
+        "filters": {
+          "declared_class_prefix": "java.nio.file.Files"
+        }
+      }
+    },
+    {
+      "id": "callers-write",
+      "scopes": [
+        "all"
+      ],
+      "note": "incoming edges of Extractor#writeEntry",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "callers-write",
+        "operation": "callers",
+        "node_id": "n-d6646a64788165a24f419991"
+      }
+    },
+    {
+      "id": "callees-extract",
+      "scopes": [
+        "all"
+      ],
+      "note": "outgoing edges of Extractor#extract",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "callees-extract",
+        "operation": "callees",
+        "node_id": "n-2489eca9d21aa72f67a1559a"
+      }
+    },
+    {
+      "id": "error-unknown-node",
+      "scopes": [
+        "all"
+      ],
+      "note": "error envelope: unknown node",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "error-unknown-node",
+        "operation": "callers",
+        "node_id": "n-000000000000000000000000"
+      }
+    },
+    {
+      "id": "error-analysis",
+      "scopes": [
+        "all"
+      ],
+      "note": "error envelope: request names another analysis",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "request_id": "error-analysis",
+        "operation": "entries"
+      }
+    }
+  ]
+}

@@ -42,6 +42,8 @@ Tekmerion eksportuje planowane `report.md`, wersjonowane `report.json` i katalog
 
 ### RH-A0 — akceptacja producenta i konsumenta
 
+**Status 2026-11-25: IN_PROGRESS (strona producenta zrobiona).** Punkty 1–5 po stronie Ariadne: pakiet [acceptance/](../docs/research-interface/acceptance/) (biblioteka kontrolna, bundle `all` i `reachable`, 17 prawdziwych odpowiedzi wszystkich operacji, 132 mutacje z regułą), `ariadne research check` (werdykt producenta, reguły w [ACCEPTANCE.md](../docs/research-interface/ACCEPTANCE.md#3-rules)), `research query -verify full` i opis weryfikacji na żądanie, macierz producent/konsument. Te same reguły dają werdykty przypadków `v1/` (w tym odrzucenie `invalid-missing-with-path` i `invalid-path-shape`). Pozostaje strona konsumenta (RH-T0: pin pakietu i porównanie werdyktów) oraz reguły bez przypadku w bibliotece kontrolnej (`path-dispatch`, `record-type`, `error-envelope`).
+
 1. Zebrać rzeczywiste odpowiedzi z kontrolnej biblioteki dla wszystkich operacji. Zachować binarkę, scenariusz, `analysis_id` i żądania.
 2. Sprawdzić schemat oraz semantykę odpowiedzi, w tym rozwiązanie celu, ciągłość krawędzi, korzenie, warunki i limity.
 3. Udostępnić Tekmerion zestaw przypadków poprawnych oraz mutacji odpowiedzi do testów adaptera. W szczególności `missing` ze ścieżką i nieciągła ścieżka mają być odrzucane.

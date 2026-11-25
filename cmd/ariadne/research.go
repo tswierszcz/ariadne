@@ -34,7 +34,8 @@ import (
 const researchUsage = `usage:
   ariadne research index -app JAR -roots all|profile|api [-deps DIR] [-deps-list FILE]
                          [-profile NAME] [-target-java N] ... -out BUNDLE_DIR
-  ariadne research query -bundle BUNDLE_DIR -request REQUEST.json -out RESPONSE.json
+  ariadne research query -bundle BUNDLE_DIR -request REQUEST.json -out RESPONSE.json [-verify operation|full]
+  ariadne research check -bundle BUNDLE_DIR -request REQUEST.json -response RESPONSE.json [-replay]
 
 index builds the call graph of the built input with every model the CVE scan
 uses, without advisories and without network access (Maven Central reference
@@ -43,7 +44,13 @@ research bundle (contract ` + research.ContractRevision + `). query answers one 
 (operations: entries, methods, calls, callers, callees, reachability) from the
 bundle. Exit status: 0 a result (also missing / not_found / incomplete),
 2 an invalid argument or request, 1 a bundle, I/O or internal failure.
-See docs/research-interface/README.md.
+query verifies the datasets its operation reads in full and the others for
+presence and size; -verify full verifies every dataset.
+check is the producer's verdict on a response (RESEARCH_HARNESS RH-A0): it
+writes {"valid", "violations", "replay"} to stdout; exit 0 valid, 1 a broken
+rule (or, with -replay, a response this producer would not give), 2 an
+invalid argument or an unreadable bundle.
+See docs/research-interface/README.md and ACCEPTANCE.md.
 `
 
 func researchMain(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -59,6 +66,8 @@ func researchMain(args []string, stdout, stderr io.Writer, getenv func(string) s
 		return researchIndexMain(args[1:], stderr, getenv)
 	case "query":
 		return researchQueryMain(args[1:], stderr)
+	case "check":
+		return researchCheckMain(args[1:], stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "ariadne research: unknown command %q\n%s", args[0], researchUsage)
 	return 2
@@ -150,15 +159,20 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 func researchQueryMain(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("ariadne research query", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var bundleDir, reqPath, out string
+	var bundleDir, reqPath, out, verify string
 	fs.StringVar(&bundleDir, "bundle", "", "research bundle directory")
 	fs.StringVar(&reqPath, "request", "", "request JSON file")
 	fs.StringVar(&out, "out", "", "response JSON file (replaced atomically)")
+	fs.StringVar(&verify, "verify", "operation", `"operation": verify the datasets the operation reads in full, the others for presence and size; "full": every dataset`)
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if bundleDir == "" || reqPath == "" || out == "" || fs.NArg() > 0 {
 		fmt.Fprintln(stderr, "ariadne research query: -bundle, -request and -out are required")
+		return 2
+	}
+	if verify != "operation" && verify != "full" {
+		fmt.Fprintln(stderr, `ariadne research query: -verify is "operation" or "full"`)
 		return 2
 	}
 	raw, rerr := os.ReadFile(reqPath)
@@ -178,6 +192,9 @@ func researchQueryMain(args []string, stderr io.Writer) int {
 		Operation string `json:"operation"`
 	}
 	json.Unmarshal(raw, &head)
+	if verify == "full" {
+		head.Operation = "" // every dataset
+	}
 	b, err := research.LoadFor(bundleDir, head.Operation)
 	if err != nil {
 		var re *research.Error
@@ -199,6 +216,58 @@ func researchQueryMain(args []string, stderr io.Writer) int {
 	}
 	if err := writeResponse(out, resp); err != nil {
 		fmt.Fprintln(stderr, "ariadne research query: writing the response:", err)
+		return 1
+	}
+	return 0
+}
+
+func researchCheckMain(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("ariadne research check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var bundleDir, reqPath, respPath string
+	var replay bool
+	fs.StringVar(&bundleDir, "bundle", "", "research bundle directory (verified in full)")
+	fs.StringVar(&reqPath, "request", "", "the request JSON file the response answers")
+	fs.StringVar(&respPath, "response", "", "response JSON file to check")
+	fs.BoolVar(&replay, "replay", false, "also require the response to be byte-identical to this producer's answer")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if bundleDir == "" || reqPath == "" || respPath == "" || fs.NArg() > 0 {
+		fmt.Fprintln(stderr, "ariadne research check: -bundle, -request and -response are required")
+		return 2
+	}
+	reqRaw, err := os.ReadFile(reqPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research check:", err)
+		return 2
+	}
+	respRaw, err := os.ReadFile(respPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research check:", err)
+		return 2
+	}
+	b, err := research.Load(bundleDir)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research check: bundle:", err)
+		return 2
+	}
+	v := research.CheckResponse(b, reqRaw, respRaw)
+	verdict := struct {
+		Valid      bool                 `json:"valid"`
+		Violations []research.Violation `json:"violations"`
+		Replay     string               `json:"replay"`
+	}{Violations: append([]research.Violation{}, v...), Replay: "skipped"}
+	if replay {
+		verdict.Replay = "identical"
+		if r := research.Replay(b, reqRaw, respRaw); r != nil {
+			verdict.Replay = "differs"
+		}
+	}
+	verdict.Valid = len(v) == 0
+	out, _ := json.MarshalIndent(verdict, "", "  ")
+	fmt.Fprintln(stdout, string(out))
+	if !verdict.Valid || verdict.Replay == "differs" {
 		return 1
 	}
 	return 0
