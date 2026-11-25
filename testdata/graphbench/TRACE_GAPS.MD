@@ -436,3 +436,28 @@ targets of `DispatcherHelper`'s invoke site) — would close it. **Built the sam
 `stripes` profile (`roots.handlers`); on this trace JPetStore auto-detects `spring+stripes` (28
 entry points instead of 6) and CVE-2020-26945 is `REACHABLE` under `-roots profile` (path from
 `AccountActionBean#newAccount`); the relation counts are unchanged (roots add no edge).
+
+## Whole traced stacks (`n4-1`, 2026-11-25)
+
+petclinic was recorded once more with the unchanged `scripts/runtime-trace-petclinic.sh` (JDK 25.0.5: 15 420 class loads, 556 samples, 226 539 `jdk.MethodTrace` events). The **same recording** was converted twice: by `scripts/JfrToTrace.java` before `n4-1` (only the traced method's caller) and after it (the whole stack of each traced event). Each trace was analyzed with the script's own arguments (`-profile spring`, CHA, `-roots all`), once by the analyzer before `n4-1` and once after it.
+
+| Converter | Measured relations | In the static graph | Not in the static graph |
+|---|---|---|---|
+| before `n4-1` | 2 620 | 2 515 | 105 (4.0%) |
+| after `n4-1` | **3 445** (+825) | **3 301** (+786) | 144 (4.2%, +39) |
+
+| Cause | Before | After |
+|---|---|---|
+| `skipped-receiver` | 48 | 63 (`java.lang.Runnable` 4 → 8, `javax.servlet.ServletContext` 2 → 4) |
+| `reflection` | 35 | 52 (`Method#invoke` 30 → 46) |
+| `sam-call` | 13 | 14 |
+| `class-init` | 5 | 9 (Spring `HttpHeaders`, `HttpEntity`, `FormHttpMessageConverter`, `AbstractMessageConverterMethodProcessor`) |
+| `async` | 2 | 3 |
+| `no-call-at-site` | 2 | 3 |
+| `proxy` | 0 | 0 |
+
+- The frames above each traced method add 825 measured relations. 95% of them (786) are edges the graph already has, which confirms the graph deeper along the request paths than the traced methods' callers alone could. The 39 new gaps fall under the existing causes, with the same mix (reflection and JDK receivers first), so the work list does not change.
+- The `n4-1` classifier change (a lambda or method-reference `InvocationHandler` as `proxy`) has no effect here. The analyzer before and after `n4-1` gives identical counts on the new trace. Spring's proxies are `InvocationHandler` classes (`JdkDynamicAopProxy`), which the `proxy` rule already covered, and this scenario's stacks have no relation through a JDK proxy into one.
+- **Truncation limits the gain.** JFR truncated 70 393 of the traced stacks (31%) at its default stack depth (64 frames), so the frames below the cut, those nearest the request entry, are missing. A recording with a larger `stackdepth` would show more of them at more overhead; the script does not set it.
+- Cost: the trace grows by 3.5% (4.03 → 4.17 MB). The conversion reads the same events.
+
