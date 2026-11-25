@@ -307,6 +307,18 @@ func mutations(b *research.Bundle, resp []byte) []mutation {
 			delete(d["error"].(map[string]any), "code")
 			return true
 		})
+		add("empty-error-code", research.RuleErrorEnvelope, "an error without a code or message", func(d map[string]any) bool {
+			e := d["error"].(map[string]any)
+			e["code"], e["message"] = "", ""
+			return true
+		})
+		add("error-other-request", research.RuleBinding, "an error naming another request", func(d map[string]any) bool {
+			if d["request_id"] == nil {
+				return false
+			}
+			d["request_id"] = "someone-else"
+			return true
+		})
 		for i := range out {
 			out[i].envelope = true
 		}
@@ -341,6 +353,18 @@ func mutations(b *research.Bundle, resp []byte) []mutation {
 
 func discoveryMutations(b *research.Bundle, resp []byte, add func(string, string, string, func(map[string]any) bool)) {
 	records := func(d map[string]any) []any { return d["records"].([]any) }
+	add("foreign-record-type", research.RuleRecordType, "an unchanged bundle record of another type in place of the first record", func(d map[string]any) bool {
+		rs := records(d)
+		if len(rs) == 0 || len(b.Nodes) == 0 || len(b.Roots) == 0 {
+			return false
+		}
+		if rs[0].(map[string]any)["record_type"] == "node" {
+			rs[0] = generic(&b.Roots[0])
+		} else {
+			rs[0] = generic(&b.Nodes[0])
+		}
+		return true
+	})
 	add("record-modified", research.RuleRecordOriginal, "a record member changed", func(d map[string]any) bool {
 		rs := records(d)
 		if len(rs) == 0 {

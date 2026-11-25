@@ -60,8 +60,9 @@ var Rules = []string{RuleJSON, RuleShape, RuleVersion, RuleBinding, RuleErrorEnv
 	RulePathDispatch, RuleEvidenceOriginal, RuleEvidenceMissing, RuleEvidenceExtra, RuleReplay}
 
 type checker struct {
-	b   *Bundle
-	req *Request
+	b      *Bundle
+	req    *Request
+	reqRaw []byte
 	out []Violation
 	// originals: record type -> id -> the bundle record as a generic value
 	originals map[string]map[string]any
@@ -76,7 +77,7 @@ func (c *checker) add(rule, loc, format string, a ...any) {
 // request must be one ParseRequest accepts; a response to a request it
 // rejects can only be an error envelope, checked for shape and binding.
 func CheckResponse(b *Bundle, reqRaw, respRaw []byte) []Violation {
-	c := &checker{b: b}
+	c := &checker{b: b, reqRaw: reqRaw}
 	if r, perr := ParseRequest(b, reqRaw); perr == nil {
 		c.req = r
 	}
@@ -227,8 +228,14 @@ func (c *checker) checkError(r *ErrorResponse) {
 	if r.Error.Code == "" || r.Error.Message == "" {
 		c.add(RuleErrorEnvelope, "/error", "code and message are required")
 	}
-	if c.req != nil && r.RequestID != nil && *r.RequestID != c.req.RequestID {
-		c.add(RuleBinding, "/request_id", "%q, the request says %q", *r.RequestID, c.req.RequestID)
+	// A rejected request is not parsed; its request_id, when it has a
+	// string one, is still what the envelope must echo.
+	var head struct {
+		RequestID any `json:"request_id"`
+	}
+	json.Unmarshal(c.reqRaw, &head)
+	if id, ok := head.RequestID.(string); ok && r.RequestID != nil && *r.RequestID != id {
+		c.add(RuleBinding, "/request_id", "%q, the request says %q", *r.RequestID, id)
 	}
 }
 

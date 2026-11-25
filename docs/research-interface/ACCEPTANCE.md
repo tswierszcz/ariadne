@@ -67,6 +67,8 @@ Envelope mutations are generated once per kind of response (reachability, discov
 | `targets-reordered`, `root-basis` | `target-order`, `root-basis` | Results are out of request order, or the root basis is wrong |
 | `record-modified`, `record-dropped`, `cursor-on-last-page`, `truncated-without-cursor` | `record-original`, `page` | Discovery records or pages are inconsistent |
 | `unrelated-edge` | `neighbor` | A `callers`/`callees` edge does not touch the node |
+| `foreign-record-type` | `record-type` | An unchanged bundle record of another type in a discovery page |
+| `empty-error-code`, `error-other-request` | `error-envelope`, `binding` | An error envelope without code or message, or echoing another request |
 
 `go test ./internal/research` (`TestAcceptancePackage`) checks the hashes in `SHA256SUMS`, every verdict and every replay. A failing replay means a query now answers differently. In that case, regenerate the package with `scripts/research-acceptance.sh` and state the change in the PR, because the consumer compares verdicts on this package.
 
@@ -101,8 +103,8 @@ The same rules also reproduce the semantic verdicts of the v1 conformance cases 
 | `json` | No duplicate member at any depth, valid UTF-8, no BOM, no trailing data |
 | `shape` | Exactly the contract's members at every level of the envelope, results, paths, pages and errors: nothing unknown, nothing missing, `null` where the contract writes null. Records are compared whole under the `*-original` rules. |
 | `version` | `schema_version` and `contract_revision` |
-| `binding` | `analysis_id` is the bundle's, `provenance` is the bundle identity's, and `request_id`, `operation` and the request's analysis match |
-| `error-envelope` | An error has a code and a message, and echoes the request id |
+| `binding` | `analysis_id` is the bundle's, `provenance` is the bundle identity's, and `request_id`, `operation` and the request's analysis match; an error envelope echoes the `request_id` of the request, even one the producer rejected |
+| `error-envelope` | An error has a code and a message |
 | `page` | `returned_count` equals the number of records, a cursor exists exactly when the page is truncated, `total_count` ≥ returned, and records are in ascending id order |
 | `record-type` | Discovery record types per operation: `entries` root, `methods` node, `calls` call, `callers`/`callees` edge |
 | `record-original`, `evidence-original` | Each record is the bundle's record with that id, member for member |
@@ -124,10 +126,7 @@ The same rules also reproduce the semantic verdicts of the v1 conformance cases 
 | `path-dispatch` | After a complete search, an entry's `client_dispatch` (`supplied_dispatch`) is true exactly when no path from its root to a matched node avoids client (supplied) dispatch edges (CONTRACT.md §9: every path decides it, not the shown one) |
 | `replay` | `-replay` only: byte-identical to this producer's answer |
 
-The control library cannot break two of these rules, so the package exercises them only partly:
-
-- `record-type`: a changed type is reported as `record-original`.
-- `error-envelope`: the error mutations break `shape`.
+Every rule except `replay` is broken by at least one mutation; `TestAcceptancePackage` fails otherwise. `record-type` is exercised by `foreign-record-type`: an unchanged bundle record of another type, which `record-original` cannot catch. `error-envelope` is exercised by `empty-error-code`.
 
 Until 2026-11-25 (RH-A2), `path-dispatch` required the flag whenever the *shown* path took a dispatch edge. That reading contradicts CONTRACT.md §9 and would have rejected a correct entry whose other path avoids the edge. Nothing exercised it then, because the control library had no dispatch edge. It now recomputes the flag over every path.
 
