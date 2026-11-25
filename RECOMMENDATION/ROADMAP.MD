@@ -84,7 +84,7 @@ Gotowe, gdy model usługi może wprowadzić typ, który uruchamia kolejne popraw
 | R4 | DATA_FLOW D4–D5; DESERIALIZATION Z0–Z3 | Zweryfikowane źródła/sinki i przepływ wartości. | Ścieżki danych i modele wejść deserializacji. |
 | R5 | RUNTIME N0–N4 | B0–B1 i CVE F3 dla powtarzalnych dowodów. | Import śladów, opcjonalny agent, jawne granice native. |
 | R6 | GRAPH_PRECISION P3–P4; dalsze modele pozostałych torów | Wyniki pomiarów wcześniejszych wydań. | Analiza możliwych obiektów i szersze modele, jeśli uzasadnia je benchmark. |
-| Osobny pilot | ECOSYSTEMS E0–E4 | B0 i uzgodniony wynik v2. | Import/integracja Go bez przepisywania całego silnika JVM. |
+| ~~Osobny pilot~~ | ~~ECOSYSTEMS E0–E4~~ — **wycofane 2026-11-25** | — | Go poza Ariadne: oddzielne rozwiązanie AriadneGO ([archiwum](../archive/2026-11-25/ecosystems/WITHDRAWN.md)). |
 
 To kolejność dostarczania, nie szacowanie czasu. RUNTIME N0–N1 (kontrakt i import) można wdrożyć wcześniej do pomiarów modeli statycznych; agent nie jest wymagany do pierwszego wydania.
 

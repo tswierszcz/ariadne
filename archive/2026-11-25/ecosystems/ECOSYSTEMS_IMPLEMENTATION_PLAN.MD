@@ -1,6 +1,6 @@
 # Inne ekosystemy — fazy E0–E4
 
-Status: plan eksploracyjny. Wymagania: [ECOSYSTEMS.MD](ECOSYSTEMS.MD). Zależności: [ROADMAP.MD](ROADMAP.MD).
+Status: **WYCOFANY 2026-11-25** — Go dostanie oddzielne rozwiązanie AriadneGO; zob. [WITHDRAWN.md](WITHDRAWN.md). Dawniej: plan eksploracyjny. Wymagania: [ECOSYSTEMS.MD](ECOSYSTEMS.MD). Zależności: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## E0. Ocena kontraktu i zakresu pilota
 

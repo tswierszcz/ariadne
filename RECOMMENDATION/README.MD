@@ -21,6 +21,10 @@ prośbę użytkownika dotyczącą jego treści.
 interfejs RI z procesem Tekmerion, określa wspólne kamienie milowe H0–H5 i
 akceptację dowodów po adaptacji `cloudflare/security-audit-skill`.
 
+**Inne ekosystemy (Go) — WYCOFANE (2026-11-25).** Decyzja użytkownika: Ariadne zostaje
+narzędziem dla JVM, a analiza Go powstanie jako oddzielne rozwiązanie AriadneGO. Plany E0–E4
+(nierozpoczęte) są w [`archive/2026-11-25/ecosystems/`](../archive/2026-11-25/ecosystems/WITHDRAWN.md).
+
 **Podstawy grafu JVM (inicjalizacja, dziedziczenie, wybór klas, multi-release) —
 DONE (2026-10-22), wszystkie fazy G0–G5.** Dawne `JVM_GRAPH.MD`/
 `JVM_GRAPH_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
@@ -90,7 +94,6 @@ pozostaje `Partial`.
 |---|---|---|
 | Interfejs badawczy dla Tekmerion — kontrakt draft.1, CLI planowane | [Specyfikacja, schemat i przykłady](../docs/research-interface/README.md) | [RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD](RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD) |
 | Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
-| Inne języki: pilotaż integracji Go | [ECOSYSTEMS.MD](ECOSYSTEMS.MD) | [ECOSYSTEMS_IMPLEMENTATION_PLAN.MD](ECOSYSTEMS_IMPLEMENTATION_PLAN.MD) |
 
 ## Pokrycie pierwotnych rekomendacji
 
@@ -110,7 +113,7 @@ pozostaje `Partial`.
 | Taint analysis | DATA_FLOW — **DONE, zarchiwizowane** (D0–D5); pilotaż `-taint` opt-in, kwalifikacja w `docs/TAINT_QUALIFICATION.MD` |
 | Obserwacja działającej aplikacji | RUNTIME_NATIVE |
 | Rozpoznawanie samych podatności — pięć punktów | CVE — **DONE, zarchiwizowane** (F0–F10) |
-| Inne języki, w szczególności Go | ECOSYSTEMS |
+| Inne języki, w szczególności Go | Poza Ariadne — **ECOSYSTEMS wycofany (2026-11-25)**, Go dostaje oddzielne rozwiązanie AriadneGO ([archiwum](../archive/2026-11-25/ecosystems/WITHDRAWN.md)) |
 | Pomiar skuteczności i kolejność realizacji | ROADMAP i kryteria poszczególnych faz |
 
 Multi-release JAR-y i stabilny wybór klas (JVM_GRAPH, teraz zarchiwizowane jako DONE) były uzupełnieniem niezbędnym do wiarygodnego grafu — **nie są deklaracją, że refleksja, callbacki czy JNI zostały rozwiązane**; `archive/2026-10-22/jvm_graph/COMPLETION.md` potwierdza explicite, że te wiersze `docs/SUPPORT.MD` wciąż są `Not implemented`.

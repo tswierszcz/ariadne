@@ -10,7 +10,7 @@ do uruchomienia ariadne na firmowej flocie aplikacji.
 
 Wszystkie obszary planu rozwoju, które nie czekają na decyzje, są zamknięte i zarchiwizowane
 (zob. [IMPLEMENTATION_STATUS.MD](IMPLEMENTATION_STATUS.MD)); otwarte zostały tylko
-RUNTIME_NATIVE N2–N5 (brak celu z wieloma kontekstami ładowania) i ECOSYSTEMS (inne języki).
+RUNTIME_NATIVE N2–N5 (brak celu z wieloma kontekstami ładowania); ECOSYSTEMS wycofany 2026-11-25 (Go: oddzielne AriadneGO).
 Dla floty istotne od 2026-11-15:
 
 - **Tryb biblioteki kompletny** (LIBRARY_MODE LB0–LB4, zarchiwizowany): `-roots api`,
