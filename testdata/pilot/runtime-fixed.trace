@@ -1,0 +1,27 @@
+{"record":"header","format":"ariadne-runtime-trace-1","run_id":"pilot-fixed","scenario":"px.client.Main with fixed.jar: normal entry, ../escaped.txt, writeFile","started":"2026-11-25T12:23:29.148Z","ended":"2026-11-25T12:23:29.285Z","runtime":{"name":"OpenJDK 64-Bit Server VM","version":"OpenJDK 64-Bit Server VM (25.0.5+8-1-Debian) for linux-amd64 JRE (25.0.5+8-1-Debian), built on 2026-10-22T00:58:38Z with gcc 16.2.0","vendor":""},"recorder":{"name":"ariadne-jfr-convert","version":"1","source":"JFR jdk.ClassLoad, jdk.ExecutionSample, jdk.MethodTrace"},"scope":{"event_kinds":["loaded","executed","call"],"classes":"artifacts","method_filters":["px.archive.Entries::target","px.archive.Unpacker::filter","px.archive.internal.Store::overwrite","px.archive.internal.Store::write"]},"sampling":{"kind":"none","interval_ms":0},"completeness":{"complete":false,"lost_events":0,"truncated_stacks":0,"reasons":["exact entries only for the filtered methods","JFR does not report where class bytes came from: class hashes are a classpath lookup"]},"data_policy":"identifiers-only"}
+{"record":"artifact","id":"a1","name":"fixed.jar","sha256":"1a49c4c89aa3e218a47a3ff3e4abf6ffc2667273fa16da698ac25219e60c8629"}
+{"record":"artifact","id":"a2","name":"client.jar","sha256":"f6ea95fdef77430849c9d36f43e939443384c0c9cae107dbc68d2ee0e493d2f3"}
+{"record":"loader","id":"l2","name":"app","type":"jdk.internal.loader.ClassLoaders$AppClassLoader"}
+{"record":"class","id":"c1","name":"px.archive.Entries","loader":"l2","artifact":"a1","sha256":"da0b0f8a28705e37647183705c75cf47d560497eefab0465e150ed228c87f2c0","source_basis":"classpath-lookup"}
+{"record":"class","id":"c2","name":"px.archive.Unpacker","loader":"l2","artifact":"a1","sha256":"e6468be675d4164bda67920b5f997db18ecf7834f93a24a2de23156d26794eb8","source_basis":"classpath-lookup"}
+{"record":"class","id":"c3","name":"px.archive.internal.Store","loader":"l2","artifact":"a1","sha256":"332bf20ea76c3a241aef97be19d8eee74e0775ca0b2dc22c2f019123c79f1342","source_basis":"classpath-lookup"}
+{"record":"class","id":"c4","name":"px.client.Main","loader":"l2","artifact":"a2","sha256":"e533794d42d56e1d3d5dc81462d8121b21e4014a07d3ca0e08fb0a0e375756a0","source_basis":"classpath-lookup"}
+{"record":"method","id":"m1","class":"c1","name":"target","desc":"(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"}
+{"record":"method","id":"m2","class":"c2","name":"unpack","desc":"(Ljava/io/InputStream;)I"}
+{"record":"method","id":"m3","class":"c2","name":"writeFile","desc":"(Ljava/nio/file/Path;[B)V"}
+{"record":"method","id":"m4","class":"c3","name":"write","desc":"(Ljava/nio/file/Path;[B)V"}
+{"record":"method","id":"m5","class":"c4","name":"main","desc":"([Ljava/lang/String;)V"}
+{"record":"method","id":"m6","class":"c4","name":"run","desc":"(Ljava/lang/String;Ljava/nio/file/Path;Ljava/nio/file/Path;Ljava/lang/String;)V"}
+{"record":"loaded","id":"e1","class":"c1"}
+{"record":"loaded","id":"e2","class":"c2"}
+{"record":"loaded","id":"e3","class":"c3"}
+{"record":"loaded","id":"e4","class":"c4"}
+{"record":"executed","id":"e5","method":"m1","basis":"traced","count":2}
+{"record":"executed","id":"e6","method":"m4","basis":"traced","count":2}
+{"record":"call","id":"e7","caller":"m2","callee":"m1","basis":"stack-adjacent","source":"traced","count":2,"bci":41,"line":29}
+{"record":"call","id":"e8","caller":"m2","callee":"m4","basis":"stack-adjacent","source":"traced","count":1,"bci":48,"line":29}
+{"record":"call","id":"e9","caller":"m3","callee":"m4","basis":"stack-adjacent","source":"traced","count":1,"bci":2,"line":41}
+{"record":"call","id":"e10","caller":"m5","callee":"m3","basis":"stack-adjacent","source":"traced","count":1,"bci":59,"line":25}
+{"record":"call","id":"e11","caller":"m5","callee":"m6","basis":"stack-adjacent","source":"traced","count":2,"bci":32,"line":21}
+{"record":"call","id":"e12","caller":"m5","callee":"m6","basis":"stack-adjacent","source":"traced","count":1,"bci":41,"line":23}
+{"record":"call","id":"e13","caller":"m6","callee":"m2","basis":"stack-adjacent","source":"traced","count":3,"bci":100,"line":41}

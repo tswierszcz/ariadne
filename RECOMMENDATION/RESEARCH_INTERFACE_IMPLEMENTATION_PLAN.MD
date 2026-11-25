@@ -222,6 +222,8 @@ Późniejszy przyrost `trace-config` przyjmie dowolne rozstrzygnięte cele i wyg
 
 ### RI6 — dowody runtime
 
+**Status 2026-11-25: IN_PROGRESS (pierwszy przekrój, eksperymentalny).** `research trace-config` (cele jak w `reachability` → filtr JFR `jdk.MethodTrace` i manifest `ariadne-research-trace-config-1`, przeciążenia jawnie w `also_traced_node_ids`) i `research correlate` (ślad `ariadne-runtime-trace-1` → węzły bundle'a po treści klasy; `ariadne-research-correlation-1`), poza kontraktem `1.0.0-draft.1` (§13: późniejsze operacje) — [RUNTIME.md](../docs/research-interface/RUNTIME.md). Pilot (`scripts/pilot-runtime.sh`, `TestPilotRuntime`): `Store#write` wchodzi 3× w wariancie wadliwym, 2× w poprawnym; martwa metoda i refleksja `traced_not_entered`; ślad jednego wariantu przeciw bundle'owi drugiego — `class_differs` dla `Entries`. Pozostaje: przyjęcie przez konsumenta i włączenie do rewizji kontraktu.
+
 - Uogólnić wybór metod dla filtra JFR z celów mapowania CVE na cele zapytania.
 - Reużyć obecny kontrakt i importer trace, uwzględniając wersję JDK oraz dostępne rodzaje zdarzeń.
 - Korelować oryginalne metody i odpowiednie specjalizacje, zachowując pochodzenie klasy i loadera.
