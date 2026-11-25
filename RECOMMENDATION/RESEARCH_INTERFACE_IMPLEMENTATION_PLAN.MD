@@ -1,5 +1,7 @@
 # Interfejs badawczy Ariadne dla Tekmerion
 
+Adaptację procesu Recon → Hunt → Validate po przeglądzie Cloudflare opisuje [RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD](RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD) (2026-11-25). Etapy RH-A0–RH-A4 porządkują kolejne zadania w ramach RI0–RI6 i współpracę z Tekmerion.
+
 Data planu 2026-11-23. Aktualizacja 2026-11-24. Stan RI0 — specyfikacja i pakiet danych kontraktu przygotowane, akceptacja konsumenta (TM0) pozostaje do wykonania. RI1–RI3 IN_PROGRESS — pierwszy działający przekrój `research index`/`research query` (status poniżej, w sekcji 6). RI4–RI6 PLANOWANE. Kontrakt opisuje [dokumentacja interfejsu badawczego](../docs/research-interface/README.md).
 
 ## 1. Cel i podział odpowiedzialności
