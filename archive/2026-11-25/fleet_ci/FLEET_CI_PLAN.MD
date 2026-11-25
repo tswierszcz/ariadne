@@ -147,7 +147,7 @@ syntetycznych wynikach (`testdata/fleet`). Nie zrobione: powiązanie biblioteka 
     statyczna ścieżka (priorytet, nie dowód wykorzystania), `FRAMEWORK` =
     ścieżka przez wnętrze frameworka (ręczny przegląd), `NOT_REACHABLE` =
     brak ścieżki w modelu (nie dowód bezpieczeństwa —
-    [SUPPORT.MD](../docs/SUPPORT.MD)), `UNKNOWN` = brak mapowania metody;
+    [SUPPORT.MD](../../../docs/SUPPORT.MD)), `UNKNOWN` = brak mapowania metody;
     dla bibliotek: `REACHABLE` = „użytkownik publicznego API biblioteki może
     dojść do podatnego kodu”, nie „aplikacja to robi”; zmierzone granice
     trybu (LB4): ścieżki przez przekazania asynchroniczne nie są śladami

@@ -91,7 +91,7 @@ Agent ma odczytać zapisany postęp. Nie musisz kopiować podsumowań z poprzedn
 | Sprawdzić, gdzie zakończyła się praca | [IMPLEMENTATION_STATUS](RECOMMENDATION/IMPLEMENTATION_STATUS.MD) |
 | Dowiedzieć się, co działa obecnie i jakie ma ograniczenia | [SUPPORT](docs/SUPPORT.MD) |
 | Znaleźć pełne prompty i warianty uruchomienia | [START_IMPLEMENTATION](RECOMMENDATION/START_IMPLEMENTATION.MD) |
-| Wrócić do ustaleń audytu | [AUDIT](AUDIT.MD) |
+| Wrócić do ustaleń audytu | [AUDIT](archive/2026-11-25/docs/AUDIT.MD) |
 | Sprawdzić instrukcje prowadzące agenta | [Skill ariadne-implement](RECOMMENDATION/skills/ariadne-implement/SKILL.md) |
 
 **Rekomendacje opisują zamierzenia, rejestr postępu opisuje wykonane prace, a SUPPORT opisuje aktualnie dostępne możliwości produktu.** Zapisanie planu nie oznacza wdrożenia funkcji.

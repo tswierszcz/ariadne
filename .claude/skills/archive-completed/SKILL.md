@@ -1,6 +1,6 @@
 ---
 name: archive-completed
-description: Use this right after a RECOMMENDATION phase (or any other planned item from PLAN.md/RECOMMENDATION) actually ships and is verified — when the user says something is done, finished, merged, or asks to "zarchiwizuj", "oznacz fazę jako zrobioną", "archive this". Moves the completed planning content into archive/<date>/, updates docs/SUPPORT.MD's status table, and updates RECOMMENDATION/IMPLEMENTATION_STATUS.MD. Do not invoke this on a plan or proposal alone — only after real, verified completion.
+description: Use this right after a RECOMMENDATION phase (or any other planned item from RECOMMENDATION) actually ships and is verified — when the user says something is done, finished, merged, or asks to "zarchiwizuj", "oznacz fazę jako zrobioną", "archive this". Moves the completed planning content into archive/<date>/, updates docs/SUPPORT.MD's status table, and updates RECOMMENDATION/IMPLEMENTATION_STATUS.MD. Do not invoke this on a plan or proposal alone — only after real, verified completion.
 ---
 
 # Archiving a completed item
@@ -8,8 +8,9 @@ description: Use this right after a RECOMMENDATION phase (or any other planned i
 Purpose: once a planned item is actually done, move its planning text out of the
 active backlog into a dated archive record, and make the two "current state" documents
 (`docs/SUPPORT.MD`, `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`) reflect reality. This keeps
-`RECOMMENDATION/` and `PLAN.md` from accumulating stale, already-finished backlog items
-next to the still-open ones.
+`RECOMMENDATION/` from accumulating stale, already-finished backlog items next to the
+still-open ones. (The original `PLAN.md` is itself archived, read-only, in
+`archive/2026-11-25/docs/`.)
 
 ## 0. Confirm it's actually done, not just coded
 
@@ -39,9 +40,7 @@ item (`cves-file-input`).
 
 ## 3. Move the completed content
 
-The exact move depends on where the item lives — **PLAN.md's own convention is to never
-move or delete its content** (status notes accumulate in place; see the catch-up skill),
-so only RECOMMENDATION content actually moves:
+The exact move depends on where the item lives (only RECOMMENDATION content moves):
 
 - **A single completed phase within a RECOMMENDATION area** (most common case): extract
   that phase's text from `RECOMMENDATION/<AREA>_IMPLEMENTATION_PLAN.MD` into a new file
@@ -53,10 +52,9 @@ so only RECOMMENDATION content actually moves:
   (`<AREA>.MD` + `<AREA>_IMPLEMENTATION_PLAN.MD`) into `archive/<date>/<area>/` and remove
   that area's row from `RECOMMENDATION/README.MD`'s index table (both the "Dokumenty według
   obszaru" and "Pokrycie pierwotnych rekomendacji" tables).
-- **A `PLAN.md`-only item (not tracked in RECOMMENDATION)**: do not touch `PLAN.md`. Instead
-  write a completion record to `archive/<date>/<feature-slug>/SUMMARY.md` (same fields as
-  above) purely as a dated record — `PLAN.md`'s own status note, updated in place as usual,
-  stays the actual source of truth for that item.
+- **An item not tracked in RECOMMENDATION**: write a completion record to
+  `archive/<date>/<feature-slug>/SUMMARY.md` (same fields as above) and an entry in
+  `IMPLEMENTATION_STATUS.MD`. Never edit the archived `PLAN.md`.
 
 ## 4. Update `docs/SUPPORT.MD`
 
@@ -71,13 +69,13 @@ the new behavior and links to the actual changed files/tests, per that document'
 Add/update the phase's row per the "Rejestr faz" format already specified there: full
 phase id and state (`DONE`, or `NEEDS_VERIFICATION` if some criteria are still open),
 scope actually executed, changed files and user-visible behavior, met/unmet criteria with
-evidence links, commands actually run, which of SUPPORT/README/report/FAQ changed (or why
+evidence links, commands actually run, which of SUPPORT/README/HOW_IT_WORKS (+JAK_TO_DZIALA)/report changed (or why
 not), remaining limitations, and the next step. Update the area's row in the overview table
 too — don't mark a whole area `DONE` after one phase.
 
 ## 6. Report back
 
 Summarize: what moved where, what `docs/SUPPORT.MD`/`IMPLEMENTATION_STATUS.MD` rows
-changed, and whether `README.md`/`FAQ.md` also need a touch-up (they already point readers
-at `docs/SUPPORT.MD`/`RECOMMENDATION` rather than duplicating status, so usually no change
-is needed there — only if their own prose directly described the now-completed limitation).
+changed, and whether `README.md` or `docs/HOW_IT_WORKS.md` + `docs/JAK_TO_DZIALA.md` (kept in sync)
+also need a touch-up — only if their own text directly described the now-completed
+limitation; they point readers at `docs/SUPPORT.MD` for status.

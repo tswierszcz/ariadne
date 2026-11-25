@@ -6,7 +6,7 @@
 
 # Podstawy grafu JVM — fazy implementacji G0–G5
 
-Status: plan. Wymagania: [JVM_GRAPH.MD](JVM_GRAPH.MD). Kontrakty B0–B4: [ROADMAP.MD](ROADMAP.MD).
+Status: plan. Wymagania: [JVM_GRAPH.MD](JVM_GRAPH.MD). Kontrakty B0–B4: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## G0. Kontrakt miejsc i krawędzi
 

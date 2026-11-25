@@ -29,7 +29,7 @@ Raport pokazuje nazwę usługi, dostawcę, rejestrację, miejsce materializacji,
 
 ## Zakres i gotowość
 
-MVP: classpath, znany literał klasy, iterator i prosty `Provider.get`. Rozszerzenie: wartości przekazywane między metodami, JPMS i jawne scenariusze warstw. Niestandardowy classloader z runtime’u wymaga informacji z [RUNTIME_NATIVE](RUNTIME_NATIVE.MD).
+MVP: classpath, znany literał klasy, iterator i prosty `Provider.get`. Rozszerzenie: wartości przekazywane między metodami, JPMS i jawne scenariusze warstw. Niestandardowy classloader z runtime’u wymaga informacji z [RUNTIME_NATIVE](../../2026-11-25/runtime_native/RUNTIME_NATIVE.MD).
 
 Gotowość: dostawca używany jest uwzględniony, samo zadeklarowanie nie tworzy ścieżki do wszystkich jego metod, a brak klasy/fabryki i nieznana usługa mają jawne powody.
 

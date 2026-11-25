@@ -2,7 +2,7 @@
 
 Status: plan, implementacja nie została rozpoczęta w ramach tego dokumentu.
 
-Wymagania funkcjonalne: [CVE.MD](CVE.MD). Szersze rekomendacje rozwoju JVM: [MD](../../../RECOMMENDATION/MD).
+Wymagania funkcjonalne: [CVE.MD](CVE.MD). Szersze rekomendacje rozwoju JVM: [MD](../../2026-11-25/docs/RECOMMENDATION-source.MD).
 
 ## 1. Zasady realizacji
 

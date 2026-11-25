@@ -27,7 +27,7 @@ now maps Tomcat's files too instead of needing the LLM for them. Measured
 effect: petclinic's mapped count rose from 56/148 to 91/148 (diff: 55 → 90);
 32 of the 35 Tomcat CVEs moved straight from `UNKNOWN` to `FRAMEWORK` (Tomcat
 is a framework package) without ever reaching this source. See
-[PLAN.md](../PLAN.md)'s Phase 4 follow-up note for the full numbers. The
+[PLAN.md](../archive/2026-11-25/docs/PLAN.md)'s Phase 4 follow-up note for the full numbers. The
 measurements and prompts in the rest of this document are unaffected by this
 change: they describe source 3's own design and behavior, not how many CVEs
 reach it.
@@ -417,9 +417,9 @@ fake server (the same approach as for source 2).
   see this file's own live-check note under section 2/`PLAN.md`'s Phase 4.
 - **(b)** Only if approved separately: a full petclinic run with `-llm`,
   showing how the status counts change. Done, and repeated against a later
-  baseline — see [docs/llm-test-report.md](llm-test-report.md) for both
-  runs and [docs/llm-run/petclinic.md](llm-run/petclinic.md)/
-  [webgoat.md](llm-run/webgoat.md) for the full reports.
+  baseline — see [docs/llm-test-report.md](../archive/2026-11-25/docs/llm-test-report.md) for both
+  runs and [docs/llm-run/petclinic.md](../archive/2026-11-25/docs/llm-run/petclinic.md)/
+  [webgoat.md](../archive/2026-11-25/docs/llm-run/webgoat.md) for the full reports.
 
 ## 7. Process
 

@@ -10,7 +10,7 @@ This page gives a consumer three things:
 
 The plan accepts the contract when the producer and the consumer reach the same verdict on every case in this package.
 
-The [v1 conformance package](v1/) is unchanged: the files and hashes the consumer pins stay the same. The acceptance package lives next to it, in [acceptance/](acceptance/), with its own `SHA256SUMS`.
+The [v1 conformance package](v1) is unchanged: the files and hashes the consumer pins stay the same. The acceptance package lives next to it, in [acceptance/](acceptance), with its own `SHA256SUMS`.
 
 ## 1. The package
 

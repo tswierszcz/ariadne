@@ -2,7 +2,7 @@
 
 Notes explaining ariadne's design decisions, written while working through
 the tool with the user. A companion to [PLAN.md](PLAN.md) (phase-by-phase
-history) and [README.md](README.md) (how the pipeline works) — this file
+history) and [README.md](../../../README.md) (how the pipeline works) — this file
 is about *why*, not *what*.
 
 A Polish version of this file exists as [FAQ_PL.MD](FAQ_PL.MD).
@@ -377,8 +377,8 @@ target).
 only needed to build the application being analyzed — `ariadne` itself
 parses `.class` files with its own parser.
 
-See [docs/SUPPORT.MD](docs/SUPPORT.MD) for a mechanism-by-mechanism current-status table
-and [RECOMMENDATION](RECOMMENDATION/README.MD) for plans to extend what's still missing
+See [docs/SUPPORT.MD](../../../docs/SUPPORT.MD) for a mechanism-by-mechanism current-status table
+and [RECOMMENDATION](../../../RECOMMENDATION/README.MD) for plans to extend what's still missing
 above — this section is a narrative companion to those, not a separately maintained list.
 
 ## How the pipeline works, step by step
@@ -631,7 +631,7 @@ registers (`DispatcherServlet`, a few standard filters, Spring Security's
 log. What it cannot name (a `@Bean` returning a `FilterRegistrationBean`)
 is reported as an incomplete model fact, not guessed. Its real-JVM check is
 `testdata/servletdispatch`; its effect on petclinic and WebGoat is in
-[testdata/graphbench/RESULTS.MD](testdata/graphbench/RESULTS.MD).
+[testdata/graphbench/RESULTS.MD](../../../testdata/graphbench/RESULTS.MD).
 
 **And calls on the request and response themselves?** `request.getHeader(…)`
 or `chain.doFilter(…)` are `javax.servlet` receivers as well. Since model
@@ -906,7 +906,7 @@ reported as `NOT_REACHABLE` (`MAPPED_CODE_ABSENT`) — `UNKNOWN`
 27/26/5 → 1/0/0.
 
 Source 4 is an LLM reading the advisory + fix diff, opt-in with `-llm`
-(design and exact prompt: [docs/phase4-llm.md](docs/phase4-llm.md)). It
+(design and exact prompt: [docs/phase4-llm.md](../../../docs/phase4-llm.md)). It
 runs only for CVEs sources 1 and 2 left unmapped, and each method it
 names is checked to exist in the analyzed bytecode. When it saw only the
 advisory text (no diff), a `NOT_REACHABLE` result is downgraded to
@@ -1145,7 +1145,7 @@ is the result (`results.json`, `report.md`) and the HTTP response cache.
   then answers questions about arbitrary methods (which API entries reach
   this one, who calls it, what JDK operations the library calls) from the
   bundle alone, without the JARs, an advisory or the network. The format is
-  the contract in [docs/research-interface](docs/research-interface/README.md);
+  the contract in [docs/research-interface](../../../docs/research-interface/README.md);
   Tekmerion is its first consumer.
 
 **Why the CVE scan itself does not reuse a saved graph:** the graph is

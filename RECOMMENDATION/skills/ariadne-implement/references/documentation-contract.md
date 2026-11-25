@@ -7,17 +7,17 @@ Wszystkie ścieżki w tym dokumencie są względem root repozytorium Ariadne. Cz
 | Dokument | Rola i oczekiwana aktualizacja |
 |---|---|
 | `docs/SUPPORT.MD` | Utrzymywany opis aktualnych możliwości, ich granic, warunków i dowodów. Zmieniaj odpowiednie wiersze po rzeczywistej zmianie zachowania. |
-| `README.md` | Publiczny opis działania i użycia. Aktualizuj pipeline, flagi, przykłady, wymagania i ograniczenia w zakresie zmiany. |
+| `README.md` | Instrukcja użycia: budowanie, przygotowanie wejścia, wszystkie flagi, zmienne środowiskowe, wyniki, kody wyjścia. Aktualizuj flagi, przykłady i wymagania w zakresie zmiany. |
 | `internal/report/templates/report.md.tmpl` | Twierdzenia trafiające do wygenerowanego raportu. Aktualizuj, gdy nowy model zmienia ich prawdziwość; sprawdź powiązane testy renderowania. |
-| `FAQ.md`, `FAQ_PL.MD` | Wyjaśnienia i przykłady wsparcia. Popraw oba warianty językowe, jeśli zawierają twierdzenie zmienione przez daną fazę. Nie przepisuj niepowiązanych rozdziałów. |
+| `docs/HOW_IT_WORKS.md`, `docs/JAK_TO_DZIALA.md` | Opis działania (EN i PL). Oba warianty językowe zmieniaj razem, w tym samym commicie, jeśli zmiana dotyczy opisanego przebiegu lub znaczenia wyników. |
 | `RECOMMENDATION/<OBSZAR>.MD` | Cel i wymagania. Dodaj odnośnik do zakresu dostarczonego; reszta pozostaje planem, dopóki nie została wykonana. |
 | `RECOMMENDATION/<OBSZAR>_IMPLEMENTATION_PLAN.MD` | Kryteria i stan konkretnych faz z dowodami. Nie usuwaj niewykonanych wymagań, aby pozornie ukończyć fazę. |
 | `RECOMMENDATION/IMPLEMENTATION_STATUS.MD` | Aktualny punkt kontynuacji między sesjami i rejestr faktycznie wykonanych kontroli. |
 | `RECOMMENDATION/README.MD`, `ROADMAP.MD` | Nawigacja, zależności i kolejność. Aktualizuj, jeśli rzeczywista realizacja wymaga korekty tych informacji. |
 | `docs/phase4-llm.md` i inne dokumenty szczegółowe | Aktualizuj przy zmianie danego kontraktu, evidence, promptu lub sposobu interpretacji wyniku. |
-| `PLAN.md` | Historia i wcześniejsze założenia. Dopisuj wynik wdrożenia, jeśli potrzebne; zachowaj istniejące wpisy i zmiany użytkownika. Nie traktuj starego planu jako aktualnej macierzy wsparcia. |
+| `archive/2026-11-25/docs/PLAN.md` | Historia (zarchiwizowana 2026-11-25, tylko do odczytu). Nie edytuj; wynik wdrożenia zapisuj w `IMPLEMENTATION_STATUS.MD`. |
 
-Zachowaj język istniejącego dokumentu: README i FAQ angielskie, FAQ_PL polski; macierz SUPPORT jest angielska. Nowy wpis ma być czytelny dla użytkownika produktu, nie tylko autora kodu.
+Zachowaj język istniejącego dokumentu: README i HOW_IT_WORKS angielskie, JAK_TO_DZIALA polski; macierz SUPPORT jest angielska. Nowy wpis ma być czytelny dla użytkownika produktu, nie tylko autora kodu.
 
 ## 2. Minimalny opis nowej możliwości
 

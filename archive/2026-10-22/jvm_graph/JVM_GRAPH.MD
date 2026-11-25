@@ -5,7 +5,7 @@
 
 # Podstawy grafu JVM — rekomendacja funkcjonalna
 
-Status: plan. Implementacja: [JVM_GRAPH_IMPLEMENTATION_PLAN.MD](JVM_GRAPH_IMPLEMENTATION_PLAN.MD). Wspólne kontrakty: [ROADMAP.MD](ROADMAP.MD).
+Status: plan. Implementacja: [JVM_GRAPH_IMPLEMENTATION_PLAN.MD](JVM_GRAPH_IMPLEMENTATION_PLAN.MD). Wspólne kontrakty: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## Cel i stan obecny
 
