@@ -128,8 +128,8 @@ type config struct {
 	frameworkCheck bool
 
 	// research is set by `ariadne research index` (RESEARCH_INTERFACE
-	// RI1): analyze publishes the static pipeline's state as a research
-	// bundle and stops before the CVE stage.
+	// RI1), which publishes prepare's state as a research bundle instead
+	// of running the CVE stage.
 	research *researchOut
 }
 
@@ -308,18 +308,118 @@ func validate(cfg config) error {
 	return nil
 }
 
+// staticRun is the state of the static pipeline (RESEARCH_INTERFACE RI1):
+// everything `ariadne analyze` computes before it reads an advisory. The
+// CVE scan and `ariadne research index` both start from it.
+type staticRun struct {
+	ctx                           context.Context
+	cfg                           config
+	targetRuntime                 *runtimeinfo.Runtime
+	sr                            *snapshotRun
+	runtimeAssessment             *runtimevuln.Assessment
+	graphBefore                   *callgraph.Export
+	runtimeTrace                  *runtimeevents.Trace
+	webXMLInput                   report.WebXMLInput
+	springXMLBeans                []report.XMLBeanRow
+	depJars                       []input.DepJar
+	identified                    int
+	unidentified                  []string
+	h                             *hierarchy.Hierarchy
+	warnings                      []string
+	maxBytecode                   int
+	components                    *component.Inventory
+	snapInputs                    []snapshot.Input
+	svcRegs                       []serviceload.ServiceRegistration
+	svcLoadSites                  []serviceload.ServiceLoadSite
+	svcConsumptionSites           []serviceload.ServiceConsumptionSite
+	moduleInventory               serviceload.ModuleInventory
+	jpmsScenario                  serviceload.ModuleScenario
+	callbackSites                 []callback.RegistrationSite
+	resolvedCallbacks             []callback.ResolvedCallback
+	detected                      []string
+	prof                          profile.Profile
+	activeProfiles                []string
+	springRoutes                  []profile.Route
+	springBeanNames               []profile.BeanName
+	springBeanMethods             []profile.BeanName
+	springRepositoryBeans         []profile.BeanName
+	springProfileConditions       []profile.ProfileCondition
+	resolvedInjections            []profile.ResolvedInjection
+	webXMLRootsFound              []profile.WebXMLRoot
+	externalEntries               []profile.ExternalEntry
+	proxyHandlers                 []aop.ProxyHandler
+	g                             *callgraph.Graph
+	svcMaterializations           []serviceload.ProviderMaterialization
+	callbackEdgeResults           []callback.CallbackEdgeResult
+	resolvedHandles               []methodhandle.ResolvedInvoke
+	handleEdgeResults             []methodhandle.HandleEdgeResult
+	samResults                    []samcall.Result
+	samStats                      samcall.Stats
+	resolvedReflectInvokes        []reflectinvoke.ResolvedInvoke
+	reflectEdgeResults            []reflectinvoke.InvokeEdgeResult
+	resolvedReflectNewInstances   []reflectinvoke.ResolvedNewInstance
+	reflectNewInstanceEdgeResults []reflectinvoke.NewInstanceEdgeResult
+	deserSites                    []deserialize.Site
+	deserSummary                  deserialize.CandidateSummary
+	deserTargets                  []deserialize.Target
+	deserEdgesAdded               int
+	cache                         *httpcache.Cache
+	central                       *centralClient
+	centralFetch                  func(ctx context.Context, url string) ([]byte, error)
+	deserChains                   []deserialize.ChainPresence
+	apiCoverage                   *libapi.Coverage
+	libDeps                       *component.LibraryDependencies
+	beanRoots                     []profile.BeanRoot
+	bodyRoots                     []profile.WebBodyRoot
+	modelGapReasons               []string
+	samLine                       string
+	allocCatalog                  alloc.Catalog
+	allocSummary                  alloc.Summary
+	rtaResult                     *callgraph.RTAResult
+	ptaResult                     *pta.Result
+	engine                        *reach.Engine
+	gapSites                      []reach.GapSite
+	nativeSummary                 nativebound.Summary
+	reachableGaps                 int
+	unboundedGaps                 int
+	reflectCensusSummary          *reflectinvoke.ProvenanceSummary
+	unboundedSummary              *reach.UnboundedSummary
+	// Used only by the research bundle: the roots, the API surface the
+	// library inherits or announces, the framework matcher, the model
+	// fixed point and the participants switched off.
+	roots         []uint32
+	apiInherited  map[uint32][]string
+	apiAnnounced  map[uint32][]string
+	framework     *reach.FrameworkMatcher
+	modelResult   analysis.Result
+	disabledParts []analysis.Participant
+	// cleanup removes the prepared input's temporary files.
+	cleanup func() error
+}
+
 func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
+	static, err := prepare(ctx, cfg, stdout)
+	if err != nil {
+		return err
+	}
+	defer static.cleanup()
+	return scanCVEs(ctx, cfg, stdout, static)
+}
+
+// prepare runs the static pipeline: input, hierarchy, call graph, roots,
+// models and the reachability engine. It needs no advisory.
+func prepare(ctx context.Context, cfg config, stdout io.Writer) (_ *staticRun, err error) {
 	log := func(format string, a ...any) { fmt.Fprintf(stdout, format+"\n", a...) }
 
 	// CVE:F8a: the target runtime is identified first, so a bad
 	// description fails before the analysis.
 	targetRuntime, err := loadTargetRuntime(cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sr, err := newSnapshotRun(cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sr.config["target-runtime"] = targetRuntimeKey(targetRuntime)
 	assessedAt := time.Now()
@@ -328,7 +428,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 	runtimeAssessment, catalogVersion, err := assessTargetRuntime(targetRuntime, cfg.openjdkCatalog, assessedAt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if cfg.openjdkCatalog != "" {
 		sr.config["openjdk-catalog"] = catalogVersion
@@ -352,12 +452,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if cfg.graphCompare != "" {
 		f, err := os.Open(cfg.graphCompare)
 		if err != nil {
-			return fmt.Errorf("-graph-compare: %w", err)
+			return nil, fmt.Errorf("-graph-compare: %w", err)
 		}
 		ex, err := callgraph.Read(f)
 		f.Close()
 		if err != nil {
-			return fmt.Errorf("-graph-compare %s: %w", cfg.graphCompare, err)
+			return nil, fmt.Errorf("-graph-compare %s: %w", cfg.graphCompare, err)
 		}
 		graphBefore = &ex
 	}
@@ -366,7 +466,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if cfg.runtimeTrace != "" {
 		t, err := loadRuntimeTrace(cfg.runtimeTrace)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		runtimeTrace = t
 	}
@@ -377,9 +477,13 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("preparing application input from %s", cfg.app)
 	prepared, err := input.PrepareAppInput(cfg.app)
 	if err != nil {
-		return fmt.Errorf("preparing -app %s: %w", cfg.app, err)
+		return nil, fmt.Errorf("preparing -app %s: %w", cfg.app, err)
 	}
-	defer prepared.Cleanup()
+	defer func() {
+		if err != nil {
+			prepared.Cleanup()
+		}
+	}()
 
 	depsDir := cfg.deps
 	if prepared.ExtractedLibs != "" {
@@ -411,7 +515,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		for _, module := range modules {
 			parsed, err := webxml.Parse(bytes.NewReader(prepared.WebXMLs[module]))
 			if err != nil {
-				return fmt.Errorf("parsing %s's web.xml: %w", moduleLabel(module), err)
+				return nil, fmt.Errorf("parsing %s's web.xml: %w", moduleLabel(module), err)
 			}
 			for _, s := range parsed.Servlets {
 				webXMLInput.Servlets = append(webXMLInput.Servlets, report.ServletRow{Module: module, Name: s.Name, Class: s.Class})
@@ -462,7 +566,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var xmlAOP []springxml.AOPConfig
 	beansXMLResources, beansXMLWarnings, err := input.FindBeansXML(prepared.AppClassesJar)
 	if err != nil {
-		return fmt.Errorf("scanning %s for Spring XML bean definitions: %w", prepared.AppClassesJar, err)
+		return nil, fmt.Errorf("scanning %s for Spring XML bean definitions: %w", prepared.AppClassesJar, err)
 	}
 	for path, data := range prepared.WebInfBeansXMLs {
 		if beansXMLResources == nil {
@@ -479,7 +583,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		for _, path := range resources {
 			parsed, err := springxml.Parse(bytes.NewReader(beansXMLResources[path]))
 			if err != nil {
-				return fmt.Errorf("parsing %s: %w", path, err)
+				return nil, fmt.Errorf("parsing %s: %w", path, err)
 			}
 			for _, b := range parsed.Beans {
 				springXMLBeans = append(springXMLBeans, report.XMLBeanRow{Source: path, ID: b.ID, Class: b.Class, Scope: b.Scope, Primary: b.Primary})
@@ -495,12 +599,12 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if cfg.depsList != "" {
 		f, err := os.Open(cfg.depsList)
 		if err != nil {
-			return fmt.Errorf("opening -deps-list %s: %w", cfg.depsList, err)
+			return nil, fmt.Errorf("opening -deps-list %s: %w", cfg.depsList, err)
 		}
 		depsList, err = input.ParseDepsList(f)
 		f.Close()
 		if err != nil {
-			return fmt.Errorf("parsing -deps-list %s: %w", cfg.depsList, err)
+			return nil, fmt.Errorf("parsing -deps-list %s: %w", cfg.depsList, err)
 		}
 	}
 
@@ -508,7 +612,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if depsDir != "" {
 		depJars, err = input.ResolveDepJars(depsDir, depsList)
 		if err != nil {
-			return fmt.Errorf("resolving dependency jars in %s: %w", depsDir, err)
+			return nil, fmt.Errorf("resolving dependency jars in %s: %w", depsDir, err)
 		}
 	}
 	var identified int
@@ -525,7 +629,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("building class hierarchy")
 	h, warnings, err := hierarchy.BuildWithTarget(prepared.AppClassesJar, depJars, cfg.targetJava)
 	if err != nil {
-		return fmt.Errorf("building hierarchy: %w", err)
+		return nil, fmt.Errorf("building hierarchy: %w", err)
 	}
 	warnings = append(warnings, beansXMLWarnings...)
 	maxBytecode := 0
@@ -554,15 +658,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		DepJars: depJars,
 	}, h)
 	if err != nil {
-		return fmt.Errorf("building the component inventory: %w", err)
+		return nil, fmt.Errorf("building the component inventory: %w", err)
 	}
 	snapInputs, err := snapshotInputs(cfg, components)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if sr.replay != nil {
 		if err := snapshot.CheckInputs(*sr.replay, snapInputs); err != nil {
-			return err
+			return nil, err
 		}
 		log("snapshot: %d inputs match the manifest", len(snapInputs))
 	}
@@ -574,7 +678,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// serviceload.ServiceRegistration's own doc comment).
 	svcRegs, svcWarnings, err := serviceload.Inventory(h, prepared.AppClassesJar, depJars)
 	if err != nil {
-		return fmt.Errorf("inventorying ServiceLoader providers: %w", err)
+		return nil, fmt.Errorf("inventorying ServiceLoader providers: %w", err)
 	}
 	warnings = append(warnings, svcWarnings...)
 	log("ServiceLoader: %d provider registrations found", len(svcRegs))
@@ -585,7 +689,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// edge (see serviceload.ServiceLoadSite's own doc comment).
 	svcLoadSites, svcLoadWarnings, err := serviceload.FindLoadSites(h)
 	if err != nil {
-		return fmt.Errorf("finding ServiceLoader.load call sites: %w", err)
+		return nil, fmt.Errorf("finding ServiceLoader.load call sites: %w", err)
 	}
 	warnings = append(warnings, svcLoadWarnings...)
 	resolvedLoadSites := 0
@@ -597,7 +701,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	log("ServiceLoader: %d load() call sites found, %d resolved to a service interface", len(svcLoadSites), resolvedLoadSites)
 	svcConsumptionSites, svcConsumptionWarnings, err := serviceload.FindConsumptionSites(h, svcLoadSites)
 	if err != nil {
-		return fmt.Errorf("finding ServiceLoader consumption call sites: %w", err)
+		return nil, fmt.Errorf("finding ServiceLoader consumption call sites: %w", err)
 	}
 	warnings = append(warnings, svcConsumptionWarnings...)
 	linkedConsumptionSites := 0
@@ -614,7 +718,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	// serviceload.ScenarioClasspath's own doc comment).
 	moduleInventory, moduleWarnings, err := serviceload.InventoryModules(h, prepared.AppClassesJar, depJars, cfg.targetJava, svcRegs)
 	if err != nil {
-		return fmt.Errorf("inventorying JPMS module descriptors: %w", err)
+		return nil, fmt.Errorf("inventorying JPMS module descriptors: %w", err)
 	}
 	warnings = append(warnings, moduleWarnings...)
 	jpmsScenario, _ := serviceload.ParseScenario(cfg.jpmsScenario)           // validated in parseFlags
@@ -665,11 +769,11 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	catalog, err := profile.LoadDefaultCatalog()
 	if err != nil {
-		return fmt.Errorf("loading default profile catalog: %w", err)
+		return nil, fmt.Errorf("loading default profile catalog: %w", err)
 	}
 	if cfg.profileFile != "" {
 		if err := catalog.AddFile(cfg.profileFile); err != nil {
-			return fmt.Errorf("loading -profile-file %s: %w", cfg.profileFile, err)
+			return nil, fmt.Errorf("loading -profile-file %s: %w", cfg.profileFile, err)
 		}
 	}
 	// FRAMEWORKS F0: which frameworks' own marker classes are present —
@@ -688,14 +792,14 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	prof, err := profile.Select(catalog, cfg.profile, h)
 	if err != nil {
-		return fmt.Errorf("selecting profile: %w", err)
+		return nil, fmt.Errorf("selecting profile: %w", err)
 	}
 	log("profile: %s", prof.Name)
 	// ROADMAP B3 b3-3: the profile chooses the fixed point's participants;
 	// an unknown ID stops the run before any work.
 	activeParts, disabledParts, err := analysis.Select(participantCatalog(), prof.Models.Disable)
 	if err != nil {
-		return fmt.Errorf("profile %s: %w", prof.Name, err)
+		return nil, fmt.Errorf("profile %s: %w", prof.Name, err)
 	}
 	partOff := map[string]bool{}
 	for _, p := range disabledParts {
@@ -1134,18 +1238,18 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 
 	cache, err := httpcache.New(cfg.cacheDir, cfg.offline)
 	if err != nil {
-		return fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
+		return nil, fmt.Errorf("opening cache dir %s: %w", cfg.cacheDir, err)
 	}
 	sr.attach(cache, "main")
 	cache.SetPolicy(httpcache.Policy{TTL: cfg.dataTTL, MaxAge: cfg.maxDataAge, Refresh: cfg.refresh, AllowStale: cfg.allowStale})
 
 	embeddedDecls, err := component.LoadDeclarations(cfg.embeddedComps)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sbom, err := component.LoadSBOM(cfg.sbom)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	components.ApplySBOM(sbom)
 	if sb := components.SBOM; sb != nil {
@@ -1164,7 +1268,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	central := &centralClient{cache: cache, base: strings.TrimRight(centralBase, "/"), local: cfg.mavenLocal, userAgent: "ariadne/" + version()}
 	centralFetch := central.fetch
 	if err := components.ResolveEmbedded(ctx, centralFetch, cfg.centralURL, h, embeddedDecls); err != nil {
-		return fmt.Errorf("resolving embedded components: %w", err)
+		return nil, fmt.Errorf("resolving embedded components: %w", err)
 	}
 	embConfirmed, embUnconfirmed, embModules := components.EmbeddedCounts()
 	embRelocated := 0
@@ -1506,7 +1610,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	jointBudget := modelBudget + 2*len(steps)
 	modelResult, err := analysis.Run(h, g, registry, modelEvaluator, roots, analysis.Options{MaxIterations: jointBudget, Steps: steps})
 	if err != nil {
-		return fmt.Errorf("coordinating library models: %w", err)
+		return nil, fmt.Errorf("coordinating library models: %w", err)
 	}
 	log("models and gates (ROADMAP B3 fixed point): %d iterations of at most %d; %d model facts, %d model edges; gate edges %s (incomplete=%t)",
 		modelResult.Iterations, jointBudget, len(modelResult.Facts), modelResult.AddedEdges, stepSummary(steps, modelResult.StepEdges), modelResult.Incomplete)
@@ -1690,67 +1794,141 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		}
 	}
 	engine.SetWebAssetPackages(webAssets)
-	// RESEARCH_INTERFACE RI1: everything above is the static pipeline, which
-	// needs no advisory; the CVE stage (OSV, mapping) starts here. A research
-	// index publishes that state instead.
-	if cfg.research != nil {
-		id, err := writeResearchBundle(researchState{cfg: cfg, h: h, g: g, roots: roots, inv: components,
-			apiInherited: apiInherited, apiAnnounced: apiAnnounced,
-			gapSites: gapSites, reachable: engine.MethodReachable, dispatch: engine.DispatchFlags, framework: framework, profile: prof.Name,
-			activeProfs: activeProfiles, fixedPoint: modelResult, disabled: analysis.Labels(disabledParts)}, log)
-		if err != nil {
-			return fmt.Errorf("research bundle: %w", err)
-		}
-		cfg.research.analysisID = id
-		return nil
-	}
+	return &staticRun{
+		ctx:                           ctx,
+		cfg:                           cfg,
+		targetRuntime:                 targetRuntime,
+		sr:                            sr,
+		runtimeAssessment:             runtimeAssessment,
+		graphBefore:                   graphBefore,
+		runtimeTrace:                  runtimeTrace,
+		webXMLInput:                   webXMLInput,
+		springXMLBeans:                springXMLBeans,
+		depJars:                       depJars,
+		identified:                    identified,
+		unidentified:                  unidentified,
+		h:                             h,
+		warnings:                      warnings,
+		maxBytecode:                   maxBytecode,
+		components:                    components,
+		snapInputs:                    snapInputs,
+		svcRegs:                       svcRegs,
+		svcLoadSites:                  svcLoadSites,
+		svcConsumptionSites:           svcConsumptionSites,
+		moduleInventory:               moduleInventory,
+		jpmsScenario:                  jpmsScenario,
+		callbackSites:                 callbackSites,
+		resolvedCallbacks:             resolvedCallbacks,
+		detected:                      detected,
+		prof:                          prof,
+		activeProfiles:                activeProfiles,
+		springRoutes:                  springRoutes,
+		springBeanNames:               springBeanNames,
+		springBeanMethods:             springBeanMethods,
+		springRepositoryBeans:         springRepositoryBeans,
+		springProfileConditions:       springProfileConditions,
+		resolvedInjections:            resolvedInjections,
+		webXMLRootsFound:              webXMLRootsFound,
+		externalEntries:               externalEntries,
+		proxyHandlers:                 proxyHandlers,
+		g:                             g,
+		svcMaterializations:           svcMaterializations,
+		callbackEdgeResults:           callbackEdgeResults,
+		resolvedHandles:               resolvedHandles,
+		handleEdgeResults:             handleEdgeResults,
+		samResults:                    samResults,
+		samStats:                      samStats,
+		resolvedReflectInvokes:        resolvedReflectInvokes,
+		reflectEdgeResults:            reflectEdgeResults,
+		resolvedReflectNewInstances:   resolvedReflectNewInstances,
+		reflectNewInstanceEdgeResults: reflectNewInstanceEdgeResults,
+		deserSites:                    deserSites,
+		deserSummary:                  deserSummary,
+		deserTargets:                  deserTargets,
+		deserEdgesAdded:               deserEdgesAdded,
+		cache:                         cache,
+		central:                       central,
+		centralFetch:                  centralFetch,
+		deserChains:                   deserChains,
+		apiCoverage:                   apiCoverage,
+		libDeps:                       libDeps,
+		beanRoots:                     beanRoots,
+		bodyRoots:                     bodyRoots,
+		modelGapReasons:               modelGapReasons,
+		samLine:                       samLine,
+		allocCatalog:                  allocCatalog,
+		allocSummary:                  allocSummary,
+		rtaResult:                     rtaResult,
+		ptaResult:                     ptaResult,
+		engine:                        engine,
+		gapSites:                      gapSites,
+		nativeSummary:                 nativeSummary,
+		reachableGaps:                 reachableGaps,
+		unboundedGaps:                 unboundedGaps,
+		reflectCensusSummary:          reflectCensusSummary,
+		unboundedSummary:              unboundedSummary,
+		roots:                         roots,
+		apiInherited:                  apiInherited,
+		apiAnnounced:                  apiAnnounced,
+		framework:                     framework,
+		modelResult:                   modelResult,
+		disabledParts:                 disabledParts,
+		cleanup:                       prepared.Cleanup,
+	}, nil
+}
+
+// scanCVEs is the CVE stage of `ariadne analyze`: OSV, mapping, reachability
+// verdicts and the reports, over the static pipeline's state.
+func scanCVEs(ctx context.Context, cfg config, stdout io.Writer, static *staticRun) error {
+	log := func(format string, a ...any) { fmt.Fprintf(stdout, format+"\n", a...) }
+	var err error
 	var gavs []input.GAV
 	seenGAV := map[input.GAV]bool{}
-	for _, dj := range depJars {
+	for _, dj := range static.depJars {
 		if dj.GAV != nil && !seenGAV[*dj.GAV] {
 			seenGAV[*dj.GAV] = true
 			gavs = append(gavs, *dj.GAV)
 		}
 	}
-	for _, g := range components.ConfirmedEmbeddedGAVs() {
+	for _, g := range static.components.ConfirmedEmbeddedGAVs() {
 		if !seenGAV[g] {
 			seenGAV[g] = true
 			gavs = append(gavs, g)
 		}
 	}
 	log("querying OSV for %d resolved dependencies", len(gavs))
-	resolution, err := cves.NewClient(cache).ResolveAll(ctx, gavs)
+	resolution, err := cves.NewClient(static.cache).ResolveAll(static.ctx, gavs)
 	if err != nil {
 		return fmt.Errorf("resolving CVEs: %w", err)
 	}
 	cveList := resolution.CVEs
 	log("found %d CVEs (%d withdrawn advisories not analyzed)", len(cveList), len(resolution.Withdrawn))
 
-	manual, err := vulnmap.LoadManual(cfg.vulnMethods)
+	manual, err := vulnmap.LoadManual(static.cfg.vulnMethods)
 	if err != nil {
 		return fmt.Errorf("loading vuln_methods.yaml: %w", err)
 	}
-	resolver := vulnmap.NewResolver(manual, cache)
-	resolver.GithubToken = cfg.githubToken
-	resolver.ReleaseDiff = cfg.releaseDiff
-	resolver.Bytecode = declaredOverloads(h)
-	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(cfg.vulnMethods); err != nil {
+	resolver := vulnmap.NewResolver(manual, static.cache)
+	resolver.GithubToken = static.cfg.githubToken
+	resolver.ReleaseDiff = static.cfg.releaseDiff
+	resolver.Bytecode = declaredOverloads(static.h)
+	if resolver.ManualMeta, err = vulnmap.LoadManualMeta(static.cfg.vulnMethods); err != nil {
 		return fmt.Errorf("loading vuln_methods mapping metadata: %w", err)
 	}
 	var llmSrc *vulnmap.LLMSource
-	if cfg.llm {
-		llmCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "llm"), cfg.offline)
+	if static.cfg.llm {
+		llmCache, err := httpcache.New(filepath.Join(static.cfg.cacheDir, "llm"), static.cfg.offline)
 		if err != nil {
 			return fmt.Errorf("opening LLM cache dir: %w", err)
 		}
-		sr.attach(llmCache, "llm")
-		llmSrc = vulnmap.NewLLMSource(cfg.llmConfig, llmCache, nil)
-		llmSrc.ReaskChanged = cfg.llmReaskChanged
+		static.sr.attach(llmCache, "llm")
+		llmSrc = vulnmap.NewLLMSource(static.cfg.llmConfig, llmCache, nil)
+		llmSrc.ReaskChanged = static.cfg.llmReaskChanged
 		resolver.LLM = llmSrc
-		resolver.MethodExists = methodExists(h)
-		log("LLM source enabled: model %s", cfg.llmConfig.Model)
+		resolver.MethodExists = methodExists(static.h)
+		log("LLM source enabled: model %s", static.cfg.llmConfig.Model)
 	}
-	vm, err := resolver.ResolveAll(ctx, cveList)
+	vm, err := resolver.ResolveAll(static.ctx, cveList)
 	if err != nil {
 		return fmt.Errorf("mapping CVEs to vulnerable methods: %w", err)
 	}
@@ -1778,40 +1956,40 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		st := llmSrc.Stats()
 		log("llm: %d mapped, %d answered with no usable method, %d skipped (request failed), %d invalid reply, %d methods dropped as not in bytecode, %d previous answers reused for changed advisories",
 			st.Mapped, st.Empty, st.Skipped, st.Invalid, st.Dropped, st.Reused)
-		warnings = append(warnings, llmSrc.Warnings()...)
+		static.warnings = append(static.warnings, llmSrc.Warnings()...)
 	}
 
-	results := engine.Analyze(cveList, vm)
+	results := static.engine.Analyze(cveList, vm)
 	// LIBRARY_MODE LB3 lb3-2: other versions of the library's dependencies,
 	// assessed apart from the run's findings.
-	if altVersionsOn(cfg) && libDeps != nil && apiCoverage != nil {
-		sets, err := assessAltVersions(ctx, altVersionDeps{inv: components, libDeps: libDeps, fetch: centralFetch, base: cfg.centralURL,
-			osv: cves.NewClient(cache), resolver: resolver, vm: vm, engine: engine, mode: cfg.altVersionsMode, strategy: cfg.altVersions})
+	if altVersionsOn(static.cfg) && static.libDeps != nil && static.apiCoverage != nil {
+		sets, err := assessAltVersions(static.ctx, altVersionDeps{inv: static.components, libDeps: static.libDeps, fetch: static.centralFetch, base: static.cfg.centralURL,
+			osv: cves.NewClient(static.cache), resolver: resolver, vm: vm, engine: static.engine, mode: static.cfg.altVersionsMode, strategy: static.cfg.altVersions})
 		if err != nil {
 			return err
 		}
-		apiCoverage.AlternateVersions = &libapi.AlternateVersions{Strategy: cfg.altVersions, Mode: cfg.altVersionsMode, Rules: component.AltVersionsVersion, Sets: sets}
-		log("other dependency versions (LIBRARY_MODE LB3 %s, -alt-versions %s, mode %s): %s", component.AltVersionsVersion, cfg.altVersions, cfg.altVersionsMode, altVersionsLine(sets))
+		static.apiCoverage.AlternateVersions = &libapi.AlternateVersions{Strategy: static.cfg.altVersions, Mode: static.cfg.altVersionsMode, Rules: component.AltVersionsVersion, Sets: sets}
+		log("other dependency versions (LIBRARY_MODE LB3 %s, -alt-versions %s, mode %s): %s", component.AltVersionsVersion, static.cfg.altVersions, static.cfg.altVersionsMode, altVersionsLine(sets))
 	}
 
 	// ROADMAP B0 b0-4: measure, report-only, which NOT_REACHABLE findings
 	// a narrower (instance-scoped) or wider (lambda, skipped-receiver)
 	// model-gap rule would mark. No verdict or reason code depends on it.
 	probeStart := time.Now()
-	engine.SetProbe(lambdaProbeSites(h, samResults), callgraph.DefaultSkip)
-	engine.ApplyProbe(results)
+	static.engine.SetProbe(lambdaProbeSites(static.h, static.samResults), callgraph.DefaultSkip)
+	static.engine.ApplyProbe(results)
 	gapProbe := reach.SummarizeProbe(results)
-	probeLambda, probeTargets, probeCalls := engine.ProbeInputs()
+	probeLambda, probeTargets, probeCalls := static.engine.ProbeInputs()
 	log("gap-rule probe (ROADMAP B0 %s, report-only): %d reachable unresolved lambda calls, %d skipped JDK targets (%d reachable calls); NOT_REACHABLE findings marked by variant: %s; in %s",
 		reach.GapProbeVersion, probeLambda, probeTargets, probeCalls, probeLine(gapProbe), time.Since(probeStart).Round(time.Millisecond))
 
 	// RUNTIME_NATIVE N1: the exact-entry tracing selection for a recorded
 	// run (-runtime-filter-out; the file is written with the other outputs).
 	var runtimeFilterSel RuntimeFilter
-	if cfg.runtimeFilter != "" {
-		runtimeFilterSel = runtimeFilter(results, h, cfg.runtimeStatus)
+	if static.cfg.runtimeFilter != "" {
+		runtimeFilterSel = runtimeFilter(results, static.h, static.cfg.runtimeStatus)
 		if len(runtimeFilterSel.Filters) == 0 {
-			warnings = append(warnings, "-runtime-filter-out: no mapped vulnerable method of the selected verdicts is in the analyzed input; the settings file traces nothing")
+			static.warnings = append(static.warnings, "-runtime-filter-out: no mapped vulnerable method of the selected verdicts is in the analyzed input; the settings file traces nothing")
 		}
 	}
 
@@ -1820,15 +1998,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	var runtimeResult *runtimeevents.Result
 	var runtimeObs map[string]map[string][]runtimeevents.MethodObservation
 	var runtimeTracedBy map[string]map[string]bool
-	if runtimeTrace != nil {
-		lookup, closeJars := classLookup(h)
-		rt := runtimeevents.Correlate(runtimeTrace, runtimeevents.Inputs{G: g, Lookup: lookup, Classify: gapClassifier(h, g.Config().Mode)})
+	if static.runtimeTrace != nil {
+		lookup, closeJars := classLookup(static.h)
+		rt := runtimeevents.Correlate(static.runtimeTrace, runtimeevents.Inputs{G: static.g, Lookup: lookup, Classify: gapClassifier(static.h, static.g.Config().Mode)})
 		closeJars()
 		runtimeResult = &rt
-		runtimeObs = runtimeObserved(rt, results, h, components)
-		runtimeTracedBy = runtimeTraced(rt, results, h, components)
+		runtimeObs = runtimeObserved(rt, results, static.h, static.components)
+		runtimeTracedBy = runtimeTraced(rt, results, static.h, static.components)
 		log("runtime trace (RUNTIME_NATIVE N1, %s): run %s, %s, sampling %s, complete=%t; classes %s; loaded %s; executed (usable) %s, %d not usable; calls %s; %d advisories with an observed vulnerable method",
-			cfg.runtimeTrace, rt.RunID, rt.Recorder, rt.Sampling, rt.Complete, report.GapCounts(rt.ClassCounts), report.GapCounts(rt.LoadedCounts),
+			static.cfg.runtimeTrace, rt.RunID, rt.Recorder, rt.Sampling, rt.Complete, report.GapCounts(rt.ClassCounts), report.GapCounts(rt.LoadedCounts),
 			report.GapCounts(rt.ExecutedCounts), rt.ExecutedOther, report.GapCounts(rt.CallCounts), len(runtimeObs))
 	}
 
@@ -1841,7 +2019,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		counts[reach.StatusNotApplicable])
 
 	var cveByID map[string]cves.CVE
-	if cfg.exploitCheck || cfg.frameworkCheck {
+	if static.cfg.exploitCheck || static.cfg.frameworkCheck {
 		cveByID = make(map[string]cves.CVE, len(cveList))
 		for _, c := range cveList {
 			cveByID[c.ID] = c
@@ -1849,15 +2027,15 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	}
 
 	var exploitStats exploit.Stats
-	if cfg.exploitCheck {
-		log("exploit-check: asking %s about %d REACHABLE CVEs", cfg.llmConfig.Model, counts[reach.StatusReachable])
-		exploitCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "exploit"), cfg.offline)
+	if static.cfg.exploitCheck {
+		log("exploit-check: asking %s about %d REACHABLE CVEs", static.cfg.llmConfig.Model, counts[reach.StatusReachable])
+		exploitCache, err := httpcache.New(filepath.Join(static.cfg.cacheDir, "exploit"), static.cfg.offline)
 		if err != nil {
 			return fmt.Errorf("opening exploit-check cache dir: %w", err)
 		}
-		sr.attach(exploitCache, "exploit")
-		checker := exploit.NewChecker(cfg.llmConfig, exploitCache, nil)
-		findings, err := checker.CheckAll(ctx, results, cveByID)
+		static.sr.attach(exploitCache, "exploit")
+		checker := exploit.NewChecker(static.cfg.llmConfig, exploitCache, nil)
+		findings, err := checker.CheckAll(static.ctx, results, cveByID)
 		if err != nil {
 			return fmt.Errorf("exploit-check: %w", err)
 		}
@@ -1871,19 +2049,19 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		exploitStats = checker.Stats()
 		log("exploit-check: %d checked, %d skipped (request failed), %d invalid reply",
 			exploitStats.Checked, exploitStats.Skipped, exploitStats.Invalid)
-		warnings = append(warnings, checker.Warnings()...)
+		static.warnings = append(static.warnings, checker.Warnings()...)
 	}
 
 	var frameworkCheckStats exploit.Stats
-	if cfg.frameworkCheck {
-		log("framework-check: asking %s about %d FRAMEWORK CVEs", cfg.llmConfig.Model, counts[reach.StatusFramework])
-		frameworkCache, err := httpcache.New(filepath.Join(cfg.cacheDir, "framework-check"), cfg.offline)
+	if static.cfg.frameworkCheck {
+		log("framework-check: asking %s about %d FRAMEWORK CVEs", static.cfg.llmConfig.Model, counts[reach.StatusFramework])
+		frameworkCache, err := httpcache.New(filepath.Join(static.cfg.cacheDir, "framework-check"), static.cfg.offline)
 		if err != nil {
 			return fmt.Errorf("opening framework-check cache dir: %w", err)
 		}
-		sr.attach(frameworkCache, "framework-check")
-		checker := exploit.NewFrameworkChecker(cfg.llmConfig, frameworkCache, nil)
-		findings, err := checker.CheckAll(ctx, results, cveByID)
+		static.sr.attach(frameworkCache, "framework-check")
+		checker := exploit.NewFrameworkChecker(static.cfg.llmConfig, frameworkCache, nil)
+		findings, err := checker.CheckAll(static.ctx, results, cveByID)
 		if err != nil {
 			return fmt.Errorf("framework-check: %w", err)
 		}
@@ -1897,52 +2075,52 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		frameworkCheckStats = checker.Stats()
 		log("framework-check: %d checked, %d skipped (request failed), %d invalid reply",
 			frameworkCheckStats.Checked, frameworkCheckStats.Skipped, frameworkCheckStats.Invalid)
-		warnings = append(warnings, checker.Warnings()...)
+		static.warnings = append(static.warnings, checker.Warnings()...)
 	}
 
 	// Every network fetch of the run is done by now (OSV, fix diffs).
-	freshness := cache.Freshness()
-	freshnessState, freshnessLines, freshnessWarnings := report.DescribeFreshness(freshness, cfg.dataTTL)
-	if sr.replay != nil {
-		recorded := sr.replay.DataFreshness
+	freshness := static.cache.Freshness()
+	freshnessState, freshnessLines, freshnessWarnings := report.DescribeFreshness(freshness, static.cfg.dataTTL)
+	if static.sr.replay != nil {
+		recorded := static.sr.replay.DataFreshness
 		freshnessState = report.FreshnessReplayed
-		freshnessLines = []string{fmt.Sprintf("snapshot data set %s, created %s, recorded as %q", sr.replay.DataSetID, sr.replay.CreatedAt.Format(time.RFC3339), recorded)}
+		freshnessLines = []string{fmt.Sprintf("snapshot data set %s, created %s, recorded as %q", static.sr.replay.DataSetID, static.sr.replay.CreatedAt.Format(time.RFC3339), recorded)}
 		freshnessWarnings = nil
-		for _, d := range snapshot.ConfigDiff(sr.replay.Config, sr.config) {
-			warnings = append(warnings, "snapshot: configuration differs from the recorded run: "+d)
+		for _, d := range snapshot.ConfigDiff(static.sr.replay.Config, static.sr.config) {
+			static.warnings = append(static.warnings, "snapshot: configuration differs from the recorded run: "+d)
 		}
-		if !sr.replay.Tool.Reproducible {
-			warnings = append(warnings, "snapshot: recorded by a locally modified build — the data replays, the analyzer source is identified only by the binary hash")
+		if !static.sr.replay.Tool.Reproducible {
+			static.warnings = append(static.warnings, "snapshot: recorded by a locally modified build — the data replays, the analyzer source is identified only by the binary hash")
 		}
 	} else {
-		warnings = append(warnings, freshnessWarnings...)
+		static.warnings = append(static.warnings, freshnessWarnings...)
 	}
 	log("data freshness: %s (%s)", freshnessState, strings.Join(freshnessLines, "; "))
 
-	if sr.replayer != nil {
-		if f := sr.replayer.Failures(); len(f) > 0 {
+	if static.sr.replayer != nil {
+		if f := static.sr.replayer.Failures(); len(f) > 0 {
 			return fmt.Errorf("the snapshot could not answer %d lookups, so the replay is not a reproduction: %s", len(f), strings.Join(f, "; "))
 		}
 	}
 	// CVE:F3: derivation keys, the manifest of this run, and the
 	// comparison with an earlier snapshot.
-	ders := derivations(cveList, vm, results, components, cfg.llmConfig.Model)
+	ders := derivations(cveList, vm, results, static.components, static.cfg.llmConfig.Model)
 	var observations []httpcache.Observation
-	if sr.recorder != nil {
-		if observations, err = sr.recorder.Observations(); err != nil {
+	if static.sr.recorder != nil {
+		if observations, err = static.sr.recorder.Observations(); err != nil {
 			return fmt.Errorf("writing snapshot objects: %w", err)
 		}
-	} else if sr.replay != nil {
-		observations = sr.replay.Observations
+	} else if static.sr.replay != nil {
+		observations = static.sr.replay.Observations
 	}
-	current := sr.manifest(snapInputs, observations, ders, results, freshnessState)
+	current := static.sr.manifest(static.snapInputs, observations, ders, results, freshnessState)
 	var changes []snapshot.Change
-	if sr.compare != nil {
-		changes = snapshot.Compare(*sr.compare, current)
-		log("snapshot compare: %d advisories with invalidated derivations or changed verdicts since %s", len(changes), sr.compare.DataSetID)
+	if static.sr.compare != nil {
+		changes = snapshot.Compare(*static.sr.compare, current)
+		log("snapshot compare: %d advisories with invalidated derivations or changed verdicts since %s", len(changes), static.sr.compare.DataSetID)
 	}
-	profileLabel := prof.Name
-	if cfg.roots == "profile" {
+	profileLabel := static.prof.Name
+	if static.cfg.roots == "profile" {
 		profileLabel += " (roots: profile)"
 	}
 	// GRAPH_PRECISION P0: the final graph (every model edge added) with
@@ -1951,84 +2129,84 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	for _, r := range results {
 		graphFindings = append(graphFindings, callgraph.FindingPath{ID: r.CVE, Status: string(r.Status), Path: r.Path})
 	}
-	graphNow := callgraph.Snapshot(g, graphFindings)
-	graphNow.Types = allocExport(allocCatalog)
+	graphNow := callgraph.Snapshot(static.g, graphFindings)
+	graphNow.Types = allocExport(static.allocCatalog)
 	var graphCmp *callgraph.Comparison
-	if graphBefore != nil {
-		c := callgraph.Compare(*graphBefore, graphNow)
+	if static.graphBefore != nil {
+		c := callgraph.Compare(*static.graphBefore, graphNow)
 		graphCmp = &c
 		log("call graph comparison with %s: %d → %d edges, %d added, %d removed, %d with other call-site evidence; %d findings changed; settings: %s",
-			cfg.graphCompare, c.EdgesBefore, c.EdgesAfter, len(c.Added), len(c.Removed), c.EvidenceChanged, len(c.Findings), graphSettings(c.ConfigDifferences))
+			static.cfg.graphCompare, c.EdgesBefore, c.EdgesAfter, len(c.Added), len(c.Removed), c.EvidenceChanged, len(c.Findings), graphSettings(c.ConfigDifferences))
 	}
-	runGapList := runGaps(gapSites, engine.ReachableGapsByKind(), allocSummary.Gaps, samStats.Gaps, modelGapReasons, runtimeResult)
+	runGapList := runGaps(static.gapSites, static.engine.ReachableGapsByKind(), static.allocSummary.Gaps, static.samStats.Gaps, static.modelGapReasons, runtimeResult)
 	header := report.Header{
 		Gaps:               runGapList,
 		GapProbe:           gapProbe,
-		UnboundedSites:     unboundedSummary,
-		ReflectionCensus:   reflectCensusSummary,
+		UnboundedSites:     static.unboundedSummary,
+		ReflectionCensus:   static.reflectCensusSummary,
 		GapProbeRows:       reach.ProbeRows(results),
-		App:                cfg.app,
+		App:                static.cfg.app,
 		GeneratedAt:        time.Now(),
 		AriadneVersion:     version(),
 		DataFreshness:      freshnessState,
 		FreshnessLines:     freshnessLines,
 		Profile:            profileLabel,
-		FrameworksDetected: strings.Join(detected, ", "),
-		MaxBytecodeVer:     maxBytecode,
-		JPMSScenario:       string(jpmsScenario),
-		GraphConfig:        g.Config(),
-		GraphNodes:         g.NodeCount(),
-		GraphEdges:         g.EdgeCount(),
-		PreCHAEdges:        g.PreCHAEdgeCount(),
-		CHAEdges:           g.CHAEdgeCount(),
-		InitEdges:          g.InitEdgeCount(),
-		ModelEdges:         g.ModelEdgeCount(),
-		SAMEdges:           g.SAMEdgeCount(),
-		SAMLine:            samLine,
-		TargetRuntime:      targetRuntimeLine(targetRuntime, runtimeAssessment),
-		RuntimeAdvisories:  runtimeAdvisoryRows(runtimeAssessment),
-		UnresolvedDyn:      g.UnresolvedDynamicCount(),
-		UnresolvedOwner:    g.UnresolvedOwnerCount(),
-		GapSites:           len(gapSites),
-		GapsReachable:      reachableGaps,
-		GapsUnbounded:      unboundedGaps,
-		DepsTotal:          len(depJars),
-		DepsIdentified:     identified,
-		UnidentifiedJar:    unidentified,
+		FrameworksDetected: strings.Join(static.detected, ", "),
+		MaxBytecodeVer:     static.maxBytecode,
+		JPMSScenario:       string(static.jpmsScenario),
+		GraphConfig:        static.g.Config(),
+		GraphNodes:         static.g.NodeCount(),
+		GraphEdges:         static.g.EdgeCount(),
+		PreCHAEdges:        static.g.PreCHAEdgeCount(),
+		CHAEdges:           static.g.CHAEdgeCount(),
+		InitEdges:          static.g.InitEdgeCount(),
+		ModelEdges:         static.g.ModelEdgeCount(),
+		SAMEdges:           static.g.SAMEdgeCount(),
+		SAMLine:            static.samLine,
+		TargetRuntime:      targetRuntimeLine(static.targetRuntime, static.runtimeAssessment),
+		RuntimeAdvisories:  runtimeAdvisoryRows(static.runtimeAssessment),
+		UnresolvedDyn:      static.g.UnresolvedDynamicCount(),
+		UnresolvedOwner:    static.g.UnresolvedOwnerCount(),
+		GapSites:           len(static.gapSites),
+		GapsReachable:      static.reachableGaps,
+		GapsUnbounded:      static.unboundedGaps,
+		DepsTotal:          len(static.depJars),
+		DepsIdentified:     static.identified,
+		UnidentifiedJar:    static.unidentified,
 	}
 	if llmSrc != nil {
 		st := llmSrc.Stats()
-		header.LLMModel = cfg.llmConfig.Model
+		header.LLMModel = static.cfg.llmConfig.Model
 		header.LLMMapped = st.Mapped
 		header.LLMSkipped = st.Skipped + st.Invalid
 	}
-	if cfg.exploitCheck {
-		header.ExploitModel = cfg.llmConfig.Model
+	if static.cfg.exploitCheck {
+		header.ExploitModel = static.cfg.llmConfig.Model
 		header.ExploitChecked = exploitStats.Checked
 		header.ExploitSkipped = exploitStats.Skipped + exploitStats.Invalid
 	}
-	if cfg.frameworkCheck {
-		header.FrameworkCheckModel = cfg.llmConfig.Model
+	if static.cfg.frameworkCheck {
+		header.FrameworkCheckModel = static.cfg.llmConfig.Model
 		header.FrameworkChecked = frameworkCheckStats.Checked
 		header.FrameworkCheckSkipped = frameworkCheckStats.Skipped + frameworkCheckStats.Invalid
 	}
-	if central.limited != nil {
-		warnings = append(warnings, fmt.Sprintf("maven repository: %v; files it was asked for are missing from this run (see the notes); use ARIADNE_MAVEN_LOCAL or a caching proxy (ARIADNE_MAVEN_CENTRAL)", central.limited))
+	if static.central.limited != nil {
+		static.warnings = append(static.warnings, fmt.Sprintf("maven repository: %v; files it was asked for are missing from this run (see the notes); use ARIADNE_MAVEN_LOCAL or a caching proxy (ARIADNE_MAVEN_CENTRAL)", static.central.limited))
 	}
-	data := report.Build(header, cveList, results, warnings, svcRegs, svcLoadSites, svcMaterializations, callbackSites, resolvedCallbacks, callbackEdgeResults, resolvedHandles, handleEdgeResults, springRoutes, springBeanNames, springProfileConditions, cfg.activeProfiles, webXMLInput, springXMLBeans, resolvedInjections, webXMLRootsFound, externalEntries, proxyHandlers, resolvedReflectInvokes, reflectEdgeResults, resolvedReflectNewInstances, reflectNewInstanceEdgeResults, svcConsumptionSites)
-	data.Modules = moduleInventory
-	data.LibraryDeps = libDeps
-	data.Components = components
-	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: deserSites, Summary: deserSummary, Targets: len(deserTargets), EdgesAdded: deserEdgesAdded,
-		Chains: deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
-		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(cfg.taint)}
-	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(cfg.graphCompare)
-	data.CreatedTypes, data.CreatedTypeGaps, data.RTA = &allocSummary, allocCatalog.Gaps, rtaResult
+	data := report.Build(header, cveList, results, static.warnings, static.svcRegs, static.svcLoadSites, static.svcMaterializations, static.callbackSites, static.resolvedCallbacks, static.callbackEdgeResults, static.resolvedHandles, static.handleEdgeResults, static.springRoutes, static.springBeanNames, static.springProfileConditions, static.cfg.activeProfiles, static.webXMLInput, static.springXMLBeans, static.resolvedInjections, static.webXMLRootsFound, static.externalEntries, static.proxyHandlers, static.resolvedReflectInvokes, static.reflectEdgeResults, static.resolvedReflectNewInstances, static.reflectNewInstanceEdgeResults, static.svcConsumptionSites)
+	data.Modules = static.moduleInventory
+	data.LibraryDeps = static.libDeps
+	data.Components = static.components
+	data.Deserialization = &report.Deserialization{Models: deserialize.Catalog, Sites: static.deserSites, Summary: static.deserSummary, Targets: len(static.deserTargets), EdgesAdded: static.deserEdgesAdded,
+		Chains: static.deserChains, ChainCatalogVersion: deserialize.ChainCatalogVersion,
+		ModelCatalogVersion: deserialize.ModelCatalogVersion, TaintCatalog: taintCatalog(static.cfg.taint)}
+	data.GraphComparison, data.GraphCompareFile = graphCmp, filepath.Base(static.cfg.graphCompare)
+	data.CreatedTypes, data.CreatedTypeGaps, data.RTA = &static.allocSummary, static.allocCatalog.Gaps, static.rtaResult
 	if runtimeResult != nil {
 		data.Runtime = &report.Runtime{Result: *runtimeResult, Findings: runtimeFindings(runtimeObs, results), TracedNoEntry: tracedNoEntry(runtimeTracedBy, runtimeObs, results), NotInGraph: runtimeResult.NotInGraph()}
 	}
 	data.Withdrawn = resolution.Withdrawn
-	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(sr)
+	data.SnapshotChanges, data.SnapshotComparedWith = changes, compareID(static.sr)
 
 	// CVE:F9.9: every artifact is rendered in memory first and written
 	// at the end, all or nothing (internal/atomicfile): an error anywhere
@@ -2039,36 +2217,36 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	//
 	// The v2 document is built on every run so that its v1 export is
 	// checked against the engine's v1 rows (contract §5) either way.
-	if st := central.stats; st.Local+st.Network+st.Failed+st.Skipped > 0 {
+	if st := static.central.stats; st.Local+st.Network+st.Failed+st.Skipped > 0 {
 		log("maven repository %s: %d files from the local repository %s, %d fetched (or from the cache), %d failed, %d not requested again%s",
-			central.base, st.Local, orNone(central.local), st.Network, st.Failed, st.Skipped, limitedNote(central.limited))
+			static.central.base, st.Local, orNone(static.central.local), st.Network, st.Failed, st.Skipped, limitedNote(static.central.limited))
 	}
 	doc := resultsv2.Build(resultsv2.Inputs{
-		LibraryDeps: libDeps,
-		ToolVersion: version(), Offline: cfg.offline, Inventory: components, CVEs: cveList, Mappings: vm, Results: results,
-		Freshness:         resultsv2.DataFreshness{State: freshnessState, TTL: cfg.dataTTL.String(), MaxAge: maxAgeString(cfg.maxDataAge), Kinds: freshness},
+		LibraryDeps: static.libDeps,
+		ToolVersion: version(), Offline: static.cfg.offline, Inventory: static.components, CVEs: cveList, Mappings: vm, Results: results,
+		Freshness:         resultsv2.DataFreshness{State: freshnessState, TTL: static.cfg.dataTTL.String(), MaxAge: maxAgeString(static.cfg.maxDataAge), Kinds: freshness},
 		Withdrawn:         resolution.Withdrawn,
-		DataSet:           dataSetRef(sr, cfg, observations),
+		DataSet:           dataSetRef(static.sr, static.cfg, observations),
 		Changes:           changes,
-		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(gapSites), Reachable: reachableGaps, Unbounded: unboundedGaps, ModelAnalysis: modelGapReasons},
+		Gaps:              resultsv2.GlobalGaps{UnresolvedSites: len(static.gapSites), Reachable: static.reachableGaps, Unbounded: static.unboundedGaps, ModelAnalysis: static.modelGapReasons},
 		DeserModelCatalog: deserialize.ModelCatalogVersion, DeserChainCatalog: deserialize.ChainCatalogVersion,
-		DeserSites: deserSites, DeserChains: deserChains, TaintCatalog: taintCatalog(cfg.taint),
-		CallGraph: &resultsv2.CallGraph{Config: g.Config(), Nodes: g.NodeCount(), Edges: g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &allocSummary, RTA: rtaResult, PTA: ptaResult},
+		DeserSites: static.deserSites, DeserChains: static.deserChains, TaintCatalog: taintCatalog(static.cfg.taint),
+		CallGraph: &resultsv2.CallGraph{Config: static.g.Config(), Nodes: static.g.NodeCount(), Edges: static.g.EdgeCount(), Comparison: graphCmp, CreatedTypes: &static.allocSummary, RTA: static.rtaResult, PTA: static.ptaResult},
 		Runtime:   runtimeResult, RuntimeObserved: runtimeObs, RuntimeTraced: runtimeTracedBy,
 	})
-	doc.TargetRuntime = targetRuntimeResult(targetRuntime, runtimeAssessment)
-	doc.Coverage.Native = &nativeSummary
+	doc.TargetRuntime = targetRuntimeResult(static.targetRuntime, static.runtimeAssessment)
+	doc.Coverage.Native = &static.nativeSummary
 	doc.Frameworks = resultsv2.BuildFrameworks(resultsv2.FrameworksInputs{
-		Profile: prof.Name, ActiveProfiles: activeProfiles,
-		Stereotypes: springBeanNames, BeanMethods: springBeanMethods, Repositories: springRepositoryBeans,
-		Conditions: springProfileConditions, Injections: resolvedInjections, Entries: externalEntries,
-		LifecycleRoots: beanRoots, WebBodyRoots: bodyRoots,
+		Profile: static.prof.Name, ActiveProfiles: static.activeProfiles,
+		Stereotypes: static.springBeanNames, BeanMethods: static.springBeanMethods, Repositories: static.springRepositoryBeans,
+		Conditions: static.springProfileConditions, Injections: static.resolvedInjections, Entries: static.externalEntries,
+		LifecycleRoots: static.beanRoots, WebBodyRoots: static.bodyRoots,
 	})
 	doc.Coverage.Gaps = runGapList
 	doc.Coverage.GapProbe = gapProbe
-	doc.Coverage.UnboundedSites = unboundedSummary
-	doc.Coverage.ReflectionCensus = reflectCensusSummary
-	doc.Coverage.API = apiCoverage
+	doc.Coverage.UnboundedSites = static.unboundedSummary
+	doc.Coverage.ReflectionCensus = static.reflectCensusSummary
+	doc.Coverage.API = static.apiCoverage
 	if mismatch := resultsv2.CheckV1(doc, results); len(mismatch) > 0 {
 		return fmt.Errorf("v2 findings do not aggregate to the v1 results (internal error): %s", strings.Join(mismatch, "; "))
 	}
@@ -2078,7 +2256,7 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return err
 	}
 	var resultsBytes []byte
-	if cfg.jsonFormat == "v2" {
+	if static.cfg.jsonFormat == "v2" {
 		resultsBytes, err = resultsv2.Marshal(doc)
 	} else {
 		resultsBytes, err = report.ResultsJSON(results)
@@ -2086,10 +2264,10 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("rendering results JSON: %w", err)
 	}
-	data.NativeMethods, data.NativeReachable, data.NativeLoads = nativeReportRows(nativeSummary)
-	data.ShadowedClasses, data.ShadowedDiffering, data.ShadowRows = shadowReportRows(components)
-	if components != nil {
-		data.ClasspathOrder = components.ClasspathOrder
+	data.NativeMethods, data.NativeReachable, data.NativeLoads = nativeReportRows(static.nativeSummary)
+	data.ShadowedClasses, data.ShadowedDiffering, data.ShadowRows = shadowReportRows(static.components)
+	if static.components != nil {
+		data.ClasspathOrder = static.components.ClasspathOrder
 	}
 	data.AnalysisID = doc.AnalysisID
 	// DESERIALIZATION Z4: the advisory row names the catalog chains
@@ -2120,8 +2298,8 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 			data.Rows[i].Chains = strings.Join(ns, "; ")
 		}
 	}
-	data.ResultsFile = filepath.Base(cfg.jsonOut)
-	data.ResultsFormat = cfg.jsonFormat
+	data.ResultsFile = filepath.Base(static.cfg.jsonOut)
+	data.ResultsFormat = static.cfg.jsonFormat
 	if data.ResultsFormat == "" {
 		data.ResultsFormat = "v1"
 	}
@@ -2131,40 +2309,40 @@ func analyze(ctx context.Context, cfg config, stdout io.Writer) error {
 		return fmt.Errorf("writing report: %w", err)
 	}
 	var outputs atomicfile.Set
-	outputs.Add(cfg.out, []byte(rendered))
-	outputs.Add(cfg.jsonOut, resultsBytes)
-	if cfg.graphOut != "" {
+	outputs.Add(static.cfg.out, []byte(rendered))
+	outputs.Add(static.cfg.jsonOut, resultsBytes)
+	if static.cfg.graphOut != "" {
 		var gb strings.Builder
 		if err := callgraph.Write(&gb, graphNow); err != nil {
 			return fmt.Errorf("writing call graph: %w", err)
 		}
-		outputs.Add(cfg.graphOut, []byte(gb.String()))
+		outputs.Add(static.cfg.graphOut, []byte(gb.String()))
 	}
-	if cfg.runtimeFilter != "" {
-		outputs.Add(cfg.runtimeFilter, runtimeFilterSel.jfcFile(cfg.runtimeStatus))
+	if static.cfg.runtimeFilter != "" {
+		outputs.Add(static.cfg.runtimeFilter, runtimeFilterSel.jfcFile(static.cfg.runtimeStatus))
 	}
-	if sr.recorder != nil {
+	if static.sr.recorder != nil {
 		current.AnalysisID = doc.AnalysisID
 		manifest, err := snapshot.Marshal(current)
 		if err != nil {
 			return fmt.Errorf("writing snapshot: %w", err)
 		}
-		outputs.Add(snapshot.ManifestPath(cfg.snapshotOut), manifest)
+		outputs.Add(snapshot.ManifestPath(static.cfg.snapshotOut), manifest)
 	}
 	if err := outputs.Commit(); err != nil {
 		return err
 	}
-	log("wrote %s", cfg.out)
-	log("wrote %s", cfg.jsonOut)
-	if cfg.runtimeFilter != "" {
+	log("wrote %s", static.cfg.out)
+	log("wrote %s", static.cfg.jsonOut)
+	if static.cfg.runtimeFilter != "" {
 		log("wrote runtime filter %s: exact entries of %d mapped vulnerable methods of %d advisories (%s; %d mapped methods not in the input); record with -XX:StartFlightRecording=settings=profile,settings=%s (JDK 25+)",
-			cfg.runtimeFilter, len(runtimeFilterSel.Filters), runtimeFilterSel.Advisories, cfg.runtimeStatus, runtimeFilterSel.Skipped, cfg.runtimeFilter)
+			static.cfg.runtimeFilter, len(runtimeFilterSel.Filters), runtimeFilterSel.Advisories, static.cfg.runtimeStatus, runtimeFilterSel.Skipped, static.cfg.runtimeFilter)
 	}
-	if cfg.graphOut != "" {
-		log("wrote call graph %s (%d edges, %s)", cfg.graphOut, len(graphNow.Edges), callgraph.ExportFormat)
+	if static.cfg.graphOut != "" {
+		log("wrote call graph %s (%d edges, %s)", static.cfg.graphOut, len(graphNow.Edges), callgraph.ExportFormat)
 	}
-	if sr.recorder != nil {
-		log("wrote snapshot %s (data set %s, %d observations)", cfg.snapshotOut, snapshot.DataSetID(observations), len(observations))
+	if static.sr.recorder != nil {
+		log("wrote snapshot %s (data set %s, %d observations)", static.cfg.snapshotOut, snapshot.DataSetID(observations), len(observations))
 	}
 	log("analysis %s", doc.AnalysisID)
 	return nil

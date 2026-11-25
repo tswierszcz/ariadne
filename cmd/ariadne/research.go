@@ -131,11 +131,19 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 		defer t.close()
 		cfg.research.sources = t
 	}
-	if err := analyze(context.Background(), cfg, stderr); err != nil {
+	static, err := prepare(context.Background(), cfg, stderr)
+	if err != nil {
 		fmt.Fprintln(stderr, "ariadne research index:", err)
 		return 1
 	}
-	fmt.Fprintf(stderr, "research bundle %s published (analysis %s)\n", out, cfg.research.analysisID)
+	defer static.cleanup()
+	log := func(format string, a ...any) { fmt.Fprintf(stderr, format+"\n", a...) }
+	id, err := writeResearchBundle(static.research(cfg), log)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research index: research bundle:", err)
+		return 1
+	}
+	fmt.Fprintf(stderr, "research bundle %s published (analysis %s)\n", out, id)
 	return 0
 }
 
@@ -219,14 +227,13 @@ func writeResponse(path string, v any) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// researchOut is set on a research index run: analyze hands the static
-// pipeline's state to writeResearchBundle instead of the CVE stage.
+// researchOut is set on a research index run: prepare's state goes to
+// writeResearchBundle instead of the CVE stage.
 type researchOut struct {
 	dir        string
 	scope      string // "all" or "reachable"
 	sources    *sourceTree
 	sourcesArg string
-	analysisID string
 }
 
 // researchState is the static pipeline's result (RESEARCH_INTERFACE RI1):
@@ -247,6 +254,43 @@ type researchState struct {
 	activeProfs  []string
 	fixedPoint   analysis.Result
 	disabled     []string
+}
+
+// research selects what the bundle needs from the static pipeline's state.
+func (s *staticRun) research(cfg config) researchState {
+	return researchState{cfg: cfg, h: s.h, g: s.g, roots: s.roots, inv: s.components,
+		apiInherited: s.apiInherited, apiAnnounced: s.apiAnnounced,
+		gapSites: s.gapSites, reachable: s.engine.MethodReachable, dispatch: s.engine.DispatchFlags, framework: s.framework, profile: s.prof.Name,
+		activeProfs: s.activeProfiles, fixedPoint: s.modelResult, disabled: analysis.Labels(s.disabledParts)}
+}
+
+// embeddedLimit names the embedded library candidates that were not
+// identified: their classes stay in the host's component, so nothing in the
+// records tells them apart. reference_unavailable is the offline case — the
+// reference jar is neither in -cache-dir nor in ARIADNE_MAVEN_LOCAL.
+func embeddedLimit(inv *component.Inventory) string {
+	byStatus := map[string][]string{}
+	n := 0
+	for _, e := range inv.Embedded {
+		if e.Kind != component.EmbeddedLibrary || e.Status == component.EmbeddedConfirmed || e.Status == component.EmbeddedVersionCandidates {
+			continue
+		}
+		byStatus[e.Status] = append(byStatus[e.Status], e.GAV.String())
+		n++
+	}
+	if n == 0 {
+		return ""
+	}
+	var parts []string
+	for st, gavs := range byStatus {
+		parts = append(parts, st+": "+strings.Join(sortedUnique(gavs), ", "))
+	}
+	sort.Strings(parts)
+	l := fmt.Sprintf("Embedded components: %d library candidates not identified (%s); whatever classes of theirs the host carries are attributed to the host component.", n, strings.Join(parts, "; "))
+	if len(byStatus[component.EmbeddedReferenceUnavailable]) > 0 {
+		l += " reference_unavailable: the reference jar is in neither -cache-dir nor ARIADNE_MAVEN_LOCAL (research index does not use the network)."
+	}
+	return l
 }
 
 func rid(prefix string, parts ...string) string {
@@ -295,6 +339,9 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 	artifactLoc := map[string]string{}
 	for _, a := range inv.Artifacts {
 		artifactLoc[a.ID] = a.Location
+	}
+	if l := embeddedLimit(inv); l != "" {
+		limits = append(limits, l)
 	}
 	frameworkInst := map[string]bool{}
 	for _, in := range inv.Instances {
