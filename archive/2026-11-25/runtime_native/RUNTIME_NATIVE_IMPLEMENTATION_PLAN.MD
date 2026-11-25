@@ -1,6 +1,6 @@
 # Runtime i native — fazy N0–N5
 
-Status: N0, N1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md); kontrakt `ariadne-runtime-trace-1`, importer `internal/runtimeevents` `n1-1`, `-runtime-trace`, rejestrator z JFR bez agenta); N2 odłożony (2026-11-23), N3 i N4 ocenione 2026-11-25 (agent niebudowany — patrz niżej), N5 wycinek `n5-1`; zob. IMPLEMENTATION_STATUS. Wymagania: [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD). Zasady: [ROADMAP.MD](ROADMAP.MD).
+Status: **Obszar DONE for this scope (2026-11-25), zarchiwizowany** — zob. [COMPLETION.md](COMPLETION.md). Stan faz przed zamknięciem: N0, N1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../../../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md); kontrakt `ariadne-runtime-trace-1`, importer `internal/runtimeevents` `n1-1`, `-runtime-trace`, rejestrator z JFR bez agenta); N2 odłożony (2026-11-23), N3 i N4 ocenione 2026-11-25 (agent niebudowany — patrz niżej), N5 wycinek `n5-1`; zob. IMPLEMENTATION_STATUS. Wymagania: [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD). Zasady: [ROADMAP.MD](../../../RECOMMENDATION/ROADMAP.MD).
 
 ## N0. Kontrakt śladu i zakres dowodów — DONE (zarchiwizowane 2026-11-08)
 
@@ -9,7 +9,7 @@ Status: N0, N1 DONE (2026-11-08, zarchiwizowane: [archive/2026-11-08/runtime_nat
 Kontrakt `ariadne-runtime-trace-1` (`docs/RUNTIME_TRACE.MD`), importer `internal/runtimeevents`
 (`-runtime-trace`), rejestrator z JFR bez agenta (`scripts/JfrToTrace.java`), a jako
 rozszerzenie N1 — `-runtime-filter-out` (ustawienia JFR śledzące podatne metody ustaleń);
-zobacz [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)
+zobacz [archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md](../../../archive/2026-11-08/runtime_native/RUNTIME_NATIVE_N0_N1.md)
 po pełny zapis i `docs/SUPPORT.MD` po bieżący opis zachowania.
 
 ## N2. Dodatkowe klasy i kontekst ładowania
@@ -28,7 +28,7 @@ Gotowe: dwie definicje tej samej klasy pozostają odrębne, a znany plugin ma wa
 
 ## N3. Pierwszy opcjonalny agent Java
 
-**Ocena 2026-11-25: NOT STARTED — agent niebudowany, zastąpiony ścieżką JFR.** Cel MVP N3 (dokładne wejścia ograniczonego katalogu metod, ramka wywołującego, oznaczona utrata zdarzeń, brak zdarzenia ≠ brak wywołania) spełnia od N1 rejestrator bez agenta: JFR `jdk.MethodTrace` (JDK 25+, JEP 520) z filtrem metod, `scripts/JfrToTrace.java`, `-runtime-filter-out`. Pomiar [testdata/runtime-n4](../testdata/runtime-n4/RESULTS.MD): refleksja i proxy dają dokładne wejścia z relacją przez ramki runtime. Agent dałby ponad to tylko: (a) dokładne wejścia na JDK < 25, (b) korelację przez granicę wątku (token rejestracji — N4 async), (c) bajty klas przed/po transformacji i hidden classes (N2). Wznowić, gdy cel tego wymaga — badany przebieg na JDK < 25, eksperyment Tekmerion wymagający przypisania wykonania do rejestracji, cel z transformacją klas; wtedy agent jest kolejnym rejestratorem tego samego formatu `ariadne-runtime-trace-1`.
+**Ocena 2026-11-25: NOT STARTED — agent niebudowany, zastąpiony ścieżką JFR.** Cel MVP N3 (dokładne wejścia ograniczonego katalogu metod, ramka wywołującego, oznaczona utrata zdarzeń, brak zdarzenia ≠ brak wywołania) spełnia od N1 rejestrator bez agenta: JFR `jdk.MethodTrace` (JDK 25+, JEP 520) z filtrem metod, `scripts/JfrToTrace.java`, `-runtime-filter-out`. Pomiar [testdata/runtime-n4](../../../testdata/runtime-n4/RESULTS.MD): refleksja i proxy dają dokładne wejścia z relacją przez ramki runtime. Agent dałby ponad to tylko: (a) dokładne wejścia na JDK < 25, (b) korelację przez granicę wątku (token rejestracji — N4 async), (c) bajty klas przed/po transformacji i hidden classes (N2). Wznowić, gdy cel tego wymaga — badany przebieg na JDK < 25, eksperyment Tekmerion wymagający przypisania wykonania do rejestracji, cel z transformacją klas; wtedy agent jest kolejnym rejestratorem tego samego formatu `ariadne-runtime-trace-1`.
 
 - Utworzyć osobny artefakt, np. katalog `agent/`, ze wskazaną wersją JDK i procesem budowania. Czysty analizator Go nie zależy od jego obecności.
 - Wybrać mechanizm instrumentacji i ewentualną bibliotekę dopiero po sprawdzeniu możliwości, licencji i zakresu wspieranych klas/JDK. Samo java.lang.instrument nie daje automatycznie gotowego call trace.
@@ -41,7 +41,7 @@ Gotowe: agent w kontrolowanej aplikacji rejestruje znane metody/wywołania w swo
 
 ## N4. Refleksja, proxy i asynchroniczna przyczynowość
 
-**Ocena 2026-11-25: refleksja pokryta, proxy pokryte od `n4-1`, async odłożone.** Pomiar [testdata/runtime-n4](../testdata/runtime-n4/RESULTS.MD) na JDK 25:
+**Ocena 2026-11-25: refleksja pokryta, proxy pokryte od `n4-1`, async odłożone.** Pomiar [testdata/runtime-n4](../../../testdata/runtime-n4/RESULTS.MD) na JDK 25:
 - *Refleksja* — pokryta bez agenta: `main` (linia wywołania `invoke`) → rzeczywisty cel, `stack-through-runtime`, `traced`; przyczyna `reflection` w klasyfikacji luk `g2` już istnieje.
 - *Proxy* — handler → cel pokryty; miejsce wywołania proxy → handler ginie w konwerterze (dla zdarzeń `traced` bierze tylko najbliższą ramkę z zakresu), choć JFR ma pełny stos. To poprawka konwertera, nie agent. **Wycinek `n4-1` DONE (2026-11-25):** `JfrToTrace` czyta cały stos zdarzenia `jdk.MethodTrace` (relacje `traced` między kolejnymi ramkami z zakresu, kluczowane bci/linią), a klasyfikator luk uznaje za `proxy` także handler-lambdę/referencję metody utworzoną dla `InvocationHandler#invoke`. Sonda: dwa wywołania proxy z linii 30 i 31 `main` to dwie relacje `proxy`; async bez wymyślonej relacji. `TestRuntimeN4Probe`.
 - *Async* — wykonanie jest widoczne (`Task#run` → `work`), rejestracja nie: stos wątku roboczego jej nie zawiera, JFR nie przenosi tokenu. Wymaga agenta (N3 (b)); statycznie async jest modelowane (ASYNC_CALLBACKS A0–A4, wyrocznie JVM), a lambda z osobnego miejsca ma własne ciało, więc niejednoznaczne jest tylko to samo zadanie zgłoszone z kilku miejsc. Odłożone do konkretnej potrzeby.
