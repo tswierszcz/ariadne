@@ -16,6 +16,11 @@ prośbę użytkownika dotyczącą jego treści.
 
 ## Dokumenty według obszaru
 
+**Proces badawczy Recon → Hunt → Validate — PLANOWANE (2026-11-25).**
+[Plan wsparcia Ariadne](RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD) wiąże istniejący
+interfejs RI z procesem Tekmerion, określa wspólne kamienie milowe H0–H5 i
+akceptację dowodów po adaptacji `cloudflare/security-audit-skill`.
+
 **Podstawy grafu JVM (inicjalizacja, dziedziczenie, wybór klas, multi-release) —
 DONE (2026-10-22), wszystkie fazy G0–G5.** Dawne `JVM_GRAPH.MD`/
 `JVM_GRAPH_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w

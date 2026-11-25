@@ -1,0 +1,69 @@
+{
+  "schema_version": "ariadne-research-response-1",
+  "contract_revision": "1.0.0-draft.1",
+  "status": "ok",
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "request_id": "callers-write",
+  "operation": "callers",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "effective_limits": {
+    "max_records": 100,
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_work_units": 1000000
+  },
+  "warnings": [],
+  "records": [
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-079949a9dfe005a93f974755",
+      "from": "n-ade33e5f64b60986bdef8e5a",
+      "kind": "virtual",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-ade33e5f64b60986bdef8e5a",
+          "condition": null,
+          "kind": "virtual",
+          "pc": 9
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-d6646a64788165a24f419991"
+    },
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-2804e9a664bc8f6868c69db0",
+      "from": "n-2489eca9d21aa72f67a1559a",
+      "kind": "virtual",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-2489eca9d21aa72f67a1559a",
+          "condition": null,
+          "kind": "virtual",
+          "pc": 32
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-d6646a64788165a24f419991"
+    }
+  ],
+  "page": {
+    "returned_count": 2,
+    "total_count": 2,
+    "next_cursor": null,
+    "truncated": false,
+    "work_complete": true
+  }
+}

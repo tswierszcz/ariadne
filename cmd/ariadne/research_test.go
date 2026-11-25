@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -375,5 +376,57 @@ func TestResearchEmbeddedLimit(t *testing.T) {
 	}
 	if l := embeddedLimit(&component.Inventory{Embedded: inv.Embedded[:3]}); l != "" {
 		t.Fatalf("all identified, got limit %q", l)
+	}
+}
+
+// RH-A0: `research check` accepts this producer's response (with replay)
+// and rejects a broken one; `research query -verify full` verifies the
+// datasets an operation does not read, which the default only checks for
+// presence and size.
+func TestResearchCheckAndVerify(t *testing.T) {
+	dir := t.TempDir()
+	bundle, b := researchIndex(t, dir)
+	req := filepath.Join(dir, "req.json")
+	raw, _ := json.Marshal(map[string]any{"schema_version": research.QuerySchema, "analysis_id": b.AnalysisID, "request_id": "c1", "operation": "entries"})
+	os.WriteFile(req, raw, 0o644)
+	resp := filepath.Join(dir, "resp.json")
+	if code, msg := runWithEnv([]string{"research", "query", "-bundle", bundle, "-request", req, "-out", resp}, nil); code != 0 {
+		t.Fatalf("query: %d %s", code, msg)
+	}
+	var stdout bytes.Buffer
+	check := func(response string) (int, map[string]any) {
+		stdout.Reset()
+		var stderr bytes.Buffer
+		code := run([]string{"research", "check", "-bundle", bundle, "-request", req, "-response", response, "-replay"}, &stdout, &stderr, func(string) string { return "" })
+		var v map[string]any
+		if err := json.Unmarshal(stdout.Bytes(), &v); err != nil {
+			t.Fatalf("check output %q (%s): %v", stdout.String(), stderr.String(), err)
+		}
+		return code, v
+	}
+	if code, v := check(resp); code != 0 || v["valid"] != true || v["replay"] != "identical" {
+		t.Fatalf("own response: exit %d verdict %v", code, v)
+	}
+	good, _ := os.ReadFile(resp)
+	bad := filepath.Join(dir, "bad.json")
+	os.WriteFile(bad, bytes.Replace(good, []byte(`"request_id": "c1"`), []byte(`"request_id": "c2"`), 1), 0o644)
+	code, v := check(bad)
+	if code != 1 || v["valid"] != false || v["replay"] != "differs" || !strings.Contains(stdout.String(), `"rule": "binding"`) {
+		t.Fatalf("broken response: exit %d verdict %s", code, stdout.String())
+	}
+	// calls.jsonl is not read by entries: a damaged copy passes the default
+	// verification and fails -verify full.
+	calls := filepath.Join(bundle, "calls.jsonl")
+	cb, _ := os.ReadFile(calls)
+	cb[10] ^= 1
+	os.WriteFile(calls, cb, 0o644)
+	if code, msg := runWithEnv([]string{"research", "query", "-bundle", bundle, "-request", req, "-out", resp}, nil); code != 0 {
+		t.Fatalf("default verification: %d %s", code, msg)
+	}
+	if code, _ := runWithEnv([]string{"research", "query", "-bundle", bundle, "-request", req, "-out", resp, "-verify", "full"}, nil); code != 1 {
+		t.Fatalf("-verify full on a damaged dataset: exit %d, want 1", code)
+	}
+	if b, _ := os.ReadFile(resp); !strings.Contains(string(b), `"BUNDLE_CORRUPT"`) && !strings.Contains(string(b), `"status": "error"`) {
+		t.Fatalf("-verify full response: %s", b)
 	}
 }

@@ -1,0 +1,146 @@
+{
+  "schema_version": "ariadne-research-identity-1",
+  "contract_revision": "1.0.0-draft.1",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "tool": {
+    "name": "ariadne",
+    "version": "v0.0.0-20261125090655-e352e2fccb66",
+    "binary_sha256": "sha256:95700242cc9c05b37b747d6238e014780dd3692071a66324a4c5290c8567c5cc",
+    "algorithms": {
+      "callgraph.builder": "6",
+      "callgraph.skip_rule": "receiver types under java., javax., jdk., sun. are not expanded",
+      "callgraph.unknown_allocation": "all-subtypes",
+      "libapi": "lb2-9",
+      "research.dispatch": "research-dispatch-1",
+      "research.paths": "research-paths-1",
+      "research.relevance": "research-relevance-1",
+      "research.work": "research-work-1"
+    }
+  },
+  "configuration": {
+    "roots_mode": "api",
+    "graph_mode": "cha",
+    "target_java": 0,
+    "profile": "generic",
+    "active_profiles": [],
+    "jpms_scenario": "classpath",
+    "api_exclude": [],
+    "settings": {
+      "central_lookups": "offline: cache and ARIADNE_MAVEN_LOCAL only",
+      "framework_instance_ids": "",
+      "participants": "async-callbacks:completion@a3-7,async-callbacks:listeners@a3-5,async-callbacks:reactive@a3-6,async-callbacks:rejection@a4-1,async-callbacks:returned-tasks@a3-4,dynamic-linkage:sam-calls@l1-1,framework:proxies@x3,jdbc:drivers@u1,jdbc:objects@j2,jdk:service-loader-classpath-provider@s4,jdk:service-loader-consumption@s4,jdk:service-loader-provider-dispatch@s4,jpa:objects@e1,service-provider:dispatch@p3,servlet-container:dispatch@s2,servlet-container:objects@s2,spring:aop@a2,spring:events@ev1",
+      "scope": "reachable"
+    }
+  },
+  "inputs": [
+    {
+      "id": "a-1d00c75071c1857c",
+      "role": "app",
+      "logical_location": "app:lib.jar",
+      "sha256": "sha256:a1cbff5b999371b7317536eab17c2eefeff25bbfafae2f1f5fc18d3aee744718"
+    },
+    {
+      "id": "a-8a2a0b72e88b60de",
+      "role": "dependency",
+      "logical_location": "deps:fx-dep-1.0.jar",
+      "sha256": "sha256:870526fe46a3b78eb69b3a05b7fc99899494c8dded92a74569924e774c92a0f4"
+    },
+    {
+      "id": "a-1f9012416d771688",
+      "role": "dependency",
+      "logical_location": "deps:fx-dep-2.0.jar",
+      "sha256": "sha256:83a3219f7178c9737c804f053f1cadaf28107c8c4812c55f895d3505467bcc9f"
+    },
+    {
+      "id": "in-deps-list",
+      "role": "deps-list",
+      "logical_location": "deps.txt",
+      "sha256": "sha256:5e54490c6504060d26313a4d8c41213e971081b69247e5e3dfc468c2726e10ff"
+    }
+  ],
+  "classpath_order": [
+    "a-1d00c75071c1857c",
+    "a-8a2a0b72e88b60de",
+    "a-1f9012416d771688"
+  ],
+  "datasets": [
+    {
+      "path": "components.jsonl",
+      "sha256": "sha256:607dc4676d0fc456cc3dc9b981df667adf315574fd8e9c30a93c348eb4479aa1",
+      "size_bytes": 752,
+      "record_count": 3,
+      "encoding": "jsonl-utf8"
+    },
+    {
+      "path": "classes.jsonl",
+      "sha256": "sha256:eeada410facfad213243666588efed323e4ce63e5b3c707451099826f2bef4d1",
+      "size_bytes": 1808,
+      "record_count": 6,
+      "encoding": "jsonl-utf8"
+    },
+    {
+      "path": "nodes.jsonl",
+      "sha256": "sha256:06e1631013d402f3f6e3086d5fc47ccaea087cce9613c9875622a36a6ef50846",
+      "size_bytes": 14339,
+      "record_count": 27,
+      "encoding": "jsonl-utf8"
+    },
+    {
+      "path": "edges.jsonl",
+      "sha256": "sha256:3e0ae9e9d16d87287235ac6032a482d0a1a4ea9d1319c466b92f7b41d6a4deb4",
+      "size_bytes": 7828,
+      "record_count": 22,
+      "encoding": "jsonl-utf8"
+    },
+    {
+      "path": "roots.jsonl",
+      "sha256": "sha256:bb561439a0711701cc84a744ab85d984c5f20633a5f7d75a237cb254ca75c522",
+      "size_bytes": 1738,
+      "record_count": 11,
+      "encoding": "jsonl-utf8"
+    },
+    {
+      "path": "gaps.jsonl",
+      "sha256": "sha256:829aa276355e7e9d0d8a582bb5945f5bba7a79a85810f576e02b5a39e539561e",
+      "size_bytes": 875,
+      "record_count": 2,
+      "encoding": "jsonl-utf8"
+    },
+    {
+      "path": "calls.jsonl",
+      "sha256": "sha256:9ff2f606cd37872c38ab1cad4f095c687bcb7b9d798bb5fb0173de4d3b90b393",
+      "size_bytes": 7323,
+      "record_count": 21,
+      "encoding": "jsonl-utf8"
+    }
+  ],
+  "capabilities": [
+    "entries",
+    "methods",
+    "calls",
+    "callers",
+    "callees",
+    "reachability"
+  ],
+  "fixed_point": {
+    "state": "converged",
+    "reasons": []
+  },
+  "coverage": {
+    "limits": [
+      "Classes form one flat class path (application first, then dependency jars in the order listed from the dependency directory (sorted by file name); the first copy of a class wins); class-loader isolation is not modeled.",
+      "Gap sites are anchored at their calling method (pc 0, kind implicit): the model-gap rule records the method of an unresolved site, not its bytecode offset.",
+      "Calls list every bytecode call site of the analyzed methods; edges added by models, CHA and declarations are edges, not calls.",
+      "Roots carry their selection mode; under -roots all/profile, roots added from web.xml and bean lifecycles are not told apart.",
+      "Edges carry client_dispatch by library mode's LB2 rule and supplied_dispatch only for caller-supplied field values (on every path); a caller-supplied parameter of the entry method itself (lb2-7) is not yet reported per entry.",
+      "Source locations: path is the package path of the file the class's SourceFile attribute names (a nested class names its outer file), lines the method's LineNumberTable range; with -sources, source_sha256 is the hash of the one file in the given sources that ends with that path. The binding stays declared: nothing ties the given sources to the analyzed build.",
+      "No advisory, CVE mapping or network lookup is part of the index; Maven Central reference data comes only from the cache and ARIADNE_MAVEN_LOCAL.",
+      "Scope reachable: 27 of 30 graph nodes, those the roots or the input's own methods reach, with all their edges and calls; a method outside the scope resolves as missing (index with -scope all to see it), and callers lists omit callers outside the scope."
+    ],
+    "disabled_participants": []
+  }
+}

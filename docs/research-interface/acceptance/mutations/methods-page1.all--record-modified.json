@@ -1,0 +1,149 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_records": 5,
+    "max_work_units": 1000000
+  },
+  "operation": "methods",
+  "page": {
+    "next_cursor": "c1.eyJhIjoic2hhMjU2OjVkNzRhOGVlMzUyZGE1ZWU5ZTFiODU5MzZlYjIxNmRiYjU4YWQ2OTIwYWJmZTI2MjQwZDRkZDkxMWY3NWM3NWYiLCJiIjoiODU4ODgzNDFhNThjYzlmMTFiYjY4ZDE3IiwiYWZ0ZXIiOiJuLTQ3MjcyNjM2N2FlMWM2YmM5NGIwNzUwMiJ9",
+    "returned_count": 5,
+    "total_count": 17,
+    "truncated": true,
+    "work_complete": true
+  },
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "records": [
+    {
+      "access_flags": 1,
+      "body": "changed",
+      "canonical_node_id": "n-2489eca9d21aa72f67a1559a",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/io/InputStream;Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-b46ef75cb683daf927dfd487",
+        "name": "extract"
+      },
+      "node_id": "n-2489eca9d21aa72f67a1559a",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 16,
+        "line_start": 13,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 2,
+      "body": "bytecode",
+      "canonical_node_id": "n-2b17b3780912e7ca913276e7",
+      "method": {
+        "class": "fx.dep.Paths2",
+        "class_sha256": "sha256:0de4e5ff239683b26dc0907cb20315443be69925c0dc5b02bd992dfc0a741b9d",
+        "descriptor": "()V",
+        "instance_id": "c-2e6c5aec0b4760bc",
+        "method_id": "m-27d7f326efba625b2f55ca6a",
+        "name": "\u003cinit\u003e"
+      },
+      "node_id": "n-2b17b3780912e7ca913276e7",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 7,
+        "line_start": 7,
+        "path": "fx/dep/Paths2.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 4,
+      "body": "bytecode",
+      "canonical_node_id": "n-2de67a82796ef0432c11cde0",
+      "method": {
+        "class": "fx.research.DeletingHandler",
+        "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-bc4ee339ac6e04db7c11626f",
+        "name": "handle"
+      },
+      "node_id": "n-2de67a82796ef0432c11cde0",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 11,
+        "line_start": 10,
+        "path": "fx/research/DeletingHandler.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 2,
+      "body": "bytecode",
+      "canonical_node_id": "n-330b76dd37f4267ea64405c5",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-58cd4dd1fe7f9c9e423d3f54",
+        "name": "unused"
+      },
+      "node_id": "n-330b76dd37f4267ea64405c5",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 26,
+        "line_start": 25,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-472726367ae1c6bc94b07502",
+      "method": {
+        "class": "fx.research.internal.Cleaner",
+        "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-5ce223ad006c1037a2e43955",
+        "name": "wipe"
+      },
+      "node_id": "n-472726367ae1c6bc94b07502",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 12,
+        "line_start": 11,
+        "path": "fx/research/internal/Cleaner.java",
+        "source_sha256": null
+      }
+    }
+  ],
+  "request_id": "methods-page1",
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": []
+}

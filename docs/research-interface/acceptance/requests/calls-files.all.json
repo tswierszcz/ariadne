@@ -1,0 +1,9 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "filters": {
+    "declared_class_prefix": "java.nio.file.Files"
+  },
+  "operation": "calls",
+  "request_id": "calls-files",
+  "schema_version": "ariadne-research-query-1"
+}

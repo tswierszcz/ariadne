@@ -1,0 +1,87 @@
+{
+  "analysis_id": "sha256:66c2833f3ba19984a3b2c469ecda61e4c5c9437e14cac2724ec514a5004ed49c",
+  "operation": "reachability",
+  "request_id": "reach-cases",
+  "roots": {
+    "selection": "indexed"
+  },
+  "schema_version": "ariadne-research-query-1",
+  "targets": [
+    {
+      "id": "a-write",
+      "selector": {
+        "class": "fx.research.Extractor",
+        "descriptor": "(Ljava/nio/file/Path;[B)V",
+        "instance_id": "c-647467be3ca085f1",
+        "name": "writeEntry"
+      }
+    },
+    {
+      "id": "a-write-by-id",
+      "method_id": "m-10abdb8a73df52cf7851492e"
+    },
+    {
+      "id": "b-unused",
+      "selector": {
+        "class": "fx.research.Extractor",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "name": "unused"
+      }
+    },
+    {
+      "id": "d-save-bytes",
+      "selector": {
+        "class": "fx.research.Extractor",
+        "descriptor": "([B)V",
+        "instance_id": "c-647467be3ca085f1",
+        "name": "save"
+      }
+    },
+    {
+      "id": "e-wipe",
+      "selector": {
+        "class": "fx.research.internal.Cleaner",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "name": "wipe"
+      }
+    },
+    {
+      "id": "f-resolve",
+      "selector": {
+        "class": "fx.dep.Paths2",
+        "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;",
+        "instance_id": "c-2e6c5aec0b4760bc",
+        "name": "resolve"
+      }
+    },
+    {
+      "id": "g-legacy",
+      "selector": {
+        "class": "fx.dep.Paths2",
+        "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;",
+        "instance_id": "c-2e6c5aec0b4760bc",
+        "name": "legacyResolve"
+      }
+    },
+    {
+      "id": "h-safe-shadowed",
+      "selector": {
+        "class": "fx.dep.Paths2",
+        "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;",
+        "instance_id": "c-3f12b7b765c8133e",
+        "name": "safeResolve"
+      }
+    },
+    {
+      "id": "i-absent",
+      "selector": {
+        "class": "fx.research.Extractor",
+        "descriptor": "()V",
+        "instance_id": "c-647467be3ca085f1",
+        "name": "absent"
+      }
+    }
+  ]
+}

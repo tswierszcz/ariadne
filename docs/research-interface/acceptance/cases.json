@@ -1,0 +1,1930 @@
+{
+  "schema": "ariadne-research-acceptance-1",
+  "contract_revision": "1.0.0-draft.1",
+  "producer": {
+    "binary_sha256": "sha256:95700242cc9c05b37b747d6238e014780dd3692071a66324a4c5290c8567c5cc",
+    "built_by": "go1.27.4",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "bundles": {
+    "all": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+    "reachable": "sha256:66c2833f3ba19984a3b2c469ecda61e4c5c9437e14cac2724ec514a5004ed49c"
+  },
+  "rules": [
+    "json",
+    "shape",
+    "version",
+    "binding",
+    "error-envelope",
+    "page",
+    "record-type",
+    "record-original",
+    "neighbor",
+    "target-order",
+    "resolution",
+    "search-state",
+    "entry-count",
+    "model",
+    "limits",
+    "root-basis",
+    "path-root",
+    "path-continuity",
+    "path-end",
+    "path-character",
+    "path-pass",
+    "path-dispatch",
+    "evidence-original",
+    "evidence-missing",
+    "evidence-extra",
+    "replay"
+  ],
+  "cases": [
+    {
+      "id": "reach-cases.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "responses/reach-cases.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "EXPECTED.MD cases a-i; in the reachable bundle g-legacy (a dependency method nothing reaches) resolves as missing, b-unused stays (the input's own methods are in scope)"
+    },
+    {
+      "id": "reach-cases.all--duplicate-member",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--duplicate-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "json"
+      ],
+      "note": "a repeated top-level member"
+    },
+    {
+      "id": "reach-cases.all--unknown-member",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--unknown-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "shape"
+      ],
+      "note": "an extra top-level member"
+    },
+    {
+      "id": "reach-cases.all--wrong-analysis",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--wrong-analysis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "analysis_id of another bundle"
+    },
+    {
+      "id": "reach-cases.all--wrong-request-id",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--wrong-request-id.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "request_id of another request"
+    },
+    {
+      "id": "reach-cases.all--wrong-origin",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--wrong-origin.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "provenance of another producer build"
+    },
+    {
+      "id": "reach-cases.all--wrong-revision",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--wrong-revision.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "version"
+      ],
+      "note": "another contract revision"
+    },
+    {
+      "id": "reach-cases.all--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-cases.all--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-cases.all--not-found-to-found",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--not-found-to-found.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "a not_found target claimed found without a path"
+    },
+    {
+      "id": "reach-cases.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-cases.all--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-cases.all--path-gap",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--path-gap.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a middle node and its edge removed from a path"
+    },
+    {
+      "id": "reach-cases.all--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-cases.all--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-cases.all--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-cases.all--character-dropped",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-cases.all--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-cases.all--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-cases.all--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-cases.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-cases.all--targets-reordered",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--targets-reordered.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "target-order"
+      ],
+      "note": "results not in the request's target order"
+    },
+    {
+      "id": "reach-cases.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-cases.reachable",
+      "kind": "response",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "responses/reach-cases.reachable.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "EXPECTED.MD cases a-i; in the reachable bundle g-legacy (a dependency method nothing reaches) resolves as missing, b-unused stays (the input's own methods are in scope)"
+    },
+    {
+      "id": "reach-cases.reachable--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-cases.reachable--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-cases.reachable--not-found-to-found",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--not-found-to-found.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "a not_found target claimed found without a path"
+    },
+    {
+      "id": "reach-cases.reachable--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-cases.reachable--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-cases.reachable--path-gap",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--path-gap.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a middle node and its edge removed from a path"
+    },
+    {
+      "id": "reach-cases.reachable--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-cases.reachable--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-cases.reachable--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-cases.reachable--character-dropped",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-cases.reachable--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-cases.reachable--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-cases.reachable--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-cases.reachable--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-cases.reachable--targets-reordered",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--targets-reordered.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "target-order"
+      ],
+      "note": "results not in the request's target order"
+    },
+    {
+      "id": "reach-cases.reachable--root-basis",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-subset.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "responses/reach-subset.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "roots limited to Extractor#extract"
+    },
+    {
+      "id": "reach-subset.all--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-subset.all--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-subset.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-subset.all--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-subset.all--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-subset.all--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-subset.all--character-dropped",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-subset.all--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-subset.all--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-subset.all--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-subset.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-subset.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-truncated-entries.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "responses/reach-truncated-entries.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "shortened presentation: one entry of several shown, the total kept"
+    },
+    {
+      "id": "reach-truncated-entries.all--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-truncated-entries.all--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-truncated-entries.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-truncated-entries.all--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-truncated-entries.all--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-truncated-entries.all--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-truncated-entries.all--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-truncated-entries.all--character-dropped",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-truncated-entries.all--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-truncated-entries.all--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-truncated-entries.all--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-truncated-entries.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-truncated-entries.all--targets-reordered",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--targets-reordered.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "target-order"
+      ],
+      "note": "results not in the request's target order"
+    },
+    {
+      "id": "reach-truncated-entries.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-truncated-paths.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "responses/reach-truncated-paths.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "shortened paths: Cleaner#wipe's paths cut at two nodes, full_node_count kept"
+    },
+    {
+      "id": "reach-truncated-paths.all--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-truncated-paths.all--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-truncated-paths.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-truncated-paths.all--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-truncated-paths.all--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-truncated-paths.all--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-truncated-paths.all--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-truncated-paths.all--character-dropped",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-truncated-paths.all--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-truncated-paths.all--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-truncated-paths.all--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-truncated-paths.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-truncated-paths.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-budget-before.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-before.all.json",
+      "response": "responses/reach-budget-before.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "budget ends before any path: incomplete, total null"
+    },
+    {
+      "id": "reach-budget-before.all--unknown-count-zeroed",
+      "kind": "mutation",
+      "base": "reach-budget-before.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-before.all.json",
+      "response": "mutations/reach-budget-before.all--unknown-count-zeroed.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "entry-count"
+      ],
+      "note": "an unknown total_entry_count (null) turned into 0"
+    },
+    {
+      "id": "reach-budget-before.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-budget-before.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-before.all.json",
+      "response": "mutations/reach-budget-before.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-budget-before.all--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-budget-before.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-before.all.json",
+      "response": "mutations/reach-budget-before.all--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-budget-before.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-budget-before.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-before.all.json",
+      "response": "mutations/reach-budget-before.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-budget-before.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-budget-before.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-before.all.json",
+      "response": "mutations/reach-budget-before.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-budget-after.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "responses/reach-budget-after.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "budget ends after a witness: found with an incomplete search (smallest budget that gives it)"
+    },
+    {
+      "id": "reach-budget-after.all--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-budget-after.all--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-budget-after.all--unknown-count-zeroed",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--unknown-count-zeroed.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "entry-count"
+      ],
+      "note": "an unknown total_entry_count (null) turned into 0"
+    },
+    {
+      "id": "reach-budget-after.all--budget-claimed-complete",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--budget-claimed-complete.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "entry-count"
+      ],
+      "note": "a search the budget ended reported complete, count still unknown"
+    },
+    {
+      "id": "reach-budget-after.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-budget-after.all--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-budget-after.all--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-budget-after.all--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-budget-after.all--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-budget-after.all--character-dropped",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-budget-after.all--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-budget-after.all--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-budget-after.all--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-budget-after.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-budget-after.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-budget-after.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-budget-after.all.json",
+      "response": "mutations/reach-budget-after.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "entries.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "responses/entries.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "every indexed root"
+    },
+    {
+      "id": "entries.all--duplicate-member",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--duplicate-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "json"
+      ],
+      "note": "a repeated top-level member"
+    },
+    {
+      "id": "entries.all--unknown-member",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--unknown-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "shape"
+      ],
+      "note": "an extra top-level member"
+    },
+    {
+      "id": "entries.all--wrong-analysis",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--wrong-analysis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "analysis_id of another bundle"
+    },
+    {
+      "id": "entries.all--wrong-request-id",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--wrong-request-id.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "request_id of another request"
+    },
+    {
+      "id": "entries.all--wrong-origin",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--wrong-origin.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "provenance of another producer build"
+    },
+    {
+      "id": "entries.all--wrong-revision",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--wrong-revision.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "version"
+      ],
+      "note": "another contract revision"
+    },
+    {
+      "id": "entries.all--record-modified",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "entries.all--record-dropped",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "entries.all--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "entries.reachable",
+      "kind": "response",
+      "bundle": "bundle-reachable",
+      "request": "requests/entries.reachable.json",
+      "response": "responses/entries.reachable.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "every indexed root"
+    },
+    {
+      "id": "entries.reachable--record-modified",
+      "kind": "mutation",
+      "base": "entries.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/entries.reachable.json",
+      "response": "mutations/entries.reachable--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "entries.reachable--record-dropped",
+      "kind": "mutation",
+      "base": "entries.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/entries.reachable.json",
+      "response": "mutations/entries.reachable--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "entries.reachable--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "entries.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/entries.reachable.json",
+      "response": "mutations/entries.reachable--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "entries-filtered.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/entries-filtered.all.json",
+      "response": "responses/entries-filtered.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "class_prefix filter"
+    },
+    {
+      "id": "entries-filtered.all--record-modified",
+      "kind": "mutation",
+      "base": "entries-filtered.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries-filtered.all.json",
+      "response": "mutations/entries-filtered.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "entries-filtered.all--record-dropped",
+      "kind": "mutation",
+      "base": "entries-filtered.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries-filtered.all.json",
+      "response": "mutations/entries-filtered.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "entries-filtered.all--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "entries-filtered.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries-filtered.all.json",
+      "response": "mutations/entries-filtered.all--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "methods-page1.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page1.all.json",
+      "response": "responses/methods-page1.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "first page, truncated, with a cursor"
+    },
+    {
+      "id": "methods-page1.all--record-modified",
+      "kind": "mutation",
+      "base": "methods-page1.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page1.all.json",
+      "response": "mutations/methods-page1.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "methods-page1.all--record-dropped",
+      "kind": "mutation",
+      "base": "methods-page1.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page1.all.json",
+      "response": "mutations/methods-page1.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "methods-page1.all--truncated-without-cursor",
+      "kind": "mutation",
+      "base": "methods-page1.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page1.all.json",
+      "response": "mutations/methods-page1.all--truncated-without-cursor.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a truncated page with no cursor"
+    },
+    {
+      "id": "methods-page2.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page2.all.json",
+      "response": "responses/methods-page2.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "second page through the cursor"
+    },
+    {
+      "id": "methods-page2.all--record-modified",
+      "kind": "mutation",
+      "base": "methods-page2.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page2.all.json",
+      "response": "mutations/methods-page2.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "methods-page2.all--record-dropped",
+      "kind": "mutation",
+      "base": "methods-page2.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page2.all.json",
+      "response": "mutations/methods-page2.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "methods-page2.all--truncated-without-cursor",
+      "kind": "mutation",
+      "base": "methods-page2.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page2.all.json",
+      "response": "mutations/methods-page2.all--truncated-without-cursor.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a truncated page with no cursor"
+    },
+    {
+      "id": "calls-files.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/calls-files.all.json",
+      "response": "responses/calls-files.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "JDK operations the library calls"
+    },
+    {
+      "id": "calls-files.all--record-modified",
+      "kind": "mutation",
+      "base": "calls-files.all",
+      "bundle": "bundle-all",
+      "request": "requests/calls-files.all.json",
+      "response": "mutations/calls-files.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "calls-files.all--record-dropped",
+      "kind": "mutation",
+      "base": "calls-files.all",
+      "bundle": "bundle-all",
+      "request": "requests/calls-files.all.json",
+      "response": "mutations/calls-files.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "calls-files.all--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "calls-files.all",
+      "bundle": "bundle-all",
+      "request": "requests/calls-files.all.json",
+      "response": "mutations/calls-files.all--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "callers-write.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/callers-write.all.json",
+      "response": "responses/callers-write.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "incoming edges of Extractor#writeEntry"
+    },
+    {
+      "id": "callers-write.all--record-modified",
+      "kind": "mutation",
+      "base": "callers-write.all",
+      "bundle": "bundle-all",
+      "request": "requests/callers-write.all.json",
+      "response": "mutations/callers-write.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "callers-write.all--record-dropped",
+      "kind": "mutation",
+      "base": "callers-write.all",
+      "bundle": "bundle-all",
+      "request": "requests/callers-write.all.json",
+      "response": "mutations/callers-write.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "callers-write.all--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "callers-write.all",
+      "bundle": "bundle-all",
+      "request": "requests/callers-write.all.json",
+      "response": "mutations/callers-write.all--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "callers-write.all--unrelated-edge",
+      "kind": "mutation",
+      "base": "callers-write.all",
+      "bundle": "bundle-all",
+      "request": "requests/callers-write.all.json",
+      "response": "mutations/callers-write.all--unrelated-edge.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "neighbor"
+      ],
+      "note": "an edge of another node in place of the first record"
+    },
+    {
+      "id": "callees-extract.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/callees-extract.all.json",
+      "response": "responses/callees-extract.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "outgoing edges of Extractor#extract"
+    },
+    {
+      "id": "callees-extract.all--record-modified",
+      "kind": "mutation",
+      "base": "callees-extract.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-extract.all.json",
+      "response": "mutations/callees-extract.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "callees-extract.all--record-dropped",
+      "kind": "mutation",
+      "base": "callees-extract.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-extract.all.json",
+      "response": "mutations/callees-extract.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "callees-extract.all--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "callees-extract.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-extract.all.json",
+      "response": "mutations/callees-extract.all--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "callees-extract.all--unrelated-edge",
+      "kind": "mutation",
+      "base": "callees-extract.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-extract.all.json",
+      "response": "mutations/callees-extract.all--unrelated-edge.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "neighbor"
+      ],
+      "note": "an edge of another node in place of the first record"
+    },
+    {
+      "id": "error-unknown-node.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/error-unknown-node.all.json",
+      "response": "responses/error-unknown-node.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "error envelope: unknown node"
+    },
+    {
+      "id": "error-unknown-node.all--duplicate-member",
+      "kind": "mutation",
+      "base": "error-unknown-node.all",
+      "bundle": "bundle-all",
+      "request": "requests/error-unknown-node.all.json",
+      "response": "mutations/error-unknown-node.all--duplicate-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "json"
+      ],
+      "note": "a repeated top-level member"
+    },
+    {
+      "id": "error-unknown-node.all--unknown-member",
+      "kind": "mutation",
+      "base": "error-unknown-node.all",
+      "bundle": "bundle-all",
+      "request": "requests/error-unknown-node.all.json",
+      "response": "mutations/error-unknown-node.all--unknown-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "shape"
+      ],
+      "note": "an extra top-level member"
+    },
+    {
+      "id": "error-unknown-node.all--missing-error-code",
+      "kind": "mutation",
+      "base": "error-unknown-node.all",
+      "bundle": "bundle-all",
+      "request": "requests/error-unknown-node.all.json",
+      "response": "mutations/error-unknown-node.all--missing-error-code.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "shape"
+      ],
+      "note": "the error object without its code"
+    },
+    {
+      "id": "error-analysis.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/error-analysis.all.json",
+      "response": "responses/error-analysis.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "error envelope: request names another analysis"
+    }
+  ]
+}

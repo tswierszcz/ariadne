@@ -1,0 +1,37 @@
+{
+  "schema_version": "ariadne-research-response-1",
+  "contract_revision": "1.0.0-draft.1",
+  "status": "ok",
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "request_id": "entries-filtered",
+  "operation": "entries",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "effective_limits": {
+    "max_records": 100,
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_work_units": 1000000
+  },
+  "warnings": [],
+  "records": [
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-472726367ae1c6bc94b07502",
+      "record_type": "root",
+      "root_id": "r-a035ebaa0e603fe6699dad88"
+    }
+  ],
+  "page": {
+    "returned_count": 1,
+    "total_count": 1,
+    "next_cursor": null,
+    "truncated": false,
+    "work_complete": true
+  }
+}
