@@ -18,6 +18,10 @@
 //   - in a Spring Boot application, Spring beans whose class is a
 //     Servlet/Filter (a stereotype class or a @Bean method's declared
 //     return type — Boot registers every Servlet/Filter bean);
+//   - servlets/filters registered in code at start-up
+//     (ServletContext#addServlet/addFilter in a ServletContainerInitializer
+//     or a class of its @HandlesTypes types — Spring's
+//     WebApplicationInitializer; s3, see programmatic.go);
 //   - a fixed catalog of Spring Boot auto-configurations that register a
 //     servlet or filter (DispatcherServlet, the character-encoding,
 //     form-content and request-context filters, Spring Security's
@@ -53,7 +57,7 @@ const ModelID = "servlet-container:dispatch"
 
 // Version versions the model's semantics (signatures, registration sources,
 // Spring Boot catalog). Snapshots record it.
-const Version = "s2"
+const Version = "s3"
 
 // MaxChain is how many model iterations one dispatch can need: the
 // container's Servlet#service edge, then HttpServlet#service(Http...), then
@@ -97,6 +101,11 @@ type Bean struct {
 type Inputs struct {
 	WebXMLServlets, WebXMLFilters []string
 	Beans                         []Bean
+	// Programmatic are the registrations FindProgrammatic found
+	// (ServletContext#addServlet/addFilter run at start-up), and
+	// ProgrammaticUnresolved those it could not name.
+	Programmatic           []Registration
+	ProgrammaticUnresolved []Unresolved
 }
 
 type api struct {
@@ -156,7 +165,7 @@ func Register(registry *models.Registry) {
 	})
 	registry.Register(&models.Model{
 		ID:         ModelID,
-		Source:     "Servlet specification (Servlet#service, Filter#doFilter, HttpServlet template methods) dispatched to the servlets/filters registered by web.xml, @WebServlet/@WebFilter, Spring beans and Spring Boot auto-configuration",
+		Source:     "Servlet specification (Servlet#service, Filter#doFilter, HttpServlet template methods) dispatched to the servlets/filters registered by web.xml, @WebServlet/@WebFilter, ServletContext#addServlet/addFilter at start-up (ServletContainerInitializer, @HandlesTypes), Spring beans and Spring Boot auto-configuration",
 		Signatures: list,
 	})
 }
@@ -241,6 +250,9 @@ func Find(h *hierarchy.Hierarchy, in Inputs) ([]Registration, []Unresolved) {
 	for _, c := range in.WebXMLFilters {
 		add(c, KindFilter, "web.xml")
 	}
+	for _, r := range in.Programmatic {
+		add(r.Class, r.Kind, r.Basis)
+	}
 	for _, fqcn := range h.SortedFQCNs() {
 		ci, _ := h.Lookup(fqcn)
 		if !ci.IsApp {
@@ -260,7 +272,7 @@ func Find(h *hierarchy.Hierarchy, in Inputs) ([]Registration, []Unresolved) {
 	// (a filter bean needs a DelegatingFilterProxy), so beans count only
 	// in a Boot application.
 	excluded, boot := bootApplication(h)
-	var unresolved []Unresolved
+	unresolved := append([]Unresolved(nil), in.ProgrammaticUnresolved...)
 	for _, b := range in.Beans {
 		if !boot {
 			break

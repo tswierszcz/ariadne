@@ -442,7 +442,14 @@ func (it *interp) stepCall(st *absState, op classfile.LocalOp) string {
 		case op.CallOwner == classOwner && op.CallName == "forName":
 			reason = "Class.forName target is not statically known (class-name argument not a literal)"
 		}
-		st.push(valueflow.Unknown(reason), op.Width)
+		u := valueflow.Unknown(reason)
+		if op.CallKind == classfile.CallVirtual || op.CallKind == classfile.CallInterface {
+			// The declared return type (an upper bound) for consumers
+			// that can use one (servlet-container:dispatch s3, a
+			// factory method returning an abstract servlet type).
+			u.Type = refReturnType(op.CallDesc)
+		}
+		st.push(u, op.Width)
 	}
 	return ""
 }
@@ -520,4 +527,14 @@ func IsTaskReturn(desc string) bool {
 
 func isServiceLoaderTraceOwner(owner string) bool {
 	return owner == "java.util.ServiceLoader" || owner == "java.util.ServiceLoader$Provider" || owner == "java.util.Iterator" || owner == "java.util.Optional" || owner == "java.util.Spliterator" || owner == "java.util.stream.BaseStream" || strings.HasPrefix(owner, "java.util.stream.")
+}
+
+// refReturnType is the class a method descriptor returns ("" for a
+// primitive, void or an array).
+func refReturnType(desc string) string {
+	i := strings.LastIndexByte(desc, ')')
+	if i < 0 || i+2 >= len(desc) || desc[i+1] != 'L' {
+		return ""
+	}
+	return strings.ReplaceAll(desc[i+2:len(desc)-1], "/", ".")
 }

@@ -69,7 +69,7 @@ Wywołania na typach JDK i `javax` nie są rozwijane przez CHA, bo JDK połączy
 
 - inicjalizacja klas (`<clinit>`), lambdy i referencje metod (wywołania SAM), MethodHandle,
 - refleksja ze znanymi nazwami (literały, wartości wpływające do wywołania, konfiguracja),
-- ServiceLoader i JPMS `provides`, dispatch sterowników i obiektów JDBC, dispatch kontenera servletów,
+- ServiceLoader i JPMS `provides`, dispatch sterowników i obiektów JDBC, dispatch kontenera servletów (do servletów i filtrów z `web.xml`, `@WebServlet`/`@WebFilter`, Spring Boota oraz tych, które kod startowy rejestruje przez `ServletContext#addServlet`/`addFilter`),
 - proxy frameworków (repozytoria Spring Data, mappery MyBatis, proxy transakcyjne), advice Spring AOP, zdarzenia Springa, JPA,
 - callbacki i wykonanie asynchroniczne (wątki, executory, CompletableFuture, listenery, reactive),
 - punkty wejścia deserializacji i kandydaci łańcuchów gadgetów.

@@ -872,9 +872,28 @@ func prepare(ctx context.Context, cfg config, stdout io.Writer) (_ *staticRun, e
 	for _, b := range springBeanMethods {
 		servletBeans = append(servletBeans, servletdispatch.Bean{Class: b.FQCN, Detail: "@Bean " + b.Name, Method: "@Bean " + b.Name})
 	}
-	servletRegs, servletUnresolved := servletdispatch.Find(h, servletdispatch.Inputs{WebXMLServlets: servletClasses, WebXMLFilters: filterClasses, Beans: servletBeans})
-	log("servlet dispatch (%s): %d registered servlets/filters%s, %d registrations of unknown class",
-		servletdispatch.Version, len(servletRegs), servletRegistrationSummary(servletRegs), len(servletUnresolved))
+	// s3: what start-up code registers (ServletContainerInitializers from
+	// META-INF/services and the classes of their @HandlesTypes types).
+	var initializers []string
+	for _, r := range svcRegs {
+		if servletdispatch.IsInitializerService(r.Interface) && r.ProviderFound {
+			initializers = append(initializers, r.ProviderClass)
+		}
+	}
+	sort.Strings(initializers)
+	startupClasses := servletdispatch.StartupClasses(h, initializers)
+	var progRegs []servletdispatch.Registration
+	var progUnresolved []servletdispatch.Unresolved
+	if len(startupClasses) > 0 {
+		progIdx := dataflow.NewCallerIndex(h)
+		progIdx.SetOptions(dataflow.CallerOptions{VirtualCallers: true, Direct: true, MaxFacts: 4096})
+		progRegs, progUnresolved = servletdispatch.FindProgrammatic(h, progIdx, startupClasses)
+		progIdx.Close()
+	}
+	servletRegs, servletUnresolved := servletdispatch.Find(h, servletdispatch.Inputs{WebXMLServlets: servletClasses, WebXMLFilters: filterClasses, Beans: servletBeans,
+		Programmatic: progRegs, ProgrammaticUnresolved: progUnresolved})
+	log("servlet dispatch (%s): %d registered servlets/filters%s, %d registrations of unknown class; start-up: %d initializers, %d start-up classes, %d registrations in code",
+		servletdispatch.Version, len(servletRegs), servletRegistrationSummary(servletRegs), len(servletUnresolved), len(initializers), len(startupClasses), len(progRegs))
 
 	// FRAMEWORKS F3's own first slice: proxy/target/interceptor
 	// identity only — no new call-graph edge (see aop.FindProxyHandlers'
@@ -1673,6 +1692,9 @@ func prepare(ctx context.Context, cfg config, stdout io.Writer) (_ *staticRun, e
 		deserJava, deserXStream, deserSites, svcLoadSites, reflectNewInstanceSites, reflectNewInstanceEdgeTargets)
 	for _, r := range servletRegs {
 		allocIn.Container = append(allocIn.Container, alloc.ContainerBean{Class: r.Class, Detail: string(r.Kind) + " registration (" + r.Basis + ")"})
+	}
+	for _, c := range startupClasses {
+		allocIn.Container = append(allocIn.Container, alloc.ContainerBean{Class: c.Class, Detail: "start-up class (" + c.Detail + ")"})
 	}
 	allocCatalog := alloc.Build(allocIn)
 	allocSummary := alloc.Summarize(allocCatalog, g)
