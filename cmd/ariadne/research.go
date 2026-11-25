@@ -264,6 +264,35 @@ func (s *staticRun) research(cfg config) researchState {
 		activeProfs: s.activeProfiles, fixedPoint: s.modelResult, disabled: analysis.Labels(s.disabledParts)}
 }
 
+// embeddedLimit names the embedded library candidates that were not
+// identified: their classes stay in the host's component, so nothing in the
+// records tells them apart. reference_unavailable is the offline case — the
+// reference jar is neither in -cache-dir nor in ARIADNE_MAVEN_LOCAL.
+func embeddedLimit(inv *component.Inventory) string {
+	byStatus := map[string][]string{}
+	n := 0
+	for _, e := range inv.Embedded {
+		if e.Kind != component.EmbeddedLibrary || e.Status == component.EmbeddedConfirmed || e.Status == component.EmbeddedVersionCandidates {
+			continue
+		}
+		byStatus[e.Status] = append(byStatus[e.Status], e.GAV.String())
+		n++
+	}
+	if n == 0 {
+		return ""
+	}
+	var parts []string
+	for st, gavs := range byStatus {
+		parts = append(parts, st+": "+strings.Join(sortedUnique(gavs), ", "))
+	}
+	sort.Strings(parts)
+	l := fmt.Sprintf("Embedded components: %d library candidates not identified (%s); whatever classes of theirs the host carries are attributed to the host component.", n, strings.Join(parts, "; "))
+	if len(byStatus[component.EmbeddedReferenceUnavailable]) > 0 {
+		l += " reference_unavailable: the reference jar is in neither -cache-dir nor ARIADNE_MAVEN_LOCAL (research index does not use the network)."
+	}
+	return l
+}
+
 func rid(prefix string, parts ...string) string {
 	s := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return prefix + hex.EncodeToString(s[:12])
@@ -310,6 +339,9 @@ func writeResearchBundle(st researchState, log func(string, ...any)) (string, er
 	artifactLoc := map[string]string{}
 	for _, a := range inv.Artifacts {
 		artifactLoc[a.ID] = a.Location
+	}
+	if l := embeddedLimit(inv); l != "" {
+		limits = append(limits, l)
 	}
 	frameworkInst := map[string]bool{}
 	for _, in := range inv.Instances {

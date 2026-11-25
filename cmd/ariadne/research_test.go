@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"ariadne/internal/component"
+	"ariadne/internal/input"
 	"ariadne/internal/research"
 )
 
@@ -352,4 +354,26 @@ func writeZipOf(t *testing.T, dir, out string) {
 	})
 	zw.Close()
 	f.Close()
+}
+
+// RI1: embedded library candidates that were not identified are named in
+// coverage.limits; confirmed ones and modules of the host are not.
+func TestResearchEmbeddedLimit(t *testing.T) {
+	gav := func(a, v string) input.GAV { return input.GAV{Group: "g", Artifact: a, Version: v} }
+	inv := &component.Inventory{Embedded: []component.Embedded{
+		{Kind: component.EmbeddedLibrary, GAV: gav("ok", "1"), Status: component.EmbeddedConfirmed},
+		{Kind: component.EmbeddedLibrary, GAV: gav("cand", "1"), Status: component.EmbeddedVersionCandidates},
+		{Kind: component.EmbeddedModule, GAV: gav("mod", "1")},
+		{Kind: component.EmbeddedLibrary, GAV: gav("b", "2"), Status: component.EmbeddedReferenceUnavailable},
+		{Kind: component.EmbeddedLibrary, GAV: gav("a", "1"), Status: component.EmbeddedReferenceUnavailable},
+		{Kind: component.EmbeddedLibrary, GAV: gav("c", "3"), Status: component.EmbeddedPartial},
+	}}
+	got := embeddedLimit(inv)
+	want := "Embedded components: 3 library candidates not identified (partial: g:c:3; reference_unavailable: g:a:1, g:b:2); whatever classes of theirs the host carries are attributed to the host component. reference_unavailable: the reference jar is in neither -cache-dir nor ARIADNE_MAVEN_LOCAL (research index does not use the network)."
+	if got != want {
+		t.Fatalf("limit:\n got %s\nwant %s", got, want)
+	}
+	if l := embeddedLimit(&component.Inventory{Embedded: inv.Embedded[:3]}); l != "" {
+		t.Fatalf("all identified, got limit %q", l)
+	}
 }
