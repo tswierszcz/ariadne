@@ -2,7 +2,7 @@
   "schema_version": "ariadne-research-response-1",
   "contract_revision": "1.0.0-draft.1",
   "status": "error",
-  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
   "request_id": "error-unknown-node",
   "operation": "callers",
   "error": {

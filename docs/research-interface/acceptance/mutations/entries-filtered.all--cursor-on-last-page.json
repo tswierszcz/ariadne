@@ -1,5 +1,5 @@
 {
-  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
   "contract_revision": "1.0.0-draft.1",
   "effective_limits": {
     "max_entries": 20,
@@ -10,17 +10,25 @@
   "operation": "entries",
   "page": {
     "next_cursor": "c1.bogus",
-    "returned_count": 1,
-    "total_count": 1,
+    "returned_count": 2,
+    "total_count": 2,
     "truncated": false,
     "work_complete": true
   },
   "provenance": {
     "kind": "analysis",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
   },
   "records": [
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-e0303fd5c8ec2bdb82abd5bd",
+      "record_type": "root",
+      "root_id": "r-8a1d414d21c94ca64b91f0f4"
+    },
     {
       "announced_by": [],
       "basis": "public_api",

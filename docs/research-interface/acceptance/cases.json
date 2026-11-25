@@ -2,14 +2,14 @@
   "schema": "ariadne-research-acceptance-1",
   "contract_revision": "1.0.0-draft.1",
   "producer": {
-    "binary_sha256": "sha256:95700242cc9c05b37b747d6238e014780dd3692071a66324a4c5290c8567c5cc",
+    "binary_sha256": "sha256:bff6c0b73d27d46d4f63d25cc04b5854f3631392476d47d22810c58ecaea1bd7",
     "built_by": "go1.27.4",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
   },
   "bundles": {
-    "all": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
-    "reachable": "sha256:66c2833f3ba19984a3b2c469ecda61e4c5c9437e14cac2724ec514a5004ed49c"
+    "all": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
+    "reachable": "sha256:4f786ec4c1f0719a983dee9d125a2b43319aec6cdd70b103e0f29d3b1ed91219"
   },
   "rules": [
     "json",
@@ -259,6 +259,32 @@
       "note": "an edge character removed from an entry"
     },
     {
+      "id": "reach-cases.all--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-cases.all--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-cases.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-cases.all.json",
+      "response": "mutations/reach-cases.all--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
       "id": "reach-cases.all--pass-unknown",
       "kind": "mutation",
       "base": "reach-cases.all",
@@ -477,6 +503,32 @@
       "note": "an edge character removed from an entry"
     },
     {
+      "id": "reach-cases.reachable--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-cases.reachable--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-cases.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-cases.reachable.json",
+      "response": "mutations/reach-cases.reachable--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
       "id": "reach-cases.reachable--pass-unknown",
       "kind": "mutation",
       "base": "reach-cases.reachable",
@@ -553,6 +605,608 @@
         "root-basis"
       ],
       "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-dispatch.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "responses/reach-dispatch.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "cases j and k: client dispatch (Drains#drain, Pipeline#run), a caller-supplied field (Relay#send), a parameter of the entry itself (Drains#hand, lb2-7: false, stated in warnings), a conditional callback (Workers#recover)"
+    },
+    {
+      "id": "reach-dispatch.all--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-dispatch.all--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-dispatch.all--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-dispatch.all--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-dispatch.all--path-gap",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--path-gap.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a middle node and its edge removed from a path"
+    },
+    {
+      "id": "reach-dispatch.all--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-dispatch.all--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-dispatch.all--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-dispatch.all--character-dropped",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-dispatch.all--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-dispatch.all--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-dispatch.all--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-dispatch.all--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-dispatch.all--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-dispatch.all--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-dispatch.all--targets-reordered",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--targets-reordered.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "target-order"
+      ],
+      "note": "results not in the request's target order"
+    },
+    {
+      "id": "reach-dispatch.all--root-basis",
+      "kind": "mutation",
+      "base": "reach-dispatch.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-dispatch.all.json",
+      "response": "mutations/reach-dispatch.all--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "reach-dispatch.reachable",
+      "kind": "response",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "responses/reach-dispatch.reachable.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "cases j and k: client dispatch (Drains#drain, Pipeline#run), a caller-supplied field (Relay#send), a parameter of the entry itself (Drains#hand, lb2-7: false, stated in warnings), a conditional callback (Workers#recover)"
+    },
+    {
+      "id": "reach-dispatch.reachable--missing-with-path",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--missing-with-path.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "resolution"
+      ],
+      "note": "a found target declared missing, its path kept"
+    },
+    {
+      "id": "reach-dispatch.reachable--found-without-entries",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--found-without-entries.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "search-state"
+      ],
+      "note": "found with the path evidence removed"
+    },
+    {
+      "id": "reach-dispatch.reachable--work-over-budget",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--work-over-budget.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "limits"
+      ],
+      "note": "work units above max_work_units"
+    },
+    {
+      "id": "reach-dispatch.reachable--model-complete-with-gaps",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--model-complete-with-gaps.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "model"
+      ],
+      "note": "complete_under_declared_model with relevant gaps"
+    },
+    {
+      "id": "reach-dispatch.reachable--path-gap",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--path-gap.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a middle node and its edge removed from a path"
+    },
+    {
+      "id": "reach-dispatch.reachable--path-edge-swapped",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--path-edge-swapped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-continuity"
+      ],
+      "note": "a path edge replaced by an edge between other nodes"
+    },
+    {
+      "id": "reach-dispatch.reachable--path-cut-silently",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--path-cut-silently.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-end"
+      ],
+      "note": "the last step removed, the path still marked complete"
+    },
+    {
+      "id": "reach-dispatch.reachable--path-wrong-root",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--path-wrong-root.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-root"
+      ],
+      "note": "an entry's root replaced by another node of its path"
+    },
+    {
+      "id": "reach-dispatch.reachable--character-dropped",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--character-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-character"
+      ],
+      "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-dispatch.reachable--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-dispatch.reachable--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-dispatch.reachable--pass-unknown",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--pass-unknown.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-pass"
+      ],
+      "note": "an entry's pass outside app_only/full"
+    },
+    {
+      "id": "reach-dispatch.reachable--evidence-modified",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--evidence-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-original"
+      ],
+      "note": "an evidence edge's character changed"
+    },
+    {
+      "id": "reach-dispatch.reachable--evidence-dropped",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--evidence-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-missing"
+      ],
+      "note": "an edge of a path missing from the evidence"
+    },
+    {
+      "id": "reach-dispatch.reachable--evidence-duplicated",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--evidence-duplicated.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "evidence-extra"
+      ],
+      "note": "an evidence record repeated"
+    },
+    {
+      "id": "reach-dispatch.reachable--targets-reordered",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--targets-reordered.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "target-order"
+      ],
+      "note": "results not in the request's target order"
+    },
+    {
+      "id": "reach-dispatch.reachable--root-basis",
+      "kind": "mutation",
+      "base": "reach-dispatch.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/reach-dispatch.reachable.json",
+      "response": "mutations/reach-dispatch.reachable--root-basis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "root-basis"
+      ],
+      "note": "root_basis not matching the request's roots"
+    },
+    {
+      "id": "callees-later.all",
+      "kind": "response",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "responses/callees-later.all.json",
+      "expected_valid": true,
+      "expected_rules": [],
+      "note": "case k: Workers#later's callback edges, the exceptional condition only on recover's site"
+    },
+    {
+      "id": "callees-later.all--duplicate-member",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--duplicate-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "json"
+      ],
+      "note": "a repeated top-level member"
+    },
+    {
+      "id": "callees-later.all--unknown-member",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--unknown-member.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "shape"
+      ],
+      "note": "an extra top-level member"
+    },
+    {
+      "id": "callees-later.all--wrong-analysis",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--wrong-analysis.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "analysis_id of another bundle"
+    },
+    {
+      "id": "callees-later.all--wrong-request-id",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--wrong-request-id.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "request_id of another request"
+    },
+    {
+      "id": "callees-later.all--wrong-origin",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--wrong-origin.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "provenance of another producer build"
+    },
+    {
+      "id": "callees-later.all--wrong-revision",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--wrong-revision.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "version"
+      ],
+      "note": "another contract revision"
+    },
+    {
+      "id": "callees-later.all--record-modified",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--record-modified.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-original"
+      ],
+      "note": "a record member changed"
+    },
+    {
+      "id": "callees-later.all--record-dropped",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--record-dropped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "returned_count no longer counts the records"
+    },
+    {
+      "id": "callees-later.all--cursor-on-last-page",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--cursor-on-last-page.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "page"
+      ],
+      "note": "a cursor on an untruncated page"
+    },
+    {
+      "id": "callees-later.all--unrelated-edge",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--unrelated-edge.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "neighbor"
+      ],
+      "note": "an edge of another node in place of the first record"
     },
     {
       "id": "reach-subset.all",
@@ -654,6 +1308,32 @@
         "path-character"
       ],
       "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-subset.all--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-subset.all--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-subset.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-subset.all.json",
+      "response": "mutations/reach-subset.all--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
     },
     {
       "id": "reach-subset.all--pass-unknown",
@@ -833,6 +1513,32 @@
         "path-character"
       ],
       "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-truncated-entries.all--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-truncated-entries.all--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-truncated-entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-entries.all.json",
+      "response": "mutations/reach-truncated-entries.all--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
     },
     {
       "id": "reach-truncated-entries.all--pass-unknown",
@@ -1025,6 +1731,32 @@
         "path-character"
       ],
       "note": "an edge character removed from an entry"
+    },
+    {
+      "id": "reach-truncated-paths.all--client-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--client-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's client_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
+    },
+    {
+      "id": "reach-truncated-paths.all--supplied-dispatch-flipped",
+      "kind": "mutation",
+      "base": "reach-truncated-paths.all",
+      "bundle": "bundle-all",
+      "request": "requests/reach-truncated-paths.all.json",
+      "response": "mutations/reach-truncated-paths.all--supplied-dispatch-flipped.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "path-dispatch"
+      ],
+      "note": "an entry's supplied_dispatch flipped (CONTRACT.md §9: every path from the root decides it)"
     },
     {
       "id": "reach-truncated-paths.all--pass-unknown",
@@ -1380,84 +2112,6 @@
       "expected_valid": true,
       "expected_rules": [],
       "note": "every indexed root"
-    },
-    {
-      "id": "entries.all--duplicate-member",
-      "kind": "mutation",
-      "base": "entries.all",
-      "bundle": "bundle-all",
-      "request": "requests/entries.all.json",
-      "response": "mutations/entries.all--duplicate-member.json",
-      "expected_valid": false,
-      "expected_rules": [
-        "json"
-      ],
-      "note": "a repeated top-level member"
-    },
-    {
-      "id": "entries.all--unknown-member",
-      "kind": "mutation",
-      "base": "entries.all",
-      "bundle": "bundle-all",
-      "request": "requests/entries.all.json",
-      "response": "mutations/entries.all--unknown-member.json",
-      "expected_valid": false,
-      "expected_rules": [
-        "shape"
-      ],
-      "note": "an extra top-level member"
-    },
-    {
-      "id": "entries.all--wrong-analysis",
-      "kind": "mutation",
-      "base": "entries.all",
-      "bundle": "bundle-all",
-      "request": "requests/entries.all.json",
-      "response": "mutations/entries.all--wrong-analysis.json",
-      "expected_valid": false,
-      "expected_rules": [
-        "binding"
-      ],
-      "note": "analysis_id of another bundle"
-    },
-    {
-      "id": "entries.all--wrong-request-id",
-      "kind": "mutation",
-      "base": "entries.all",
-      "bundle": "bundle-all",
-      "request": "requests/entries.all.json",
-      "response": "mutations/entries.all--wrong-request-id.json",
-      "expected_valid": false,
-      "expected_rules": [
-        "binding"
-      ],
-      "note": "request_id of another request"
-    },
-    {
-      "id": "entries.all--wrong-origin",
-      "kind": "mutation",
-      "base": "entries.all",
-      "bundle": "bundle-all",
-      "request": "requests/entries.all.json",
-      "response": "mutations/entries.all--wrong-origin.json",
-      "expected_valid": false,
-      "expected_rules": [
-        "binding"
-      ],
-      "note": "provenance of another producer build"
-    },
-    {
-      "id": "entries.all--wrong-revision",
-      "kind": "mutation",
-      "base": "entries.all",
-      "bundle": "bundle-all",
-      "request": "requests/entries.all.json",
-      "response": "mutations/entries.all--wrong-revision.json",
-      "expected_valid": false,
-      "expected_rules": [
-        "version"
-      ],
-      "note": "another contract revision"
     },
     {
       "id": "entries.all--record-modified",

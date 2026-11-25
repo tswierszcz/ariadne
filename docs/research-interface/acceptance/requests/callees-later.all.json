@@ -1,0 +1,7 @@
+{
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
+  "node_id": "n-fa28b945dbf0a60fbe2fb336",
+  "operation": "callees",
+  "request_id": "callees-later",
+  "schema_version": "ariadne-research-query-1"
+}

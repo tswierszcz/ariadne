@@ -1,0 +1,158 @@
+{
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_records": 100,
+    "max_work_units": 1000000
+  },
+  "evidence": [
+    {
+      "class": "fx.research.Extractor",
+      "class_id": "k-2727bffe2f6efab32f25f53f",
+      "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-2727bffe2f6efab32f25f53f",
+      "variant_java": 0
+    },
+    {
+      "artifact_sha256": "sha256:57f9746f81537b867e2f251179474e6a7986d4717f87b99f55839b2c259ba91b",
+      "gav": null,
+      "identity": "unidentified",
+      "instance_id": "c-cc24b8d02788eb22",
+      "location": "app:lib.jar",
+      "record_type": "component",
+      "role": "library"
+    },
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-2804e9a664bc8f6868c69db0",
+      "from": "n-2489eca9d21aa72f67a1559a",
+      "kind": "virtual",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-2489eca9d21aa72f67a1559a",
+          "condition": null,
+          "kind": "virtual",
+          "pc": 32
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-d6646a64788165a24f419991"
+    },
+    {
+      "access_flags": 1,
+      "body": "bytecode",
+      "canonical_node_id": "n-2489eca9d21aa72f67a1559a",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/io/InputStream;Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-408093a821dbc22e8481d533",
+        "name": "extract"
+      },
+      "node_id": "n-2489eca9d21aa72f67a1559a",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 16,
+        "line_start": 13,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 2,
+      "body": "bytecode",
+      "canonical_node_id": "n-d6646a64788165a24f419991",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/nio/file/Path;[B)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-549ee05ee290c5d6ab92eae5",
+        "name": "writeEntry"
+      },
+      "node_id": "n-d6646a64788165a24f419991",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 21,
+        "line_start": 20,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    }
+  ],
+  "operation": "reachability",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
+  },
+  "request_id": "reach-subset",
+  "results": [
+    {
+      "entries": [
+        {
+          "character": [
+            "jvm_rule"
+          ],
+          "client_dispatch": true,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-2804e9a664bc8f6868c69db0"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-2489eca9d21aa72f67a1559a",
+              "n-d6646a64788165a24f419991"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-2489eca9d21aa72f67a1559a",
+          "supplied_dispatch": false
+        }
+      ],
+      "entries_truncated": false,
+      "matched_node_ids": [
+        "n-d6646a64788165a24f419991"
+      ],
+      "model": {
+        "global_gap_count": 6,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [],
+        "scope_uncertain": false,
+        "state": "complete_under_declared_model"
+      },
+      "resolution": "matched",
+      "root_basis": "subset_on_indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 41
+      },
+      "target_id": "a-write",
+      "total_entry_count": 1
+    }
+  ],
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": [
+    "supplied_dispatch covers objects the caller supplies through a library field; a call on a parameter of the entry method itself (LIBRARY_MODE lb2-7) is not reflected, so an entry whose paths all go through such a call shows supplied_dispatch false"
+  ]
+}

@@ -18,8 +18,8 @@ The generator is [scripts/research-acceptance.sh](../../scripts/research-accepta
 
 | Directory | Scope | Records |
 |---|---|---|
-| `bundle-all` | `-scope all` | @ALL@ |
-| `bundle-reachable` | `-scope reachable` | @REACH@ |
+| `bundle-all` | `-scope all` | 184 |
+| `bundle-reachable` | `-scope reachable` | 172 |
 
 It then answers every request in [requests.json](../../testdata/research/acceptance/requests.json) with that binary.
 

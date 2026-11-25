@@ -1,0 +1,666 @@
+{
+  "analysis_id": "sha256:4f786ec4c1f0719a983dee9d125a2b43319aec6cdd70b103e0f29d3b1ed91219",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_records": 100,
+    "max_work_units": 1000000
+  },
+  "evidence": [
+    {
+      "class": "fx.research.Pipeline",
+      "class_id": "k-07aed1cec8b4eb25e6d2a953",
+      "class_sha256": "sha256:b2457b3785dc6549f668f6d67eb9f0becb865c01021cf4b7c1ac21288344cef4",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-07aed1cec8b4eb25e6d2a953",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.PurgingSink",
+      "class_id": "k-1468bb2ca26e7de4a8609c13",
+      "class_sha256": "sha256:d25791df298bafb09e4e1ff6bbd429bab90fa6d212b2bf062d430350807fc767",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-1468bb2ca26e7de4a8609c13",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.Relay",
+      "class_id": "k-91f47ab1f1852f39c073ffac",
+      "class_sha256": "sha256:98b956cca718927aef192449092582effa8ada9c8bbebc077aa126ece4768fcc",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-91f47ab1f1852f39c073ffac",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.internal.Cleaner",
+      "class_id": "k-9b73036a70d5d1f902b82916",
+      "class_sha256": "sha256:764eec10f949f63b9fe7759b069cb63430c2495d22878a42acdeac60eb283a4f",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-9b73036a70d5d1f902b82916",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.Workers",
+      "class_id": "k-9f7cd8ba21c0a66b520ee15a",
+      "class_sha256": "sha256:103963ebe792a64649ca9d9b7faf603fb17652474a8d1e2e324b876db10edeb9",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-9f7cd8ba21c0a66b520ee15a",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.Drains",
+      "class_id": "k-d7bee489b22457c215e6787a",
+      "class_sha256": "sha256:70485b1f6015454500604cf28511204541c15c8caa7c17dbd3560a357395d86e",
+      "instance_id": "c-cc24b8d02788eb22",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-d7bee489b22457c215e6787a",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.dep.Purger",
+      "class_id": "k-d9ace8dc6e8d7f1e9fd44025",
+      "class_sha256": "sha256:0d5f53c1e5cdc1532963f38938108ab9b921bacf948dc6cac57e5f36f492528d",
+      "instance_id": "c-efea9694f7c8279a",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-d9ace8dc6e8d7f1e9fd44025",
+      "variant_java": 0
+    },
+    {
+      "artifact_sha256": "sha256:57f9746f81537b867e2f251179474e6a7986d4717f87b99f55839b2c259ba91b",
+      "gav": null,
+      "identity": "unidentified",
+      "instance_id": "c-cc24b8d02788eb22",
+      "location": "app:lib.jar",
+      "record_type": "component",
+      "role": "library"
+    },
+    {
+      "artifact_sha256": "sha256:602d79a514dac8c2a97712f62b09340c8a65bd7ab488b9cfc407f95ebac683be",
+      "gav": "fx.test:fx-dep:1.0",
+      "identity": "identified",
+      "instance_id": "c-efea9694f7c8279a",
+      "location": "deps:fx-dep-1.0.jar",
+      "record_type": "component",
+      "role": "dependency"
+    },
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-155822e12af3e906383d1f8c",
+      "from": "n-fa28b945dbf0a60fbe2fb336",
+      "kind": "dynamic",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-fa28b945dbf0a60fbe2fb336",
+          "condition": null,
+          "kind": "dynamic",
+          "pc": 11
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-c17cc56eee8a0b66244ca734"
+    },
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-15e2d2a983bf325d52db44ed",
+      "from": "n-30b0b70da72251ae24792a10",
+      "kind": "static",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-30b0b70da72251ae24792a10",
+          "condition": null,
+          "kind": "static",
+          "pc": 1
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-e0303fd5c8ec2bdb82abd5bd"
+    },
+    {
+      "basis": "cha",
+      "character": "heuristic",
+      "client_dispatch": false,
+      "edge_id": "e-32132f7621fced7775f1383d",
+      "from": "n-7fd2bc510afcf88573ea0c91",
+      "kind": "interface",
+      "record_type": "edge",
+      "rule": "cha@6",
+      "sites": [
+        {
+          "caller_node_id": "n-7fd2bc510afcf88573ea0c91",
+          "condition": null,
+          "kind": "interface",
+          "pc": 2
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-4b35152185437ee36b753f81"
+    },
+    {
+      "basis": "cha",
+      "character": "heuristic",
+      "client_dispatch": true,
+      "edge_id": "e-3dbeb34177cb03829ca7abd5",
+      "from": "n-19f007c34dacfc1117f1c75a",
+      "kind": "interface",
+      "record_type": "edge",
+      "rule": "cha@6",
+      "sites": [
+        {
+          "caller_node_id": "n-19f007c34dacfc1117f1c75a",
+          "condition": null,
+          "kind": "interface",
+          "pc": 2
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-30b0b70da72251ae24792a10"
+    },
+    {
+      "basis": "cha",
+      "character": "heuristic",
+      "client_dispatch": true,
+      "edge_id": "e-6382aefb49210da8a43715b5",
+      "from": "n-b6e452cf0d19652c0b46bfc7",
+      "kind": "interface",
+      "record_type": "edge",
+      "rule": "cha@6",
+      "sites": [
+        {
+          "caller_node_id": "n-b6e452cf0d19652c0b46bfc7",
+          "condition": null,
+          "kind": "interface",
+          "pc": 5
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-30b0b70da72251ae24792a10"
+    },
+    {
+      "basis": "cha",
+      "character": "heuristic",
+      "client_dispatch": false,
+      "edge_id": "e-e69c1243bf6e9ad43647bce3",
+      "from": "n-984e5610f8913dbbda9e0f77",
+      "kind": "interface",
+      "record_type": "edge",
+      "rule": "cha@6",
+      "sites": [
+        {
+          "caller_node_id": "n-984e5610f8913dbbda9e0f77",
+          "condition": null,
+          "kind": "interface",
+          "pc": 5
+        }
+      ],
+      "supplied_dispatch": true,
+      "to": "n-4b35152185437ee36b753f81"
+    },
+    {
+      "candidate_instance_ids": null,
+      "candidate_method_ids": null,
+      "gap_id": "g-524eaea924f847821476bf8d",
+      "mechanism": "reflection",
+      "reachable_from_indexed_roots": true,
+      "reason": "Unresolved reflection site in fx.research.Extractor#plugin: no bounded set of targets.",
+      "record_type": "gap",
+      "rule": "gaps.reflection@b0",
+      "site": {
+        "caller_node_id": "n-992e77530d704c699491704a",
+        "condition": null,
+        "kind": "implicit",
+        "pc": 0
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-19f007c34dacfc1117f1c75a",
+      "method": {
+        "class": "fx.research.Drains",
+        "class_sha256": "sha256:70485b1f6015454500604cf28511204541c15c8caa7c17dbd3560a357395d86e",
+        "descriptor": "(Lfx/research/Sink;Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-e454ce0ce9677886e05e1b7a",
+        "name": "drain"
+      },
+      "node_id": "n-19f007c34dacfc1117f1c75a",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 11,
+        "line_start": 10,
+        "path": "fx/research/Drains.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 1,
+      "body": "bytecode",
+      "canonical_node_id": "n-30b0b70da72251ae24792a10",
+      "method": {
+        "class": "fx.research.PurgingSink",
+        "class_sha256": "sha256:d25791df298bafb09e4e1ff6bbd429bab90fa6d212b2bf062d430350807fc767",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-5b13655a4e0ed88d4447c9c1",
+        "name": "accept"
+      },
+      "node_id": "n-30b0b70da72251ae24792a10",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 13,
+        "line_start": 12,
+        "path": "fx/research/PurgingSink.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 1,
+      "body": "bytecode",
+      "canonical_node_id": "n-4b35152185437ee36b753f81",
+      "method": {
+        "class": "fx.dep.Purger",
+        "class_sha256": "sha256:0d5f53c1e5cdc1532963f38938108ab9b921bacf948dc6cac57e5f36f492528d",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-efea9694f7c8279a",
+        "method_id": "m-8f0a77e2aac7897e6e7a406b",
+        "name": "call"
+      },
+      "node_id": "n-4b35152185437ee36b753f81",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 11,
+        "line_start": 10,
+        "path": "fx/dep/Purger.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-7fd2bc510afcf88573ea0c91",
+      "method": {
+        "class": "fx.research.Drains",
+        "class_sha256": "sha256:70485b1f6015454500604cf28511204541c15c8caa7c17dbd3560a357395d86e",
+        "descriptor": "(Lfx/dep/Callback;Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-32e5bc78b60590895ca5dcb3",
+        "name": "hand"
+      },
+      "node_id": "n-7fd2bc510afcf88573ea0c91",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 16,
+        "line_start": 15,
+        "path": "fx/research/Drains.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 1,
+      "body": "bytecode",
+      "canonical_node_id": "n-984e5610f8913dbbda9e0f77",
+      "method": {
+        "class": "fx.research.Relay",
+        "class_sha256": "sha256:98b956cca718927aef192449092582effa8ada9c8bbebc077aa126ece4768fcc",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-e920e696e8ccec55edbb6cdb",
+        "name": "send"
+      },
+      "node_id": "n-984e5610f8913dbbda9e0f77",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 16,
+        "line_start": 15,
+        "path": "fx/research/Relay.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 1,
+      "body": "bytecode",
+      "canonical_node_id": "n-b6e452cf0d19652c0b46bfc7",
+      "method": {
+        "class": "fx.research.Pipeline",
+        "class_sha256": "sha256:b2457b3785dc6549f668f6d67eb9f0becb865c01021cf4b7c1ac21288344cef4",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-5b605bccebe0de69ee282085",
+        "name": "run"
+      },
+      "node_id": "n-b6e452cf0d19652c0b46bfc7",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 15,
+        "line_start": 14,
+        "path": "fx/research/Pipeline.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 8,
+      "body": "bytecode",
+      "canonical_node_id": "n-c17cc56eee8a0b66244ca734",
+      "method": {
+        "class": "fx.research.Workers",
+        "class_sha256": "sha256:103963ebe792a64649ca9d9b7faf603fb17652474a8d1e2e324b876db10edeb9",
+        "descriptor": "(Ljava/lang/Throwable;)Ljava/nio/file/Path;",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-3e147cc8277acf8d80ad8742",
+        "name": "recover"
+      },
+      "node_id": "n-c17cc56eee8a0b66244ca734",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 20,
+        "line_start": 20,
+        "path": "fx/research/Workers.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-e0303fd5c8ec2bdb82abd5bd",
+      "method": {
+        "class": "fx.research.internal.Cleaner",
+        "class_sha256": "sha256:764eec10f949f63b9fe7759b069cb63430c2495d22878a42acdeac60eb283a4f",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-737b66cf5f8d4357cb7c13e7",
+        "name": "purge"
+      },
+      "node_id": "n-e0303fd5c8ec2bdb82abd5bd",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 17,
+        "line_start": 16,
+        "path": "fx/research/internal/Cleaner.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-fa28b945dbf0a60fbe2fb336",
+      "method": {
+        "class": "fx.research.Workers",
+        "class_sha256": "sha256:103963ebe792a64649ca9d9b7faf603fb17652474a8d1e2e324b876db10edeb9",
+        "descriptor": "(Ljava/util/concurrent/CompletableFuture;)Ljava/util/concurrent/CompletableFuture;",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-6c2e5402f083598b1871003c",
+        "name": "later"
+      },
+      "node_id": "n-fa28b945dbf0a60fbe2fb336",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 12,
+        "line_start": 11,
+        "path": "fx/research/Workers.java",
+        "source_sha256": null
+      }
+    }
+  ],
+  "operation": "reachability",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
+  },
+  "request_id": "reach-dispatch",
+  "results": [
+    {
+      "entries": [
+        {
+          "character": [
+            "jvm_rule",
+            "heuristic"
+          ],
+          "client_dispatch": true,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-3dbeb34177cb03829ca7abd5"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-19f007c34dacfc1117f1c75a",
+              "n-30b0b70da72251ae24792a10"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-19f007c34dacfc1117f1c75a",
+          "supplied_dispatch": false
+        },
+        {
+          "character": [
+            "jvm_rule",
+            "heuristic"
+          ],
+          "client_dispatch": true,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-6382aefb49210da8a43715b5",
+              "e-15e2d2a983bf325d52db44ed"
+            ],
+            "full_node_count": 3,
+            "node_ids": [
+              "n-b6e452cf0d19652c0b46bfc7",
+              "n-30b0b70da72251ae24792a10",
+              "n-e0303fd5c8ec2bdb82abd5bd"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-b6e452cf0d19652c0b46bfc7",
+          "supplied_dispatch": false
+        },
+        {
+          "character": [],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [],
+            "full_node_count": 1,
+            "node_ids": [
+              "n-e0303fd5c8ec2bdb82abd5bd"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-e0303fd5c8ec2bdb82abd5bd",
+          "supplied_dispatch": false
+        }
+      ],
+      "entries_truncated": false,
+      "matched_node_ids": [
+        "n-e0303fd5c8ec2bdb82abd5bd"
+      ],
+      "model": {
+        "global_gap_count": 6,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 115
+      },
+      "target_id": "j-purge",
+      "total_entry_count": 3
+    },
+    {
+      "entries": [
+        {
+          "character": [
+            "heuristic"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-32132f7621fced7775f1383d"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-7fd2bc510afcf88573ea0c91",
+              "n-4b35152185437ee36b753f81"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-7fd2bc510afcf88573ea0c91",
+          "supplied_dispatch": false
+        },
+        {
+          "character": [
+            "heuristic"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-e69c1243bf6e9ad43647bce3"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-984e5610f8913dbbda9e0f77",
+              "n-4b35152185437ee36b753f81"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-984e5610f8913dbbda9e0f77",
+          "supplied_dispatch": true
+        }
+      ],
+      "entries_truncated": false,
+      "matched_node_ids": [
+        "n-4b35152185437ee36b753f81"
+      ],
+      "model": {
+        "global_gap_count": 6,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 25
+      },
+      "target_id": "j-purger",
+      "total_entry_count": 2
+    },
+    {
+      "entries": [
+        {
+          "character": [
+            "jvm_rule"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-155822e12af3e906383d1f8c"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-fa28b945dbf0a60fbe2fb336",
+              "n-c17cc56eee8a0b66244ca734"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-fa28b945dbf0a60fbe2fb336",
+          "supplied_dispatch": false
+        }
+      ],
+      "entries_truncated": false,
+      "matched_node_ids": [
+        "n-c17cc56eee8a0b66244ca734"
+      ],
+      "model": {
+        "global_gap_count": 6,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 24
+      },
+      "target_id": "k-recover",
+      "total_entry_count": 1
+    }
+  ],
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": [
+    "supplied_dispatch covers objects the caller supplies through a library field; a call on a parameter of the entry method itself (LIBRARY_MODE lb2-7) is not reflected, so an entry whose paths all go through such a call shows supplied_dispatch false"
+  ]
+}

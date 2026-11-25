@@ -1,7 +1,7 @@
 {
   "schema_version": "ariadne-research-bundle-1",
   "contract_revision": "1.0.0-draft.1",
-  "analysis_id": "sha256:66c2833f3ba19984a3b2c469ecda61e4c5c9437e14cac2724ec514a5004ed49c",
+  "analysis_id": "sha256:4f786ec4c1f0719a983dee9d125a2b43319aec6cdd70b103e0f29d3b1ed91219",
   "identity_path": "identity.json",
-  "created_at": "2026-11-25T09:07:06Z"
+  "created_at": "2026-11-25T09:20:03Z"
 }
