@@ -54,10 +54,20 @@ runs can use `-offline`.
 | What you have | `-app` | `-deps` |
 |---|---|---|
 | Maven build | `target/classes` or the built jar | `mvn dependency:copy-dependencies -DincludeScope=runtime` output; add `-deps-list` from `mvn dependency:list` |
-| Gradle build | the built jar or `build/classes/java/main` | copy the runtime classpath with `scripts/gradle-copy-deps.init.gradle` (also writes a `-deps-list` file) |
+| Gradle build | `build/classes/java/main` (for Spring Boot, not the fat jar together with `-deps`) | copy the runtime classpath with `scripts/gradle-copy-deps.init.gradle` (also writes a `-deps-list` file) |
 | Spring Boot fat jar | the fat jar | not needed (`BOOT-INF/lib` is read) |
 | WAR / EAR | the archive | not needed (`WEB-INF/lib`, EAR modules); `-deps-list` still helps identify jars |
 | A library (jar others depend on) | the library jar | its runtime dependencies; use `-roots api` (see [Library mode](#library-mode)) |
+
+For a Gradle build (single module; run per subproject in a multi-module build):
+
+```bash
+./gradlew classes
+./gradlew -I /path/to/ariadne/scripts/gradle-copy-deps.init.gradle ariadneCopyDeps ariadneDepsList \
+  -PariadneOutputDir=$PWD/build/ariadne-deps -PariadneDepsListFile=$PWD/build/ariadne-deps.txt
+bin/ariadne -app build/classes/java/main -deps build/ariadne-deps -deps-list build/ariadne-deps.txt \
+  -out report.md -json results.json
+```
 
 `-deps-list` identifies jars that carry no `pom.properties`. Without identification a jar is
 analyzed but cannot be matched to advisories.

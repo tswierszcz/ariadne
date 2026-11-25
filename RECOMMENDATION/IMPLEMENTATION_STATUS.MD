@@ -2,6 +2,11 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Kontrola po dniu zmian i sprawdzenie README (2026-11-25)
+
+- Regresja: `scripts/pipeline-compare.sh 0c6f4f6 2297bf6` (stan sprzed zmian dnia — wydzielenie `prepare`, klasyfikator `n4-1`, RI6, `rerun` — wobec `main` po #167): 7/7 konfiguracji identycznych (Petclinic all/profile/RTA, WebGoat, JPetStore, fixture biblioteki CHA/PTA).
+- README sprawdzony w działaniu: kody wyjścia (0 / 1 bez zapisanych plików / 2 dla złych flag), polecenia `research index` (z `-scope reachable`, `-sources`, odmowa istniejącego `-out`), `query` (także `-verify full`, ta sama odpowiedź), `check -replay` (`valid`, `identical`), przykład trybu biblioteki na fixture (`exposed_api`, `supplied_by`, sekcja „Exposed API”). Poprawka: dopisany pełny przykład Gradle z `scripts/gradle-copy-deps.init.gradle`; `-app` to katalog klas (`build/classes/java/main`), nie fat jar razem z `-deps`.
+
 ## Porządki w dokumentacji (2026-11-25)
 
 - Na prośbę użytkownika: zbędne pliki przeniesione do [`archive/2026-11-25/docs/`](../archive/2026-11-25/docs/README-2026-11-25.md) — `PLAN.md`, `FAQ.md`, `FAQ_PL.MD`, `AUDIT.MD`, dotychczasowy `README.md` (jako `README-2026-11-25.md`, z pełnym opisem modeli i pomiarów), `docs/llm-test-report.md` z `docs/llm-run/`, źródłowa rekomendacja `RECOMMENDATION/MD` (jako `RECOMMENDATION-source.MD`). Linki we wszystkich plikach Markdown przepisane automatycznie (linki do sekcji starego README prowadzą do archiwum), martwe linki w starszych archiwach naprawione; sprawdzenie: żaden link względny nie jest martwy.
