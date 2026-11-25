@@ -323,7 +323,10 @@ type Value struct {
 	// type `new`/`anewarray`/`multianewarray` itself names, not a claim
 	// about the object's contents; ASYNC_CALLBACKS A1's own first
 	// consumer, to tell which concrete Runnable/Callable a registration
-	// call's argument actually is).
+	// call's argument actually is). On a KindUnknown value it may hold
+	// the declared reference return type of the virtual/interface call
+	// that produced it — an upper bound only, never a claim about the
+	// object (servlet-container:dispatch s3's factory methods).
 	Type string
 
 	// Parameter is set only for a KindTyped value created while an

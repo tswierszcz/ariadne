@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ariadne/internal/callgraph"
+	"ariadne/internal/classfile"
 	"ariadne/internal/hierarchy"
 )
 
@@ -213,6 +214,34 @@ func TestNameableClasses(t *testing.T) {
 	}
 	if got["rt.Shape"] || got["rt.Scanned"] {
 		t.Error("an interface/annotation type is in the fallback (only concrete classes can be created)")
+	}
+}
+
+// TestNameableSkipsSynthetic: a class named only in a synthetic member's
+// descriptor (javac's access$NNN accessor of a nested class, an outer
+// this$0 field) is not nameable; a real parameter or field type is.
+func TestNameableSkipsSynthetic(t *testing.T) {
+	h := hierarchy.NewForTesting([]*hierarchy.ClassInfo{
+		{FQCN: "p.Outer$Visitor", Methods: []hierarchy.Method{
+			{Method: classfile.Method{Name: "access$300", Descriptor: "(Lp/Outer$Visitor;)I", AccessFlags: classfile.AccStatic | classfile.AccSynthetic}},
+		}},
+		{FQCN: "p.Inner", Fields: []classfile.Field{
+			{Name: "this$0", Descriptor: "Lp/Outer;", AccessFlags: classfile.AccFinal | classfile.AccSynthetic},
+		}},
+		{FQCN: "p.Outer"},
+		{FQCN: "p.Dto"},
+		{FQCN: "p.Service", Methods: []hierarchy.Method{
+			{Method: classfile.Method{Name: "save", Descriptor: "(Lp/Dto;)V", AccessFlags: classfile.AccPublic}},
+		}},
+	})
+	got := map[string]bool{}
+	for _, c := range nameableClasses(h) {
+		got[c] = true
+	}
+	for c, want := range map[string]bool{"p.Outer$Visitor": false, "p.Outer": false, "p.Dto": true} {
+		if got[c] != want {
+			t.Errorf("%s nameable %v, want %v", c, got[c], want)
+		}
 	}
 }
 

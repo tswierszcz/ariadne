@@ -69,7 +69,7 @@ Calls on JDK and `javax` types are not expanded by CHA, because the JDK would ot
 
 - class initialization (`<clinit>`), lambdas and method references (SAM calls), MethodHandles,
 - reflection with known names (literals, values that flow into the call, configuration),
-- ServiceLoader and JPMS `provides`, JDBC driver and object dispatch, servlet container dispatch,
+- ServiceLoader and JPMS `provides`, JDBC driver and object dispatch, servlet container dispatch (to the servlets and filters of `web.xml`, `@WebServlet`/`@WebFilter`, Spring Boot, and those start-up code registers with `ServletContext#addServlet`/`addFilter`),
 - framework proxies (Spring Data repositories, MyBatis mappers, transactional proxies), Spring AOP advice, Spring events, JPA,
 - callbacks and asynchronous execution (threads, executors, CompletableFuture, listeners, reactive),
 - deserialization entry points and candidate gadget chains.

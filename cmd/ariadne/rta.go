@@ -87,8 +87,13 @@ func rtaInputs(h *hierarchy.Hierarchy, g *callgraph.Graph, c alloc.Catalog, root
 // input), classes carrying a class-level annotation (what frameworks
 // scan for: entities, components, DTOs), and classes used as a field,
 // parameter or return type (what binders, ORMs and serializers
-// instantiate from member types). Not covered: a class named only in a
-// resource or configuration file, or only in a generic signature.
+// instantiate from member types). Synthetic members (javac's access$NNN
+// accessors, this$0/val$ fields, lambda bodies, bridges) do not count:
+// binders and serializers skip them, and an accessor's own class in its
+// descriptor would make every nested class with private members
+// nameable (jsoup's Cleaner$CleaningVisitor in Lavagna, 2026-11-25). Not
+// covered: a class named only in a resource or configuration file, or
+// only in a generic signature.
 func nameableClasses(h *hierarchy.Hierarchy) []string {
 	named := map[string]bool{}
 	addDesc := func(desc string) {
@@ -116,10 +121,14 @@ func nameableClasses(h *hierarchy.Hierarchy) []string {
 			}
 		}
 		for _, f := range ci.Fields {
-			addDesc(f.Descriptor)
+			if f.AccessFlags&classfile.AccSynthetic == 0 {
+				addDesc(f.Descriptor)
+			}
 		}
 		for _, m := range ci.Methods {
-			addDesc(m.Descriptor)
+			if m.AccessFlags&classfile.AccSynthetic == 0 {
+				addDesc(m.Descriptor)
+			}
 		}
 	}
 	var out []string

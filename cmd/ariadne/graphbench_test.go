@@ -34,6 +34,12 @@ var benchFixtures = []benchFixture{
 	{name: "servlet", jar: "../../testdata/servletdispatch/sd.war", observed: "../../testdata/servletdispatch/observed.txt",
 		main: "sd.Oracle#main([Ljava/lang/String;)V", pkg: "sd.", trace: "sd.Ran#here", bodyColumn: 0,
 		neverReached: []string{"sd.UnusedServlet#", "sd.UnusedFilter#"}},
+	{name: "servletprog", jar: "../../testdata/servletprog/sp.war", observed: "../../testdata/servletprog/observed.txt",
+		main: "sp.Oracle#main([Ljava/lang/String;)V", pkg: "sp.", trace: "sp.Ran#here", bodyColumn: 0,
+		// The ghosts' bodies: CHA does reach GhostServlet's constructor
+		// (Startup#onStartup expands to the abstract UnusedStartup's body),
+		// but nothing registers it, so the container never dispatches to it.
+		neverReached: []string{"sp.GhostServlet#service", "sp.GhostFilter#doFilter"}},
 }
 
 func (f benchFixture) observedBodies(t *testing.T) map[string]bool {
