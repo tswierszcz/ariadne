@@ -82,7 +82,7 @@ Gotowe, gdy model usługi może wprowadzić typ, który uruchamia kolejne popraw
 | R2 | REFLECTION R0–R2; DYNAMIC L0–L2; FRAMEWORK F0–F2 | B2–B3 oraz modele wejść. | Podstawowa refleksja, uchwyty i ograniczony model frameworka. |
 | R3 | SERVICE S3, FRAMEWORK F3–F4; DATA_FLOW D3; GRAPH_PRECISION P0–P2 | Dostępne modele typów tworzonych pośrednio. | JPMS, więcej wejść, streszczenia między metodami, eksperymentalne RTA. |
 | R4 | DATA_FLOW D4–D5; DESERIALIZATION Z0–Z3 | Zweryfikowane źródła/sinki i przepływ wartości. | Ścieżki danych i modele wejść deserializacji. |
-| R5 | RUNTIME N0–N4 | B0–B1 i CVE F3 dla powtarzalnych dowodów. | Import śladów, opcjonalny agent, jawne granice native. |
+| R5 | RUNTIME N0–N4 — **DONE for this scope (2026-11-25), [zarchiwizowane](../archive/2026-11-25/runtime_native/COMPLETION.md)** | B0–B1 i CVE F3 dla powtarzalnych dowodów. | Import śladów, opcjonalny agent, jawne granice native. |
 | R6 | GRAPH_PRECISION P3–P4; dalsze modele pozostałych torów | Wyniki pomiarów wcześniejszych wydań. | Analiza możliwych obiektów i szersze modele, jeśli uzasadnia je benchmark. |
 | ~~Osobny pilot~~ | ~~ECOSYSTEMS E0–E4~~ — **wycofane 2026-11-25** | — | Go poza Ariadne: oddzielne rozwiązanie AriadneGO ([archiwum](../archive/2026-11-25/ecosystems/WITHDRAWN.md)). |
 

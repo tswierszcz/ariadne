@@ -1,6 +1,6 @@
 # Runtime, dynamiczne klasy i JNI — rekomendacja funkcjonalna
 
-Status: plan. Fazy: [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD). Ocena podatności wydania JDK pozostaje w [CVE](../archive/2026-11-23/cve/CVE.MD).
+Status: **DONE for this scope (2026-11-25), zarchiwizowane** — zob. [COMPLETION.md](COMPLETION.md). Dawniej: plan. Fazy: [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD). Ocena podatności wydania JDK pozostaje w [CVE](../../../archive/2026-11-23/cve/CVE.MD).
 
 ## Cel i stan obecny
 

@@ -21,6 +21,11 @@ prośbę użytkownika dotyczącą jego treści.
 interfejs RI z procesem Tekmerion, określa wspólne kamienie milowe H0–H5 i
 akceptację dowodów po adaptacji `cloudflare/security-audit-skill`.
 
+**Runtime, dynamiczne klasy i JNI — DONE for this scope (2026-11-25).** Dawne `RUNTIME_NATIVE.MD`/
+`RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD` są zarchiwizowane w
+[`archive/2026-11-25/runtime_native/`](../archive/2026-11-25/runtime_native/COMPLETION.md) (`COMPLETION.md`
+tam: stan faz N0–N5, pomiary i warunki wznowienia N2, agenta i streszczeń native).
+
 **Inne ekosystemy (Go) — WYCOFANE (2026-11-25).** Decyzja użytkownika: Ariadne zostaje
 narzędziem dla JVM, a analiza Go powstanie jako oddzielne rozwiązanie AriadneGO. Plany E0–E4
 (nierozpoczęte) są w [`archive/2026-11-25/ecosystems/`](../archive/2026-11-25/ecosystems/WITHDRAWN.md).
@@ -93,7 +98,6 @@ pozostaje `Partial`.
 | Obszar | Plan funkcjonalny | Plan implementacyjny |
 |---|---|---|
 | Interfejs badawczy dla Tekmerion — kontrakt draft.1, CLI planowane | [Specyfikacja, schemat i przykłady](../docs/research-interface/README.md) | [RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD](RESEARCH_INTERFACE_IMPLEMENTATION_PLAN.MD) |
-| Obserwacja runtime’u, dynamiczne klasy i JNI | [RUNTIME_NATIVE.MD](RUNTIME_NATIVE.MD) | [RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD](RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD) |
 
 ## Pokrycie pierwotnych rekomendacji
 
@@ -108,10 +112,10 @@ pozostaje `Partial`.
 | MethodHandle i pozostałe invokedynamic | DYNAMIC_LINKAGE — **DONE, zarchiwizowane** (L0–L4; L3 niebudowane po pomiarze) |
 | Deserializacja | DESERIALIZATION — **DONE, zarchiwizowane** (Z0–Z4); dopływ danych z DATA_FLOW D4 |
 | Konfiguracja i wejścia frameworka | FRAMEWORKS — **DONE, zarchiwizowane** (F0–F5) |
-| Dynamiczne ładowanie klas i JNI | RUNTIME_NATIVE; statyczne nazwy klas obsługuje również REFLECTION |
+| Dynamiczne ładowanie klas i JNI | RUNTIME_NATIVE — **DONE for this scope, zarchiwizowane** (N0, N1, N4, N5 `n5-1`; N2, agent N3 i streszczenia native czekają na cel); statyczne nazwy klas obsługuje również REFLECTION |
 | RTA i analiza możliwych obiektów | GRAPH_PRECISION — **DONE, zarchiwizowane** (P0–P4) |
 | Taint analysis | DATA_FLOW — **DONE, zarchiwizowane** (D0–D5); pilotaż `-taint` opt-in, kwalifikacja w `docs/TAINT_QUALIFICATION.MD` |
-| Obserwacja działającej aplikacji | RUNTIME_NATIVE |
+| Obserwacja działającej aplikacji | RUNTIME_NATIVE — **DONE for this scope, zarchiwizowane** (JFR bez agenta; dowody dla celów badawczych: RI6) |
 | Rozpoznawanie samych podatności — pięć punktów | CVE — **DONE, zarchiwizowane** (F0–F10) |
 | Inne języki, w szczególności Go | Poza Ariadne — **ECOSYSTEMS wycofany (2026-11-25)**, Go dostaje oddzielne rozwiązanie AriadneGO ([archiwum](../archive/2026-11-25/ecosystems/WITHDRAWN.md)) |
 | Pomiar skuteczności i kolejność realizacji | ROADMAP i kryteria poszczególnych faz |

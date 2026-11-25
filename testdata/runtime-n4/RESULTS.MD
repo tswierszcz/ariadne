@@ -6,7 +6,7 @@ This probe checks what the agent-free recorder (N1: JFR on JDK 25 with `jdk.Meth
 - two JDK proxies created by `proxy("p1")` and `proxy("p2")`, whose handler forwards to `Real#op`,
 - one task class `Task`, submitted to an executor from two methods (`submitA`, `submitB`), whose `run` calls `work`.
 
-This probe is the measurement behind the assessment in `RECOMMENDATION/RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD`. The committed files `n4.jar` and `run.trace` (converted after `n4-1`) are checked by `TestRuntimeN4Probe` in `cmd/ariadne/runtime_test.go`. To reproduce it on JDK 25+:
+This probe is the measurement behind the assessment in `archive/2026-11-25/runtime_native/RUNTIME_NATIVE_IMPLEMENTATION_PLAN.MD`. The committed files `n4.jar` and `run.trace` (converted after `n4-1`) are checked by `TestRuntimeN4Probe` in `cmd/ariadne/runtime_test.go`. To reproduce it on JDK 25+:
 
 ```sh
 java scripts/JavaBuild.java testdata/runtime-n4/src /tmp/n4.jar 21
