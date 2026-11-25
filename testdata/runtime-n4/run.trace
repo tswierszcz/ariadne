@@ -1,0 +1,24 @@
+{"record":"header","format":"ariadne-runtime-trace-1","run_id":"f10e61f74b4b2373","scenario":"probe","started":"2026-11-25T10:05:21.368Z","ended":"2026-11-25T10:05:21.409Z","runtime":{"name":"OpenJDK 64-Bit Server VM","version":"OpenJDK 64-Bit Server VM (25.0.5+8-1-Debian) for linux-amd64 JRE (25.0.5+8-1-Debian), built on 2026-10-22T00:58:38Z with gcc 16.2.0","vendor":""},"recorder":{"name":"ariadne-jfr-convert","version":"1","source":"JFR jdk.ClassLoad, jdk.ExecutionSample, jdk.MethodTrace"},"scope":{"event_kinds":["loaded","executed","call"],"classes":"artifacts","method_filters":["n4.Main$Real::op","n4.Main::target","n4.Main::work"]},"sampling":{"kind":"periodic","interval_ms":10},"completeness":{"complete":false,"lost_events":0,"truncated_stacks":0,"reasons":["periodic stack sampling: a method that ran between samples is not recorded","exact entries only for the filtered methods","JFR does not report where class bytes came from: class hashes are a classpath lookup"]},"data_policy":"identifiers-only"}
+{"record":"artifact","id":"a1","name":"n4.jar","sha256":"37d048ffbbf1a352ce9dc95f76ba6b487c3b8c85023dc8808b796dac8be20b97"}
+{"record":"loader","id":"l2","name":"app","type":"jdk.internal.loader.ClassLoaders$AppClassLoader"}
+{"record":"class","id":"c1","name":"n4.Main","loader":"l2","artifact":"a1","sha256":"3f4331e072f662a7b3e042c8caf6bf48f9b8ef742a1367a7daebd5f9d16453b8","source_basis":"classpath-lookup"}
+{"record":"class","id":"c2","name":"n4.Main$Real","loader":"l2","artifact":"a1","sha256":"3715f169306c4ae909143f2e841a2c595fc1e1cfbd4508cec5272d1bc6044281","source_basis":"classpath-lookup"}
+{"record":"class","id":"c3","name":"n4.Main$Task","loader":"l2","artifact":"a1","sha256":"3041ad54c552e3770462c085921a017beb940cdab9df91827fcba4bbac2897de","source_basis":"classpath-lookup"}
+{"record":"method","id":"m1","class":"c1","name":"lambda$proxy$0","desc":"(Ln4/Main$Svc;Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;"}
+{"record":"method","id":"m2","class":"c1","name":"main","desc":"([Ljava/lang/String;)V"}
+{"record":"method","id":"m3","class":"c1","name":"proxy","desc":"(Ljava/lang/String;)Ln4/Main$Svc;"}
+{"record":"method","id":"m4","class":"c1","name":"target","desc":"(I)I"}
+{"record":"method","id":"m5","class":"c1","name":"work","desc":"(I)V"}
+{"record":"method","id":"m6","class":"c2","name":"op","desc":"(I)I"}
+{"record":"method","id":"m7","class":"c3","name":"run","desc":"()V"}
+{"record":"executed","id":"e1","method":"m2","basis":"sampled","count":1}
+{"record":"executed","id":"e2","method":"m3","basis":"sampled","count":1}
+{"record":"executed","id":"e3","method":"m4","basis":"traced","count":3}
+{"record":"executed","id":"e4","method":"m5","basis":"traced","count":2}
+{"record":"executed","id":"e5","method":"m6","basis":"traced","count":2}
+{"record":"call","id":"e6","caller":"m1","callee":"m6","basis":"stack-through-runtime","source":"traced","count":2,"bci":3,"line":21}
+{"record":"call","id":"e7","caller":"m2","callee":"m1","basis":"stack-through-runtime","source":"traced","count":1,"bci":54,"line":30}
+{"record":"call","id":"e8","caller":"m2","callee":"m1","basis":"stack-through-runtime","source":"traced","count":1,"bci":66,"line":31}
+{"record":"call","id":"e9","caller":"m2","callee":"m3","basis":"stack-adjacent","source":"sampled","count":1,"bci":50,"line":30}
+{"record":"call","id":"e10","caller":"m2","callee":"m4","basis":"stack-through-runtime","source":"traced","count":3,"bci":38,"line":29}
+{"record":"call","id":"e11","caller":"m7","callee":"m5","basis":"stack-adjacent","source":"traced","count":2,"bci":4,"line":14}

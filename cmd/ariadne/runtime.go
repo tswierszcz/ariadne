@@ -360,6 +360,7 @@ func gapClassifier(h *hierarchy.Hierarchy, mode string) func(caller, callee stri
 		}
 		return false
 	}
+	invocationHandler := classfile.Call{Owner: "java.lang.reflect.InvocationHandler", Name: "invoke"}
 	asyncOwners := map[string]bool{
 		"java.lang.Thread": true, "java.util.concurrent.Executor": true, "java.util.concurrent.ExecutorService": true,
 		"java.util.concurrent.ScheduledExecutorService": true, "java.util.concurrent.CompletableFuture": true,
@@ -401,6 +402,10 @@ func gapClassifier(h *hierarchy.Hierarchy, mode string) func(caller, callee stri
 		case site.Owner == "java.lang.invoke.MethodHandle":
 			return runtimeevents.GapMethodHandle, target
 		case eName == "invoke" && implements(eOwner, "java.lang.reflect.InvocationHandler") && site.Owner != eOwner:
+			return runtimeevents.GapProxy, site.Owner
+		case basis == runtimeevents.BasisThroughRuntime && site.Owner != eOwner && samCall(&invocationHandler, eOwner, eName, eDesc):
+			// RUNTIME_NATIVE n4-1: the handler is a lambda or method
+			// reference the input creates for InvocationHandler#invoke.
 			return runtimeevents.GapProxy, site.Owner
 		case asyncOwners[site.Owner] && basis == runtimeevents.BasisThroughRuntime:
 			return runtimeevents.GapAsync, target
