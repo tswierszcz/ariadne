@@ -2,6 +2,14 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## RESEARCH_HARNESS RH-A3 — cel kontrolny pilota (2026-11-25)
+
+- Stan IN_PROGRESS dla RH-A3: strona Ariadne (cel kontrolny i dowód drogi) zrobiona; eksperyment należy do Tekmerion. Opis: [testdata/pilot/EXPECTED.MD](../testdata/pilot/EXPECTED.MD), budowa `scripts/pilot-fixture.sh` (JavaBuild, `MethodTrace`, linie `effect:` klienta do `effects-*.txt`).
+- Własność: `Unpacker#unpack` zapisuje tylko w katalogu docelowym. Warianty różnią się wyłącznie `Entries#target`. JVM: te same ciała metod w obu wariantach; traversal `../escaped.txt` — wadliwy zapisuje plik poza katalogiem, poprawny odmawia.
+- Ariadne: każda metoda wykonana przez JVM `found`; `Store#write` z tymi samymi wejściami (`unpack`, dozwolone `writeFile`, sama `Store#write` — publiczna klasa w `internal`) i charakterem w obu wariantach — oś statyczna nie rozstrzyga własności; kontrole: `Store#overwrite` `not_found`, refleksja `Unpacker#filter` robi model `incomplete`; różnica wariantów widoczna w `calls` (`startsWith`/`normalize` tylko w poprawnym).
+- Źródła sprzeczne z binarką (wadliwy jar + źródła poprawnego): hash podanego pliku, wiązanie `declared` — Ariadne nie wykrywa niezgodności, to zadanie konsumenta.
+- Weryfikacja: `TestPilotTarget`, `TestPilotConflictingSources`; `go test ./...`, `go vet ./...`.
+
 ## RESEARCH_HARNESS RH-A2 — dowody dla niezależnego Validatora (2026-11-25)
 
 - Stan IN_PROGRESS dla RH-A2: strona Ariadne zrobiona. Opis: [ACCEPTANCE.md §5](../docs/research-interface/ACCEPTANCE.md#5-evidence-for-an-independent-validator-rh-a2).

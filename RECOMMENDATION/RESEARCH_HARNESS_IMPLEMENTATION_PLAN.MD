@@ -76,6 +76,8 @@ Odbiór obejmuje hipotezę potwierdzoną drogą bez CHA, drogę zależną od heu
 
 ### RH-A3 — wspólny pilot
 
+**Status 2026-11-25: IN_PROGRESS (cel kontrolny po stronie Ariadne gotowy).** [testdata/pilot](../testdata/pilot/EXPECTED.MD): `px.archive.Unpacker#unpack` w wariancie wadliwym (`resolve` nazwy wpisu) i poprawnym (normalizacja i odmowa), te same API i ta sama metoda zapisu `Store#write`; klient-wyrocznia przez publiczne API na plikach lokalnych (scenariusze normalny, traversal, dozwolone API) pod `MethodTrace` — te same metody w obu wariantach, różny skutek (plik poza katalogiem tylko w wadliwym). Kontrole: martwa metoda (`not_found`), nierozwiązana refleksja (model `incomplete`), API dozwolone przez kontrakt (`found`, nie znalezisko). `TestPilotTarget`: wszystko, co wykonał JVM, jest `found`; odpowiedzi dla `Store#write` identyczne w obu wariantach; strażnik widoczny w `calls` `Entries#target`. `TestPilotConflictingSources`: binarka wadliwa ze źródłami poprawnymi dostaje hash podanego pliku z wiązaniem `declared` — zgodność binarki i źródeł rozstrzyga konsument. Pozostaje: eksperyment i asercja własności po stronie Tekmerion (RH-T4–T5), potem rzeczywista biblioteka.
+
 Kontrolny target zawiera wadliwą implementację własności ograniczenia zapisu do katalogu oraz wariant zachowujący tę własność. Oba mogą osiągać tę samą metodę zapisu. Klient testowy korzysta z publicznego API, lokalnych plików i zarejestrowanego scenariusza.
 
 Ariadne dostarcza dowód drogi. Tekmerion sprawdza wynik operacji i wiąże go ze źródłami, wejściem i asercją. Odbiór wymaga zgodności z niezależną obserwacją JVM oraz uwzględnienia martwej metody, nierozwiązanej refleksji i jawnie dozwolonej niebezpiecznej funkcji API jako przypadków kontrolnych.

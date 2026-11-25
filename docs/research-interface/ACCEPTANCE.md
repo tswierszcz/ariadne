@@ -174,7 +174,16 @@ The four acceptance cases in the plan:
 
 Every case keeps all of its axes: resolution, search state, model state, entry count, characters and dispatch flags.
 
-## 6. Producer/consumer matrix
+## 6. Pilot control target (RH-A3)
+
+[testdata/pilot](../../testdata/pilot/EXPECTED.MD) holds an archive unpacker in two variants:
+
+- **defective**: writes outside its directory on `../` entries,
+- **fixed**: refuses such entries.
+
+Both have the same API and the same write method. Run under a JVM oracle, they execute the same methods and differ only in the file-system effect. Ariadne gives identical path evidence for the write method in both variants. Only the experiment's property assertion tells them apart, and the guard shows up in `calls`. The controls are a dead method, unresolved reflection and an API that is allowed to write anywhere. A consumer indexes `defective.jar` and `fixed.jar` itself with `research index -roots api -profile generic`.
+
+## 7. Producer/consumer matrix
 
 | Producer (Ariadne) | Contract | Conformance package `v1/` | Acceptance package | Consumer (Tekmerion) |
 |---|---|---|---|---|
