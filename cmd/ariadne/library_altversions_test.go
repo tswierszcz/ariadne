@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,14 +137,81 @@ func TestLibraryAltVersionsFlags(t *testing.T) {
 	for name, args := range map[string][]string{
 		"no -roots api":   {"-roots", "all", "-alt-versions", "newest"},
 		"unknown":         {"-roots", "api", "-alt-versions", "every"},
-		"rerun not built": {"-roots", "api", "-alt-versions", "newest", "-alt-versions-mode", "rerun"},
+		"unknown mode":    {"-roots", "api", "-alt-versions", "newest", "-alt-versions-mode", "exact"},
 	} {
 		_, code, msg := runAltVersions(t, "v2", true, args...)
 		if code == 0 {
 			t.Errorf("%s: exit 0, want a rejection", name)
 		}
-		if name == "rerun not built" && !strings.Contains(msg, "not built yet") {
+		if name == "unknown mode" && !strings.Contains(msg, "-alt-versions-mode must be") {
 			t.Errorf("%s: %s", name, msg)
 		}
+	}
+}
+
+// TestLibraryAltVersionsRerun (LIBRARY_MODE LB3 lb3-3, mode rerun):
+// testdata/library-altversions/EXPECTED.MD. pom-rerun.xml declares
+// commons-lang3 [3.11,3.13), so 3.12.0 is chosen; its jar comes from the
+// fixture's local Maven repository (m2/), the static pipeline runs again
+// with it in place of 3.11, and CVE-2025-48924 is REACHABLE on 3.12.0's own
+// code. Without the jar the version is not_assessed and the run succeeds;
+// the run's own findings never change.
+func TestLibraryAltVersionsRerun(t *testing.T) {
+	m2, err := filepath.Abs(altVersionsFixture + "m2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := func(mode string, env map[string]string) altVersionsDoc {
+		t.Helper()
+		dir := t.TempDir()
+		cache := filepath.Join(dir, "cache")
+		for _, c := range []string{libraryFixture + "cache", libraryDepsFixture + "cache", altVersionsFixture + "cache", altVersionsFixture + "cache-rerun"} {
+			copyDir(t, c, cache)
+		}
+		out := filepath.Join(dir, "r.json")
+		code, msg := runWithEnv([]string{"-offline", "-cache-dir", cache, "-app", libraryDepsFixture + "lib.jar", "-deps", libraryFixture + "deps",
+			"-library-pom", altVersionsFixture + "pom-rerun.xml", "-profile", "generic", "-roots", "api", "-alt-versions", "newest",
+			"-alt-versions-mode", mode, "-json-format", "v2", "-out", filepath.Join(dir, "r.md"), "-json", out}, env)
+		if code != 0 {
+			t.Fatalf("%s: exit %d: %s", mode, code, msg)
+		}
+		b, _ := os.ReadFile(out)
+		var d altVersionsDoc
+		if err := json.Unmarshal(b, &d); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	lang3 := func(d altVersionsDoc) (version, basis, notAssessed string, findings map[string]string) {
+		findings = map[string]string{}
+		for _, dep := range d.Coverage.API.Alt.Deps {
+			if dep.Package != "org.apache.commons:commons-lang3" || len(dep.Versions) != 1 {
+				continue
+			}
+			v := dep.Versions[0]
+			for _, f := range v.Findings {
+				findings[f.Advisory] = f.Status
+			}
+			return v.Version, v.Basis, v.NotAssessed, findings
+		}
+		t.Fatal("no commons-lang3 version")
+		return
+	}
+	env := map[string]string{"ARIADNE_MAVEN_LOCAL": m2}
+	approx, rerun := run("approx", env), run("rerun", env)
+	v, basis, na, f := lang3(rerun)
+	if v != "3.12.0" || na != "" || !strings.HasPrefix(basis, "rerun: the graph rebuilt with the jar of org.apache.commons:commons-lang3:3.12.0") || f["CVE-2025-48924"] != "REACHABLE" {
+		t.Errorf("rerun: version %s basis %q not_assessed %q findings %v", v, basis, na, f)
+	}
+	if rerun.Coverage.API.Alt.Mode != "rerun" {
+		t.Errorf("mode %q", rerun.Coverage.API.Alt.Mode)
+	}
+	if fmt.Sprint(approx.Findings) != fmt.Sprint(rerun.Findings) {
+		t.Error("the run's own findings differ between approx and rerun")
+	}
+	// No local repository, offline: the jar is unavailable.
+	missing := run("rerun", nil)
+	if _, _, na, _ := lang3(missing); !strings.Contains(na, "the jar of org.apache.commons:commons-lang3:3.12.0 is unavailable") {
+		t.Errorf("without the jar: not_assessed %q", na)
 	}
 }

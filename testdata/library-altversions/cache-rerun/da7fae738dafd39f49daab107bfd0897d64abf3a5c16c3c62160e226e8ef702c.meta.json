@@ -1,0 +1,10 @@
+{
+  "key": "da7fae738dafd39f49daab107bfd0897d64abf3a5c16c3c62160e226e8ef702c",
+  "kind": "osv",
+  "method": "POST",
+  "url": "https://api.osv.dev/v1/querybatch",
+  "fetched_at": "2026-11-25T12:28:54.569756763Z",
+  "validated_at": "2026-11-25T12:28:54.569756763Z",
+  "sha256": "df01acc0f08943200b497c0bde6f8556c3ce5887f52782579baa8357a63c9389",
+  "bytes": 95
+}

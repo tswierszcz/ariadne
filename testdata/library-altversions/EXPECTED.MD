@@ -28,5 +28,12 @@ list is deliberately absent.
     not in the cache) — never "no other version".
 - Without the OSV answer for 3.17.0 the version is chosen but `not_assessed` with the reason,
   and the run still succeeds.
-- `-alt-versions` without `-roots api`, an unknown strategy, and `-alt-versions-mode rerun` (the
-  future second graph run, option B) are rejected.
+- `-alt-versions` without `-roots api`, an unknown strategy and an unknown mode are rejected.
+
+## Expected with `-alt-versions-mode rerun` (`lb3-3`, 2026-11-25)
+
+`pom-rerun.xml` is `pom.xml` with commons-lang3 declared `[3.11,3.13)`. `m2/` is a local Maven repository (read through `ARIADNE_MAVEN_LOCAL`) with the commons-lang3 3.12.0 jar copied from a Central download, and `cache-rerun/` holds the OSV answer for 3.12.0 (fetched 2026-11-25: CVE-2025-48924).
+
+- (v) commons-lang3: **3.12.0**, `chosen_by: [range_max]`, `mode: rerun`. The `basis` says that the graph was rebuilt with 3.12.0's jar (with its hash) in place of 3.11. **CVE-2025-48924 is `REACHABLE`** on 3.12.0's own code, from `ld.Render#render` through commons-text's `ConstantStringLookup` to `ClassUtils#getClass`.
+- The run's own findings are those of the same run in mode `approx`.
+- Offline without `m2/`, the version is `not_assessed`, because its jar is unavailable, and the run succeeds.

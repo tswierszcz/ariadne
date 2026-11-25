@@ -12,4 +12,4 @@ Plan i opis: [LIBRARY_MODE.MD](LIBRARY_MODE.MD), [LIBRARY_MODE_IMPLEMENTATION_PL
 
 **Weryfikacja:** fixtures `testdata/library*`, wyrocznie JVM (`library-oracle.sh`, `library-lb4-*`, `library-deps-oracle.sh` z Maven 3.9), pomiary `scripts/library-measure.sh` — wpisy LIBRARY_MODE w `RECOMMENDATION/IMPLEMENTATION_STATUS.MD`.
 
-**Odłożone (przyszłość):** tryb `rerun` dla innych wersji zależności (flaga zarezerwowana), inne strategie wyboru wersji, ścieżki warunkowe po kodzie klienta, Micronaut 4.x; powiązanie z CI floty — `RECOMMENDATION/FLEET_CI_PLAN.MD`. Wiersz `docs/SUPPORT.MD` „Library mode” pozostaje `Partial`.
+**Odłożone (przyszłość):** ~~tryb `rerun` dla innych wersji zależności~~ — zbudowany 2026-11-25 (`lb3-3`, zob. IMPLEMENTATION_STATUS), inne strategie wyboru wersji, ścieżki warunkowe po kodzie klienta, Micronaut 4.x; powiązanie z CI floty — `RECOMMENDATION/FLEET_CI_PLAN.MD`. Wiersz `docs/SUPPORT.MD` „Library mode” pozostaje `Partial`.
