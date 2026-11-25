@@ -2,6 +2,10 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Plan CI floty — wycofany (2026-11-25)
+
+- Decyzja użytkownika: CI floty (uruchamianie ariadne dla kilkudziesięciu artefaktów i raport zbiorczy) będzie robione z poziomu Tekmerion, nie w Ariadne. `FLEET_CI_PLAN.MD` przeniesiony do [`archive/2026-11-25/fleet_ci/`](../archive/2026-11-25/fleet_ci/WITHDRAWN.md); wycofanie dotyczy tylko dokumentacji — prototyp `cmd/ariadne-fleet` i `testdata/fleet` zostają bez zmian (bez dalszego rozwoju w Ariadne), akapit w README wskazuje archiwum. Wcześniejsze wpisy o flocie zostają jako historia.
+
 ## ECOSYSTEMS — obszar wycofany (2026-11-25)
 
 - Decyzja użytkownika: Ariadne rezygnuje z ECOSYSTEMS w całości; dla Go powstanie oddzielne rozwiązanie AriadneGO. Fazy E0–E4 nie były rozpoczęte (stan UNASSESSED), kodu nie ma.
