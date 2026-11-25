@@ -24,7 +24,10 @@
 #    unchanged.
 #  - maven-compiler-plugin runs javac through error-prone 2.3.3, which
 #    does not run on a current JDK, so the Java sources are compiled with
-#    scripts/JavaBuild.java (-source/-target 8) against the Kotlin classes.
+#    scripts/JavaBuild.java (-source/-target 8) against the Kotlin classes,
+#    with debug information (-g, Maven's default): Spring picks one of the
+#    two TaskScheduler beans by the parameter name, without it Lavagna does
+#    not start.
 #  - The first `mvn` fetches from Maven Central (once); later runs can add
 #    -o.
 #
@@ -61,7 +64,7 @@ rm -rf target/classes ../app-dependency
 cd ..
 cat deps-runtime.txt deps-provided.txt > deps.txt
 
-java "$root/scripts/JavaBuild.java" src/src/main/java java-classes.jar 8 "$(cat compile-cp.txt):src/target/classes"
+java "$root/scripts/JavaBuild.java" src/src/main/java java-classes.jar 8 "$(cat compile-cp.txt):src/target/classes" g
 python3 -I - <<'PY'
 import pathlib, zipfile
 seen = set()
