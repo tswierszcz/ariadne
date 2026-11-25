@@ -59,7 +59,8 @@ func node(t *testing.T, g *callgraph.Graph, key string) uint32 {
 // interface), returned, stored by a setter, held in a final field (a bound
 // reference to an overridden method: the override is the target),
 // a constructor reference, handed to List#forEach, captured by another
-// lambda. A lambda nobody runs and one whose creator is never called get
+// lambda, folded in a loop x = combine(x, l) (a cycle through the
+// helper's returned parameter). A lambda nobody runs and one whose creator is never called get
 // no SAM edge.
 func TestSAMFixture(t *testing.T) {
 	g, results, st := fixtureGraph(t)
@@ -92,8 +93,8 @@ func TestSAMFixture(t *testing.T) {
 			t.Errorf("no SAM edge %s -> %s at pc %d", p[0], p[2], bci)
 		}
 	}
-	if rows != 8 {
-		t.Errorf("%d observed relations, want 8", rows)
+	if rows != 11 {
+		t.Errorf("%d observed relations, want 11", rows)
 	}
 
 	for _, body := range []string{"sc.Main#lambda$unused$0(I)I", "sc.Main#lambda$neverCalled$0(I)I"} {

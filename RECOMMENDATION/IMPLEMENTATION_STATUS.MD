@@ -2,6 +2,13 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Test na ślepo: Lavagna 1.1.9 i cykl „fold” w samcall (2026-11-25)
+
+- Cel: aplikacja, na której Ariadne nie była dostrajana — Lavagna 1.1.9 (tracker Kanban, zarchiwizowany): czysty Spring 5.3 bez Boota (konfiguracja w Javie, `WebApplicationInitializer`), wbudowany Jetty 9.4.44, HSQLDB w pamięci, model w Kotlinie. Wejście: `scripts/prepare-lavagna.sh` (467 klas, 79 zależności łącznie z „provided” Jetty z wykonywalnego wara; obejścia JDK 25 opisane w skrypcie — Kotlin 2.2.21 w trybie 1.9 zamiast 1.3.61, `JavaBuild` zamiast error-prone). Jedno pobranie z Maven Central przez `mvn` i jeden przebieg online Ariadne (OSV), dalej `-offline`.
+- Znaleziony błąd: przepełnienie stosu w `internal/samcall` na Jetty `HttpChannelListeners.<init>` — pętla `x = combine(x, l)`: zwracany parametr pomocnika to argument w miejscu wywołania, którego wartość zawiera wynik tego samego wywołania; `callResult` → `returnedParam` → `value` nie przechodziło przez `memo`, więc cykl nie był wykrywany (głębokość rosła, ale była sprawdzana tylko w `memo`). Poprawka: argument w miejscu wywołania jest zapamiętywany per miejsce i indeks parametru (klucz `a:`), jak parametry i pola.
+- Weryfikacja: fixture `testdata/samcall` dostał `caseCombineLoop` (`scripts/samcall-oracle.sh` na JVM: 11 relacji zamiast 8, w tym przez cykl); bez poprawki `TestSAMFixture` kończy się przepełnieniem stosu, z poprawką wszystkie 11 relacji ma krawędzie SAM; `go test ./...` zielone. Lavagna: przebieg kończy się (CHA, `-roots all`, profil spring) — REACHABLE=33 FRAMEWORK=34 NOT_REACHABLE=16 UNKNOWN=16 (99 CVE), graf identyczny przy powtórzeniu offline na odbudowanym wejściu. Regresja `scripts/pipeline-compare.sh dce6976 working-tree`: 7/7 konfiguracji identycznych (Petclinic all/profile/RTA, WebGoat, JPetStore, fixture biblioteki CHA/PTA) — żadna nie trafia na ten cykl.
+- Do zrobienia (nie w tym PR): ślad JFR Lavagny i porównanie werdyktów; do sprawdzenia w pierwszej kolejności jsoup CVE-2022-36033 `REACHABLE` (aplikacja wywołuje tylko `Jsoup.parse(...).text()`, nie `clean`), commons-text CVE-2022-42889 `NOT_REACHABLE`, hsqldb CVE-2022-41853 `REACHABLE`.
+
 ## Kontrola po dniu zmian i sprawdzenie README (2026-11-25)
 
 - Regresja: `scripts/pipeline-compare.sh 0c6f4f6 2297bf6` (stan sprzed zmian dnia — wydzielenie `prepare`, klasyfikator `n4-1`, RI6, `rerun` — wobec `main` po #167): 7/7 konfiguracji identycznych (Petclinic all/profile/RTA, WebGoat, JPetStore, fixture biblioteki CHA/PTA).

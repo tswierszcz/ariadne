@@ -706,8 +706,15 @@ func (r *Resolver) callResult(ref valueflow.CallResultRef, depth int, a *acc) {
 			params = append(params, ret)
 		}
 	}
+	// The argument at this site, memoized per site and parameter like a
+	// parameter or a field: in a fold x = combine(x, l) the argument's
+	// value includes this call's own result, a cycle (Jetty's
+	// HttpChannelListeners).
 	for _, ret := range params {
-		r.returnedParam(ret, ref, caller, okCaller, depth, a)
+		key := fmt.Sprintf("a:%s%s@%d/%d", ref.Site.Method, ref.Site.Descriptor, ref.Site.PC, ret.Parameter.Index)
+		r.memo(key, depth, a, func(b *acc, depth int) {
+			r.returnedParam(ret, ref, caller, okCaller, depth, b)
+		})
 	}
 }
 
@@ -747,7 +754,7 @@ func (r *Resolver) returnedParam(ret valueflow.Value, ref valueflow.CallResultRe
 		a.gap(GapCallResult, fmt.Sprintf("no argument %d recorded at %s pc=%d", ret.Parameter.Index, caller, ref.Site.PC))
 		return
 	}
-	r.value(arg, caller, depth+1, a)
+	r.value(arg, caller, depth, a) // memo counted this link
 }
 
 func (r *Resolver) calleeReturns(ref valueflow.CallResultRef) callValues {

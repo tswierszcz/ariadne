@@ -80,6 +80,7 @@ public final class Main {
         caseEscape();
         caseCaptured();
         caseInterfaceHelper();
+        caseCombineLoop();
         unused();
     }
 
@@ -157,6 +158,37 @@ public final class Main {
     static void caseInterfaceHelper() {
         Exec e = new DirectExec();
         e.exec(() -> Oracle.ran());
+    }
+
+    static final Op NOOP = x -> x;
+
+    /**
+     * Folds listeners in a loop, x = combine(x, l) (Jetty's
+     * HttpChannelListeners): the returned parameter is the argument at the
+     * call site, whose value includes that call's own result — a cycle.
+     */
+    static void caseCombineLoop() {
+        Op op = NOOP;
+        for (int i = 0; i < 2; i++) {
+            op = combine(op, x -> {
+                Oracle.ran();
+                return x + 1;
+            });
+        }
+        op.apply(1);
+    }
+
+    static Op combine(Op first, Op second) {
+        if (first == NOOP) {
+            return second;
+        }
+        if (second == NOOP) {
+            return first;
+        }
+        return x -> {
+            Oracle.ran();
+            return second.apply(first.apply(x));
+        };
     }
 
     /** Creates a lambda nobody runs. */
