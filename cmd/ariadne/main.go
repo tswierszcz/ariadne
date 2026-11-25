@@ -1964,7 +1964,10 @@ func scanCVEs(ctx context.Context, cfg config, stdout io.Writer, static *staticR
 	// assessed apart from the run's findings.
 	if altVersionsOn(static.cfg) && static.libDeps != nil && static.apiCoverage != nil {
 		sets, err := assessAltVersions(static.ctx, altVersionDeps{inv: static.components, libDeps: static.libDeps, fetch: static.centralFetch, base: static.cfg.centralURL,
-			osv: cves.NewClient(static.cache), resolver: resolver, vm: vm, engine: static.engine, mode: static.cfg.altVersionsMode, strategy: static.cfg.altVersions})
+			osv: cves.NewClient(static.cache), resolver: resolver, vm: vm, engine: static.engine, mode: static.cfg.altVersionsMode, strategy: static.cfg.altVersions,
+			rerun: func(ctx context.Context, gav input.GAV, file, oldVersion string, jar []byte) (*staticRun, error) {
+				return rerunWithJar(ctx, static.cfg, gav, file, oldVersion, jar)
+			}})
 		if err != nil {
 			return err
 		}

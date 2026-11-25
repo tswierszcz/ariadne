@@ -1132,9 +1132,16 @@ variant for that version gives `MAPPING_VERSION_UNCOVERED`. Results are
 in v2 `coverage.api.alternate_versions` only — never in the findings, the
 v1 rows or a verdict. A version list that cannot be read is a note on its
 dependency; advisories or mappings that cannot be read mark the chosen
-version `not_assessed` and the run still succeeds. A second graph run with
-the other version's jar (`-alt-versions-mode rerun`) and other selection
-strategies are reserved, not built. Verified on
+version `not_assessed` and the run still succeeds. With
+`-alt-versions-mode rerun` (`lb3-3`, 2026-11-25) each other version with an
+advisory is assessed on its own code instead. Its jar is read from the
+cache, `ARIADNE_MAVEN_LOCAL` or Maven Central (unless `-offline`) and
+replaces the analyzed jar in a copy of `-deps`. The whole static
+pipeline then runs again, and the advisories are assessed for that
+version's instance. `basis` says so; a jar that cannot be had, or a
+dependency that is not a `-deps` jar, leaves the version `not_assessed`.
+A rerun costs one more pipeline run per version that has an advisory.
+Other selection strategies are reserved, not built. Verified on
 `testdata/library-altversions` ([EXPECTED.MD](testdata/library-altversions/EXPECTED.MD),
 `TestLibraryAltVersions`): commons-lang3 `[3.11,3.18.0)` with 3.11 in the
 input gives 3.17.0, CVE-2025-48924 `REACHABLE`. On the five LB4 libraries
@@ -2119,7 +2126,7 @@ Flags:
 | `-profile-file` | no | Load/override one profile from a YAML file (same shape as the embedded defaults). |
 | `-roots` | no | `all` (default: every application method, plus the lifecycle methods of `web.xml`-registered servlets/filters/listeners), `profile` (the active profile's own entry points, plus the same `web.xml` methods) or `api` (library mode, below: the `-app` jar is a library and its public API is the roots). |
 | `-alt-versions` | no | With `-roots api`: `off` (default) or `newest` — also assess other versions of the library's dependencies a user can get (LIBRARY_MODE LB3 `lb3-2`): the highest published version in a declared range and the newest of the analyzed version's major.minor line. v2 `coverage.api.alternate_versions` only. |
-| `-alt-versions-mode` | no | How `-alt-versions` assesses a version: `approx` (default and only mode: its advisories and mapping variant, reachability on the analyzed version's code). `rerun` (a second graph run with that version's jar) is reserved. |
+| `-alt-versions-mode` | no | How `-alt-versions` assesses a version: `approx` (default: its advisories and mapping variant, reachability on the analyzed version's code) or `rerun` (`lb3-3`: the static pipeline runs again with that version's jar in place of the analyzed one, the advisories assessed on its own code; the jar from the cache, `ARIADNE_MAVEN_LOCAL` or Central). |
 | `-library-pom` | no | With `-roots api`: the library's `pom.xml`, read for its dependency declarations (LIBRARY_MODE LB3) — for a library jar that embeds none (e.g. a Gradle build); default: the pom in the jar's `META-INF/maven/`. |
 | `-api-exclude` | no | With `-roots api`: comma-separated package prefixes left out of the API (`com.example.internal`). |
 | `-target-java` | no | Java feature version (e.g. `17`) to resolve multi-release JAR variants against (JVM_GRAPH G4). Unset: every jar's base classes, regardless of any `META-INF/versions/` present. |

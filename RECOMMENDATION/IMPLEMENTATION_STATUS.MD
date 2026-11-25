@@ -2,6 +2,13 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## LIBRARY_MODE LB3 — tryb `rerun` dla innych wersji zależności (`lb3-3`, 2026-11-25)
+
+- `-alt-versions-mode rerun` (opcja B z decyzji 2026-11-23, dotąd flaga zarezerwowana): dla każdej innej wersji z advisory jar tej wersji (cache, `ARIADNE_MAVEN_LOCAL`, Central poza `-offline`) zastępuje analizowany jar w kopii `-deps` (oraz linię `-deps-list`), cały statyczny pipeline (`prepare`) liczy się ponownie, advisories ocenia się dla instancji tej wersji na nowym grafie. `basis` mówi o przebudowie i hashu jara; brak jara albo zależność spoza `-deps` → `not_assessed` z powodem; wersja bez advisory nie wymaga przebiegu. Wynik tylko w v2 `coverage.api.alternate_versions`, własne ustalenia bez zmian.
+- Fixture: `testdata/library-altversions/pom-rerun.xml` (`[3.11,3.13)` → 3.12.0), `m2/` z jarem commons-lang3 3.12.0 (kopia pobranego z Central, z `_remote.repositories`), `cache-rerun/` z odpowiedzią OSV dla 3.12.0 (pobrana 2026-11-25; listy wersji z cache, bez nowych zapytań do Central poza jedną listą commons-text, nieużytą w fixture).
+- Wynik: CVE-2025-48924 `REACHABLE` na kodzie 3.12.0 (ścieżka `ld.Render#render` → commons-text `ConstantStringLookup` → `ClassUtils#getClass`); własne ustalenia identyczne jak w `approx`; offline bez `m2/` — `not_assessed`.
+- Weryfikacja: `TestLibraryAltVersionsRerun`, `TestLibraryAltVersionsFlags` (nieznany tryb odrzucany, `rerun` przyjęty), `TestLibraryAltVersions`; `go test ./...`, `go vet ./...`.
+
 ## RESEARCH_INTERFACE RI6 / RESEARCH_HARNESS RH-A4 — dowody runtime dla celów (2026-11-25)
 
 - Stan IN_PROGRESS (eksperymentalne, poza kontraktem `1.0.0-draft.1`; CONTRACT.md §13 zapowiada `trace-config`/`correlate` jako późniejsze operacje). Opis: [docs/research-interface/RUNTIME.md](../docs/research-interface/RUNTIME.md).
