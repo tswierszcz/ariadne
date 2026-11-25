@@ -529,7 +529,7 @@ func (c *checker) checkReachability(r *ReachabilityResponse) {
 		}
 		seenRoot := map[string]bool{}
 		for j, e := range res.Entries {
-			c.checkEntry(e, fmt.Sprintf("%s/entries/%d", loc, j), matchedSet, rootSet, subset, fw, lim, seenRoot, needNode, need)
+			c.checkEntry(e, fmt.Sprintf("%s/entries/%d", loc, j), res.Search.WorkComplete, matchedSet, rootSet, subset, fw, lim, seenRoot, needNode, need)
 		}
 	}
 	if work > lim.MaxWorkUnits {
@@ -539,7 +539,7 @@ func (c *checker) checkReachability(r *ReachabilityResponse) {
 	// them); replay pins this producer's exact set.
 }
 
-// checkState applies the per-state rules (CONTRACT.md §7).
+// checkState applies the per-state rules (CONTRACT.md §8).
 func (c *checker) checkState(res *TargetResult, loc string) {
 	s := res.Search
 	n := len(res.Entries)
@@ -612,7 +612,7 @@ func (c *checker) checkState(res *TargetResult, loc string) {
 	}
 }
 
-func (c *checker) checkEntry(e EntryEvidence, loc string, matched, roots, subset map[string]bool, fw []bool, lim EffectiveLimits,
+func (c *checker) checkEntry(e EntryEvidence, loc string, complete bool, matched, roots, subset map[string]bool, fw []bool, lim EffectiveLimits,
 	seenRoot map[string]bool, needNode func(id, loc string), need func(typ, id, loc string)) {
 	p := e.Path
 	if !roots[e.RootNodeID] {
@@ -646,7 +646,6 @@ func (c *checker) checkEntry(e EntryEvidence, loc string, matched, roots, subset
 		needNode(id, fmt.Sprintf("%s/path/node_ids/%d", loc, k))
 	}
 	chars := map[string]bool{}
-	client, supplied := false, false
 	for k, id := range p.EdgeIDs {
 		eloc := fmt.Sprintf("%s/path/edge_ids/%d", loc, k)
 		pos, ok := c.b.idx.edgePos[id]
@@ -660,8 +659,6 @@ func (c *checker) checkEntry(e EntryEvidence, loc string, matched, roots, subset
 			c.add(RulePathContinuity, eloc, "edge %s runs %s → %s, the path steps %s → %s", id, ed.From, ed.To, p.NodeIDs[k], p.NodeIDs[k+1])
 		}
 		chars[ed.Character] = true
-		client = client || ed.ClientDispatch
-		supplied = supplied || ed.SuppliedDispatch
 		if e.Pass == "app_only" {
 			if fp, ok := c.b.idx.nodePos[ed.From]; ok && fw[fp] {
 				c.add(RulePathPass, eloc, "an app_only path expands framework node %s", ed.From)
@@ -720,12 +717,46 @@ func (c *checker) checkEntry(e EntryEvidence, loc string, matched, roots, subset
 			}
 		}
 	}
-	if client && !e.ClientDispatch {
-		c.add(RulePathDispatch, loc+"/client_dispatch", "false, yet the path takes a client dispatch edge")
+	// CONTRACT.md §9: an entry's flag says that every path from its root
+	// to a matched node takes such an edge, not that the shown path does.
+	// Recomputed from the bundle when the search was complete (an
+	// incomplete classification may mark an entry as requiring it).
+	if complete {
+		if want := !c.reaches(e.RootNodeID, matched, func(ed Edge) bool { return ed.ClientDispatch }); want != e.ClientDispatch {
+			c.add(RulePathDispatch, loc+"/client_dispatch", "%v, the bundle says %v (every path from the root takes a client dispatch edge: %v)", e.ClientDispatch, want, want)
+		}
+		if want := !c.reaches(e.RootNodeID, matched, func(ed Edge) bool { return ed.SuppliedDispatch }); want != e.SuppliedDispatch {
+			c.add(RulePathDispatch, loc+"/supplied_dispatch", "%v, the bundle says %v (every path from the root takes a supplied dispatch edge: %v)", e.SuppliedDispatch, want, want)
+		}
 	}
-	if supplied && !e.SuppliedDispatch {
-		c.add(RulePathDispatch, loc+"/supplied_dispatch", "false, yet the path takes a supplied dispatch edge")
+}
+
+// reaches: a matched node is reachable from root over edges drop rejects.
+func (c *checker) reaches(root string, matched map[string]bool, drop func(Edge) bool) bool {
+	start, ok := c.b.idx.nodePos[root]
+	if !ok {
+		return false
 	}
+	seen := map[int32]bool{start: true}
+	queue := []int32{start}
+	for len(queue) > 0 {
+		v := queue[0]
+		queue = queue[1:]
+		if matched[c.b.Nodes[v].NodeID] {
+			return true
+		}
+		for _, ei := range c.b.idx.out[v] {
+			ed := c.b.Edges[ei]
+			if drop(ed) {
+				continue
+			}
+			if u, ok := c.b.idx.nodePos[ed.To]; ok && !seen[u] {
+				seen[u] = true
+				queue = append(queue, u)
+			}
+		}
+	}
+	return false
 }
 
 // Replay compares a response with what this producer answers to the same

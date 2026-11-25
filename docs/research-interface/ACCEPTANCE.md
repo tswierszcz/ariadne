@@ -18,8 +18,8 @@ The generator is [scripts/research-acceptance.sh](../../scripts/research-accepta
 
 | Directory | Scope | Records |
 |---|---|---|
-| `bundle-all` | `-scope all` | 101 |
-| `bundle-reachable` | `-scope reachable` | 92 |
+| `bundle-all` | `-scope all` | @ALL@ |
+| `bundle-reachable` | `-scope reachable` | @REACH@ |
 
 It then answers every request in [requests.json](../../testdata/research/acceptance/requests.json) with that binary.
 
@@ -35,6 +35,8 @@ It then answers every request in [requests.json](../../testdata/research/accepta
 | `methods-page1`, `methods-page2` | all | A truncated page and the next one through its cursor. |
 | `calls-files` | all | JDK calls (`body_in_input = false`). |
 | `callers-write`, `callees-extract` | all | One-hop neighborhood. |
+| `reach-dispatch` | all, reachable | Cases j and k: client dispatch (`Drains#drain`, `Pipeline#run`), a caller-supplied field (`Relay#send`), a parameter of the entry itself (`Drains#hand`, lb2-7: false, stated in `warnings`), a conditional callback (`Workers#recover`). |
+| `callees-later` | all | Case k: `Workers#later`'s two callback edges; the `exceptional` condition is only on `recover`'s site. |
 | `error-unknown-node`, `error-analysis` | all | Error envelopes `INVALID_REQUEST` and `ANALYSIS_MISMATCH`. |
 
 Every real response (`kind: response` in `cases.json`) satisfies three checks:
@@ -60,6 +62,7 @@ Envelope mutations are generated once per kind of response (reachability, discov
 | `path-wrong-root` | `path-root` | The entry's root is not the first node of the path |
 | `character-dropped` | `path-character` | An edge character is missing from the entry |
 | `pass-unknown` | `path-pass` | A pass other than `app_only`/`full` |
+| `client-dispatch-flipped`, `supplied-dispatch-flipped` | `path-dispatch` | An entry's dispatch flag inverted |
 | `evidence-modified`, `evidence-dropped`, `evidence-duplicated` | `evidence-original`, `evidence-missing`, `evidence-extra` | An evidence record is changed, missing or repeated |
 | `targets-reordered`, `root-basis` | `target-order`, `root-basis` | Results are out of request order, or the root basis is wrong |
 | `record-modified`, `record-dropped`, `cursor-on-last-page`, `truncated-without-cursor` | `record-original`, `page` | Discovery records or pages are inconsistent |
@@ -118,14 +121,15 @@ The same rules also reproduce the semantic verdicts of the v1 conformance cases 
 | `path-end` | An untruncated path ends at a matched node, passes none before its end, and has `full_node_count` equal to its length. A truncated path has exactly `max_path_nodes` nodes, fewer than `full_node_count`. |
 | `path-character` | `character` is the ordered set (`jvm_rule`, `library_model`, `input_declaration`, `heuristic`, `unclassified`) of the path's edge characters. A truncated path's shown edges are among them. |
 | `path-pass` | `app_only` or `full`; an `app_only` path does not expand a framework instance's node (identity setting `framework_instance_ids`) |
-| `path-dispatch` | A path that takes a client or supplied dispatch edge carries that flag |
+| `path-dispatch` | After a complete search, an entry's `client_dispatch` (`supplied_dispatch`) is true exactly when no path from its root to a matched node avoids client (supplied) dispatch edges (CONTRACT.md §9: every path decides it, not the shown one) |
 | `replay` | `-replay` only: byte-identical to this producer's answer |
 
-The control library cannot break three of these rules, so the package exercises them only partly:
+The control library cannot break two of these rules, so the package exercises them only partly:
 
-- `path-dispatch`: the library has no client or supplied dispatch edge.
 - `record-type`: a changed type is reported as `record-original`.
 - `error-envelope`: the error mutations break `shape`.
+
+Until 2026-11-25 (RH-A2), `path-dispatch` required the flag whenever the *shown* path took a dispatch edge. That reading contradicts CONTRACT.md §9 and would have rejected a correct entry whose other path avoids the edge. Nothing exercised it then, because the control library had no dispatch edge. It now recomputes the flag over every path.
 
 ## 4. Verification on demand
 
@@ -143,12 +147,40 @@ The control library cannot break three of these rules, so the package exercises 
 
 As a result, a damaged dataset an operation does not read goes unnoticed by that operation. `-verify full` verifies every dataset in full before answering. `research check` always does. Use `-verify full` for acceptance runs and for the first query on a bundle that was copied or stored. The cost is reading every dataset once (Petclinic `-scope all`: the calls dataset, 821,366 records, is the largest addition). The test `TestResearchCheckAndVerify` damages `calls.jsonl`: `entries` still answers by default, and `-verify full` fails with a bundle error.
 
-## 5. Producer/consumer matrix
+## 5. Evidence for an independent validator (RH-A2)
+
+A validator can verify a hypothesis's path on its own from three things:
+
+- the bundle,
+- the request (rerun it with `research query`; `research check -replay` confirms the answer is the producer's),
+- the response's evidence.
+
+| Plan item | Where it stands |
+|---|---|
+| 1. Everything needed to verify the path | `evidence-missing` requires every matched and path node with its component and class, every path edge and every relevant gap. `path-continuity` and `path-end` tie the path to the bundle. |
+| 2. Kinds of step kept apart | Each edge has `basis` (`direct`, `cha`, `model`, `callback`, …), `character` (`jvm_rule`, `library_model`, `input_declaration`, `heuristic`) and per-site `kind` and `condition`. Case k: two callbacks of one method are separate edges, and only `recover`'s site has `exceptional`. |
+| 3. Client/supplied dispatch | Entry flags are recomputed over every path (rule `path-dispatch`). Case j covers client dispatch, a supplied field and a supplied parameter. The parameter case (lb2-7) is not in the bundle, so every reachability response of a `-roots api` bundle states it in `warnings`. |
+| 4. Graph basis of a root subset | The identity records `graph_mode`, the participants with their versions, and the fixed point. A subset query on an RTA/PTA graph warns that the graph was pruned for all indexed roots (conservative for the subset). |
+| 5. Reproducible request | Replay is byte-identical. The ordering and limit rules are versioned (`research-paths-1`, `research-relevance-1`, `research-work-1`, `research-dispatch-1`). |
+
+The four acceptance cases in the plan:
+
+| Case | In the package |
+|---|---|
+| Path confirmed without CHA | `reach-cases`, `a-write`: `extract` → `writeEntry`, `jvm_rule` only |
+| Path that depends on a heuristic | `reach-cases`, `e-wipe`: a CHA step to `DeletingHandler#handle`, `heuristic`; `reach-dispatch`, `j-purge`: client dispatch |
+| No path while a relevant gap exists | `reach-cases`, `b-unused`: `not_found` with the model `incomplete` (reachable unresolved reflection) |
+| Target absent from a limited bundle | `reach-cases.reachable`, `g-legacy`: `missing`, the reason points to `-scope all` |
+
+Every case keeps all of its axes: resolution, search state, model state, entry count, characters and dispatch flags.
+
+## 6. Producer/consumer matrix
 
 | Producer (Ariadne) | Contract | Conformance package `v1/` | Acceptance package | Consumer (Tekmerion) |
 |---|---|---|---|---|
 | `research index`/`query` since #151 (RI1–RI3); `-scope reachable` #152; source paths #153; `prepare` #154 | `1.0.0-draft.1` | Unchanged since `d08678c` (#150) | — | `contracts/ariadne/PIN.json`: upstream `d08678c`, `v1/` files pinned by hash |
-| RH-A0 (this change): `research check`, `-verify full`, `acceptance/` | `1.0.0-draft.1` | Unchanged | `acceptance/cases.json`; its producer revision and bundles' `analysis_id` are recorded in it, and file hashes in `SHA256SUMS` | To pin `acceptance/` by `SHA256SUMS` hash next to `v1/` (RH-T0) |
+| RH-A0 (#155): `research check`, `-verify full`, `acceptance/` | `1.0.0-draft.1` | Unchanged | `acceptance/cases.json`; its producer revision and bundles' `analysis_id` are recorded in it, and file hashes in `SHA256SUMS` | To pin `acceptance/` by `SHA256SUMS` hash next to `v1/` (RH-T0) |
+| RH-A2 (this change): cases j/k, `path-dispatch` recomputed, lb2-7 and pruned-subset `warnings` | `1.0.0-draft.1` | Unchanged | Regenerated: new control library, new `analysis_id`s, `warnings` on library-mode reachability responses | Re-pin `acceptance/`; `warnings` are new strings, no new members |
 
 Change rules:
 

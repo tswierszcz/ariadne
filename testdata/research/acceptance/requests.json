@@ -20,7 +20,7 @@
           {
             "id": "a-write",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "writeEntry",
               "descriptor": "(Ljava/nio/file/Path;[B)V"
@@ -28,12 +28,12 @@
           },
           {
             "id": "a-write-by-id",
-            "method_id": "m-10abdb8a73df52cf7851492e"
+            "method_id": "@METHOD:fx.research.Extractor#writeEntry@"
           },
           {
             "id": "b-unused",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "unused",
               "descriptor": "(Ljava/nio/file/Path;)V"
@@ -42,7 +42,7 @@
           {
             "id": "d-save-bytes",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "save",
               "descriptor": "([B)V"
@@ -51,7 +51,7 @@
           {
             "id": "e-wipe",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.internal.Cleaner",
               "name": "wipe",
               "descriptor": "(Ljava/nio/file/Path;)V"
@@ -60,7 +60,7 @@
           {
             "id": "f-resolve",
             "selector": {
-              "instance_id": "c-2e6c5aec0b4760bc",
+              "instance_id": "@INSTANCE:deps:fx-dep-1.0.jar@",
               "class": "fx.dep.Paths2",
               "name": "resolve",
               "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"
@@ -69,7 +69,7 @@
           {
             "id": "g-legacy",
             "selector": {
-              "instance_id": "c-2e6c5aec0b4760bc",
+              "instance_id": "@INSTANCE:deps:fx-dep-1.0.jar@",
               "class": "fx.dep.Paths2",
               "name": "legacyResolve",
               "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"
@@ -78,7 +78,7 @@
           {
             "id": "h-safe-shadowed",
             "selector": {
-              "instance_id": "c-3f12b7b765c8133e",
+              "instance_id": "@INSTANCE:deps:fx-dep-2.0.jar@",
               "class": "fx.dep.Paths2",
               "name": "safeResolve",
               "descriptor": "(Ljava/nio/file/Path;Ljava/lang/String;)Ljava/nio/file/Path;"
@@ -87,13 +87,73 @@
           {
             "id": "i-absent",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "absent",
               "descriptor": "()V"
             }
           }
         ]
+      }
+    },
+    {
+      "id": "reach-dispatch",
+      "scopes": [
+        "all",
+        "reachable"
+      ],
+      "note": "cases j and k: client dispatch (Drains#drain, Pipeline#run), a caller-supplied field (Relay#send), a parameter of the entry itself (Drains#hand, lb2-7: false, stated in warnings), a conditional callback (Workers#recover)",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "reach-dispatch",
+        "operation": "reachability",
+        "roots": {
+          "selection": "indexed"
+        },
+        "targets": [
+          {
+            "id": "j-purge",
+            "selector": {
+              "instance_id": "@INSTANCE:app:lib.jar@",
+              "class": "fx.research.internal.Cleaner",
+              "name": "purge",
+              "descriptor": "(Ljava/nio/file/Path;)V"
+            }
+          },
+          {
+            "id": "j-purger",
+            "selector": {
+              "instance_id": "@INSTANCE:deps:fx-dep-1.0.jar@",
+              "class": "fx.dep.Purger",
+              "name": "call",
+              "descriptor": "(Ljava/nio/file/Path;)V"
+            }
+          },
+          {
+            "id": "k-recover",
+            "selector": {
+              "instance_id": "@INSTANCE:app:lib.jar@",
+              "class": "fx.research.Workers",
+              "name": "recover",
+              "descriptor": "(Ljava/lang/Throwable;)Ljava/nio/file/Path;"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "callees-later",
+      "scopes": [
+        "all"
+      ],
+      "note": "case k: Workers#later's callback edges, the exceptional condition only on recover's site",
+      "request": {
+        "schema_version": "ariadne-research-query-1",
+        "analysis_id": "@ANALYSIS_ID@",
+        "request_id": "callees-later",
+        "operation": "callees",
+        "node_id": "@NODE:fx.research.Workers#later@"
       }
     },
     {
@@ -110,14 +170,14 @@
         "roots": {
           "selection": "subset",
           "node_ids": [
-            "n-2489eca9d21aa72f67a1559a"
+            "@NODE:fx.research.Extractor#extract@"
           ]
         },
         "targets": [
           {
             "id": "a-write",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "writeEntry",
               "descriptor": "(Ljava/nio/file/Path;[B)V"
@@ -144,7 +204,7 @@
           {
             "id": "a-write",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "writeEntry",
               "descriptor": "(Ljava/nio/file/Path;[B)V"
@@ -153,7 +213,7 @@
           {
             "id": "e-wipe",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.internal.Cleaner",
               "name": "wipe",
               "descriptor": "(Ljava/nio/file/Path;)V"
@@ -183,7 +243,7 @@
           {
             "id": "e-wipe",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.internal.Cleaner",
               "name": "wipe",
               "descriptor": "(Ljava/nio/file/Path;)V"
@@ -213,7 +273,7 @@
           {
             "id": "a-write",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "writeEntry",
               "descriptor": "(Ljava/nio/file/Path;[B)V"
@@ -243,7 +303,7 @@
           {
             "id": "a-write",
             "selector": {
-              "instance_id": "c-647467be3ca085f1",
+              "instance_id": "@INSTANCE:app:lib.jar@",
               "class": "fx.research.Extractor",
               "name": "writeEntry",
               "descriptor": "(Ljava/nio/file/Path;[B)V"
@@ -351,7 +411,7 @@
         "analysis_id": "@ANALYSIS_ID@",
         "request_id": "callers-write",
         "operation": "callers",
-        "node_id": "n-d6646a64788165a24f419991"
+        "node_id": "@NODE:fx.research.Extractor#writeEntry@"
       }
     },
     {
@@ -365,7 +425,7 @@
         "analysis_id": "@ANALYSIS_ID@",
         "request_id": "callees-extract",
         "operation": "callees",
-        "node_id": "n-2489eca9d21aa72f67a1559a"
+        "node_id": "@NODE:fx.research.Extractor#extract@"
       }
     },
     {

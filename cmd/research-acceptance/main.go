@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -111,7 +112,7 @@ func main() {
 		for _, scope := range s.Scopes {
 			b := bundles[scope]
 			id := s.ID + "." + scope
-			reqDoc := fill(s.Request, b.AnalysisID, cursors)
+			reqDoc := fill(s.Request, b, cursors)
 			var resp []byte
 			reqPath := filepath.Join("requests", id+".json")
 			respPath := filepath.Join("responses", id+".json")
@@ -171,10 +172,41 @@ func main() {
 	fmt.Printf("acceptance package %s: %d responses, %d mutations\n", *out, len(pkg.Cases)-nm, nm)
 }
 
-// fill substitutes @ANALYSIS_ID@ and @CURSOR:id@ placeholders.
-func fill(tmpl map[string]any, analysisID string, cursors map[string]string) map[string]any {
+var placeholderRE = regexp.MustCompile(`@(INSTANCE|NODE|METHOD):([^@]+)@`)
+
+// fill substitutes @ANALYSIS_ID@, @CURSOR:id@ and the bundle's ids:
+// @INSTANCE:location@ (a component by location), @NODE:class#name@ and
+// @METHOD:class#name@ (the one canonical method node of that name).
+func fill(tmpl map[string]any, b *research.Bundle, cursors map[string]string) map[string]any {
 	raw, _ := json.Marshal(tmpl)
-	s := strings.ReplaceAll(string(raw), "@ANALYSIS_ID@", analysisID)
+	s := strings.ReplaceAll(string(raw), "@ANALYSIS_ID@", b.AnalysisID)
+	s = placeholderRE.ReplaceAllStringFunc(s, func(m string) string {
+		p := placeholderRE.FindStringSubmatch(m)
+		var hits []string
+		switch p[1] {
+		case "INSTANCE":
+			for _, c := range b.Components {
+				if c.Location == p[2] {
+					hits = append(hits, c.InstanceID)
+				}
+			}
+		default:
+			class, name, _ := strings.Cut(p[2], "#")
+			for _, n := range b.Nodes {
+				if n.Method != nil && n.NodeKind == "method" && n.CanonicalNodeID == n.NodeID && n.Method.Class == class && n.Method.Name == name {
+					if p[1] == "NODE" {
+						hits = append(hits, n.NodeID)
+					} else {
+						hits = append(hits, n.Method.MethodID)
+					}
+				}
+			}
+		}
+		if len(hits) != 1 {
+			fail("%s: %d matches in the bundle", m, len(hits))
+		}
+		return hits[0]
+	})
 	for id, c := range cursors {
 		s = strings.ReplaceAll(s, "@CURSOR:"+id+"@", c)
 	}
@@ -516,6 +548,29 @@ func reachMutations(b *research.Bundle, resp []byte, add func(string, string, st
 		e["character"] = ch[1:]
 		return true
 	})
+	for _, flag := range []string{"client_dispatch", "supplied_dispatch"} {
+		flag := flag
+		add(strings.ReplaceAll(flag, "_", "-")+"-flipped", research.RulePathDispatch, "an entry's "+flag+" flipped (CONTRACT.md §9: every path from the root decides it)", func(d map[string]any) bool {
+			var target map[string]any
+			for _, r := range results(d) {
+				rm := r.(map[string]any)
+				if rm["search"].(map[string]any)["work_complete"] != true {
+					continue
+				}
+				for _, e := range rm["entries"].([]any) {
+					em := e.(map[string]any)
+					if target == nil || em[flag] == true {
+						target = em
+					}
+				}
+			}
+			if target == nil {
+				return false
+			}
+			target[flag] = target[flag] != true
+			return true
+		})
+	}
 	add("pass-unknown", research.RulePathPass, "an entry's pass outside app_only/full", func(d map[string]any) bool {
 		_, e := pick(d, 0)
 		if e == nil {

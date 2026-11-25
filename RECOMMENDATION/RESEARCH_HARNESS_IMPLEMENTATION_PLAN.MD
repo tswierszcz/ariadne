@@ -64,6 +64,8 @@ Odbiór obejmuje bibliotekę z przeciążeniami, klasą zagnieżdżoną, dwiema 
 
 ### RH-A2 — dowody do weryfikacji kandydata
 
+**Status 2026-11-25: IN_PROGRESS (strona producenta zrobiona).** Biblioteka kontrolna dostała przypadki (j) client/supplied dispatch i (k) callback z warunkiem, z wyrocznią JVM. Reguła `path-dispatch` w `research check` przelicza flagi wpisu po wszystkich ścieżkach (CONTRACT.md §9) — wersja z RH-A0 wnioskowała je z pokazanej ścieżki. Ograniczenie lb2-7 jest w `warnings` każdej odpowiedzi `reachability` bundle'a `-roots api`, podzbiór korzeni na grafie RTA/PTA dostaje ostrzeżenie o przycięciu. Mapowanie pięciu punktów i czterech przypadków odbioru: [ACCEPTANCE.md §5](../docs/research-interface/ACCEPTANCE.md#5-evidence-for-an-independent-validator-rh-a2). Pozostaje: weryfikacja przez niezależny proces Validatora po stronie Tekmerion; usunięcie ograniczenia lb2-7 wymaga nowej rewizji kontraktu (miejsca parametrów korzenia w bundle'u).
+
 1. Sprawdzić, czy odpowiedź dla konkretnej hipotezy zawiera wszystkie węzły, krawędzie i luki wymagane do weryfikacji wskazanej drogi.
 2. Zachować rozróżnienie zwykłego wywołania, modelu, CHA, deklaracji wejściowej i warunku callbacka. Warunki różnych miejsc wywołania pozostają oddzielne.
 3. Zweryfikować oznaczenia client/supplied dispatch. Znane ograniczenie parametrów wejściowych klienta ma pozostać widoczne, aż zostanie usunięte osobnym przyrostem.

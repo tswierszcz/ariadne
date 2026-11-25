@@ -10,4 +10,9 @@ public final class Cleaner {
     public static void wipe(Path p) throws java.io.IOException {
         Files.deleteIfExists(p);
     }
+
+    /** Case (j) target: only PurgingSink calls it. */
+    public static void purge(Path p) throws java.io.IOException {
+        Files.deleteIfExists(p);
+    }
 }

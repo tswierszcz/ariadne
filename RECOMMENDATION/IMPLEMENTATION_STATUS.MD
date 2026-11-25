@@ -2,6 +2,15 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## RESEARCH_HARNESS RH-A2 — dowody dla niezależnego Validatora (2026-11-25)
+
+- Stan IN_PROGRESS dla RH-A2: strona Ariadne zrobiona. Opis: [ACCEPTANCE.md §5](../docs/research-interface/ACCEPTANCE.md#5-evidence-for-an-independent-validator-rh-a2).
+- Biblioteka kontrolna (`testdata/research`, `scripts/research-fixture.sh`, wyrocznia JVM): (j) `Sink` biblioteki z pakietową, nigdy nietworzoną `PurgingSink` — `Drains#drain` i `Pipeline#run` mają `client_dispatch = true`; `fx.dep.Callback`/`Purger` z zależności — `Relay#send` (pole) `supplied_dispatch = true`, `Drains#hand` (parametr wejścia, lb2-7) `false`; (k) `Workers#later` z `thenAccept(archive)` i `exceptionally(recover)` — dwie krawędzie callback, warunek `exceptional` tylko na miejscu `recover`. JVM nie wykonał `purge`, `Purger#call` ani `recover`.
+- Poprawka reguły `path-dispatch` z RH-A0: wnioskowała flagę z pokazanej ścieżki, wbrew CONTRACT.md §9 (decydują wszystkie ścieżki z korzenia); teraz BFS po bundle'u bez krawędzi danego rodzaju, po kompletnym wyszukiwaniu. Nie było przypadku z krawędzią dispatch, więc błąd nie wyszedł.
+- `warnings` odpowiedzi `reachability`: ograniczenie lb2-7 w każdej odpowiedzi bundle'a `-roots api` (`research.SuppliedParameterWarning`); przy podzbiorze korzeni na grafie `rta`/`pta` — graf przycięty dla wszystkich korzeni (`research.SubsetPrunedWarning`). Nowe napisy, bez nowych pól kontraktu.
+- Generator pakietu: symbole `@INSTANCE:…@`, `@NODE:…@`, `@METHOD:…@` w `requests.json` (identyfikatory zależą od treści biblioteki kontrolnej); nowe żądania `reach-dispatch` (oba zakresy), `callees-later`; mutacje `client-dispatch-flipped`, `supplied-dispatch-flipped`. Pakiet wygenerowany ponownie.
+- Weryfikacja: `TestResearchDispatchAndConditions`, `TestResearchSubsetPrunedWarning`, `TestAcceptancePackage` (teraz także `path-dispatch` musi mieć mutację), `TestCheckContractCases`; `go test ./...`, `go vet ./...`; schemat odpowiedzi pakietu przez `scripts/research-check.mjs`.
+
 ## RESEARCH_HARNESS RH-A0 — akceptacja producenta (2026-11-25)
 
 - Stan IN_PROGRESS dla RH-A0: strona Ariadne zrobiona, strona Tekmerion (RH-T0) należy do Codex. Plan: [RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD](RESEARCH_HARNESS_IMPLEMENTATION_PLAN.MD), opis: [ACCEPTANCE.md](../docs/research-interface/ACCEPTANCE.md).
