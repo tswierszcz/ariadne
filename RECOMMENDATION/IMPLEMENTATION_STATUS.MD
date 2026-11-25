@@ -2,6 +2,10 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## RESEARCH_HARNESS RH-A0 — każda reguła ma mutację (2026-11-25)
+
+- Uzupełnienie RH-A0: mutacje `foreign-record-type` (niezmieniony rekord bundle'a innego typu na stronie odkrywania → `record-type`, którego `record-original` nie łapie), `empty-error-code` (`error-envelope`), `error-other-request` (`binding`). Koperta błędu odrzuconego żądania jest teraz sprawdzana względem `request_id` surowego żądania (wcześniej tylko przy żądaniu przyjętym). `TestAcceptancePackage` wymaga mutacji dla każdej reguły poza `replay`. Pakiet wygenerowany ponownie: 20 odpowiedzi, 191 mutacji.
+
 ## RESEARCH_HARNESS RH-A3 — cel kontrolny pilota (2026-11-25)
 
 - Stan IN_PROGRESS dla RH-A3: strona Ariadne (cel kontrolny i dowód drogi) zrobiona; eksperyment należy do Tekmerion. Opis: [testdata/pilot/EXPECTED.MD](../testdata/pilot/EXPECTED.MD), budowa `scripts/pilot-fixture.sh` (JavaBuild, `MethodTrace`, linie `effect:` klienta do `effects-*.txt`).

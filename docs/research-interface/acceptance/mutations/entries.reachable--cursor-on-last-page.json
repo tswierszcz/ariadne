@@ -1,5 +1,5 @@
 {
-  "analysis_id": "sha256:4f786ec4c1f0719a983dee9d125a2b43319aec6cdd70b103e0f29d3b1ed91219",
+  "analysis_id": "sha256:049ab2a4e0be617f79316c46eb15016ce2fd904f8cfb5f9946dfba812623e25e",
   "contract_revision": "1.0.0-draft.1",
   "effective_limits": {
     "max_entries": 20,
@@ -18,7 +18,7 @@
   "provenance": {
     "kind": "analysis",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
+    "revision": "v0.0.0-20261125094246-29a3ff64e0ee"
   },
   "records": [
     {
