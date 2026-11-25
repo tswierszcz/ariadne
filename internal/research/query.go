@@ -777,15 +777,31 @@ func (b *Bundle) resolve(t Target) (resolution string, nodes []int32, reason str
 	return "matched", nodes, ""
 }
 
+// SuppliedParameterWarning is on every reachability response of a library
+// (-roots api) bundle: lb2-7's parameter case is not in the bundle.
+const SuppliedParameterWarning = "supplied_dispatch covers objects the caller supplies through a library field; a call on a parameter of the entry method itself (LIBRARY_MODE lb2-7) is not reflected, so an entry whose paths all go through such a call shows supplied_dispatch false"
+
+// SubsetPrunedWarning is on a root-subset reachability response over a
+// graph pruned for every indexed root (-callgraph-mode rta or pta).
+const SubsetPrunedWarning = "the graph was pruned (%s) for all indexed roots: edges justified by objects only other roots create are kept, so a path for this subset can be one a %[1]s analysis of the subset alone would not have (conservative)"
+
 var charOrder = []string{"jvm_rule", "library_model", "input_declaration", "heuristic", "unclassified"}
 
 func (b *Bundle) reachability(req *Request, lim EffectiveLimits) ReachabilityResponse {
 	resp := ReachabilityResponse{SchemaVersion: ResponseSchema, ContractRevision: ContractRevision, Status: "ok", AnalysisID: b.AnalysisID,
 		RequestID: req.RequestID, Operation: req.Operation, Provenance: b.provenance(), EffectiveLimits: lim, Warnings: []string{}}
+	if b.Identity.Configuration.RootsMode == "api" {
+		// RESEARCH_HARNESS RH-A2: the one dispatch fact the bundle cannot
+		// carry, stated where a validator reads the entries.
+		resp.Warnings = append(resp.Warnings, SuppliedParameterWarning)
+	}
 	rootBasis := "indexed_graph"
 	roots := b.idx.rootNodePos
 	if req.Roots.Selection == "subset" {
 		rootBasis = "subset_on_indexed_graph"
+		if m := b.Identity.Configuration.GraphMode; m != "" && m != "cha" {
+			resp.Warnings = append(resp.Warnings, fmt.Sprintf(SubsetPrunedWarning, m))
+		}
 		roots = nil
 		for _, id := range req.Roots.NodeIDs {
 			roots = append(roots, b.idx.nodePos[id])

@@ -42,7 +42,7 @@ Tekmerion eksportuje planowane `report.md`, wersjonowane `report.json` i katalog
 
 ### RH-A0 — akceptacja producenta i konsumenta
 
-**Status 2026-11-25: IN_PROGRESS (strona producenta zrobiona).** Punkty 1–5 po stronie Ariadne: pakiet [acceptance/](../docs/research-interface/acceptance/) (biblioteka kontrolna, bundle `all` i `reachable`, 17 prawdziwych odpowiedzi wszystkich operacji, 132 mutacje z regułą), `ariadne research check` (werdykt producenta, reguły w [ACCEPTANCE.md](../docs/research-interface/ACCEPTANCE.md#3-rules)), `research query -verify full` i opis weryfikacji na żądanie, macierz producent/konsument. Te same reguły dają werdykty przypadków `v1/` (w tym odrzucenie `invalid-missing-with-path` i `invalid-path-shape`). Pozostaje strona konsumenta (RH-T0: pin pakietu i porównanie werdyktów) oraz reguły bez przypadku w bibliotece kontrolnej (`path-dispatch`, `record-type`, `error-envelope`).
+**Status 2026-11-25: IN_PROGRESS (strona producenta zrobiona).** Punkty 1–5 po stronie Ariadne: pakiet [acceptance/](../docs/research-interface/acceptance/) (biblioteka kontrolna, bundle `all` i `reachable`, 17 prawdziwych odpowiedzi wszystkich operacji, 132 mutacje z regułą), `ariadne research check` (werdykt producenta, reguły w [ACCEPTANCE.md](../docs/research-interface/ACCEPTANCE.md#3-rules)), `research query -verify full` i opis weryfikacji na żądanie, macierz producent/konsument. Te same reguły dają werdykty przypadków `v1/` (w tym odrzucenie `invalid-missing-with-path` i `invalid-path-shape`). Pozostaje strona konsumenta (RH-T0: pin pakietu i porównanie werdyktów) oraz reguły bez przypadku w bibliotece kontrolnej (`record-type`, `error-envelope`; `path-dispatch` dostał przypadek i poprawkę w RH-A2).
 
 1. Zebrać rzeczywiste odpowiedzi z kontrolnej biblioteki dla wszystkich operacji. Zachować binarkę, scenariusz, `analysis_id` i żądania.
 2. Sprawdzić schemat oraz semantykę odpowiedzi, w tym rozwiązanie celu, ciągłość krawędzi, korzenie, warunki i limity.
@@ -63,6 +63,8 @@ Testy obejmują także brak/duplikaty pól, cel poza zakresem `reachable`, przes
 Odbiór obejmuje bibliotekę z przeciążeniami, klasą zagnieżdżoną, dwiema kopiami zależności, brakiem symboli i niejednoznacznym plikiem źródła. Powtórny odczyt tego samego indeksu daje te same fakty.
 
 ### RH-A2 — dowody do weryfikacji kandydata
+
+**Status 2026-11-25: IN_PROGRESS (strona producenta zrobiona).** Biblioteka kontrolna dostała przypadki (j) client/supplied dispatch i (k) callback z warunkiem, z wyrocznią JVM. Reguła `path-dispatch` w `research check` przelicza flagi wpisu po wszystkich ścieżkach (CONTRACT.md §9) — wersja z RH-A0 wnioskowała je z pokazanej ścieżki. Ograniczenie lb2-7 jest w `warnings` każdej odpowiedzi `reachability` bundle'a `-roots api`, podzbiór korzeni na grafie RTA/PTA dostaje ostrzeżenie o przycięciu. Mapowanie pięciu punktów i czterech przypadków odbioru: [ACCEPTANCE.md §5](../docs/research-interface/ACCEPTANCE.md#5-evidence-for-an-independent-validator-rh-a2). Pozostaje: weryfikacja przez niezależny proces Validatora po stronie Tekmerion; usunięcie ograniczenia lb2-7 wymaga nowej rewizji kontraktu (miejsca parametrów korzenia w bundle'u).
 
 1. Sprawdzić, czy odpowiedź dla konkretnej hipotezy zawiera wszystkie węzły, krawędzie i luki wymagane do weryfikacji wskazanej drogi.
 2. Zachować rozróżnienie zwykłego wywołania, modelu, CHA, deklaracji wejściowej i warunku callbacka. Warunki różnych miejsc wywołania pozostają oddzielne.

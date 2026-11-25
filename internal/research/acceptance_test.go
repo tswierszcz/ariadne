@@ -108,7 +108,7 @@ func TestAcceptancePackage(t *testing.T) {
 		}
 	}
 	// Rules no case of the control library can break (ACCEPTANCE.md §3).
-	notExercised := map[string]bool{RuleErrorEnvelope: true, RuleRecordType: true, RulePathDispatch: true, RuleReplay: true}
+	notExercised := map[string]bool{RuleErrorEnvelope: true, RuleRecordType: true, RuleReplay: true}
 	for _, r := range Rules {
 		if !exercised[r] && !notExercised[r] {
 			t.Errorf("rule %s: no mutation breaks it", r)

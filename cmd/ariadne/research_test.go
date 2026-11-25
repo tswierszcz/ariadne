@@ -430,3 +430,116 @@ func TestResearchCheckAndVerify(t *testing.T) {
 		t.Fatalf("-verify full response: %s", b)
 	}
 }
+
+// RH-A2 cases (j) and (k) of testdata/research/EXPECTED.MD: entry dispatch
+// flags recomputed over every path (client code standing in at a library
+// interface; a caller-supplied field; a parameter of the entry itself,
+// lb2-7, stated as a warning), and a callback site's condition kept on its
+// own edge. The JVM ran none of the targets (observed.txt).
+func TestResearchDispatchAndConditions(t *testing.T) {
+	dir := t.TempDir()
+	bundle, b := researchIndex(t, dir)
+	lib, v1 := instanceOf(b, "app:lib.jar"), instanceOf(b, "deps:fx-dep-1.0.jar")
+	const P = "Ljava/nio/file/Path;"
+	sel := func(inst, class, name, desc string) map[string]any {
+		return map[string]any{"instance_id": inst, "class": class, "name": name, "descriptor": desc}
+	}
+	_, doc := researchQuery(t, bundle, map[string]any{"schema_version": research.QuerySchema, "analysis_id": b.AnalysisID, "request_id": "d1",
+		"operation": "reachability", "roots": map[string]any{"selection": "indexed"}, "targets": []any{
+			map[string]any{"id": "purge", "selector": sel(lib, "fx.research.internal.Cleaner", "purge", "("+P+")V")},
+			map[string]any{"id": "purger", "selector": sel(v1, "fx.dep.Purger", "call", "("+P+")V")},
+			map[string]any{"id": "recover", "selector": sel(lib, "fx.research.Workers", "recover", "(Ljava/lang/Throwable;)"+P)},
+		}})
+	if w, _ := doc["warnings"].([]any); len(w) != 1 || w[0] != research.SuppliedParameterWarning {
+		t.Errorf("warnings %v, want the lb2-7 warning", doc["warnings"])
+	}
+	names := map[string]string{}
+	for _, n := range b.Nodes {
+		if n.Method != nil {
+			names[n.NodeID] = n.Method.Class + "#" + n.Method.Name
+		}
+	}
+	type flags struct{ client, supplied bool }
+	got := map[string]map[string]flags{}
+	for _, r := range doc["results"].([]any) {
+		rm := r.(map[string]any)
+		if st := rm["search"].(map[string]any)["state"]; st != "found" {
+			t.Errorf("%s: %v", rm["target_id"], st)
+		}
+		m := map[string]flags{}
+		for _, e := range rm["entries"].([]any) {
+			em := e.(map[string]any)
+			m[names[em["root_node_id"].(string)]] = flags{em["client_dispatch"].(bool), em["supplied_dispatch"].(bool)}
+		}
+		got[rm["target_id"].(string)] = m
+	}
+	want := map[string]map[string]flags{
+		"purge": {"fx.research.Drains#drain": {true, false}, "fx.research.Pipeline#run": {true, false}, "fx.research.internal.Cleaner#purge": {false, false}},
+		// Drains#hand: lb2-7, caller-supplied on paths that start there, not reported.
+		"purger":  {"fx.research.Drains#hand": {false, false}, "fx.research.Relay#send": {false, true}},
+		"recover": {"fx.research.Workers#later": {false, false}},
+	}
+	for target, entries := range want {
+		for root, f := range entries {
+			if g, ok := got[target][root]; !ok || g != f {
+				t.Errorf("%s from %s: %+v (present %v), want %+v", target, root, g, ok, f)
+			}
+		}
+	}
+	// The JVM ran none of the three targets.
+	obs, _ := os.ReadFile("../../testdata/research/observed.txt")
+	for _, m := range []string{"Cleaner#purge", "Purger#call", "Workers#recover"} {
+		if strings.Contains(string(obs), m) {
+			t.Errorf("observed.txt has %s", m)
+		}
+	}
+	// (k): later's two callbacks are separate edges; only recover's site
+	// carries the exceptional condition.
+	var later string
+	for id, n := range names {
+		if n == "fx.research.Workers#later" {
+			later = id
+		}
+	}
+	_, doc = researchQuery(t, bundle, map[string]any{"schema_version": research.QuerySchema, "analysis_id": b.AnalysisID, "request_id": "d2",
+		"operation": "callees", "node_id": later})
+	conds := map[string][]any{}
+	for _, r := range doc["records"].([]any) {
+		e := r.(map[string]any)
+		if e["basis"] != "callback" {
+			continue
+		}
+		for _, s := range e["sites"].([]any) {
+			conds[names[e["to"].(string)]] = append(conds[names[e["to"].(string)]], s.(map[string]any)["condition"])
+		}
+	}
+	if fmt.Sprint(conds["fx.research.Workers#recover"]) != "[exceptional]" || fmt.Sprint(conds["fx.research.Workers#archive"]) != "[<nil>]" {
+		t.Errorf("callback site conditions %v", conds)
+	}
+}
+
+// RH-A2: a root-subset query over an RTA graph says the graph was pruned
+// for every indexed root; over CHA it says nothing.
+func TestResearchSubsetPrunedWarning(t *testing.T) {
+	for _, mode := range []string{"cha", "rta"} {
+		dir := t.TempDir()
+		bundle, b := researchIndex(t, dir, "-callgraph-mode", mode)
+		var root string
+		for _, n := range b.Nodes {
+			if n.Method != nil && n.Method.Class == "fx.research.Extractor" && n.Method.Name == "extract" {
+				root = n.NodeID
+			}
+		}
+		lib := instanceOf(b, "app:lib.jar")
+		_, doc := researchQuery(t, bundle, map[string]any{"schema_version": research.QuerySchema, "analysis_id": b.AnalysisID, "request_id": "p1",
+			"operation": "reachability", "roots": map[string]any{"selection": "subset", "node_ids": []any{root}}, "targets": []any{
+				map[string]any{"id": "w", "selector": map[string]any{"instance_id": lib, "class": "fx.research.Extractor", "name": "writeEntry", "descriptor": "(Ljava/nio/file/Path;[B)V"}}}})
+		pruned := false
+		for _, w := range doc["warnings"].([]any) {
+			pruned = pruned || strings.Contains(w.(string), "was pruned (rta)")
+		}
+		if pruned != (mode == "rta") {
+			t.Errorf("%s: warnings %v", mode, doc["warnings"])
+		}
+	}
+}

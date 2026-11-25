@@ -23,7 +23,7 @@ mkdir -p "$fx/deps"
 java "$root/scripts/JavaBuild.java" "$fx/dep" "$fx/deps/fx-dep-2.0.jar" 11
 java "$root/scripts/JavaBuild.java" "$fx/depold" "$fx/deps/fx-dep-1.0.jar" 11
 java "$root/scripts/JavaBuild.java" "$fx/lib" "$fx/lib.jar" 11 "$fx/deps/fx-dep-2.0.jar"
-java "$root/scripts/JavaBuild.java" "$fx/client" "$fx/client.jar" 11 "$fx/lib.jar"
+java "$root/scripts/JavaBuild.java" "$fx/client" "$fx/client.jar" 11 "$fx/lib.jar:$fx/deps/fx-dep-2.0.jar"
 printf 'fx.test:fx-dep:jar:1.0:compile\nfx.test:fx-dep:jar:2.0:compile\n' > "$fx/deps.txt"
 cp_list="$fx/client.jar:$fx/lib.jar:$fx/deps/fx-dep-1.0.jar:$fx/deps/fx-dep-2.0.jar"  # the order ariadne selects in
 java "$root/scripts/MethodTrace.java" "$cp_list" fx.client.Main "$fx/observed.raw" 'fx.research.*' 'fx.dep.*'

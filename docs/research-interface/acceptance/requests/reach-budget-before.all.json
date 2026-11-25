@@ -1,5 +1,5 @@
 {
-  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
   "limits": {
     "max_work_units": 1
   },
@@ -15,7 +15,7 @@
       "selector": {
         "class": "fx.research.Extractor",
         "descriptor": "(Ljava/nio/file/Path;[B)V",
-        "instance_id": "c-647467be3ca085f1",
+        "instance_id": "c-cc24b8d02788eb22",
         "name": "writeEntry"
       }
     }

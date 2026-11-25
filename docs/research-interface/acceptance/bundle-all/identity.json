@@ -4,12 +4,12 @@
   "provenance": {
     "kind": "analysis",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
   },
   "tool": {
     "name": "ariadne",
-    "version": "v0.0.0-20261125090655-e352e2fccb66",
-    "binary_sha256": "sha256:95700242cc9c05b37b747d6238e014780dd3692071a66324a4c5290c8567c5cc",
+    "version": "v0.0.0-20261125092001-e1dcfb7d62e2",
+    "binary_sha256": "sha256:bff6c0b73d27d46d4f63d25cc04b5854f3631392476d47d22810c58ecaea1bd7",
     "algorithms": {
       "callgraph.builder": "6",
       "callgraph.skip_rule": "receiver types under java., javax., jdk., sun. are not expanded",
@@ -38,22 +38,22 @@
   },
   "inputs": [
     {
-      "id": "a-1d00c75071c1857c",
+      "id": "a-a40778512f974075",
       "role": "app",
       "logical_location": "app:lib.jar",
-      "sha256": "sha256:a1cbff5b999371b7317536eab17c2eefeff25bbfafae2f1f5fc18d3aee744718"
+      "sha256": "sha256:57f9746f81537b867e2f251179474e6a7986d4717f87b99f55839b2c259ba91b"
     },
     {
-      "id": "a-8a2a0b72e88b60de",
+      "id": "a-7c943bcc13020475",
       "role": "dependency",
       "logical_location": "deps:fx-dep-1.0.jar",
-      "sha256": "sha256:870526fe46a3b78eb69b3a05b7fc99899494c8dded92a74569924e774c92a0f4"
+      "sha256": "sha256:602d79a514dac8c2a97712f62b09340c8a65bd7ab488b9cfc407f95ebac683be"
     },
     {
-      "id": "a-1f9012416d771688",
+      "id": "a-b4394728a5ff3ed4",
       "role": "dependency",
       "logical_location": "deps:fx-dep-2.0.jar",
-      "sha256": "sha256:83a3219f7178c9737c804f053f1cadaf28107c8c4812c55f895d3505467bcc9f"
+      "sha256": "sha256:93b09a84fde525e8aec7d39aaeec04584d189315b94a88dbfce21d2995837822"
     },
     {
       "id": "in-deps-list",
@@ -63,58 +63,58 @@
     }
   ],
   "classpath_order": [
-    "a-1d00c75071c1857c",
-    "a-8a2a0b72e88b60de",
-    "a-1f9012416d771688"
+    "a-a40778512f974075",
+    "a-7c943bcc13020475",
+    "a-b4394728a5ff3ed4"
   ],
   "datasets": [
     {
       "path": "components.jsonl",
-      "sha256": "sha256:607dc4676d0fc456cc3dc9b981df667adf315574fd8e9c30a93c348eb4479aa1",
+      "sha256": "sha256:8efa7708967e9d1b46e20856e265206e58956f172ce0e9b805609558729c759a",
       "size_bytes": 752,
       "record_count": 3,
       "encoding": "jsonl-utf8"
     },
     {
       "path": "classes.jsonl",
-      "sha256": "sha256:eeada410facfad213243666588efed323e4ce63e5b3c707451099826f2bef4d1",
-      "size_bytes": 1808,
-      "record_count": 6,
+      "sha256": "sha256:4223642c0d33a69a880d060c055ac70879fc47ff5b333959677a8657ef0a31f9",
+      "size_bytes": 4789,
+      "record_count": 16,
       "encoding": "jsonl-utf8"
     },
     {
       "path": "nodes.jsonl",
-      "sha256": "sha256:17353e5d359950c18ad275b24c4a6752d1108ff85503ccf02bfa6a8ae3af47e2",
-      "size_bytes": 15945,
-      "record_count": 30,
+      "sha256": "sha256:0f9c1c458cebec501de7067ed932f0719100e419e89cc65b3151440d6af52e60",
+      "size_bytes": 27284,
+      "record_count": 50,
       "encoding": "jsonl-utf8"
     },
     {
       "path": "edges.jsonl",
-      "sha256": "sha256:3f1285f9dcaa97e88099bfe2f216d9cae49439d877e3f691db8d790ad7084b6a",
-      "size_bytes": 8900,
-      "record_count": 25,
+      "sha256": "sha256:5848fd0826711b9ae112ef69e0d469c4bb227cdb5065f6819974a6c55d56dbe5",
+      "size_bytes": 17120,
+      "record_count": 48,
       "encoding": "jsonl-utf8"
     },
     {
       "path": "roots.jsonl",
-      "sha256": "sha256:bb561439a0711701cc84a744ab85d984c5f20633a5f7d75a237cb254ca75c522",
-      "size_bytes": 1738,
-      "record_count": 11,
+      "sha256": "sha256:2cca2c38a0ca67a99103070ecaaa1833037dbab1acf01671e88bf97496f6ab31",
+      "size_bytes": 3160,
+      "record_count": 20,
       "encoding": "jsonl-utf8"
     },
     {
       "path": "gaps.jsonl",
-      "sha256": "sha256:829aa276355e7e9d0d8a582bb5945f5bba7a79a85810f576e02b5a39e539561e",
-      "size_bytes": 875,
-      "record_count": 2,
+      "sha256": "sha256:2b6ce9aa10e81f0f919918284ffb6552fedafd58ed82008e9a0f307fdea71f45",
+      "size_bytes": 2764,
+      "record_count": 6,
       "encoding": "jsonl-utf8"
     },
     {
       "path": "calls.jsonl",
-      "sha256": "sha256:74d2f70615964ec3ecfa062aab7cc21ba6957cc0dd6f283594fa3f6506667918",
-      "size_bytes": 8349,
-      "record_count": 24,
+      "sha256": "sha256:fff1057509e0a0f2e60ccdf60dc04efe66f030fcffe0847a6a886b42a6df9556",
+      "size_bytes": 14419,
+      "record_count": 41,
       "encoding": "jsonl-utf8"
     }
   ],

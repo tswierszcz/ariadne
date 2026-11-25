@@ -1,0 +1,38 @@
+{
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
+  "operation": "reachability",
+  "request_id": "reach-dispatch",
+  "roots": {
+    "selection": "indexed"
+  },
+  "schema_version": "ariadne-research-query-1",
+  "targets": [
+    {
+      "id": "j-purge",
+      "selector": {
+        "class": "fx.research.internal.Cleaner",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-cc24b8d02788eb22",
+        "name": "purge"
+      }
+    },
+    {
+      "id": "j-purger",
+      "selector": {
+        "class": "fx.dep.Purger",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-efea9694f7c8279a",
+        "name": "call"
+      }
+    },
+    {
+      "id": "k-recover",
+      "selector": {
+        "class": "fx.research.Workers",
+        "descriptor": "(Ljava/lang/Throwable;)Ljava/nio/file/Path;",
+        "instance_id": "c-cc24b8d02788eb22",
+        "name": "recover"
+      }
+    }
+  ]
+}

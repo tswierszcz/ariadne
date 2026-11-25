@@ -2,13 +2,13 @@
   "schema_version": "ariadne-research-response-1",
   "contract_revision": "1.0.0-draft.1",
   "status": "ok",
-  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
   "request_id": "reach-truncated-entries",
   "operation": "reachability",
   "provenance": {
     "kind": "analysis",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
   },
   "effective_limits": {
     "max_records": 100,
@@ -16,7 +16,9 @@
     "max_path_nodes": 100,
     "max_work_units": 1000000
   },
-  "warnings": [],
+  "warnings": [
+    "supplied_dispatch covers objects the caller supplies through a library field; a call on a parameter of the entry method itself (LIBRARY_MODE lb2-7) is not reflected, so an entry whose paths all go through such a call shows supplied_dispatch false"
+  ],
   "results": [
     {
       "target_id": "a-write",
@@ -27,7 +29,7 @@
       "search": {
         "state": "found",
         "work_complete": true,
-        "work_units": 64,
+        "work_units": 109,
         "reason": null
       },
       "model": {
@@ -35,7 +37,7 @@
         "relevant_gap_ids": [
           "g-524eaea924f847821476bf8d"
         ],
-        "global_gap_count": 2,
+        "global_gap_count": 6,
         "relevance_rule_version": "research-relevance-1",
         "scope_uncertain": true
       },
@@ -74,7 +76,7 @@
       "search": {
         "state": "found",
         "work_complete": true,
-        "work_units": 18,
+        "work_units": 28,
         "reason": null
       },
       "model": {
@@ -82,7 +84,7 @@
         "relevant_gap_ids": [
           "g-524eaea924f847821476bf8d"
         ],
-        "global_gap_count": 2,
+        "global_gap_count": 6,
         "relevance_rule_version": "research-relevance-1",
         "scope_uncertain": true
       },
@@ -115,40 +117,40 @@
   ],
   "evidence": [
     {
-      "class": "fx.research.internal.Cleaner",
-      "class_id": "k-8fc46e216e0801b729d9529b",
-      "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
-      "instance_id": "c-647467be3ca085f1",
+      "class": "fx.research.DeletingHandler",
+      "class_id": "k-0932d78dc7c740907f11cfcf",
+      "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
+      "instance_id": "c-cc24b8d02788eb22",
       "record_type": "class",
       "selected": true,
-      "selected_class_id": "k-8fc46e216e0801b729d9529b",
+      "selected_class_id": "k-0932d78dc7c740907f11cfcf",
       "variant_java": 0
     },
     {
       "class": "fx.research.Extractor",
-      "class_id": "k-b8277f55be8d1e4650f862e7",
+      "class_id": "k-2727bffe2f6efab32f25f53f",
       "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
-      "instance_id": "c-647467be3ca085f1",
+      "instance_id": "c-cc24b8d02788eb22",
       "record_type": "class",
       "selected": true,
-      "selected_class_id": "k-b8277f55be8d1e4650f862e7",
+      "selected_class_id": "k-2727bffe2f6efab32f25f53f",
       "variant_java": 0
     },
     {
-      "class": "fx.research.DeletingHandler",
-      "class_id": "k-e5404e977fcbff35afde3191",
-      "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
-      "instance_id": "c-647467be3ca085f1",
+      "class": "fx.research.internal.Cleaner",
+      "class_id": "k-9b73036a70d5d1f902b82916",
+      "class_sha256": "sha256:764eec10f949f63b9fe7759b069cb63430c2495d22878a42acdeac60eb283a4f",
+      "instance_id": "c-cc24b8d02788eb22",
       "record_type": "class",
       "selected": true,
-      "selected_class_id": "k-e5404e977fcbff35afde3191",
+      "selected_class_id": "k-9b73036a70d5d1f902b82916",
       "variant_java": 0
     },
     {
-      "artifact_sha256": "sha256:a1cbff5b999371b7317536eab17c2eefeff25bbfafae2f1f5fc18d3aee744718",
+      "artifact_sha256": "sha256:57f9746f81537b867e2f251179474e6a7986d4717f87b99f55839b2c259ba91b",
       "gav": null,
       "identity": "unidentified",
-      "instance_id": "c-647467be3ca085f1",
+      "instance_id": "c-cc24b8d02788eb22",
       "location": "app:lib.jar",
       "record_type": "component",
       "role": "library"
@@ -217,8 +219,8 @@
         "class": "fx.research.Extractor",
         "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
         "descriptor": "(Ljava/io/InputStream;Ljava/nio/file/Path;)V",
-        "instance_id": "c-647467be3ca085f1",
-        "method_id": "m-b46ef75cb683daf927dfd487",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-408093a821dbc22e8481d533",
         "name": "extract"
       },
       "node_id": "n-2489eca9d21aa72f67a1559a",
@@ -241,8 +243,8 @@
         "class": "fx.research.DeletingHandler",
         "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
         "descriptor": "(Ljava/nio/file/Path;)V",
-        "instance_id": "c-647467be3ca085f1",
-        "method_id": "m-bc4ee339ac6e04db7c11626f",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-5f43c1ee0afa3150c71a1980",
         "name": "handle"
       },
       "node_id": "n-2de67a82796ef0432c11cde0",
@@ -263,10 +265,10 @@
       "canonical_node_id": "n-472726367ae1c6bc94b07502",
       "method": {
         "class": "fx.research.internal.Cleaner",
-        "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
+        "class_sha256": "sha256:764eec10f949f63b9fe7759b069cb63430c2495d22878a42acdeac60eb283a4f",
         "descriptor": "(Ljava/nio/file/Path;)V",
-        "instance_id": "c-647467be3ca085f1",
-        "method_id": "m-5ce223ad006c1037a2e43955",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-bc579563f4e7a7122584d1e1",
         "name": "wipe"
       },
       "node_id": "n-472726367ae1c6bc94b07502",
@@ -289,8 +291,8 @@
         "class": "fx.research.Extractor",
         "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
         "descriptor": "(Ljava/nio/file/Path;[B)V",
-        "instance_id": "c-647467be3ca085f1",
-        "method_id": "m-10abdb8a73df52cf7851492e",
+        "instance_id": "c-cc24b8d02788eb22",
+        "method_id": "m-549ee05ee290c5d6ab92eae5",
         "name": "writeEntry"
       },
       "node_id": "n-d6646a64788165a24f419991",

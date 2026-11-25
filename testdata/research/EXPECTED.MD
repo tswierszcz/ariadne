@@ -1,4 +1,4 @@
-# Research interface control library (RESEARCH_INTERFACE RI1–RI3)
+# Research interface control library (RESEARCH_INTERFACE RI1–RI3, RESEARCH_HARNESS RH-A2)
 
 Written 2026-11-24 with the first `ariadne research index` / `research query`. The contract is
 [docs/research-interface/CONTRACT.md](../../docs/research-interface/CONTRACT.md). Built by
@@ -24,11 +24,14 @@ No case has an advisory; every target is an arbitrary method.
 | (g) selected copy, unused method | `Paths2#legacyResolve` (1.0 only) | no | `not_found` |
 | (h) shadowed copy | `Paths2#safeResolve` (2.0 only) in the 2.0 instance | no | `shadowed`, `not_evaluated` |
 | (i) absent method | `Extractor#absent()V` | — | `missing`, `not_evaluated` |
+| (j) client dispatch | `Cleaner#purge`, called only by the package-private, never-created `PurgingSink#accept` (the library's one `Sink`) | no | `found` from `Drains#drain(Sink, Path)` and `Pipeline#run` with `client_dispatch = true`: every path needs a sink only a client can supply (LB2), and the client's sinks ran instead |
+| (j) supplied dispatch | `fx.dep.Purger#call` (1.0), the dependency's own `Callback` | no | `found` from `Relay#send` with `supplied_dispatch = true` (the callback is a field only `Relay`'s caller sets); from `Drains#hand(Callback, Path)` with `supplied_dispatch = false`: a parameter of the entry itself (lb2-7) is not reflected, which the response states in `warnings` |
+| (k) conditional callback | `Workers#recover`, registered with `exceptionally` next to `thenAccept(archive)` | no (the future completes normally) | `found` from `Workers#later`; `callees` of `later`: two callback edges, the `exceptional` condition only on `recover`'s site |
 | JDK operations | `calls` with `declared_class_prefix` `java.nio.file.Files` | — | `write`, `delete`, `deleteIfExists`, each `body_in_input = false` |
 
 `client_dispatch` is false on (e) because `DeletingHandler` is a library class the library itself
 lets a client construct (LIBRARY_MODE LB2's rule); a class only a client could supply would make
 that step client dispatch.
 
-Checked by `TestResearchIndexAndQuery` (`cmd/ariadne/research_test.go`): every method in
+Cases (j) and (k) (2026-11-25) are checked by `TestResearchDispatchAndConditions`. Checked by `TestResearchIndexAndQuery` (`cmd/ariadne/research_test.go`): every method in
 `observed.txt` that is a target is `found`, and an index built twice has the same `analysis_id`.
