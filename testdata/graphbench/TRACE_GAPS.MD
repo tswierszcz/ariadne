@@ -458,6 +458,19 @@ petclinic was recorded once more with the unchanged `scripts/runtime-trace-petcl
 
 - The frames above each traced method add 825 measured relations. 95% of them (786) are edges the graph already has, which confirms the graph deeper along the request paths than the traced methods' callers alone could. The 39 new gaps fall under the existing causes, with the same mix (reflection and JDK receivers first), so the work list does not change.
 - The `n4-1` classifier change (a lambda or method-reference `InvocationHandler` as `proxy`) has no effect here. The analyzer before and after `n4-1` gives identical counts on the new trace. Spring's proxies are `InvocationHandler` classes (`JdkDynamicAopProxy`), which the `proxy` rule already covered, and this scenario's stacks have no relation through a JDK proxy into one.
-- **Truncation limits the gain.** JFR truncated 70 393 of the traced stacks (31%) at its default stack depth (64 frames), so the frames below the cut, those nearest the request entry, are missing. A recording with a larger `stackdepth` would show more of them at more overhead; the script does not set it.
+- **Truncation costs almost nothing here.** JFR truncated 70 393 of the traced stacks (31%) at its default stack depth of 64 frames. The section below measures what those cut frames would add: 5 traced relations.
 - Cost: the trace grows by 3.5% (4.03 → 4.17 MB). The conversion reads the same events.
+
+### Stack depth 64 vs 256 (2026-11-25)
+
+`scripts/runtime-trace-petclinic.sh` now takes `JFR_STACKDEPTH=N` (`-XX:FlightRecorderOptions:stackdepth=N`) and prints the recorded run's wall time. petclinic was recorded twice in a row with the converter after `n4-1`: once at the default 64 frames and once at 256.
+
+| Stack depth | Truncated traced stacks | Relations (traced / sampled) | Not in the graph | JFR file | Recorded run |
+|---|---|---|---|---|---|
+| 64 | 70 368 | 947 / 2 483 | 140 | 17.8 MB | 25 s |
+| 256 | **0** | 952 / 2 482 | 157 | 22.0 MB (+24%) | 25 s |
+
+- **Traced relations** are exact and the same in both runs for the same scenario. All 947 from depth 64 are also in the depth-256 run, which adds only **5**, all in Spring Boot startup (`org.springframework.boot.web.servlet` 3, `…autoconfigure.h2` 1, `…beans.factory.support` 1). The frames JFR cuts below 64 are almost always frames other, shorter stacks of the same run already show. For this application the default depth loses next to nothing, so the script keeps it as the default.
+- **Sampled relations vary from run to run.** Between the two recordings, about 990 of roughly 2 480 sampled relations (40%) differ, at a 10 ms sampling interval. The difference in gaps (140 vs 157: `class-init` 8 → 17, `reflection` 51 → 58, one `proxy` relation at 256) is that variance, not the stack depth. Compare gap counts between runs only on traced relations, or over several recordings.
+- The cost of the deeper stacks is in the recording's size (+24%). The wall time of this scenario (dominated by start-up and the HTTP requests) does not change.
 

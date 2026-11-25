@@ -11,7 +11,11 @@
 # Prints the report's "Runtime evidence" section. Nothing is committed: the
 # trace depends on this machine's run (timing and sampling).
 #
-# Usage: scripts/runtime-trace-petclinic.sh [OUT_DIR] [PORT]   (java 25+ with jdk.jfr and jdk.compiler on PATH)
+# JFR_STACKDEPTH=N records stacks of up to N frames (JFR's default is 64;
+# deeper stacks are truncated, losing the frames nearest the request entry).
+# The run's wall time is printed, to compare the recording overhead.
+#
+# Usage: [JFR_STACKDEPTH=N] scripts/runtime-trace-petclinic.sh [OUT_DIR] [PORT]   (java 25+ with jdk.jfr and jdk.compiler on PATH)
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 out="${1:-$(mktemp -d)}"
@@ -24,7 +28,12 @@ analyze() {
     bin/ariadne -offline -app "$w/app-classes.jar" -deps "$w/target/dependency" -deps-list "$w/deps.txt" -profile spring "$@"
 }
 analyze -runtime-filter-out "$out/vulnerable.jfc" -out "$out/static.md" -json "$out/static.json" 2>&1 | grep -E "runtime filter"
-java "-XX:StartFlightRecording=filename=$out/petclinic.jfr,settings=profile,settings=$out/vulnerable.jfc,+jdk.ClassLoad#enabled=true" \
+jfropts=()
+if [ -n "${JFR_STACKDEPTH:-}" ]; then
+    jfropts=("-XX:FlightRecorderOptions:stackdepth=$JFR_STACKDEPTH")
+fi
+start=$(date +%s)
+java "${jfropts[@]}" "-XX:StartFlightRecording=filename=$out/petclinic.jfr,settings=profile,settings=$out/vulnerable.jfc,+jdk.ClassLoad#enabled=true" \
     -cp "$w/app-classes.jar:$w/target/dependency/*" org.springframework.samples.petclinic.PetClinicApplication --server.port="$port" \
     >"$out/app.log" 2>&1 &
 pid=$!
@@ -45,6 +54,7 @@ for _ in $(seq 1 200); do
 done
 kill -TERM "$pid"
 wait "$pid" 2>/dev/null || true
+echo "recorded run: $(( $(date +%s) - start )) s (stack depth ${JFR_STACKDEPTH:-64})"
 trap - EXIT
 java scripts/JfrToTrace.java --jfr "$out/petclinic.jfr" --out "$out/petclinic.trace" --run-id petclinic \
     --scenario "PetClinicApplication: 8 pages once, then 200 x (3 static resources with If-None-Match and If-Modified-Since, /owners/1)" \
