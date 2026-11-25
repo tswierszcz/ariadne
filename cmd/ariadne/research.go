@@ -131,11 +131,19 @@ func researchIndexMain(args []string, stderr io.Writer, getenv func(string) stri
 		defer t.close()
 		cfg.research.sources = t
 	}
-	if err := analyze(context.Background(), cfg, stderr); err != nil {
+	static, err := prepare(context.Background(), cfg, stderr)
+	if err != nil {
 		fmt.Fprintln(stderr, "ariadne research index:", err)
 		return 1
 	}
-	fmt.Fprintf(stderr, "research bundle %s published (analysis %s)\n", out, cfg.research.analysisID)
+	defer static.cleanup()
+	log := func(format string, a ...any) { fmt.Fprintf(stderr, format+"\n", a...) }
+	id, err := writeResearchBundle(static.research(cfg), log)
+	if err != nil {
+		fmt.Fprintln(stderr, "ariadne research index: research bundle:", err)
+		return 1
+	}
+	fmt.Fprintf(stderr, "research bundle %s published (analysis %s)\n", out, id)
 	return 0
 }
 
@@ -219,14 +227,13 @@ func writeResponse(path string, v any) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// researchOut is set on a research index run: analyze hands the static
-// pipeline's state to writeResearchBundle instead of the CVE stage.
+// researchOut is set on a research index run: prepare's state goes to
+// writeResearchBundle instead of the CVE stage.
 type researchOut struct {
 	dir        string
 	scope      string // "all" or "reachable"
 	sources    *sourceTree
 	sourcesArg string
-	analysisID string
 }
 
 // researchState is the static pipeline's result (RESEARCH_INTERFACE RI1):
@@ -247,6 +254,14 @@ type researchState struct {
 	activeProfs  []string
 	fixedPoint   analysis.Result
 	disabled     []string
+}
+
+// research selects what the bundle needs from the static pipeline's state.
+func (s *staticRun) research(cfg config) researchState {
+	return researchState{cfg: cfg, h: s.h, g: s.g, roots: s.roots, inv: s.components,
+		apiInherited: s.apiInherited, apiAnnounced: s.apiAnnounced,
+		gapSites: s.gapSites, reachable: s.engine.MethodReachable, dispatch: s.engine.DispatchFlags, framework: s.framework, profile: s.prof.Name,
+		activeProfs: s.activeProfiles, fixedPoint: s.modelResult, disabled: analysis.Labels(s.disabledParts)}
 }
 
 func rid(prefix string, parts ...string) string {

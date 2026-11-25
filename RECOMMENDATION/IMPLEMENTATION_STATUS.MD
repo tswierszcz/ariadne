@@ -2,6 +2,13 @@
 
 Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia produktu. Aktualne możliwości opisuje [SUPPORT.MD](../docs/SUPPORT.MD), zakres prac [ROADMAP.MD](ROADMAP.MD), a sposób prowadzenia sesji [skill](skills/ariadne-implement/SKILL.md).
 
+## Interfejs badawczy RI1 — wydzielona granica `prepare` (2026-11-25)
+
+- Stan IN_PROGRESS dla RI1. `analyze` (1 860 linii) rozcięta na `prepare` (statyczny pipeline, zwraca `staticRun`) i `scanCVEs` (etap CVE i raporty). `research index` woła `prepare` bezpośrednio zamiast przerywać `analyze` w środku; pole `researchOut.analysisID` usunięte. Cleanup przygotowanego wejścia: po błędzie w `prepare`, w pozostałych przypadkach na końcu wywołującego.
+- Podział wykonany mechanicznie narzędziem na `go/types`: 78 zmiennych lokalnych przechodzących przez granicę stało się polami `staticRun`, odwołania w etapie CVE zamienione na `static.x`. Jedyna zmienna zmieniana po granicy to `warnings`; żadne domknięcie z `prepare` jej nie przechwytuje.
+- Weryfikacja: `go test ./...`, `go vet ./...`; `scripts/pipeline-compare.sh origin/main working-tree` — 7/7 konfiguracji identycznych (Petclinic all/profile/RTA, WebGoat, JPetStore, fixture biblioteki CHA/PTA); Petclinic `research index -roots profile -scope reachable -sources`: wszystkie 7 zbiorów danych identycznych bajt w bajt z `origin/main` (różnią się tylko wersja i hash binarki w tożsamości).
+- Pusty cache, bez sieci (Petclinic): węzły, krawędzie, wywołania, korzenie i luki identyczne; 2 komponenty osadzone w `ehcache-3.9.2` (m.in. `terracotta-utilities-tools`) nierozpoznane, ich klasy przypisane do hosta (269 węzłów z innym `instance_id`). Bundle nie zgłasza tego w `coverage.limits` — do zrobienia w RI1.
+
 ## Interfejs badawczy RI4 — lokalizacje źródeł (2026-11-24)
 
 - Stan IN_PROGRESS dla RI4 (pierwsza część: lokalizacje źródeł). Parser klas czyta atrybut `SourceFile` (`ClassInfo.SourceFile`); węzeł bundle'a dostaje `source.path` = ścieżka pakietu + nazwa pliku (`fx/research/Extractor.java`, klasa zagnieżdżona wskazuje plik zewnętrzny) i zakres linii z LineNumberTable, `binding: declared`.
