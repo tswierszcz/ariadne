@@ -1,0 +1,121 @@
+{
+  "analysis_id": "sha256:7c421b7d51ce7120aa19230a0b3179fc719de62a8e0e34af8fe9e3988f591843",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_records": 100,
+    "max_work_units": 1000000
+  },
+  "operation": "calls",
+  "page": {
+    "next_cursor": null,
+    "returned_count": 5,
+    "total_count": 5,
+    "truncated": false,
+    "work_complete": true
+  },
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125094246-29a3ff64e0ee"
+  },
+  "records": [
+    {
+      "access_flags": null,
+      "body": "external",
+      "canonical_node_id": "n-1077f1de9ebe749351408851",
+      "method": {
+        "class": "java.lang.reflect.Constructor",
+        "class_sha256": null,
+        "descriptor": "([Ljava/lang/Object;)Ljava/lang/Object;",
+        "instance_id": null,
+        "method_id": "m-5f23100bb026ccac9b7ebe21",
+        "name": "newInstance"
+      },
+      "node_id": "n-1077f1de9ebe749351408851",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "unavailable",
+        "line_end": null,
+        "line_start": null,
+        "path": null,
+        "source_sha256": null
+      }
+    },
+    {
+      "body_in_input": false,
+      "call_id": "s-8fcc7278378d6ce96bd32515",
+      "declared_class": "java.nio.file.Files",
+      "declared_descriptor": "(Ljava/nio/file/Path;)Z",
+      "declared_name": "deleteIfExists",
+      "record_type": "call",
+      "site": {
+        "caller_node_id": "n-e0303fd5c8ec2bdb82abd5bd",
+        "condition": null,
+        "kind": "static",
+        "pc": 1
+      },
+      "target_node_ids": [
+        "n-21a63eeda018f5831c0a031d"
+      ]
+    },
+    {
+      "body_in_input": false,
+      "call_id": "s-9b3290cbfc63f1376b0bc018",
+      "declared_class": "java.nio.file.Files",
+      "declared_descriptor": "(Ljava/nio/file/Path;)V",
+      "declared_name": "delete",
+      "record_type": "call",
+      "site": {
+        "caller_node_id": "n-330b76dd37f4267ea64405c5",
+        "condition": null,
+        "kind": "static",
+        "pc": 1
+      },
+      "target_node_ids": [
+        "n-cd3c8899cb859d96aac25269"
+      ]
+    },
+    {
+      "body_in_input": false,
+      "call_id": "s-aeae8b8355bf4a2cb6543cb8",
+      "declared_class": "java.nio.file.Files",
+      "declared_descriptor": "(Ljava/nio/file/Path;[B[Ljava/nio/file/OpenOption;)Ljava/nio/file/Path;",
+      "declared_name": "write",
+      "record_type": "call",
+      "site": {
+        "caller_node_id": "n-d6646a64788165a24f419991",
+        "condition": null,
+        "kind": "static",
+        "pc": 6
+      },
+      "target_node_ids": [
+        "n-dcb7cc5ee64af6d7f1f19082"
+      ]
+    },
+    {
+      "body_in_input": false,
+      "call_id": "s-d18daf353956a28a4ca60f1f",
+      "declared_class": "java.nio.file.Files",
+      "declared_descriptor": "(Ljava/nio/file/Path;)Z",
+      "declared_name": "deleteIfExists",
+      "record_type": "call",
+      "site": {
+        "caller_node_id": "n-4b35152185437ee36b753f81",
+        "condition": null,
+        "kind": "static",
+        "pc": 1
+      },
+      "target_node_ids": [
+        "n-21a63eeda018f5831c0a031d"
+      ]
+    }
+  ],
+  "request_id": "calls-files",
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": []
+}

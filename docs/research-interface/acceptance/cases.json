@@ -2,14 +2,14 @@
   "schema": "ariadne-research-acceptance-1",
   "contract_revision": "1.0.0-draft.1",
   "producer": {
-    "binary_sha256": "sha256:bff6c0b73d27d46d4f63d25cc04b5854f3631392476d47d22810c58ecaea1bd7",
+    "binary_sha256": "sha256:06f0ce98ae4256e529ed53c49d111e313c020bbd04190f9b255b5b13dabd2b22",
     "built_by": "go1.27.4",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
+    "revision": "v0.0.0-20261125094246-29a3ff64e0ee"
   },
   "bundles": {
-    "all": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
-    "reachable": "sha256:4f786ec4c1f0719a983dee9d125a2b43319aec6cdd70b103e0f29d3b1ed91219"
+    "all": "sha256:7c421b7d51ce7120aa19230a0b3179fc719de62a8e0e34af8fe9e3988f591843",
+    "reachable": "sha256:049ab2a4e0be617f79316c46eb15016ce2fd904f8cfb5f9946dfba812623e25e"
   },
   "rules": [
     "json",
@@ -1157,6 +1157,19 @@
       "note": "another contract revision"
     },
     {
+      "id": "callees-later.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "callees-later.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-later.all.json",
+      "response": "mutations/callees-later.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
+    },
+    {
       "id": "callees-later.all--record-modified",
       "kind": "mutation",
       "base": "callees-later.all",
@@ -2114,6 +2127,19 @@
       "note": "every indexed root"
     },
     {
+      "id": "entries.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "entries.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries.all.json",
+      "response": "mutations/entries.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
+    },
+    {
       "id": "entries.all--record-modified",
       "kind": "mutation",
       "base": "entries.all",
@@ -2161,6 +2187,19 @@
       "expected_valid": true,
       "expected_rules": [],
       "note": "every indexed root"
+    },
+    {
+      "id": "entries.reachable--foreign-record-type",
+      "kind": "mutation",
+      "base": "entries.reachable",
+      "bundle": "bundle-reachable",
+      "request": "requests/entries.reachable.json",
+      "response": "mutations/entries.reachable--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
     },
     {
       "id": "entries.reachable--record-modified",
@@ -2212,6 +2251,19 @@
       "note": "class_prefix filter"
     },
     {
+      "id": "entries-filtered.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "entries-filtered.all",
+      "bundle": "bundle-all",
+      "request": "requests/entries-filtered.all.json",
+      "response": "mutations/entries-filtered.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
+    },
+    {
       "id": "entries-filtered.all--record-modified",
       "kind": "mutation",
       "base": "entries-filtered.all",
@@ -2259,6 +2311,19 @@
       "expected_valid": true,
       "expected_rules": [],
       "note": "first page, truncated, with a cursor"
+    },
+    {
+      "id": "methods-page1.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "methods-page1.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page1.all.json",
+      "response": "mutations/methods-page1.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
     },
     {
       "id": "methods-page1.all--record-modified",
@@ -2310,6 +2375,19 @@
       "note": "second page through the cursor"
     },
     {
+      "id": "methods-page2.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "methods-page2.all",
+      "bundle": "bundle-all",
+      "request": "requests/methods-page2.all.json",
+      "response": "mutations/methods-page2.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
+    },
+    {
       "id": "methods-page2.all--record-modified",
       "kind": "mutation",
       "base": "methods-page2.all",
@@ -2359,6 +2437,19 @@
       "note": "JDK operations the library calls"
     },
     {
+      "id": "calls-files.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "calls-files.all",
+      "bundle": "bundle-all",
+      "request": "requests/calls-files.all.json",
+      "response": "mutations/calls-files.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
+    },
+    {
       "id": "calls-files.all--record-modified",
       "kind": "mutation",
       "base": "calls-files.all",
@@ -2406,6 +2497,19 @@
       "expected_valid": true,
       "expected_rules": [],
       "note": "incoming edges of Extractor#writeEntry"
+    },
+    {
+      "id": "callers-write.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "callers-write.all",
+      "bundle": "bundle-all",
+      "request": "requests/callers-write.all.json",
+      "response": "mutations/callers-write.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
     },
     {
       "id": "callers-write.all--record-modified",
@@ -2468,6 +2572,19 @@
       "expected_valid": true,
       "expected_rules": [],
       "note": "outgoing edges of Extractor#extract"
+    },
+    {
+      "id": "callees-extract.all--foreign-record-type",
+      "kind": "mutation",
+      "base": "callees-extract.all",
+      "bundle": "bundle-all",
+      "request": "requests/callees-extract.all.json",
+      "response": "mutations/callees-extract.all--foreign-record-type.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "record-type"
+      ],
+      "note": "an unchanged bundle record of another type in place of the first record"
     },
     {
       "id": "callees-extract.all--record-modified",
@@ -2569,6 +2686,32 @@
         "shape"
       ],
       "note": "the error object without its code"
+    },
+    {
+      "id": "error-unknown-node.all--empty-error-code",
+      "kind": "mutation",
+      "base": "error-unknown-node.all",
+      "bundle": "bundle-all",
+      "request": "requests/error-unknown-node.all.json",
+      "response": "mutations/error-unknown-node.all--empty-error-code.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "error-envelope"
+      ],
+      "note": "an error without a code or message"
+    },
+    {
+      "id": "error-unknown-node.all--error-other-request",
+      "kind": "mutation",
+      "base": "error-unknown-node.all",
+      "bundle": "bundle-all",
+      "request": "requests/error-unknown-node.all.json",
+      "response": "mutations/error-unknown-node.all--error-other-request.json",
+      "expected_valid": false,
+      "expected_rules": [
+        "binding"
+      ],
+      "note": "an error naming another request"
     },
     {
       "id": "error-analysis.all",

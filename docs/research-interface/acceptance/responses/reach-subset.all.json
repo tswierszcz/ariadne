@@ -2,13 +2,13 @@
   "schema_version": "ariadne-research-response-1",
   "contract_revision": "1.0.0-draft.1",
   "status": "ok",
-  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
+  "analysis_id": "sha256:7c421b7d51ce7120aa19230a0b3179fc719de62a8e0e34af8fe9e3988f591843",
   "request_id": "reach-subset",
   "operation": "reachability",
   "provenance": {
     "kind": "analysis",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
+    "revision": "v0.0.0-20261125094246-29a3ff64e0ee"
   },
   "effective_limits": {
     "max_records": 100,

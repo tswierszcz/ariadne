@@ -1,5 +1,5 @@
 {
-  "analysis_id": "sha256:8ecd64d2915c04020f20470404729badb75601add6d3bbc02a594102f41f6606",
+  "analysis_id": "sha256:7c421b7d51ce7120aa19230a0b3179fc719de62a8e0e34af8fe9e3988f591843",
   "contract_revision": "1.0.0-draft.1",
   "effective_limits": {
     "max_entries": 20,
@@ -9,7 +9,7 @@
   },
   "operation": "methods",
   "page": {
-    "next_cursor": "c1.eyJhIjoic2hhMjU2OjhlY2Q2NGQyOTE1YzA0MDIwZjIwNDcwNDA0NzI5YmFkYjc1NjAxYWRkNmQzYmJjMDJhNTk0MTAyZjQxZjY2MDYiLCJiIjoiODU4ODgzNDFhNThjYzlmMTFiYjY4ZDE3IiwiYWZ0ZXIiOiJuLTRiMzUxNTIxODU0MzdlZTM2Yjc1M2Y4MSJ9",
+    "next_cursor": "c1.eyJhIjoic2hhMjU2OjdjNDIxYjdkNTFjZTcxMjBhYTE5MjMwYTBiMzE3OWZjNzE5ZGU2MmE4ZTBlMzRhZjhmZTllMzk4OGY1OTE4NDMiLCJiIjoiODU4ODgzNDFhNThjYzlmMTFiYjY4ZDE3IiwiYWZ0ZXIiOiJuLTRiMzUxNTIxODU0MzdlZTM2Yjc1M2Y4MSJ9",
     "returned_count": 5,
     "total_count": 35,
     "truncated": true,
@@ -18,7 +18,7 @@
   "provenance": {
     "kind": "analysis",
     "producer": "ariadne",
-    "revision": "v0.0.0-20261125092001-e1dcfb7d62e2"
+    "revision": "v0.0.0-20261125094246-29a3ff64e0ee"
   },
   "records": [
     {
