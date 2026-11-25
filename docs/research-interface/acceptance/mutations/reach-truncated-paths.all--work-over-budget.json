@@ -1,0 +1,274 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 2,
+    "max_records": 100,
+    "max_work_units": 1000000
+  },
+  "evidence": [
+    {
+      "class": "fx.research.Handler",
+      "class_id": "k-42f4834bfbd59830c145a2e9",
+      "class_sha256": "sha256:02c0424bc9fcfa849f06f4b0c0e32a1590596f44d74d204169c9390cadf590a3",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-42f4834bfbd59830c145a2e9",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.internal.Cleaner",
+      "class_id": "k-8fc46e216e0801b729d9529b",
+      "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-8fc46e216e0801b729d9529b",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.DeletingHandler",
+      "class_id": "k-e5404e977fcbff35afde3191",
+      "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-e5404e977fcbff35afde3191",
+      "variant_java": 0
+    },
+    {
+      "artifact_sha256": "sha256:a1cbff5b999371b7317536eab17c2eefeff25bbfafae2f1f5fc18d3aee744718",
+      "gav": null,
+      "identity": "unidentified",
+      "instance_id": "c-647467be3ca085f1",
+      "location": "app:lib.jar",
+      "record_type": "component",
+      "role": "library"
+    },
+    {
+      "basis": "cha",
+      "character": "heuristic",
+      "client_dispatch": false,
+      "edge_id": "e-24dec21661f588651175a4b0",
+      "from": "n-b400ef10cea653d0f7210c7b",
+      "kind": "virtual",
+      "record_type": "edge",
+      "rule": "cha@6",
+      "sites": [
+        {
+          "caller_node_id": "n-b400ef10cea653d0f7210c7b",
+          "condition": null,
+          "kind": "virtual",
+          "pc": 2
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-2de67a82796ef0432c11cde0"
+    },
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-4ec64592d2f98da08dee68eb",
+      "from": "n-2de67a82796ef0432c11cde0",
+      "kind": "static",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-2de67a82796ef0432c11cde0",
+          "condition": null,
+          "kind": "static",
+          "pc": 1
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-472726367ae1c6bc94b07502"
+    },
+    {
+      "candidate_instance_ids": null,
+      "candidate_method_ids": null,
+      "gap_id": "g-524eaea924f847821476bf8d",
+      "mechanism": "reflection",
+      "reachable_from_indexed_roots": true,
+      "reason": "Unresolved reflection site in fx.research.Extractor#plugin: no bounded set of targets.",
+      "record_type": "gap",
+      "rule": "gaps.reflection@b0",
+      "site": {
+        "caller_node_id": "n-992e77530d704c699491704a",
+        "condition": null,
+        "kind": "implicit",
+        "pc": 0
+      }
+    },
+    {
+      "access_flags": 4,
+      "body": "bytecode",
+      "canonical_node_id": "n-2de67a82796ef0432c11cde0",
+      "method": {
+        "class": "fx.research.DeletingHandler",
+        "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-bc4ee339ac6e04db7c11626f",
+        "name": "handle"
+      },
+      "node_id": "n-2de67a82796ef0432c11cde0",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 11,
+        "line_start": 10,
+        "path": "fx/research/DeletingHandler.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-472726367ae1c6bc94b07502",
+      "method": {
+        "class": "fx.research.internal.Cleaner",
+        "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-5ce223ad006c1037a2e43955",
+        "name": "wipe"
+      },
+      "node_id": "n-472726367ae1c6bc94b07502",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 12,
+        "line_start": 11,
+        "path": "fx/research/internal/Cleaner.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 17,
+      "body": "bytecode",
+      "canonical_node_id": "n-b400ef10cea653d0f7210c7b",
+      "method": {
+        "class": "fx.research.Handler",
+        "class_sha256": "sha256:02c0424bc9fcfa849f06f4b0c0e32a1590596f44d74d204169c9390cadf590a3",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-1e960e013186f934aef5e00c",
+        "name": "process"
+      },
+      "node_id": "n-b400ef10cea653d0f7210c7b",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 9,
+        "line_start": 8,
+        "path": "fx/research/Handler.java",
+        "source_sha256": null
+      }
+    }
+  ],
+  "operation": "reachability",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "request_id": "reach-truncated-paths",
+  "results": [
+    {
+      "entries": [
+        {
+          "character": [
+            "jvm_rule"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-4ec64592d2f98da08dee68eb"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-2de67a82796ef0432c11cde0",
+              "n-472726367ae1c6bc94b07502"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-2de67a82796ef0432c11cde0",
+          "supplied_dispatch": false
+        },
+        {
+          "character": [],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [],
+            "full_node_count": 1,
+            "node_ids": [
+              "n-472726367ae1c6bc94b07502"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-472726367ae1c6bc94b07502",
+          "supplied_dispatch": false
+        },
+        {
+          "character": [
+            "jvm_rule",
+            "heuristic"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-24dec21661f588651175a4b0"
+            ],
+            "full_node_count": 3,
+            "node_ids": [
+              "n-b400ef10cea653d0f7210c7b",
+              "n-2de67a82796ef0432c11cde0"
+            ],
+            "truncated": true
+          },
+          "root_node_id": "n-b400ef10cea653d0f7210c7b",
+          "supplied_dispatch": false
+        }
+      ],
+      "entries_truncated": false,
+      "matched_node_ids": [
+        "n-472726367ae1c6bc94b07502"
+      ],
+      "model": {
+        "global_gap_count": 2,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 1000001
+      },
+      "target_id": "e-wipe",
+      "total_entry_count": 3
+    }
+  ],
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": []
+}

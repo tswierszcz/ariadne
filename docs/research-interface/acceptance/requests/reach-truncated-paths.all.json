@@ -1,0 +1,23 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "limits": {
+    "max_path_nodes": 2
+  },
+  "operation": "reachability",
+  "request_id": "reach-truncated-paths",
+  "roots": {
+    "selection": "indexed"
+  },
+  "schema_version": "ariadne-research-query-1",
+  "targets": [
+    {
+      "id": "e-wipe",
+      "selector": {
+        "class": "fx.research.internal.Cleaner",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "name": "wipe"
+      }
+    }
+  ]
+}

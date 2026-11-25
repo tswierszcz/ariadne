@@ -1,0 +1,117 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_records": 100,
+    "max_work_units": 1000000
+  },
+  "operation": "entries",
+  "page": {
+    "next_cursor": "c1.bogus",
+    "returned_count": 11,
+    "total_count": 11,
+    "truncated": false,
+    "work_complete": true
+  },
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "records": [
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-976c657328570d7dee34726a",
+      "record_type": "root",
+      "root_id": "r-4631fac18f77d2bbbcbf4831"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-2de67a82796ef0432c11cde0",
+      "record_type": "root",
+      "root_id": "r-4b077e27ccbcdb49652428e2"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-f616df7814179a58875e4377",
+      "record_type": "root",
+      "root_id": "r-50d7612a6afb6acb3dc102cc"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-ade33e5f64b60986bdef8e5a",
+      "record_type": "root",
+      "root_id": "r-6a4ae2e0fe02df2f86290c8d"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-61e8b2e7b8bec77bbfd45646",
+      "record_type": "root",
+      "root_id": "r-867fefdec940ce7dfab8f572"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-992e77530d704c699491704a",
+      "record_type": "root",
+      "root_id": "r-8b32ee5cdb68332d482648fa"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-472726367ae1c6bc94b07502",
+      "record_type": "root",
+      "root_id": "r-a035ebaa0e603fe6699dad88"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-b400ef10cea653d0f7210c7b",
+      "record_type": "root",
+      "root_id": "r-a3e13a7d5179058343d719c4"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-e2192997b6b7970c1f730518",
+      "record_type": "root",
+      "root_id": "r-c9b640a092ce377e37e838a7"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-a4b597811a6d998704a11a9c",
+      "record_type": "root",
+      "root_id": "r-de14ddb459d29922039f2882"
+    },
+    {
+      "announced_by": [],
+      "basis": "public_api",
+      "inherited_by": [],
+      "node_id": "n-2489eca9d21aa72f67a1559a",
+      "record_type": "root",
+      "root_id": "r-e7d5392e1102b2f8636c5573"
+    }
+  ],
+  "request_id": "entries",
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": []
+}

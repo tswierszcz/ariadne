@@ -1,0 +1,289 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 1,
+    "max_path_nodes": 100,
+    "max_records": 100,
+    "max_work_units": 1000000
+  },
+  "evidence": [
+    {
+      "class": "fx.research.internal.Cleaner",
+      "class_id": "k-8fc46e216e0801b729d9529b",
+      "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-8fc46e216e0801b729d9529b",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.Extractor",
+      "class_id": "k-b8277f55be8d1e4650f862e7",
+      "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-b8277f55be8d1e4650f862e7",
+      "variant_java": 0
+    },
+    {
+      "class": "fx.research.DeletingHandler",
+      "class_id": "k-e5404e977fcbff35afde3191",
+      "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-e5404e977fcbff35afde3191",
+      "variant_java": 0
+    },
+    {
+      "artifact_sha256": "sha256:a1cbff5b999371b7317536eab17c2eefeff25bbfafae2f1f5fc18d3aee744718",
+      "gav": null,
+      "identity": "unidentified",
+      "instance_id": "c-647467be3ca085f1",
+      "location": "app:lib.jar",
+      "record_type": "component",
+      "role": "library"
+    },
+    {
+      "basis": "direct",
+      "character": "jvm_rule",
+      "client_dispatch": false,
+      "edge_id": "e-4ec64592d2f98da08dee68eb",
+      "from": "n-2de67a82796ef0432c11cde0",
+      "kind": "static",
+      "record_type": "edge",
+      "rule": "direct@6",
+      "sites": [
+        {
+          "caller_node_id": "n-2de67a82796ef0432c11cde0",
+          "condition": null,
+          "kind": "static",
+          "pc": 1
+        }
+      ],
+      "supplied_dispatch": false,
+      "to": "n-472726367ae1c6bc94b07502"
+    },
+    {
+      "candidate_instance_ids": null,
+      "candidate_method_ids": null,
+      "gap_id": "g-524eaea924f847821476bf8d",
+      "mechanism": "reflection",
+      "reachable_from_indexed_roots": true,
+      "reason": "Unresolved reflection site in fx.research.Extractor#plugin: no bounded set of targets.",
+      "record_type": "gap",
+      "rule": "gaps.reflection@b0",
+      "site": {
+        "caller_node_id": "n-992e77530d704c699491704a",
+        "condition": null,
+        "kind": "implicit",
+        "pc": 0
+      }
+    },
+    {
+      "access_flags": 1,
+      "body": "bytecode",
+      "canonical_node_id": "n-2489eca9d21aa72f67a1559a",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/io/InputStream;Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-b46ef75cb683daf927dfd487",
+        "name": "extract"
+      },
+      "node_id": "n-2489eca9d21aa72f67a1559a",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 16,
+        "line_start": 13,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 4,
+      "body": "bytecode",
+      "canonical_node_id": "n-2de67a82796ef0432c11cde0",
+      "method": {
+        "class": "fx.research.DeletingHandler",
+        "class_sha256": "sha256:05eaf85b8a4b24d84a65273b57dcac647754e357b5fdf1c0813f15fbabf6f6de",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-bc4ee339ac6e04db7c11626f",
+        "name": "handle"
+      },
+      "node_id": "n-2de67a82796ef0432c11cde0",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 11,
+        "line_start": 10,
+        "path": "fx/research/DeletingHandler.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 9,
+      "body": "bytecode",
+      "canonical_node_id": "n-472726367ae1c6bc94b07502",
+      "method": {
+        "class": "fx.research.internal.Cleaner",
+        "class_sha256": "sha256:63ccfa74399b681dc2585b053b1e6815182edca72800a983ab2a288b745aefab",
+        "descriptor": "(Ljava/nio/file/Path;)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-5ce223ad006c1037a2e43955",
+        "name": "wipe"
+      },
+      "node_id": "n-472726367ae1c6bc94b07502",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 12,
+        "line_start": 11,
+        "path": "fx/research/internal/Cleaner.java",
+        "source_sha256": null
+      }
+    },
+    {
+      "access_flags": 2,
+      "body": "bytecode",
+      "canonical_node_id": "n-d6646a64788165a24f419991",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/nio/file/Path;[B)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-10abdb8a73df52cf7851492e",
+        "name": "writeEntry"
+      },
+      "node_id": "n-d6646a64788165a24f419991",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 21,
+        "line_start": 20,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    }
+  ],
+  "operation": "reachability",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "request_id": "reach-truncated-entries",
+  "results": [
+    {
+      "entries": [
+        {
+          "character": [
+            "jvm_rule"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-2804e9a664bc8f6868c69db0"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-2489eca9d21aa72f67a1559a",
+              "n-d6646a64788165a24f419991"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-2489eca9d21aa72f67a1559a",
+          "supplied_dispatch": false
+        }
+      ],
+      "entries_truncated": true,
+      "matched_node_ids": [
+        "n-d6646a64788165a24f419991"
+      ],
+      "model": {
+        "global_gap_count": 2,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 64
+      },
+      "target_id": "a-write",
+      "total_entry_count": 2
+    },
+    {
+      "entries": [
+        {
+          "character": [
+            "jvm_rule"
+          ],
+          "client_dispatch": false,
+          "pass": "app_only",
+          "path": {
+            "edge_ids": [
+              "e-4ec64592d2f98da08dee68eb"
+            ],
+            "full_node_count": 2,
+            "node_ids": [
+              "n-2de67a82796ef0432c11cde0",
+              "n-472726367ae1c6bc94b07502"
+            ],
+            "truncated": false
+          },
+          "root_node_id": "n-2de67a82796ef0432c11cde0",
+          "supplied_dispatch": false
+        }
+      ],
+      "entries_truncated": true,
+      "matched_node_ids": [
+        "n-472726367ae1c6bc94b07502"
+      ],
+      "model": {
+        "global_gap_count": 2,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": null,
+        "state": "found",
+        "work_complete": true,
+        "work_units": 18
+      },
+      "target_id": "e-wipe",
+      "total_entry_count": 3
+    }
+  ],
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": []
+}

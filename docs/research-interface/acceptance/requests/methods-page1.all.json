@@ -1,0 +1,12 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "filters": {
+    "class_prefix": "fx."
+  },
+  "limits": {
+    "max_records": 5
+  },
+  "operation": "methods",
+  "request_id": "methods-page1",
+  "schema_version": "ariadne-research-query-1"
+}

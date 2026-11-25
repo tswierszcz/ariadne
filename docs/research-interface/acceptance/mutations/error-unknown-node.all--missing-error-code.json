@@ -1,0 +1,18 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "contract_revision": "1.0.0-draft.1",
+  "error": {
+    "details": [
+      {
+        "location": "/node_id",
+        "reason": "unknown node"
+      }
+    ],
+    "message": "invalid request: unknown node",
+    "retryable": false
+  },
+  "operation": "callers",
+  "request_id": "error-unknown-node",
+  "schema_version": "ariadne-research-response-1",
+  "status": "error"
+}

@@ -1,0 +1,13 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "cursor": "c1.eyJhIjoic2hhMjU2OjVkNzRhOGVlMzUyZGE1ZWU5ZTFiODU5MzZlYjIxNmRiYjU4YWQ2OTIwYWJmZTI2MjQwZDRkZDkxMWY3NWM3NWYiLCJiIjoiODU4ODgzNDFhNThjYzlmMTFiYjY4ZDE3IiwiYWZ0ZXIiOiJuLTQ3MjcyNjM2N2FlMWM2YmM5NGIwNzUwMiJ9",
+  "filters": {
+    "class_prefix": "fx."
+  },
+  "limits": {
+    "max_records": 5
+  },
+  "operation": "methods",
+  "request_id": "methods-page2",
+  "schema_version": "ariadne-research-query-1"
+}

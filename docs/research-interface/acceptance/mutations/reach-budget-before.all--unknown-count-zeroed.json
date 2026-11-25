@@ -1,0 +1,126 @@
+{
+  "analysis_id": "sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+  "contract_revision": "1.0.0-draft.1",
+  "effective_limits": {
+    "max_entries": 20,
+    "max_path_nodes": 100,
+    "max_records": 100,
+    "max_work_units": 1
+  },
+  "evidence": [
+    {
+      "class": "fx.research.Extractor",
+      "class_id": "k-b8277f55be8d1e4650f862e7",
+      "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+      "instance_id": "c-647467be3ca085f1",
+      "record_type": "class",
+      "selected": true,
+      "selected_class_id": "k-b8277f55be8d1e4650f862e7",
+      "variant_java": 0
+    },
+    {
+      "artifact_sha256": "sha256:a1cbff5b999371b7317536eab17c2eefeff25bbfafae2f1f5fc18d3aee744718",
+      "gav": null,
+      "identity": "unidentified",
+      "instance_id": "c-647467be3ca085f1",
+      "location": "app:lib.jar",
+      "record_type": "component",
+      "role": "library"
+    },
+    {
+      "candidate_instance_ids": null,
+      "candidate_method_ids": null,
+      "gap_id": "g-524eaea924f847821476bf8d",
+      "mechanism": "reflection",
+      "reachable_from_indexed_roots": true,
+      "reason": "Unresolved reflection site in fx.research.Extractor#plugin: no bounded set of targets.",
+      "record_type": "gap",
+      "rule": "gaps.reflection@b0",
+      "site": {
+        "caller_node_id": "n-992e77530d704c699491704a",
+        "condition": null,
+        "kind": "implicit",
+        "pc": 0
+      }
+    },
+    {
+      "candidate_instance_ids": [],
+      "candidate_method_ids": null,
+      "gap_id": "g-7913a48a7c07faa3f86de005",
+      "mechanism": "client",
+      "reachable_from_indexed_roots": true,
+      "reason": "Call in fx.research.Handler#process may run code the library's caller supplies (client code, LIBRARY_MODE LB2); that code is not analyzed and bounds no library target.",
+      "record_type": "gap",
+      "rule": "gaps.client@b0",
+      "site": {
+        "caller_node_id": "n-b400ef10cea653d0f7210c7b",
+        "condition": null,
+        "kind": "implicit",
+        "pc": 0
+      }
+    },
+    {
+      "access_flags": 2,
+      "body": "bytecode",
+      "canonical_node_id": "n-d6646a64788165a24f419991",
+      "method": {
+        "class": "fx.research.Extractor",
+        "class_sha256": "sha256:5512f24881d9a46eca009c3f9be9cabf1791a666beb3152e401ddb69cc43495c",
+        "descriptor": "(Ljava/nio/file/Path;[B)V",
+        "instance_id": "c-647467be3ca085f1",
+        "method_id": "m-10abdb8a73df52cf7851492e",
+        "name": "writeEntry"
+      },
+      "node_id": "n-d6646a64788165a24f419991",
+      "node_kind": "method",
+      "receiver_type": null,
+      "record_type": "node",
+      "source": {
+        "binding": "declared",
+        "line_end": 21,
+        "line_start": 20,
+        "path": "fx/research/Extractor.java",
+        "source_sha256": null
+      }
+    }
+  ],
+  "operation": "reachability",
+  "provenance": {
+    "kind": "analysis",
+    "producer": "ariadne",
+    "revision": "v0.0.0-20261125090655-e352e2fccb66"
+  },
+  "request_id": "reach-budget-before",
+  "results": [
+    {
+      "entries": [],
+      "entries_truncated": true,
+      "matched_node_ids": [
+        "n-d6646a64788165a24f419991"
+      ],
+      "model": {
+        "global_gap_count": 2,
+        "relevance_rule_version": "research-relevance-1",
+        "relevant_gap_ids": [
+          "g-524eaea924f847821476bf8d",
+          "g-7913a48a7c07faa3f86de005"
+        ],
+        "scope_uncertain": true,
+        "state": "incomplete"
+      },
+      "resolution": "matched",
+      "root_basis": "indexed_graph",
+      "search": {
+        "reason": "max_work_units exhausted before a path was discovered.",
+        "state": "incomplete",
+        "work_complete": false,
+        "work_units": 1
+      },
+      "target_id": "a-write",
+      "total_entry_count": 0
+    }
+  ],
+  "schema_version": "ariadne-research-response-1",
+  "status": "ok",
+  "warnings": []
+}

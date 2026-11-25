@@ -1,0 +1,19 @@
+{
+  "schema_version": "ariadne-research-response-1",
+  "contract_revision": "1.0.0-draft.1",
+  "status": "error",
+  "analysis_id": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "request_id": "error-analysis",
+  "operation": "entries",
+  "error": {
+    "code": "ANALYSIS_MISMATCH",
+    "message": "the request is for sha256:0000000000000000000000000000000000000000000000000000000000000000, the bundle is sha256:5d74a8ee352da5ee9e1b85936eb216dbb58ad6920abfe26240d4dd911f75c75f",
+    "details": [
+      {
+        "location": "/analysis_id",
+        "reason": "analysis differs from the bundle"
+      }
+    ],
+    "retryable": false
+  }
+}
