@@ -8,6 +8,7 @@ Ten plik jest rejestrem pracy nad nowymi planami, a nie deklaracją wsparcia pro
 - `cmd/ariadne/runtime.go` (klasyfikator luk `g2`): przyczyna `proxy` także dla handlera-lambdy lub referencji metody utworzonej dla `InvocationHandler#invoke` (przez istniejące dopasowanie implementacji SAM), dotąd `indirect`.
 - Pomiar sondy [testdata/runtime-n4](../testdata/runtime-n4/RESULTS.MD) (to samo nagranie JDK 25.0.5): `main` linia 30 i 31 → handler — dwie relacje `proxy`; refleksja bez zmian; `Task#run` → `work` w grafie, rejestracja async bez relacji. Ślady skonwertowane wcześniej (`testdata/runtime/run.trace`, pomiar petclinic) nie są przeliczane — mają tylko wywołującego metody śledzonej.
 - Weryfikacja: `TestRuntimeN4Probe` (zapisany `n4.jar` i `run.trace`), `TestGapClassifier`; `go test ./...`, `go vet ./...`.
+- Pomiar na petclinic ([TRACE_GAPS.MD](../testdata/graphbench/TRACE_GAPS.MD#whole-traced-stacks-n4-1-2026-11-25), to samo nagranie JDK 25.0.5 skonwertowane starym i nowym konwerterem): relacje 2 620 → 3 445, w grafie 2 515 → 3 301, poza grafem 105 → 144 (4,0% → 4,2%), te same przyczyny (`reflection` 35 → 52, `skipped-receiver` 48 → 63); relacji `proxy` 0 przed i po, zmiana klasyfikatora bez wpływu; 31% stosów `jdk.MethodTrace` uciętych na domyślnej głębokości JFR (64 ramki); ślad +3,5%.
 
 ## RUNTIME_NATIVE N3–N4 — ocena (2026-11-25)
 
